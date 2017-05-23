@@ -107,8 +107,7 @@ public final class Routable extends Nukleus.Composite
     {
         try
         {
-            final Target target = supplyTarget(targetName);
-            final Route newRoute = new Route(sourceName, sourceRef, target, targetRef);
+            final Route newRoute = new Route(sourceName, sourceRef, targetName, targetRef);
 
             routesByRef.computeIfAbsent(sourceRef, this::newRoutes)
                        .add(newRoute);

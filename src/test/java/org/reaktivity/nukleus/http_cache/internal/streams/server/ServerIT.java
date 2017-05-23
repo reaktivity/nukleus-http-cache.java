@@ -31,11 +31,11 @@ import org.reaktivity.reaktor.test.NukleusRule;
  * RFC-6455, section 4.1 "Client-Side Requirements" RFC-6455, section 4.2
  * "Server-Side Requirements"
  */
-public class SubscribeStreamIT
+public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/subscribe")
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server")
         .scriptProperty("routeTarget \"source\"")
         .scriptProperty("newTargetInputRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
 
@@ -45,11 +45,7 @@ public class SubscribeStreamIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
-        .streams("http-cache", "source")
-//        .streams("target", "http-cache#source")
-//        .streams("http-cache", "target")
-        .streams("source", "http-cache#source");
+        .counterValuesBufferCapacity(1024);
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
@@ -57,12 +53,9 @@ public class SubscribeStreamIT
     @Test
     @Specification({
         "${route}/input/new/controller",
-        "${streams}/connection.established/server/source"})
+        "${streams}/connection.established/client"})
     public void shouldEstablishConnection() throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("ROUTED_INPUT");
-        k3po.notifyBarrier("ROUTED_OUTPUT");
         k3po.finish();
     }
 

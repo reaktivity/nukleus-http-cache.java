@@ -22,18 +22,18 @@ public class Route
 {
     private final String source;
     private final long sourceRef;
-    private final Target target;
+    private final String targetName;
     private final long targetRef;
 
     public Route(
         String source,
         long sourceRef,
-        Target target,
+        String targetName,
         long targetRef)
     {
         this.source = source;
         this.sourceRef = sourceRef;
-        this.target = target;
+        this.targetName = targetName;
         this.targetRef = targetRef;
     }
 
@@ -47,9 +47,9 @@ public class Route
         return sourceRef;
     }
 
-    public Target target()
+    public String targetName()
     {
-        return target;
+        return targetName;
     }
 
     public long targetRef()
@@ -62,7 +62,7 @@ public class Route
     {
         int result = source.hashCode();
         result = 31 * result + Long.hashCode(sourceRef);
-        result = 31 * result + target.hashCode();
+        result = 31 * result + targetName.hashCode();
         result = 31 * result + Long.hashCode(targetRef);
 
         return result;
@@ -81,14 +81,14 @@ public class Route
         return this.sourceRef == that.sourceRef &&
                 this.targetRef == that.targetRef &&
                 Objects.equals(this.source, that.source) &&
-                Objects.equals(this.target, that.target);
+                Objects.equals(this.targetName, that.targetName);
     }
 
     @Override
     public String toString()
     {
         return String.format("[source=\"%s\", sourceRef=%d, target=\"%s\", targetRef=%d]",
-                source, sourceRef, target.name(), targetRef);
+                source, sourceRef, targetName, targetRef);
     }
 
     public static Predicate<Route> sourceMatches(
@@ -108,7 +108,7 @@ public class Route
         String target)
     {
         Objects.requireNonNull(target);
-        return r -> target.equals(r.target.name());
+        return r -> target.equals(r.targetName);
     }
 
     public static Predicate<Route> targetRefMatches(

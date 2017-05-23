@@ -19,6 +19,7 @@ package org.reaktivity.nukleus.http_cache.internal.routable.stream;
 import java.util.List;
 //import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
@@ -56,18 +57,21 @@ public final class SourceInputStreamFactory
     private final Source source;
     private final LongFunction<List<Route>> supplyRoutes;
     private final LongSupplier supplyTargetId;
+    private final Function<String, Target> supplyTargetRoute;
     private final LongObjectBiConsumer<Correlation> correlateNew;
 
     public SourceInputStreamFactory(
         Source source,
         LongFunction<List<Route>> supplyRoutes,
         LongSupplier supplyTargetId,
-        LongObjectBiConsumer<Correlation> correlateNew)
+        LongObjectBiConsumer<Correlation> correlateNew,
+        Function<String, Target> supplyTargetRoute)
     {
         this.source = source;
         this.supplyRoutes = supplyRoutes;
         this.supplyTargetId = supplyTargetId;
         this.correlateNew = correlateNew;
+        this.supplyTargetRoute = supplyTargetRoute;
     }
 
     public MessageHandler newStream()
@@ -125,6 +129,8 @@ public final class SourceInputStreamFactory
                 processEnd(buffer, index, length);
                 break;
             case DataFW.TYPE_ID:
+                // NOOP (I shouldn't be getting this...?, or I should only be getting headers)
+                break;
             default:
                 processUnexpected(buffer, index, length);
                 break;
@@ -191,7 +197,7 @@ public final class SourceInputStreamFactory
             if (optional.isPresent())
             {
                 final Route route = optional.get();
-                final Target replyTo = route.target();
+                final Target replyTo = supplyTargetRoute.apply(route.targetName());
                 final long targetRef = route.targetRef();
                 final long newTargetId = supplyTargetId.getAsLong();
 
@@ -201,8 +207,6 @@ public final class SourceInputStreamFactory
                             hs.item(h -> h.name(":status").value(status));
                             hs.item(h -> h.name("content-type").value("text/event-stream"));
                         });
-
-//                replyTo.doHttpEnd(newTargetId);
 
                 this.streamState = this::afterReplyOrReset;
             }
@@ -224,68 +228,10 @@ public final class SourceInputStreamFactory
             final long correlationId = beginRO.correlationId();
 
             sendHttpResponseBegin(buffer, index, length, sourceRef, correlationId, "200");
-            {
-                final Optional<Route> optional = resolveTarget(sourceRef);
 
-                if (optional.isPresent())
-                {
-                    final Route route = optional.get();
-                    final Target replyTo = route.target();
-                    final long newTargetId = supplyTargetId.getAsLong();
-
-                    replyTo.doHttpEnd(newTargetId);
-//                    replyTo.doHttpBegin(newTargetId, targetRef, correlationId, mutator);
-//
-                    this.streamState = this::afterBeginOrData;
-//                    final long newTargetId = supplyTargetId.getAsLong();
-//                    final long targetCorrelationId = newTargetId;
-//
-//                    final Route route = optional.get();
-//                    final Target newTarget = route.target();
-//                    final long targetRef = route.targetRef();
-//                    final long streamId = beginRO.streamId();
-//                    final OctetsFW extension = beginRO.extension();
-//                    extension.get(httpBeginExRO::wrap);
-//                    final ListFW<HttpHeaderFW> headers = httpBeginExRO.headers();
-//
-//                    int slotIndex = slab.acquire(streamId);
-//                    if(slotIndex == NO_SLOT)
-//                    {
-//                        System.out.println("TODO");
-//                        throw new RuntimeException("TODO");
-//                    }
-//                    final MutableDirectBuffer store = slab.buffer(slotIndex);
-//                    storeHeadersForTargetEstablish(headers, store);
-//
-//                    if(headers.anyMatch(IS_POLL_HEADER) && headers.anyMatch(IS_INJECTED_HEADER))
-//                    {
-//                        forAllMatch(headers, IS_POLL_HEADER, h ->
-//                        {
-//                            this.pollInterval = Integer.parseInt(h.value().asString());
-//                        });
-//                        schedulePoll(newTargetId, targetCorrelationId, newTarget, targetRef, streamId);
-//                    }
-//                    else
-//                    {
-//                        newTarget.doHttpBegin(newTargetId, targetRef, targetCorrelationId, e -> e.set(beginRO.extension()));
-//                        newTarget.addThrottle(newTargetId, this::handleThrottle);
-//                    }
-//
-//                    final Correlation correlation = new Correlation(correlationId, source.routableName(),
-//                            OUTPUT_ESTABLISHED, slotIndex, this.storedRequestSize, slab);
-//                    correlateNew.accept(targetCorrelationId, correlation);
-//
                     this.sourceId = newSourceId;
-                    this.targetId = newTargetId;
-                    this.correlationId = correlationId;
-//                    this.target = newTarget;
-                }
-                else
-                {
-                    processUnexpected(buffer, index, length);
-                }
-            }
-
+//            this.sourceRef = sourceRef;
+//            this.correlationId = correlationId;
             this.streamState = this::afterBeginOrData;
         }
 
