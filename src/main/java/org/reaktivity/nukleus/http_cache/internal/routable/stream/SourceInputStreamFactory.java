@@ -15,9 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.routable.stream;
 
-//import java.util.LinkedHashMap;
 import java.util.List;
-//import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.LongFunction;
@@ -129,7 +127,8 @@ public final class SourceInputStreamFactory
                 processEnd(buffer, index, length);
                 break;
             case DataFW.TYPE_ID:
-                // NOOP (I shouldn't be getting this...?, or I should only be getting headers)
+                long streamId = dataRO.wrap(buffer, index, length).streamId();
+                source.doReset(streamId);
                 break;
             default:
                 processUnexpected(buffer, index, length);
@@ -229,9 +228,7 @@ public final class SourceInputStreamFactory
 
             sendHttpResponseBegin(buffer, index, length, sourceRef, correlationId, "200");
 
-                    this.sourceId = newSourceId;
-//            this.sourceRef = sourceRef;
-//            this.correlationId = correlationId;
+            this.sourceId = newSourceId;
             this.streamState = this::afterBeginOrData;
         }
 
