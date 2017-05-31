@@ -40,7 +40,6 @@ import org.reaktivity.nukleus.http_cache.internal.conductor.Conductor;
 import org.reaktivity.nukleus.http_cache.internal.layouts.StreamsLayout;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
-import org.reaktivity.nukleus.http_cache.internal.util.DelayedTaskScheduler;
 import org.reaktivity.nukleus.http_cache.internal.util.function.LongObjectBiConsumer;
 
 @Reaktive
@@ -60,9 +59,6 @@ public final class Routable extends Nukleus.Composite
     private final LongFunction<Correlation> lookupEstablished;
     private final LongSupplier supplyTargetId;
     private final Slab slab;
-
-    private final DelayedTaskScheduler delayExecutionTimer = new DelayedTaskScheduler();
-
 
     public Routable(
         Context context,
@@ -170,7 +166,7 @@ public final class Routable extends Nukleus.Composite
         return include(new Source(sourceName, partitionName, layout, writeBuffer,
                                   this::supplyRoutes, supplyTargetId, this::supplyTarget,
                                   correlateNew, lookupEstablished, correlateEstablished,
-                                  this.slab, this.delayExecutionTimer::schedule));
+                                  this.slab));
     }
 
     private Target supplyTarget(
@@ -195,7 +191,6 @@ public final class Routable extends Nukleus.Composite
     @Override
     public int process()
     {
-        delayExecutionTimer.process();
         return super.process();
     }
 }

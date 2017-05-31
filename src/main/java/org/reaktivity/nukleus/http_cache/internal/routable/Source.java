@@ -69,8 +69,7 @@ public final class Source implements Nukleus
         LongObjectBiConsumer<Correlation> correlateNew,
         LongFunction<Correlation> correlateEstablished,
         LongFunction<Correlation> lookupEstablished,
-        Slab slab,
-        LongObjectBiConsumer<Runnable> schedule)
+        Slab slab)
     {
         this.sourceName = sourceName;
         this.partitionName = partitionName;
@@ -84,12 +83,6 @@ public final class Source implements Nukleus
         this.streamFactories = new EnumMap<>(RouteKind.class);
         this.streamFactories.put(RouteKind.INPUT,
                 new SourceInputStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
-//        this.streamFactories.put(RouteKind.OUTPUT_ESTABLISHED,
-//                new TargetOutputEstablishedStreamFactory(this, supplyTarget, supplyTargetId, correlateEstablished)::newStream);
-//        this.streamFactories.put(RouteKind.OUTPUT,
-//                new SourceOutputStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew)::newStream);
-//        this.streamFactories.put(RouteKind.INPUT_ESTABLISHED,
-//                new TargetInputEstablishedStreamFactory(this, supplyRoutes, supplyTargetId, correlateEstablished)::newStream);
 
         this.lookupEstablished = lookupEstablished;
     }
@@ -133,7 +126,6 @@ public final class Source implements Nukleus
 
         final long streamId = frameRO.streamId();
 
-        // TODO: use Long2ObjectHashMap.getOrDefault(long, T)
         final MessageHandler handler = streams.get(streamId);
 
         if (handler != null)

@@ -47,14 +47,14 @@ public class Router extends Nukleus.Composite
     private Slab slab;
 
     public Router(
-            Context context)
-        {
-            this.context = context;
-            this.routables = new HashMap<>();
-            this.correlations = new Long2ObjectHashMap<>();
-            this.routesSourced = context.counters().routesSourced();
-            this.slab = new Slab(context.memoryForRepeatRequests, context.maximumRequestSize);
-        }
+        Context context)
+    {
+        this.context = context;
+        this.routables = new HashMap<>();
+        this.correlations = new Long2ObjectHashMap<>();
+        this.routesSourced = context.counters().routesSourced();
+        this.slab = new Slab(context.memoryForRepeatRequests, context.maximumRequestSize);
+    }
 
     public void setConductor(Conductor conductor)
     {
