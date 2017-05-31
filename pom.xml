@@ -41,8 +41,8 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <checkstyle.config.location>src/conf/checkstyle/configuration.xml</checkstyle.config.location>
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
-     <junit.version>4.12</junit.version>
-    <k3po.version>3.0.0-alpha-73</k3po.version>
+    <junit.version>4.12</junit.version>
+    <k3po.version>3.0.0-alpha-74</k3po.version>
     <k3po.nukleus.ext.version>0.4</k3po.nukleus.ext.version>
     <jmh.version>1.12</jmh.version>
     <nukleus.plugin.version>0.7.8</nukleus.plugin.version>
@@ -164,21 +164,6 @@
           </execution>
         </executions>
       </plugin>
-      <!--<plugin>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>2.17</version>
-        <configuration>
-          <includeTestSourceDirectory>true</includeTestSourceDirectory>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>validate</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>-->
       <plugin>
         <groupId>org.kaazing</groupId>
         <artifactId>k3po-maven-plugin</artifactId>

@@ -45,7 +45,11 @@ public class ServerIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+        .counterValuesBufferCapacity(1024)
+        .streams("http-cache", "source")
+        .streams("target", "http-cache#source")
+        .streams("http-cache", "target")
+        .streams("source", "http-cache#target");
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
