@@ -238,7 +238,9 @@ public final class SourceInputStreamFactory
             int index,
             int length)
         {
-            // NOOP
+            endRO.wrap(buffer, index, index + length);
+            final long streamId = endRO.streamId();
+            source.removeStream(streamId);
         }
 
         private Optional<Route> resolveTarget(
