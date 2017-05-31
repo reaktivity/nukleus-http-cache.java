@@ -16,17 +16,23 @@
 package org.reaktivity.nukleus.http_cache.internal.bench;
 
 import static java.nio.ByteBuffer.allocateDirect;
+import static java.nio.file.FileVisitOption.FOLLOW_LINKS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.agrona.BitUtil.SIZE_OF_INT;
 import static org.agrona.BitUtil.SIZE_OF_LONG;
 import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
 import static org.reaktivity.nukleus.Configuration.STREAMS_BUFFER_CAPACITY_PROPERTY_NAME;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.Random;
 import java.util.function.Consumer;
 
+import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.MessageHandler;
@@ -61,7 +67,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.reaktor.internal.Reaktor;
+import org.reaktivity.reaktor.Reaktor;
+import org.reaktivity.reaktor.matchers.NukleusMatcher;
 
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.Throughput)
@@ -73,14 +80,35 @@ public class HttpCacheServerBM
 {
     private final Configuration configuration;
     private final Reaktor reaktor;
+    private HttpCacheController controller;
 
     {
         Properties properties = new Properties();
         properties.setProperty(DIRECTORY_PROPERTY_NAME, "target/nukleus-benchmarks");
         properties.setProperty(STREAMS_BUFFER_CAPACITY_PROPERTY_NAME, Long.toString(1024L * 1024L * 16L));
 
-        configuration = new Configuration(properties);
-        reaktor = Reaktor.launch(configuration, n -> "http-cache".equals(n), HttpCacheController.class::isAssignableFrom);
+        NukleusMatcher matchNukleus = "http-push"::equals;
+        this.configuration = new Configuration(properties);
+
+        try
+        {
+            Files.walk(configuration.directory(), FOLLOW_LINKS)
+                 .map(Path::toFile)
+                 .forEach(File::delete);
+        }
+        catch (IOException ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
+        }
+
+        this.reaktor = Reaktor.builder()
+                              .config(configuration)
+                              .discover(matchNukleus)
+                              .discover(HttpCacheController.class::isAssignableFrom)
+                              .errorHandler(ex -> ex.printStackTrace(System.err))
+                              .build();
+
+        this.controller = reaktor.controller(HttpCacheController.class);
     }
 
     private final BeginFW beginRO = new BeginFW();

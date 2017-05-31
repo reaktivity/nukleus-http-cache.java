@@ -220,11 +220,12 @@ public final class SourceInputStreamFactory
             int index,
             int length)
         {
-            beginRO.wrap(buffer, index, index + length);
+            final BeginFW begin = beginRO.wrap(buffer, index, index + length);
 
-            final long newSourceId = beginRO.streamId();
-            final long sourceRef = beginRO.referenceId();
-            final long correlationId = beginRO.correlationId();
+            final long newSourceId = begin.streamId();
+            final long sourceRef = begin.referenceId();
+            final long correlationId = begin.correlationId();
+            source.doWindow(newSourceId, 0);
 
             sendHttpResponseBegin(buffer, index, length, sourceRef, correlationId, "200");
 

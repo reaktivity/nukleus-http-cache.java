@@ -39,17 +39,13 @@ public class ServerIT
         .scriptProperty("routeTarget \"source\"")
         .scriptProperty("newTargetInputRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
     private final NukleusRule nukleus = new NukleusRule("http-cache")
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
-        .streams("http-cache", "source")
-        .streams("target", "http-cache#source")
-        .streams("http-cache", "target")
-        .streams("source", "http-cache#target");
+        .counterValuesBufferCapacity(1024);
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);

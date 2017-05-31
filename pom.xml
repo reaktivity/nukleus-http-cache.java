@@ -49,9 +49,10 @@
     <nukleus.version>0.2</nukleus.version>
     <nukleus.http.spec.version>0.13</nukleus.http.spec.version>
     <nukleus.http2.spec.version>0.6</nukleus.http2.spec.version>
-    <nukleus.http.cache.spec.version>0.1</nukleus.http.cache.spec.version>
-    <reaktor.test.version>0.1</reaktor.test.version>
-    <reaktor.version>0.1</reaktor.version>  </properties>
+    <nukleus.http.cache.spec.version>0.1.1</nukleus.http.cache.spec.version>
+    <reaktor.test.version>0.4</reaktor.test.version>
+    <reaktor.version>0.2.2</reaktor.version>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -127,7 +128,7 @@
         <artifactId>nukleus-maven-plugin</artifactId>
         <version>${nukleus.plugin.version}</version>
         <configuration>
-          <scopeNames>core http http2 http-cache</scopeNames>
+          <scopeNames>core http http2</scopeNames>
           <packageName>org.reaktivity.nukleus.http_cache.internal.types</packageName>
         </configuration>
         <executions>
