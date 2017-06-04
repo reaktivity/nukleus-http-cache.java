@@ -8,6 +8,7 @@
   <artifactId>nukleus-http-cache</artifactId>
   <version>develop-SNAPSHOT</version>
   <name>HTTP Cache Nukleus Implementation</name>
+  <description>HTTP Cache Nukleus Implementation</description>
   <url>https://github.com/reaktivity/nukleus-http-cache.java</url>
 
   <licenses>
