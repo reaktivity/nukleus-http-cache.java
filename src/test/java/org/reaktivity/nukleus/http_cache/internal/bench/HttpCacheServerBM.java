@@ -140,7 +140,7 @@ public class HttpCacheServerBM
         final HttpCacheController controller = reaktor.controller(HttpCacheController.class);
 
         this.targetInputRef = random.nextLong();
-        this.sourceInputRef = controller.routeInputNew("source", 0L, "target", targetInputRef).get();
+        this.sourceInputRef = controller.routeServer("source", 0L, "target", targetInputRef).get();
 
         this.sourceInputStreams = controller.streams("source");
         this.sourceOutputEstStreams = controller.streams("http-cache", "target");
@@ -165,7 +165,8 @@ public class HttpCacheServerBM
 
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(sourceInputId)
-                .referenceId(sourceInputRef)
+                .source("source")
+                .sourceRef(sourceInputRef)
                 .correlationId(random.nextLong())
                 .build();
 
@@ -206,7 +207,7 @@ public class HttpCacheServerBM
     {
         HttpCacheController controller = reaktor.controller(HttpCacheController.class);
 
-        controller.unrouteInputNew("source", sourceInputRef, "target", targetInputRef).get();
+        controller.unrouteServer("source", sourceInputRef, "target", targetInputRef).get();
 
         this.sourceInputStreams.close();
         this.sourceInputStreams = null;

@@ -223,7 +223,7 @@ public final class SourceInputStreamFactory
             final BeginFW begin = beginRO.wrap(buffer, index, index + length);
 
             final long newSourceId = begin.streamId();
-            final long sourceRef = begin.referenceId();
+            final long sourceRef = begin.sourceRef();
             final long correlationId = begin.correlationId();
             source.doWindow(newSourceId, 0);
 
