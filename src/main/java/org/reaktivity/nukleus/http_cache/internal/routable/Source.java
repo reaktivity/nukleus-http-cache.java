@@ -29,8 +29,8 @@ import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.http_cache.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ServerStreamFactory;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab;
-import org.reaktivity.nukleus.http_cache.internal.routable.stream.SourceInputStreamFactory;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.router.RouteKind;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -82,7 +82,7 @@ public final class Source implements Nukleus
 
         this.streamFactories = new EnumMap<>(RouteKind.class);
         this.streamFactories.put(RouteKind.INPUT,
-                new SourceInputStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
+                new ServerStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
 
         this.lookupEstablished = lookupEstablished;
     }

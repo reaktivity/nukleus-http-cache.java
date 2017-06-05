@@ -39,7 +39,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.http_cache.internal.util.function.LongObjectBiConsumer;
 
-public final class SourceInputStreamFactory
+public final class ServerStreamFactory
 {
     private final FrameFW frameRO = new FrameFW();
 
@@ -58,7 +58,7 @@ public final class SourceInputStreamFactory
     private final Function<String, Target> supplyTargetRoute;
     private final LongObjectBiConsumer<Correlation> correlateNew;
 
-    public SourceInputStreamFactory(
+    public ServerStreamFactory(
         Source source,
         LongFunction<List<Route>> supplyRoutes,
         LongSupplier supplyTargetId,

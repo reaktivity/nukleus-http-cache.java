@@ -87,7 +87,7 @@ public class HttpCacheServerBM
         properties.setProperty(DIRECTORY_PROPERTY_NAME, "target/nukleus-benchmarks");
         properties.setProperty(STREAMS_BUFFER_CAPACITY_PROPERTY_NAME, Long.toString(1024L * 1024L * 16L));
 
-        NukleusMatcher matchNukleus = "http-push"::equals;
+        NukleusMatcher matchNukleus = "http-cache"::equals;
         this.configuration = new Configuration(properties);
 
         try
