@@ -27,10 +27,6 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.NukleusRule;
 
-/**
- * RFC-6455, section 4.1 "Client-Side Requirements" RFC-6455, section 4.2
- * "Server-Side Requirements"
- */
 public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()

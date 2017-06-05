@@ -16,7 +16,9 @@
 package org.reaktivity.nukleus.http_cache.internal.routable;
 
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
@@ -29,6 +31,8 @@ import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.ringbuffer.RingBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.http_cache.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ProxyAcceptStreamFactory;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ProxyConnectReplyStreamFactory;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.ServerStreamFactory;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
@@ -58,6 +62,8 @@ public final class Source implements Nukleus
     private final EnumMap<RouteKind, Supplier<MessageHandler>> streamFactories;
     private final LongFunction<Correlation> lookupEstablished;
 
+    private final Set<String> outstandingRequests = new HashSet<String>();
+
     Source(
         String sourceName,
         String partitionName,
@@ -83,6 +89,12 @@ public final class Source implements Nukleus
         this.streamFactories = new EnumMap<>(RouteKind.class);
         this.streamFactories.put(RouteKind.INPUT,
                 new ServerStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
+        this.streamFactories.put(RouteKind.OUTPUT,
+                new ProxyAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget,
+                        outstandingRequests)::newStream);
+        this.streamFactories.put(RouteKind.OUTPUT_ESTABLISHED,
+                new ProxyConnectReplyStreamFactory(this, supplyTarget, supplyTargetId, correlateEstablished,
+                        outstandingRequests)::newStream);
 
         this.lookupEstablished = lookupEstablished;
     }
