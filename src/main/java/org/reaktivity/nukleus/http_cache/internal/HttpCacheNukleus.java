@@ -24,7 +24,7 @@ import org.reaktivity.nukleus.http_cache.internal.watcher.Watcher;
 
 public final class HttpCacheNukleus extends Nukleus.Composite
 {
-    static final String NAME = "http-cache";
+    public static final String NAME = "http-cache";
 
     private final Closeable cleanup;
 

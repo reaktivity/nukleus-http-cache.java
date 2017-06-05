@@ -37,7 +37,7 @@ public class ServerIT
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server")
         .scriptProperty("routeTarget \"source\"")
-        .scriptProperty("newTargetInputRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
+        .scriptProperty("newServerConnectRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
@@ -52,7 +52,7 @@ public class ServerIT
 
     @Test
     @Specification({
-        "${route}/input/new/controller",
+        "${route}/server/controller",
         "${streams}/connection.established/client"})
     public void shouldEstablishConnection() throws Exception
     {

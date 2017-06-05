@@ -31,7 +31,6 @@ import org.reaktivity.nukleus.http_cache.internal.conductor.Conductor;
 import org.reaktivity.nukleus.http_cache.internal.routable.Routable;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.control.Role;
-import org.reaktivity.nukleus.http_cache.internal.types.control.State;
 
 @Reaktive
 public class Router extends Nukleus.Composite
@@ -70,13 +69,12 @@ public class Router extends Nukleus.Composite
     public void doRoute(
         long correlationId,
         Role role,
-        State state,
         String sourceName,
         long sourceRef,
         String targetName,
         long targetRef)
     {
-        final RouteKind routeKind = RouteKind.valueOf(role, state);
+        final RouteKind routeKind = RouteKind.valueOf(role);
 
         if (sourceRef == 0L)
         {
@@ -97,7 +95,6 @@ public class Router extends Nukleus.Composite
     public void doUnroute(
         long correlationId,
         Role role,
-        State state,
         String sourceName,
         long sourceRef,
         String targetName,
