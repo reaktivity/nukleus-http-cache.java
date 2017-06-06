@@ -16,15 +16,14 @@
 package org.reaktivity.nukleus.http_cache.internal.routable;
 
 import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Int2IntHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.MessageHandler;
@@ -62,8 +61,6 @@ public final class Source implements Nukleus
     private final EnumMap<RouteKind, Supplier<MessageHandler>> streamFactories;
     private final LongFunction<Correlation> lookupEstablished;
 
-    private final Set<String> outstandingRequests = new HashSet<String>();
-
     Source(
         String sourceName,
         String partitionName,
@@ -75,6 +72,10 @@ public final class Source implements Nukleus
         LongObjectBiConsumer<Correlation> correlateNew,
         LongFunction<Correlation> correlateEstablished,
         LongFunction<Correlation> lookupEstablished,
+        Int2IntHashMap urlToResponse,
+        Int2IntHashMap urlToRequestHeaders,
+        Int2IntHashMap urlToResponseLimit,
+        Int2IntHashMap urlToRequestHeadersLimit,
         Slab slab)
     {
         this.sourceName = sourceName;
@@ -90,11 +91,11 @@ public final class Source implements Nukleus
         this.streamFactories.put(RouteKind.INPUT,
                 new ServerStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT,
-                new ProxyAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget,
-                        outstandingRequests)::newStream);
+                new ProxyAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, correlateEstablished, supplyTarget,
+                        urlToResponse, urlToRequestHeaders, urlToResponseLimit, urlToRequestHeadersLimit, slab)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT_ESTABLISHED,
                 new ProxyConnectReplyStreamFactory(this, supplyTarget, supplyTargetId, correlateEstablished,
-                        outstandingRequests)::newStream);
+                        urlToResponse, urlToRequestHeaders, slab)::newStream);
 
         this.lookupEstablished = lookupEstablished;
     }

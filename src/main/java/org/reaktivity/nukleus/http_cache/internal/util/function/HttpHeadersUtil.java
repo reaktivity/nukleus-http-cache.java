@@ -97,8 +97,28 @@ public final class HttpHeadersUtil
         return scheme.append(authority.toString()).append(path.toString()).toString();
     }
 
+    public static long getRequestURLHash(ListFW<HttpHeaderFW> headers)
+    {
+        return hashRequestUrl(getRequestURL(headers));
+        // TODO, less garbage collection...
+    }
+
+    public static int hashRequestUrl(String string)
+    {
+        return string.hashCode();
+//        long h = 1125899906842597L; // prime
+//        int len = string.length();
+//
+//        for (int i = 0; i < len; i++)
+//        {
+//            h = 31 * h + string.charAt(i);
+//        }
+//        return h;
+    }
+
     public static String varyRequestHeaders(ListFW<HttpHeaderFW> headers)
     {
+        // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
         final StringBuilder scheme = new StringBuilder();
         final StringBuilder path = new StringBuilder();
         final StringBuilder authority = new StringBuilder();
@@ -122,37 +142,25 @@ public final class HttpHeadersUtil
         return scheme.append(authority.toString()).append(path.toString()).toString();
     }
 
-    public static boolean cacheableRequest(ListFW<HttpHeaderFW> headers)
-    {
-        return !headers.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            switch (name)
-            {
-//                case "cache-control":
-//                    TODO: ADD but ignore if injected?
-//                    if(value.contains("no-cache"))
-//                    {
-//                        return false;
-//                    }
-//                    return true;
-                case "authorization":
-                    return true;
-                case ":method":
-                    if("GET".equalsIgnoreCase(value))
-                    {
-                        return false;
-                    }
-                    return true;
-                default:
-                    return false;
-                }
-        });
-    }
 
     public static boolean cacheableResponse(ListFW<HttpHeaderFW> headers)
     {
         return false;
     }
+
+    public static String getHeader(ListFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
+    {
+        // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
+        final StringBuilder header = new StringBuilder();
+        cachedRequestHeadersRO.forEach(h ->
+        {
+            if(headerName.equals(h.name().asString()))
+            {
+                // TODO multiple list values?
+                header.append(h.value().asString());
+            }
+        });
+        return header.toString();
+    }
+
 }

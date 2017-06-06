@@ -30,6 +30,7 @@ import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
 import org.agrona.LangUtil;
+import org.agrona.collections.Int2IntHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -46,6 +47,7 @@ import org.reaktivity.nukleus.http_cache.internal.util.function.LongObjectBiCons
 public final class Routable extends Nukleus.Composite
 {
     private static final List<Route> EMPTY_ROUTES = emptyList();
+    public static final int NOT_PRESENT = -1;
 
     private final Context context;
     private final String sourceName;
@@ -59,6 +61,10 @@ public final class Routable extends Nukleus.Composite
     private final LongFunction<Correlation> lookupEstablished;
     private final LongSupplier supplyTargetId;
     private final Slab slab;
+    public final Int2IntHashMap urlToResponses = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToRequestHeaders = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToResponseLimit = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToRequestHeadersLimit = new Int2IntHashMap(NOT_PRESENT);
 
     public Routable(
         Context context,
@@ -166,7 +172,8 @@ public final class Routable extends Nukleus.Composite
         return include(new Source(sourceName, partitionName, layout, writeBuffer,
                                   this::supplyRoutes, supplyTargetId, this::supplyTarget,
                                   correlateNew, lookupEstablished, correlateEstablished,
-                                  this.slab));
+                                  this.urlToResponses, this.urlToRequestHeaders,
+                                  urlToResponseLimit, urlToRequestHeadersLimit, this.slab));
     }
 
     private Target supplyTarget(

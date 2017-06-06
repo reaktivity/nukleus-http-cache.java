@@ -15,13 +15,13 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.routable.stream;
 
-import java.util.Set;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Int2IntHashMap;
 import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
@@ -58,18 +58,25 @@ public final class ProxyConnectReplyStreamFactory
     private final LongFunction<Correlation> correlateEstablished;
     private final Slab slab;
 
+    private final Int2IntHashMap urlToResponses;
+    private final Int2IntHashMap urlToRequestHeaders;
+
     public ProxyConnectReplyStreamFactory(
         Source source,
         Function<String, Target> supplyTarget,
         LongSupplier supplyStreamId,
-        LongFunction<Correlation> correlateEstablished, Set<String> outstandingRequests)
-//        Slab slab)
+        LongFunction<Correlation> correlateEstablished,
+        Int2IntHashMap urlToResponses,
+        Int2IntHashMap urlToRequestHeaders,
+        Slab slab)
     {
         this.source = source;
         this.supplyTarget = supplyTarget;
         this.supplyStreamId = supplyStreamId;
         this.correlateEstablished = correlateEstablished;
-        this.slab = null;
+        this.urlToResponses = urlToResponses;
+        this.urlToRequestHeaders = urlToRequestHeaders;
+        this.slab = slab;
     }
 
     public MessageHandler newStream()
