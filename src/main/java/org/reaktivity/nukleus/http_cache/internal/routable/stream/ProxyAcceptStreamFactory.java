@@ -15,7 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.routable.stream;
 
-import static org.reaktivity.nukleus.http_cache.internal.routable.Routable.NOT_PRESENT;
+import static org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.router.RouteKind.OUTPUT_ESTABLISHED;
 import static org.reaktivity.nukleus.http_cache.internal.util.function.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.util.function.HttpHeadersUtil.getRequestURL;
@@ -32,7 +32,6 @@ import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Int2IntHashMap;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Route;
@@ -59,9 +58,10 @@ public final class ProxyAcceptStreamFactory
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
-    private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
-    private final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
-    private final HttpBeginExFW cachedResponseRO = new HttpBeginExFW();
+
+    private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW(); // sometimes used for request, sometimes response
+    private final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    private final ListFW<HttpHeaderFW> pendingRequestHeadersRO = new HttpBeginExFW().headers();
 
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
@@ -72,13 +72,8 @@ public final class ProxyAcceptStreamFactory
     private final Function<String, Target> supplyTargetRoute;
     private final LongObjectBiConsumer<Correlation> correlateNew;
 
-    public final Int2IntHashMap urlToResponse;
-    public final Int2IntHashMap urlToRequestHeaders;
-    public final Int2IntHashMap urlToResponseLimit;
-    public final Int2IntHashMap urlToRequestHeadersLimit;
-
+    public final Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
     private final Slab slab;
-
     private final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
 
     public ProxyAcceptStreamFactory(
@@ -87,10 +82,7 @@ public final class ProxyAcceptStreamFactory
         LongSupplier supplyTargetId,
         LongObjectBiConsumer<Correlation> correlateNew,
         Function<String, Target> supplyTargetRoute,
-        Int2IntHashMap urlToResponses,
-        Int2IntHashMap urlToRequestHeaders,
-        Int2IntHashMap urlToResponseLimit,
-        Int2IntHashMap urlToRequestHeadersLimit,
+        Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
         Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
         Slab slab
        )
@@ -100,11 +92,8 @@ public final class ProxyAcceptStreamFactory
         this.supplyTargetId = supplyTargetId;
         this.correlateNew = correlateNew;
         this.supplyTargetRoute = supplyTargetRoute;
-        this.urlToResponse = urlToResponses;
-        this.urlToRequestHeaders = urlToRequestHeaders;
-        this.urlToResponseLimit = urlToResponseLimit;
-        this.urlToRequestHeadersLimit = urlToRequestHeadersLimit;
         this.awaitingRequestMatches = awaitingRequestMatches;
+        this.urlToPendingStream = urlToPendingStream;
         this.slab = slab;
     }
 
@@ -113,7 +102,7 @@ public final class ProxyAcceptStreamFactory
         return new SourceInputStream()::handleStream;
     }
 
-    private final class SourceInputStream
+    public final class SourceInputStream
     {
 
         private MessageHandler streamState;
@@ -138,7 +127,7 @@ public final class ProxyAcceptStreamFactory
 
         private int requestCacheSlot;
 
-        private boolean useAwaitedRequest = true;
+        private boolean usePendingRequest = true;
 
         private int requestURLHash;
 
@@ -297,6 +286,7 @@ public final class ProxyAcceptStreamFactory
                 {
                     this.targetId = proxyRequest(correlationId, targetName, targetRef,
                             httpBeginEx.headers());
+                    clean();
                     this.streamState = this::afterBeginOrData;
                 }
                 else if(hasStoredResponseThatSatisfies(requestURL, requestURLHash, headers))
@@ -316,12 +306,10 @@ public final class ProxyAcceptStreamFactory
                 }
                 else
                 {
-                    if(urlToRequestHeaders.get(requestURLHash) == NOT_PRESENT)
+                    if(urlToPendingStream.containsKey(requestURLHash))
                     {
                         this.requestCacheSlot = slab.acquire(requestURLHash);
                         storeRequest(headers, requestCacheSlot);
-                        urlToRequestHeaders.put(requestURLHash, requestCacheSlot);
-                        urlToRequestHeadersLimit.put(requestURLHash, this.requestSlabSize);
                     }
                     this.targetId = proxyRequest(correlationId, targetName,
                             targetRef, httpBeginEx.headers());
@@ -376,50 +364,32 @@ public final class ProxyAcceptStreamFactory
         {
             // NOTE: we never store anything right now so this always returns false
             // TODO remove if expired!!
-            if(requestHeaders.anyMatch(h ->
-            {
-                final String name = h.name().asString();
-                final String value = h.value().asString();
-                return "cache-control".equals(name) && value.contains("no-cache");
-            }))
-            {
-                return false;
-            }
+//            if(requestHeaders.anyMatch(h ->
+//            {
+//                final String name = h.name().asString();
+//                final String value = h.value().asString();
+//                return "cache-control".equals(name) && value.contains("no-cache");
+//            }))
+//            {
+//                return false;
+//            }
+              return false;
 
-            final int responseSlot = urlToResponse.get(requestURLHash);
-            final int requestSlot = urlToRequestHeaders.get(requestURLHash);
-            if(responseSlot != NOT_PRESENT && requestSlot != NOT_PRESENT)
-            {
-                final MutableDirectBuffer requestBuffer = slab.buffer(requestSlot);
-                final int cachedRequestLimit = urlToRequestHeadersLimit.get(requestURLHash);
-                final MutableDirectBuffer responseBuffer = slab.buffer(responseSlot);
-                final int responseLimit = urlToResponseLimit.get(requestURLHash);
-                cachedRequestHeadersRO.wrap(requestBuffer, 0, cachedRequestLimit);
-                cachedResponseRO.wrap(responseBuffer, 0, responseLimit);
-                // is same url, else cache miss
-                final String cachedRequestUrl = HttpHeadersUtil.getRequestURL(cachedRequestHeadersRO);
-                if(cachedRequestUrl.equals(requestURL))
-                {
-                    return satisfiesVaries(cachedRequestHeadersRO, cachedResponseRO, requestHeaders);
-                }
-
-            }
-            return false;
         }
 
         private boolean hasOutstandingRequestThatMaySatisfy(
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            final int requestSlot = urlToRequestHeaders.get(requestURLHash);
-            // TODO optimize with expected varies
-            final boolean hasXHttpCacheSync = requestHeaders.anyMatch(h ->
+            if(urlToPendingStream.containsKey(requestURLHash))
             {
-                final String name = h.name().asString();
-                final String value = h.value().asString();
-                return "x-http-cache-sync".equals(name) && "always".equals(value);
-            });
-            boolean hasMatchingRequest = !(requestSlot == NOT_PRESENT);
-            return hasMatchingRequest && hasXHttpCacheSync;
+                return requestHeaders.anyMatch(h ->
+                {
+                    final String name = h.name().asString();
+                    final String value = h.value().asString();
+                    return "x-http-cache-sync".equals(name) && "always".equals(value);
+                });
+            }
+            return false;
         }
 
         private void processEnd(
@@ -492,7 +462,7 @@ public final class ProxyAcceptStreamFactory
             int index,
             int length)
         {
-            if(useAwaitedRequest)
+            if(usePendingRequest)
             {
                 switch (msgTypeId)
                 {
@@ -521,17 +491,19 @@ public final class ProxyAcceptStreamFactory
             beginRO.wrap(buffer, index, index + length);
             final OctetsFW extension = beginRO.extension();
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
+            final SourceInputStream pendingRequest = urlToPendingStream.get(requestURLHash);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
-            String vary = HttpHeadersUtil.getHeader(responseHeaders, "vary");
-            String myAuthorizationHeader = getHeader(getMyRequestHeaders(), "authorization");
+            final ListFW<HttpHeaderFW> pendingRequestHeaders =
+                    pendingRequest.getRequestHeaders(pendingRequestHeadersRO);
+            final ListFW<HttpHeaderFW> myRequestHeadersRO = getRequestHeaders(requestHeadersRO);
 
-            int cachedRequestSlot = urlToRequestHeaders.get(requestURLHash);
-            int cachedRequestLimit = urlToRequestHeadersLimit.get(requestURLHash);
-            ListFW<HttpHeaderFW> cachedHeaders =
-                    cachedRequestHeadersRO.wrap(slab.buffer(cachedRequestSlot), 0, cachedRequestLimit);
-            String cachedAuthorizationHeader = getHeader(cachedHeaders, "authorization");
+            String vary = HttpHeadersUtil.getHeader(responseHeaders, "vary");
+            String myAuthorizationHeader = getHeader(myRequestHeadersRO, "authorization");
+            String cachedAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+
             boolean useSharedResponse = true;
+
             if(cacheControl != null && cacheControl.contains("public"))
             {
                 useSharedResponse = true;
@@ -548,14 +520,15 @@ public final class ProxyAcceptStreamFactory
             {
                 useSharedResponse = Arrays.stream(vary.split("\\s*,\\s*")).anyMatch(v ->
                 {
-                    String cachedHeaderValue = HttpHeadersUtil.getHeader(cachedHeaders, v);
-                    String myHeaderValue = HttpHeadersUtil.getHeader(getMyRequestHeaders(), v);
+                    String cachedHeaderValue = HttpHeadersUtil.getHeader(pendingRequestHeaders, v);
+                    String myHeaderValue = HttpHeadersUtil.getHeader(myRequestHeadersRO, v);
                     return Objects.equals(cachedHeaderValue, myHeaderValue);
                 });
             }
 
             if(useSharedResponse)
             {
+                clean();
                 this.replyTarget.doHttpBegin(this.sourceId, 0L, this.correlationId, e ->
                 {
                     responseHeaders.forEach(h ->
@@ -566,20 +539,17 @@ public final class ProxyAcceptStreamFactory
             }
             else
             {
-                this.useAwaitedRequest = false;
-                ListFW<HttpHeaderFW> myRequestHeaders = getMyRequestHeaders();
+                this.usePendingRequest = false;
                 this.targetId = proxyRequest(correlationId, targetName, targetRef,
-                            myRequestHeaders);
+                            myRequestHeadersRO);
+                clean();
                 this.target.doHttpEnd(this.targetId);
             }
         }
 
-        private ListFW<HttpHeaderFW> getMyRequestHeaders()
+        private ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> headersFW)
         {
-            MutableDirectBuffer myStoredRequest = slab.buffer(this.requestCacheSlot);
-            ListFW<HttpHeaderFW> myRequestHeaders = cachedRequestHeadersRO
-                    .wrap(myStoredRequest, 0, this.requestSlabSize);
-            return myRequestHeaders;
+            return headersFW.wrap(slab.buffer(this.requestCacheSlot), 0, this.requestSlabSize);
         }
 
         private void processDataReply(
@@ -597,6 +567,14 @@ public final class ProxyAcceptStreamFactory
             int length)
         {
             this.replyTarget.doHttpEnd(this.sourceId);
+        }
+
+        public void clean()
+        {
+            if(this.requestCacheSlot != NO_SLOT)
+            {
+                slab.release(this.requestCacheSlot);
+            }
         }
 
     }
@@ -624,42 +602,6 @@ public final class ProxyAcceptStreamFactory
                 default:
                     return false;
                 }
-        });
-    }
-
-    private static boolean satisfiesVaries(
-            ListFW<HttpHeaderFW> cachedRequestHeadersRO,
-            HttpBeginExFW cachedResponseRO,
-            ListFW<HttpHeaderFW> requestHeaders)
-    {
-        // TODO with out list when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
-        List<String> variesHeaders = new ArrayList<String>();
-        cachedResponseRO.headers().forEach(h ->
-        {
-            if("vary".equals(h.name().asString()))
-            {
-                variesHeaders.addAll(Arrays.asList(h.value().asString().split("\\s*(,)\\s*")));
-            }
-        });
-        return variesHeaders.stream().allMatch(v ->
-        {
-            if(cachedRequestHeadersRO.anyMatch(h -> v.equals(h.name().asString())))
-            {
-                String cachedHeader = getHeader(cachedRequestHeadersRO, v);
-                if (cachedHeader == null)
-                {
-                    return requestHeaders.anyMatch(h -> v.equals(h.name().asString()));
-                }
-                else
-                {
-                   String requestHeader = getHeader(requestHeaders, v);
-                   return cachedHeader.equals(requestHeader);
-                }
-            }
-            else
-            {
-                return true;
-            }
         });
     }
 }

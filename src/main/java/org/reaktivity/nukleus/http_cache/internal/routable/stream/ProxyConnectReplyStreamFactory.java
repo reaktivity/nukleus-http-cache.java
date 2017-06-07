@@ -15,6 +15,8 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.routable.stream;
 
+import static java.util.Collections.emptyList;
+
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.LongFunction;
@@ -22,11 +24,11 @@ import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Int2IntHashMap;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ProxyAcceptStreamFactory.SourceInputStream;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -56,18 +58,16 @@ public final class ProxyConnectReplyStreamFactory
     private final LongFunction<Correlation> correlateEstablished;
     private final Slab slab;
 
-    private final Int2IntHashMap urlToResponses;
-    private final Int2IntHashMap urlToRequestHeaders;
-
     private Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+
+    private Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
 
     public ProxyConnectReplyStreamFactory(
         Source source,
         Function<String, Target> supplyTarget,
         LongSupplier supplyStreamId,
         LongFunction<Correlation> correlateEstablished,
-        Int2IntHashMap urlToResponses,
-        Int2IntHashMap urlToRequestHeaders,
+        Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
         Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
         Slab slab)
     {
@@ -75,9 +75,8 @@ public final class ProxyConnectReplyStreamFactory
         this.supplyTarget = supplyTarget;
         this.supplyStreamId = supplyStreamId;
         this.correlateEstablished = correlateEstablished;
-        this.urlToResponses = urlToResponses;
-        this.urlToRequestHeaders = urlToRequestHeaders;
         this.awaitingRequestMatches = awaitingRequestMatches;
+        this.urlToPendingStream = urlToPendingStream;
         this.slab = slab;
     }
 
@@ -94,7 +93,6 @@ public final class ProxyConnectReplyStreamFactory
 
         private Target target;
         private long targetId;
-
         private List<MessageHandler> forwardResponsesTo;
 
         private TargetOutputEstablishedStream()
@@ -210,8 +208,13 @@ public final class ProxyConnectReplyStreamFactory
 
             final Correlation correlation = correlateEstablished.apply(targetCorrelationId);
             int requestURLHash = correlation.requestURLHash();
-            this.forwardResponsesTo = awaitingRequestMatches.get(requestURLHash);
-            // TODO add abort on forward if not cache-able??
+
+            this.forwardResponsesTo = awaitingRequestMatches.remove(requestURLHash);
+            if(forwardResponsesTo == null)
+            {
+                forwardResponsesTo = emptyList();
+            }
+
             if (sourceRef == 0L && correlation != null)
             {
                 final Target newTarget = supplyTarget.apply(correlation.source());
@@ -223,7 +226,7 @@ public final class ProxyConnectReplyStreamFactory
 
                 newTarget.doHttpBegin(newTargetId, 0L, sourceCorrelationId, e ->
                 {
-                    httpBeginExRO.headers().forEach(h ->
+                    httpBeginEx.headers().forEach(h ->
                     {
                        e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
                     });
@@ -232,11 +235,8 @@ public final class ProxyConnectReplyStreamFactory
                 {
                     forwardResponsesTo.stream().forEach(h -> h.onMessage(BeginFW.TYPE_ID, buffer, index, length));
                 }
-                int remove = urlToRequestHeaders.remove(requestURLHash);
-                if(remove != Slab.NO_SLOT)
-                {
-                    slab.release(remove);
-                }
+
+                urlToPendingStream.remove(requestURLHash).clean();
 
                 newTarget.addThrottle(newTargetId, this::handleThrottle);
 

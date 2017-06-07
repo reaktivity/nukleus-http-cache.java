@@ -30,7 +30,6 @@ import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
 import org.agrona.LangUtil;
-import org.agrona.collections.Int2IntHashMap;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
@@ -41,6 +40,7 @@ import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.http_cache.internal.Context;
 import org.reaktivity.nukleus.http_cache.internal.conductor.Conductor;
 import org.reaktivity.nukleus.http_cache.internal.layouts.StreamsLayout;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ProxyAcceptStreamFactory.SourceInputStream;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.util.function.LongObjectBiConsumer;
@@ -63,11 +63,8 @@ public final class Routable extends Nukleus.Composite
     private final LongFunction<Correlation> lookupEstablished;
     private final LongSupplier supplyTargetId;
     private final Slab slab;
-    public final Int2IntHashMap urlToResponses;
-    public final Int2IntHashMap urlToRequestHeaders;
-    public final Int2IntHashMap urlToResponseLimit;
-    public final Int2IntHashMap urlToRequestHeadersLimit;
-    public final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+    private final Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
+    private final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
 
     public Routable(
         Context context,
@@ -76,10 +73,7 @@ public final class Routable extends Nukleus.Composite
         LongObjectBiConsumer<Correlation> correlateNew,
         LongFunction<Correlation> correlateEstablished,
         LongFunction<Correlation> lookupEstablished,
-        Int2IntHashMap urlToResponses,
-        Int2IntHashMap urlToRequestHeaders,
-        Int2IntHashMap urlToResponseLimit,
-        Int2IntHashMap urlToRequestHeadersLimit,
+        Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
         Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
         Slab slab)
     {
@@ -94,10 +88,7 @@ public final class Routable extends Nukleus.Composite
         this.targetsByName = new HashMap<>();
         this.routesByRef = new Long2ObjectHashMap<>();
         this.supplyTargetId = context.counters().streamsSourced()::increment;
-        this.urlToResponses = urlToResponses;
-        this.urlToRequestHeaders = urlToRequestHeaders;
-        this.urlToResponseLimit = urlToResponseLimit;
-        this.urlToRequestHeadersLimit = urlToRequestHeadersLimit;
+        this.urlToPendingStream = urlToPendingStream;
         this.awaitingRequestMatches = awaitingRequestMatches;
         this.slab = slab;
     }
@@ -185,8 +176,7 @@ public final class Routable extends Nukleus.Composite
         return include(new Source(sourceName, partitionName, layout, writeBuffer,
                                   this::supplyRoutes, supplyTargetId, this::supplyTarget,
                                   correlateNew, lookupEstablished, correlateEstablished,
-                                  this.urlToResponses, this.urlToRequestHeaders,
-                                  urlToResponseLimit, urlToRequestHeadersLimit,
+                                  this.urlToPendingStream,
                                   this.awaitingRequestMatches, this.slab));
     }
 
