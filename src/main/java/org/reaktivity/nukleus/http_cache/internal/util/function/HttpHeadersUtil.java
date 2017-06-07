@@ -160,7 +160,8 @@ public final class HttpHeadersUtil
                 header.append(h.value().asString());
             }
         });
-        return header.toString();
+
+        return header.length() == 0 ? null : header.toString();
     }
 
 }

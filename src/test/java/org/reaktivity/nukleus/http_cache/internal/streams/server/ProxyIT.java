@@ -85,6 +85,50 @@ public class ProxyIT
     }
 
     @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.debounce.private.cache/accept/client",
+        "${streams}/not.debounce.private.cache/connect/server",
+    })
+    public void shouldNotDebounceWhenCacheSyncPrivateCacheControl() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.debounce.implied.private/accept/client",
+        "${streams}/not.debounce.implied.private/connect/server",
+    })
+    public void shouldNotDebounceWhenImpliedCacheSyncPrivate() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/debounce.when.explicitly.public/accept/client",
+        "${streams}/debounce.when.explicitly.public/connect/server",
+    })
+    public void shouldDebounceExplicitlyPublic() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.debounce.varys/accept/client",
+        "${streams}/not.debounce.varys/connect/server",
+    })
+    public void shouldNotDebounceWhenVarys() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
     @Ignore("not implemented")
     @Specification({
         "${streams}/cache.response/accept/client",

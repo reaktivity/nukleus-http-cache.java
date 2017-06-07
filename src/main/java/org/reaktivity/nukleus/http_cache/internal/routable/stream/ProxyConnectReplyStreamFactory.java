@@ -28,8 +28,6 @@ import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
-import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -46,8 +44,6 @@ public final class ProxyConnectReplyStreamFactory
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
-    private final ListFW<HttpHeaderFW> headersFW = new HttpBeginExFW().headers();
-    private final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
 
     private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
 
@@ -92,17 +88,12 @@ public final class ProxyConnectReplyStreamFactory
 
     private final class TargetOutputEstablishedStream
     {
-        private static final int NETWORK_ROUND_TRIP_TIME = 2;
-
         private MessageHandler streamState;
 
         private long sourceId;
 
         private Target target;
         private long targetId;
-
-        // Needed due to effective final. TODO fix
-        private int pollInterval;
 
         private List<MessageHandler> forwardResponsesTo;
 
@@ -219,11 +210,6 @@ public final class ProxyConnectReplyStreamFactory
 
             final Correlation correlation = correlateEstablished.apply(targetCorrelationId);
             int requestURLHash = correlation.requestURLHash();
-            int remove = urlToRequestHeaders.remove(requestURLHash);
-            if(remove != Slab.NO_SLOT)
-            {
-                slab.release(remove);
-            }
             this.forwardResponsesTo = awaitingRequestMatches.get(requestURLHash);
             // TODO add abort on forward if not cache-able??
             if (sourceRef == 0L && correlation != null)
@@ -245,6 +231,11 @@ public final class ProxyConnectReplyStreamFactory
                 if(forwardResponsesTo != null)
                 {
                     forwardResponsesTo.stream().forEach(h -> h.onMessage(BeginFW.TYPE_ID, buffer, index, length));
+                }
+                int remove = urlToRequestHeaders.remove(requestURLHash);
+                if(remove != Slab.NO_SLOT)
+                {
+                    slab.release(remove);
                 }
 
                 newTarget.addThrottle(newTargetId, this::handleThrottle);

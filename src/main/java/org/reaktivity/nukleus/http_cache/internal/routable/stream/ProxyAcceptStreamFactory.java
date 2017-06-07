@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.util.function.HttpHeade
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.LongFunction;
@@ -126,6 +127,22 @@ public final class ProxyAcceptStreamFactory
         private String sourceName;
         // these are fields do to effectively final forEach
         private int requestSlabSize = 0;
+
+        private List<MessageHandler> awaitingRequests;
+
+        private MessageHandler addedMessageHandler;
+
+        private String targetName;
+
+        private long targetRef;
+
+        private int requestCacheSlot;
+
+        private boolean useAwaitedRequest = true;
+
+        private int requestURLHash;
+
+        private String requestURL;
 
         private SourceInputStream()
         {
@@ -267,46 +284,47 @@ public final class ProxyAcceptStreamFactory
             if (optional.isPresent())
             {
                 final Route route = optional.get();
-                final String targetName = route.targetName();
-                final long targetRef = route.targetRef();
+                this.targetName = route.targetName();
+                this.targetRef = route.targetRef();
 
                 final OctetsFW extension = beginRO.extension();
                 final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
                 final ListFW<HttpHeaderFW> headers = httpBeginExRO.headers();
-                final String requestURL = getRequestURL(headers);
-                final int requestURLHash = hashRequestURL(requestURL);
+                this.requestURL = getRequestURL(headers);
+                this.requestURLHash = hashRequestURL(requestURL);
 
                 if(!canBeServedByCache(headers))
                 {
                     this.targetId = proxyRequest(correlationId, targetName, targetRef,
-                            httpBeginEx.headers(), requestURL, requestURLHash);
+                            httpBeginEx.headers());
                     this.streamState = this::afterBeginOrData;
                 }
                 else if(hasStoredResponseThatSatisfies(requestURL, requestURLHash, headers))
                 {
                     // TODO
                 }
-                else if(hasOutstandingRequestThatMaySatisfy(requestURL, requestURLHash, headers))
+                else if(hasOutstandingRequestThatMaySatisfy(headers))
                 {
-                    List<MessageHandler> awaitingRequests =
+                    this.awaitingRequests =
                             awaitingRequestMatches.getOrDefault(requestURLHash, new ArrayList<MessageHandler>());
                     awaitingRequestMatches.put(requestURLHash, awaitingRequests);
-                    int requestSlot = slab.acquire(newSourceId);
-                    storeRequest(headers, requestSlot);
-                    awaitingRequests.add(this::handleReply);
+                    this.requestCacheSlot = slab.acquire(newSourceId);
+                    storeRequest(headers, requestCacheSlot);
+                    this.addedMessageHandler = this::handleReply;
+                    awaitingRequests.add(this.addedMessageHandler);
                     this.streamState = this::waitingForOutstanding;
                 }
                 else
                 {
                     if(urlToRequestHeaders.get(requestURLHash) == NOT_PRESENT)
                     {
-                        int requestCacheSlot = slab.acquire(requestURLHash);
+                        this.requestCacheSlot = slab.acquire(requestURLHash);
                         storeRequest(headers, requestCacheSlot);
                         urlToRequestHeaders.put(requestURLHash, requestCacheSlot);
                         urlToRequestHeadersLimit.put(requestURLHash, this.requestSlabSize);
                     }
                     this.targetId = proxyRequest(correlationId, targetName,
-                            targetRef, httpBeginEx.headers(), requestURL, requestURLHash);
+                            targetRef, httpBeginEx.headers());
                     this.streamState = this::afterBeginOrData;
                 }
                 this.sourceId = newSourceId;
@@ -331,9 +349,7 @@ public final class ProxyAcceptStreamFactory
                 final long correlationId,
                 final String targetName,
                 final long targetRef,
-                final ListFW<HttpHeaderFW> headers,
-                final String requestURL,
-                final int requestURLHash)
+                final ListFW<HttpHeaderFW> headers)
         {
             final Target newTarget = supplyTargetRoute.apply(targetName);
             final long newTargetId = supplyTargetId.getAsLong();
@@ -392,8 +408,6 @@ public final class ProxyAcceptStreamFactory
         }
 
         private boolean hasOutstandingRequestThatMaySatisfy(
-                final String requestURL,
-                final int requestURLHash,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
             final int requestSlot = urlToRequestHeaders.get(requestURLHash);
@@ -478,22 +492,24 @@ public final class ProxyAcceptStreamFactory
             int index,
             int length)
         {
-            switch (msgTypeId)
+            if(useAwaitedRequest)
             {
-                case BeginFW.TYPE_ID:
-                    // TODO, what if don't match or out of order
-                    this.replyTarget = supplyTargetRoute.apply(this.sourceName);
-                    processBeginReply(buffer, index, length);
-                    break;
-                case DataFW.TYPE_ID:
-                    processDataReply(buffer, index, length);
-                    break;
-                case EndFW.TYPE_ID:
-                    processEndReply(buffer, index, length);
-                    break;
-                default:
-                    // ignore
-                    break;
+                switch (msgTypeId)
+                {
+                    case BeginFW.TYPE_ID:
+                        this.replyTarget = supplyTargetRoute.apply(this.sourceName);
+                        processBeginReply(buffer, index, length);
+                        break;
+                    case DataFW.TYPE_ID:
+                        processDataReply(buffer, index, length);
+                        break;
+                    case EndFW.TYPE_ID:
+                        processEndReply(buffer, index, length);
+                        break;
+                    default:
+                        // ignore
+                        break;
+                }
             }
         }
 
@@ -505,14 +521,65 @@ public final class ProxyAcceptStreamFactory
             beginRO.wrap(buffer, index, index + length);
             final OctetsFW extension = beginRO.extension();
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
-            final ListFW<HttpHeaderFW> headers = httpBeginEx.headers();
-            this.replyTarget.doHttpBegin(this.sourceId, 0L, this.correlationId, e ->
+            final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
+            String vary = HttpHeadersUtil.getHeader(responseHeaders, "vary");
+            String myAuthorizationHeader = getHeader(getMyRequestHeaders(), "authorization");
+
+            int cachedRequestSlot = urlToRequestHeaders.get(requestURLHash);
+            int cachedRequestLimit = urlToRequestHeadersLimit.get(requestURLHash);
+            ListFW<HttpHeaderFW> cachedHeaders =
+                    cachedRequestHeadersRO.wrap(slab.buffer(cachedRequestSlot), 0, cachedRequestLimit);
+            String cachedAuthorizationHeader = getHeader(cachedHeaders, "authorization");
+            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+            boolean useSharedResponse = true;
+            if(cacheControl != null && cacheControl.contains("public"))
             {
-                headers.forEach(h ->
+                useSharedResponse = true;
+            }
+            else if (cacheControl != null && cacheControl.contains("private"))
+            {
+                useSharedResponse = false;
+            }
+            else if(myAuthorizationHeader != null || cachedAuthorizationHeader != null)
+            {
+                useSharedResponse = false;
+            }
+            else if(vary != null)
+            {
+                useSharedResponse = Arrays.stream(vary.split("\\s*,\\s*")).anyMatch(v ->
                 {
-                    e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
+                    String cachedHeaderValue = HttpHeadersUtil.getHeader(cachedHeaders, v);
+                    String myHeaderValue = HttpHeadersUtil.getHeader(getMyRequestHeaders(), v);
+                    return Objects.equals(cachedHeaderValue, myHeaderValue);
                 });
-            });
+            }
+
+            if(useSharedResponse)
+            {
+                this.replyTarget.doHttpBegin(this.sourceId, 0L, this.correlationId, e ->
+                {
+                    responseHeaders.forEach(h ->
+                    {
+                        e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
+                    });
+                });
+            }
+            else
+            {
+                this.useAwaitedRequest = false;
+                ListFW<HttpHeaderFW> myRequestHeaders = getMyRequestHeaders();
+                this.targetId = proxyRequest(correlationId, targetName, targetRef,
+                            myRequestHeaders);
+                this.target.doHttpEnd(this.targetId);
+            }
+        }
+
+        private ListFW<HttpHeaderFW> getMyRequestHeaders()
+        {
+            MutableDirectBuffer myStoredRequest = slab.buffer(this.requestCacheSlot);
+            ListFW<HttpHeaderFW> myRequestHeaders = cachedRequestHeadersRO
+                    .wrap(myStoredRequest, 0, this.requestSlabSize);
+            return myRequestHeaders;
         }
 
         private void processDataReply(
