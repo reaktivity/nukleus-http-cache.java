@@ -99,11 +99,11 @@ public final class HttpHeadersUtil
 
     public static long getRequestURLHash(ListFW<HttpHeaderFW> headers)
     {
-        return hashRequestUrl(getRequestURL(headers));
+        return hashRequestURL(getRequestURL(headers));
         // TODO, less garbage collection...
     }
 
-    public static int hashRequestUrl(String string)
+    public static int hashRequestURL(String string)
     {
         return string.hashCode();
 //        long h = 1125899906842597L; // prime

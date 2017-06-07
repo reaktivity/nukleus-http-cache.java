@@ -18,11 +18,15 @@ package org.reaktivity.nukleus.http_cache.internal.router;
 
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.agrona.collections.Int2IntHashMap;
+import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
+import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.status.AtomicCounter;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
@@ -37,6 +41,7 @@ public class Router extends Nukleus.Composite
 {
 
     private static final Pattern SOURCE_NAME = Pattern.compile("([^#]+).*");
+    private static final int NOT_PRESENT = -1;
     private final Context context;
     private final Map<String, Routable> routables;
     private final Long2ObjectHashMap<Correlation> correlations;
@@ -44,6 +49,12 @@ public class Router extends Nukleus.Composite
 
     private Conductor conductor;
     private Slab slab;
+
+    public final Int2IntHashMap urlToResponses = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToRequestHeaders = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToResponseLimit = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToRequestHeadersLimit = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches = new Int2ObjectHashMap<List<MessageHandler>>();
 
     public Router(
         Context context)
@@ -144,6 +155,12 @@ public class Router extends Nukleus.Composite
         String sourceName)
     {
         return include(
-            new Routable(context, conductor, sourceName, correlations::put, correlations::get, correlations::remove, slab));
+            new Routable(context, conductor, sourceName, correlations::put, correlations::get, correlations::remove,
+                    urlToResponses,
+                    urlToRequestHeaders,
+                    urlToResponseLimit,
+                    urlToRequestHeadersLimit,
+                    awaitingRequestMatches,
+                    slab));
     }
 }

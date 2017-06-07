@@ -24,15 +24,21 @@ public class Correlation
     private final long id;
     private final String source;
     private final RouteKind established;
+    private final String requestURL;
+    private final int requestURLHash;
 
     public Correlation(
         long id,
         String source,
-        RouteKind established)
+        RouteKind established,
+        String requestURL,
+        int requestURLHash)
     {
         this.id = id;
         this.source = requireNonNull(source, "source");
         this.established = requireNonNull(established, "established");
+        this.requestURL = requestURL;
+        this.requestURLHash = requestURLHash;
     }
 
     public long id()
@@ -48,6 +54,18 @@ public class Correlation
     public RouteKind established()
     {
         return established;
+    }
+
+    public String requestURL()
+    // DPW TODO add to HASH if we keep this
+    {
+        return requestURL;
+    }
+
+    public int requestURLHash()
+    // DPW TODO add to HASH if we keep this
+    {
+        return requestURLHash;
     }
 
     @Override

@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.routable.stream;
 
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
@@ -22,6 +23,7 @@ import java.util.function.LongSupplier;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2IntHashMap;
+import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
@@ -61,6 +63,8 @@ public final class ProxyConnectReplyStreamFactory
     private final Int2IntHashMap urlToResponses;
     private final Int2IntHashMap urlToRequestHeaders;
 
+    private Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+
     public ProxyConnectReplyStreamFactory(
         Source source,
         Function<String, Target> supplyTarget,
@@ -68,6 +72,7 @@ public final class ProxyConnectReplyStreamFactory
         LongFunction<Correlation> correlateEstablished,
         Int2IntHashMap urlToResponses,
         Int2IntHashMap urlToRequestHeaders,
+        Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
         Slab slab)
     {
         this.source = source;
@@ -76,6 +81,7 @@ public final class ProxyConnectReplyStreamFactory
         this.correlateEstablished = correlateEstablished;
         this.urlToResponses = urlToResponses;
         this.urlToRequestHeaders = urlToRequestHeaders;
+        this.awaitingRequestMatches = awaitingRequestMatches;
         this.slab = slab;
     }
 
@@ -98,6 +104,8 @@ public final class ProxyConnectReplyStreamFactory
         // Needed due to effective final. TODO fix
         private int pollInterval;
 
+        private List<MessageHandler> forwardResponsesTo;
+
         private TargetOutputEstablishedStream()
         {
             this.streamState = this::beforeBegin;
@@ -114,7 +122,7 @@ public final class ProxyConnectReplyStreamFactory
 
         private void beforeBegin(
             int msgTypeId,
-            DirectBuffer buffer,
+            MutableDirectBuffer buffer,
             int index,
             int length)
         {
@@ -130,10 +138,14 @@ public final class ProxyConnectReplyStreamFactory
 
         private void afterBeginOrData(
             int msgTypeId,
-            DirectBuffer buffer,
+            MutableDirectBuffer buffer,
             int index,
             int length)
         {
+            if(forwardResponsesTo != null)
+            {
+                this.forwardResponsesTo.stream().forEach(h -> h.onMessage(msgTypeId, buffer, index, length));
+            }
             switch (msgTypeId)
             {
             case DataFW.TYPE_ID:
@@ -195,9 +207,9 @@ public final class ProxyConnectReplyStreamFactory
         }
 
         private void processBegin(
-            DirectBuffer buffer,
-            int index,
-            int length)
+            final MutableDirectBuffer buffer,
+            final int index,
+            final int length)
         {
             beginRO.wrap(buffer, index, index + length);
 
@@ -206,7 +218,14 @@ public final class ProxyConnectReplyStreamFactory
             final long targetCorrelationId = beginRO.correlationId();
 
             final Correlation correlation = correlateEstablished.apply(targetCorrelationId);
-
+            int requestURLHash = correlation.requestURLHash();
+            int remove = urlToRequestHeaders.remove(requestURLHash);
+            if(remove != Slab.NO_SLOT)
+            {
+                slab.release(remove);
+            }
+            this.forwardResponsesTo = awaitingRequestMatches.get(requestURLHash);
+            // TODO add abort on forward if not cache-able??
             if (sourceRef == 0L && correlation != null)
             {
                 final Target newTarget = supplyTarget.apply(correlation.source());
@@ -220,9 +239,13 @@ public final class ProxyConnectReplyStreamFactory
                 {
                     httpBeginExRO.headers().forEach(h ->
                     {
-                       e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()));
+                       e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
                     });
                 });
+                if(forwardResponsesTo != null)
+                {
+                    forwardResponsesTo.stream().forEach(h -> h.onMessage(BeginFW.TYPE_ID, buffer, index, length));
+                }
 
                 newTarget.addThrottle(newTargetId, this::handleThrottle);
 

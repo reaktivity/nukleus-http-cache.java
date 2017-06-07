@@ -31,8 +31,10 @@ import java.util.function.Predicate;
 
 import org.agrona.LangUtil;
 import org.agrona.collections.Int2IntHashMap;
+import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
+import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
@@ -61,10 +63,11 @@ public final class Routable extends Nukleus.Composite
     private final LongFunction<Correlation> lookupEstablished;
     private final LongSupplier supplyTargetId;
     private final Slab slab;
-    public final Int2IntHashMap urlToResponses = new Int2IntHashMap(NOT_PRESENT);
-    public final Int2IntHashMap urlToRequestHeaders = new Int2IntHashMap(NOT_PRESENT);
-    public final Int2IntHashMap urlToResponseLimit = new Int2IntHashMap(NOT_PRESENT);
-    public final Int2IntHashMap urlToRequestHeadersLimit = new Int2IntHashMap(NOT_PRESENT);
+    public final Int2IntHashMap urlToResponses;
+    public final Int2IntHashMap urlToRequestHeaders;
+    public final Int2IntHashMap urlToResponseLimit;
+    public final Int2IntHashMap urlToRequestHeadersLimit;
+    public final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
 
     public Routable(
         Context context,
@@ -73,6 +76,11 @@ public final class Routable extends Nukleus.Composite
         LongObjectBiConsumer<Correlation> correlateNew,
         LongFunction<Correlation> correlateEstablished,
         LongFunction<Correlation> lookupEstablished,
+        Int2IntHashMap urlToResponses,
+        Int2IntHashMap urlToRequestHeaders,
+        Int2IntHashMap urlToResponseLimit,
+        Int2IntHashMap urlToRequestHeadersLimit,
+        Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
         Slab slab)
     {
         this.context = context;
@@ -86,6 +94,11 @@ public final class Routable extends Nukleus.Composite
         this.targetsByName = new HashMap<>();
         this.routesByRef = new Long2ObjectHashMap<>();
         this.supplyTargetId = context.counters().streamsSourced()::increment;
+        this.urlToResponses = urlToResponses;
+        this.urlToRequestHeaders = urlToRequestHeaders;
+        this.urlToResponseLimit = urlToResponseLimit;
+        this.urlToRequestHeadersLimit = urlToRequestHeadersLimit;
+        this.awaitingRequestMatches = awaitingRequestMatches;
         this.slab = slab;
     }
 
@@ -173,7 +186,8 @@ public final class Routable extends Nukleus.Composite
                                   this::supplyRoutes, supplyTargetId, this::supplyTarget,
                                   correlateNew, lookupEstablished, correlateEstablished,
                                   this.urlToResponses, this.urlToRequestHeaders,
-                                  urlToResponseLimit, urlToRequestHeadersLimit, this.slab));
+                                  urlToResponseLimit, urlToRequestHeadersLimit,
+                                  this.awaitingRequestMatches, this.slab));
     }
 
     private Target supplyTarget(
