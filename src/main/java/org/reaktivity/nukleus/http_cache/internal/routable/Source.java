@@ -93,7 +93,7 @@ public final class Source implements Nukleus
         this.streamFactories.put(RouteKind.INPUT,
                 new ServerAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT,
-                new ProxyAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, correlateEstablished, supplyTarget,
+                new ProxyAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget,
                         urlToResponse, urlToRequestHeaders, urlToResponseLimit, urlToRequestHeadersLimit, awaitingRequestMatches,
                         slab)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT_ESTABLISHED,

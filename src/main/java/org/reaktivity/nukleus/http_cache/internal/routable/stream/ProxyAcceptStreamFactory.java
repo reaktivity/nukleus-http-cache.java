@@ -58,7 +58,6 @@ public final class ProxyAcceptStreamFactory
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
-    private final OctetsFW octetsRO = new OctetsFW();
     private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     private final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
     private final HttpBeginExFW cachedResponseRO = new HttpBeginExFW();
@@ -79,7 +78,6 @@ public final class ProxyAcceptStreamFactory
 
     private final Slab slab;
 
-    private final LongFunction<Correlation> correlateEstablished;
     private final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
 
     public ProxyAcceptStreamFactory(
@@ -87,7 +85,6 @@ public final class ProxyAcceptStreamFactory
         LongFunction<List<Route>> supplyRoutes,
         LongSupplier supplyTargetId,
         LongObjectBiConsumer<Correlation> correlateNew,
-        LongFunction<Correlation> correlateEstablished,
         Function<String, Target> supplyTargetRoute,
         Int2IntHashMap urlToResponses,
         Int2IntHashMap urlToRequestHeaders,
@@ -101,7 +98,6 @@ public final class ProxyAcceptStreamFactory
         this.supplyRoutes = supplyRoutes;
         this.supplyTargetId = supplyTargetId;
         this.correlateNew = correlateNew;
-        this.correlateEstablished = correlateEstablished;
         this.supplyTargetRoute = supplyTargetRoute;
         this.urlToResponse = urlToResponses;
         this.urlToRequestHeaders = urlToRequestHeaders;
@@ -125,16 +121,11 @@ public final class ProxyAcceptStreamFactory
         private Target target;
         private long targetId;
 
+        private Target replyTarget;
+        private long correlationId;
+        private String sourceName;
         // these are fields do to effectively final forEach
         private int requestSlabSize = 0;
-
-        private Target replyTarget;
-
-        private long sourceRef;
-
-        private long correlationId;
-
-        private String sourceName;
 
         private SourceInputStream()
         {
@@ -268,7 +259,6 @@ public final class ProxyAcceptStreamFactory
             final long correlationId = begin.correlationId();
             this.sourceName = begin.source().asString();
 
-            this.sourceRef = sourceRef;
             this.correlationId = correlationId;
             source.doWindow(newSourceId, 0);
 
@@ -368,7 +358,8 @@ public final class ProxyAcceptStreamFactory
                 final int requestURLHash,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            // TODO remove expired!!
+            // NOTE: we never store anything right now so this always returns false
+            // TODO remove if expired!!
             if(requestHeaders.anyMatch(h ->
             {
                 final String name = h.name().asString();
@@ -407,7 +398,14 @@ public final class ProxyAcceptStreamFactory
         {
             final int requestSlot = urlToRequestHeaders.get(requestURLHash);
             // TODO optimize with expected varies
-            return !(requestSlot == NOT_PRESENT);
+            final boolean hasXHttpCacheSync = requestHeaders.anyMatch(h ->
+            {
+                final String name = h.name().asString();
+                final String value = h.value().asString();
+                return "x-http-cache-sync".equals(name) && "always".equals(value);
+            });
+            boolean hasMatchingRequest = !(requestSlot == NOT_PRESENT);
+            return hasMatchingRequest && hasXHttpCacheSync;
         }
 
         private void processEnd(
@@ -544,13 +542,12 @@ public final class ProxyAcceptStreamFactory
             final String value = h.value().asString();
             switch (name)
             {
-//                case "cache-control":
-//                    TODO: ADD but ignore if injected?
-//                    if(value.contains("no-cache"))
-//                    {
-//                        return false;
-//                    }
-//                    return true;
+                case "cache-control":
+                    if(value.contains("no-cache"))
+                    {
+                        return false;
+                    }
+                    return true;
                 case ":method":
                     if("GET".equalsIgnoreCase(value))
                     {

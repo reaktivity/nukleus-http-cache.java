@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -60,36 +61,50 @@ public class ProxyIT
         k3po.finish();
     }
 
+
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/debounce.multiple.requests/accept/client",
-        "${streams}/debounce.multiple.requests/connect/server",
+        "${streams}/debounce.cache.sync/accept/client",
+        "${streams}/debounce.cache.sync/connect/server",
     })
-    public void shouldDebounceMultipleRequests() throws Exception
+    public void shouldDebounceCacheSync() throws Exception
     {
         k3po.finish();
     }
 
-//    @Test
-//    @Specification({
-//        "${streams}/cache.response/accept/client",
-//        "${streams}/cache.response/connect/server",
-//    })
-//    public void shouldCacheResponse() throws Exception
-//    {
-//        k3po.finish();
-//    }
-//
-//    @Test
-//    @Specification({
-//        "${streams}/cache.response.and.push.promise/accept/client",
-//        "${streams}/cache.response.and.push.promise/connect/server",
-//    })
-//    public void shouldCacheResponseAndPushPromise() throws Exception
-//    {
-//        k3po.finish();
-//    }
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.debounce.multiple.requests/accept/client",
+        "${streams}/not.debounce.multiple.requests/connect/server",
+    })
+    public void shouldNotDebounceMultipleRequests() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Ignore("not implemented")
+    @Specification({
+        "${streams}/cache.response/accept/client",
+        "${streams}/cache.response/connect/server",
+    })
+    public void shouldCacheResponse() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Ignore("not implemented")
+    @Specification({
+        "${streams}/cache.response.and.push.promise/accept/client",
+        "${streams}/cache.response.and.push.promise/connect/server",
+    })
+    public void shouldCacheResponseAndPushPromise() throws Exception
+    {
+        k3po.finish();
+    }
 
 
 }
