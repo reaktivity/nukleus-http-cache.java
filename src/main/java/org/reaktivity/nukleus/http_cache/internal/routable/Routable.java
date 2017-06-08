@@ -48,7 +48,6 @@ import org.reaktivity.nukleus.http_cache.internal.util.function.LongObjectBiCons
 public final class Routable extends Nukleus.Composite
 {
     private static final List<Route> EMPTY_ROUTES = emptyList();
-    public static final int NOT_PRESENT = -1;
 
     private final Context context;
     private final String sourceName;

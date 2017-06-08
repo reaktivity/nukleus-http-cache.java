@@ -88,11 +88,10 @@ public final class Source implements Nukleus
 
         this.streamFactories = new EnumMap<>(RouteKind.class);
         this.streamFactories.put(RouteKind.INPUT,
-                new ServerAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget)::newStream);
+                new ServerAcceptStreamFactory(this, supplyRoutes, supplyTargetId, supplyTarget)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT,
                 new ProxyAcceptStreamFactory(this, supplyRoutes, supplyTargetId, correlateNew, supplyTarget,
-                        urlToPendingStream, awaitingRequestMatches,
-                        slab)::newStream);
+                        urlToPendingStream, awaitingRequestMatches, slab)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT_ESTABLISHED,
                 new ProxyConnectReplyStreamFactory(this, supplyTarget, supplyTargetId, correlateEstablished,
                         urlToPendingStream, awaitingRequestMatches)::newStream);

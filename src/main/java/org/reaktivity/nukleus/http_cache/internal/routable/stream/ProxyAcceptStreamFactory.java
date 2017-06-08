@@ -19,7 +19,6 @@ import static org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab.NO
 import static org.reaktivity.nukleus.http_cache.internal.router.RouteKind.OUTPUT_ESTABLISHED;
 import static org.reaktivity.nukleus.http_cache.internal.util.function.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.util.function.HttpHeadersUtil.getRequestURL;
-import static org.reaktivity.nukleus.http_cache.internal.util.function.HttpHeadersUtil.hashRequestURL;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -275,7 +274,7 @@ public final class ProxyAcceptStreamFactory
                 final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
                 final ListFW<HttpHeaderFW> headers = httpBeginExRO.headers();
                 this.requestURL = getRequestURL(headers);
-                this.requestURLHash = hashRequestURL(requestURL);
+                this.requestURLHash = requestURL.hashCode();
 
                 if(!canBeServedByCache(headers))
                 {
