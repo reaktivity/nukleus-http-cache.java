@@ -24,15 +24,18 @@ public class Correlation
     private final long id;
     private final String source;
     private final RouteKind established;
+    private final int requestURLHash;
 
     public Correlation(
         long id,
         String source,
-        RouteKind established)
+        RouteKind established,
+        int requestURLHash)
     {
         this.id = id;
         this.source = requireNonNull(source, "source");
         this.established = requireNonNull(established, "established");
+        this.requestURLHash = requestURLHash;
     }
 
     public long id()
@@ -48,6 +51,11 @@ public class Correlation
     public RouteKind established()
     {
         return established;
+    }
+
+    public int requestURLHash()
+    {
+        return requestURLHash;
     }
 
     @Override
@@ -72,13 +80,15 @@ public class Correlation
         Correlation that = (Correlation) obj;
         return this.id == that.id &&
                 this.established == that.established &&
+                this.requestURLHash == that.requestURLHash &&
                 Objects.equals(this.source, that.source);
     }
 
     @Override
     public String toString()
     {
-        return String.format("[id=%d, source=\"%s\", established=%s]", id, source, established);
+        return String.format("[id=%d, source=\"%s\", established=%s, requestURLHash=%s]",
+                id, source, established, requestURLHash);
     }
 
 }
