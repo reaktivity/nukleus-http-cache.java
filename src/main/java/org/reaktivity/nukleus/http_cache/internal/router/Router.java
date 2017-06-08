@@ -18,10 +18,12 @@ package org.reaktivity.nukleus.http_cache.internal.router;
 
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.status.AtomicCounter;
 import org.reaktivity.nukleus.Nukleus;
@@ -29,6 +31,7 @@ import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.http_cache.internal.Context;
 import org.reaktivity.nukleus.http_cache.internal.conductor.Conductor;
 import org.reaktivity.nukleus.http_cache.internal.routable.Routable;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ProxyAcceptStreamFactory.SourceInputStream;
 import org.reaktivity.nukleus.http_cache.internal.routable.stream.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.control.Role;
 
@@ -45,6 +48,9 @@ public class Router extends Nukleus.Composite
     private Conductor conductor;
     private Slab slab;
 
+    public final Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
+    public final Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches;
+
     public Router(
         Context context)
     {
@@ -53,6 +59,8 @@ public class Router extends Nukleus.Composite
         this.correlations = new Long2ObjectHashMap<>();
         this.routesSourced = context.counters().routesSourced();
         this.slab = new Slab(context.memoryForRepeatRequests, context.maximumRequestSize);
+        this.urlToPendingStream = new  Int2ObjectHashMap<SourceInputStream>();
+        this.awaitingRequestMatches = new Int2ObjectHashMap<List<SourceInputStream>>();
     }
 
     public void setConductor(Conductor conductor)
@@ -144,6 +152,7 @@ public class Router extends Nukleus.Composite
         String sourceName)
     {
         return include(
-            new Routable(context, conductor, sourceName, correlations::put, correlations::get, correlations::remove, slab));
+            new Routable(context, conductor, sourceName, correlations::put, correlations::get, correlations::remove,
+                    urlToPendingStream, awaitingRequestMatches, slab));
     }
 }

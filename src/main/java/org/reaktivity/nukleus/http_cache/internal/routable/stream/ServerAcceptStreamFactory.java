@@ -28,26 +28,20 @@ import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Route;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
-import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
-import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.FrameFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.http_cache.internal.util.function.LongObjectBiConsumer;
 
-public final class SourceInputStreamFactory
+public final class ServerAcceptStreamFactory
 {
     private final FrameFW frameRO = new FrameFW();
 
     private final BeginFW beginRO = new BeginFW();
     private final DataFW dataRO = new DataFW();
     private final EndFW endRO = new EndFW();
-    private final OctetsFW octetsRO = new OctetsFW();
-    private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
 
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
@@ -56,19 +50,16 @@ public final class SourceInputStreamFactory
     private final LongFunction<List<Route>> supplyRoutes;
     private final LongSupplier supplyTargetId;
     private final Function<String, Target> supplyTargetRoute;
-    private final LongObjectBiConsumer<Correlation> correlateNew;
 
-    public SourceInputStreamFactory(
+    public ServerAcceptStreamFactory(
         Source source,
         LongFunction<List<Route>> supplyRoutes,
         LongSupplier supplyTargetId,
-        LongObjectBiConsumer<Correlation> correlateNew,
         Function<String, Target> supplyTargetRoute)
     {
         this.source = source;
         this.supplyRoutes = supplyRoutes;
         this.supplyTargetId = supplyTargetId;
-        this.correlateNew = correlateNew;
         this.supplyTargetRoute = supplyTargetRoute;
     }
 
@@ -82,8 +73,6 @@ public final class SourceInputStreamFactory
         private MessageHandler streamState;
 
         private long sourceId;
-        private long targetId;
-        private long correlationId;
 
         private SourceInputStream()
         {
@@ -189,6 +178,7 @@ public final class SourceInputStreamFactory
             int length,
             long sourceRef,
             long correlation,
+            long sourceId,
             String status)
         {
             final Optional<Route> optional = resolveReplyTo(sourceRef);
@@ -206,8 +196,8 @@ public final class SourceInputStreamFactory
                             hs.item(h -> h.name(":status").value(status));
                             hs.item(h -> h.name("content-type").value("text/event-stream"));
                         });
-
                 this.streamState = this::afterReplyOrReset;
+                replyTo.addThrottle(sourceId, this::handleThrottle);
             }
             else
             {
@@ -227,7 +217,7 @@ public final class SourceInputStreamFactory
             final long correlationId = begin.correlationId();
             source.doWindow(newSourceId, 0);
 
-            sendHttpResponseBegin(buffer, index, length, sourceRef, correlationId, "200");
+            sendHttpResponseBegin(buffer, index, length, sourceRef, correlationId, newSourceId, "200");
 
             this.sourceId = newSourceId;
             this.streamState = this::afterBeginOrData;
@@ -241,14 +231,6 @@ public final class SourceInputStreamFactory
             endRO.wrap(buffer, index, index + length);
             final long streamId = endRO.streamId();
             source.removeStream(streamId);
-        }
-
-        private Optional<Route> resolveTarget(
-            long sourceRef)
-        {
-            final List<Route> routes = supplyRoutes.apply(sourceRef);
-
-            return routes.stream().findFirst();
         }
 
         private Optional<Route> resolveReplyTo(
