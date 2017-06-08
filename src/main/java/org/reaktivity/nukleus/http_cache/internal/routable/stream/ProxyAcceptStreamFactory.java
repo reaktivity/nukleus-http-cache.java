@@ -37,6 +37,7 @@ import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Route;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
+import org.reaktivity.nukleus.http_cache.internal.routable.stream.ProxyConnectReplyStreamFactory.GroupThrottle;
 import org.reaktivity.nukleus.http_cache.internal.router.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -60,8 +61,7 @@ public final class ProxyAcceptStreamFactory
     private final EndFW endRO = new EndFW();
 
     private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW(); // sometimes used for request, sometimes response
-    private final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    private final ListFW<HttpHeaderFW> pendingRequestHeadersRO = new HttpBeginExFW().headers();
+    private final ListFW<HttpHeaderFW> headersRO = new HttpBeginExFW().headers();
 
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
@@ -74,7 +74,7 @@ public final class ProxyAcceptStreamFactory
 
     public final Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
     private final Slab slab;
-    private final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+    private final Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches;
 
     public ProxyAcceptStreamFactory(
         Source source,
@@ -83,7 +83,7 @@ public final class ProxyAcceptStreamFactory
         LongObjectBiConsumer<Correlation> correlateNew,
         Function<String, Target> supplyTargetRoute,
         Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
-        Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
+        Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches,
         Slab slab
        )
     {
@@ -114,24 +114,19 @@ public final class ProxyAcceptStreamFactory
         private Target replyTarget;
         private long correlationId;
         private String sourceName;
+
+        private List<SourceInputStream> awaitingRequests;
+        private String targetName;
+        private long targetRef;
+        private int requestCacheSlot;
+        private boolean usePendingRequest = true;
+        private int requestURLHash;
+        private String requestURL;
+        private MessageHandler replyMessageHandler;
+        private GroupThrottle replyThrottle;
+
         // these are fields do to effectively final forEach
         private int requestSlabSize = 0;
-
-        private List<MessageHandler> awaitingRequests;
-
-        private MessageHandler addedMessageHandler;
-
-        private String targetName;
-
-        private long targetRef;
-
-        private int requestCacheSlot;
-
-        private boolean usePendingRequest = true;
-
-        private int requestURLHash;
-
-        private String requestURL;
 
         private SourceInputStream()
         {
@@ -285,34 +280,36 @@ public final class ProxyAcceptStreamFactory
                 if(!canBeServedByCache(headers))
                 {
                     this.targetId = proxyRequest(correlationId, targetName, targetRef,
-                            httpBeginEx.headers());
+                            httpBeginEx.headers(), false);
                     clean();
                     this.streamState = this::afterBeginOrData;
                 }
                 else if(hasStoredResponseThatSatisfies(requestURL, requestURLHash, headers))
                 {
-                    // TODO
+                    // always false right now, so can't get here
                 }
                 else if(hasOutstandingRequestThatMaySatisfy(headers))
                 {
                     this.awaitingRequests =
-                            awaitingRequestMatches.getOrDefault(requestURLHash, new ArrayList<MessageHandler>());
+                            awaitingRequestMatches.getOrDefault(requestURLHash, new ArrayList<SourceInputStream>());
                     awaitingRequestMatches.put(requestURLHash, awaitingRequests);
                     this.requestCacheSlot = slab.acquire(newSourceId);
                     storeRequest(headers, requestCacheSlot);
-                    this.addedMessageHandler = this::handleReply;
-                    awaitingRequests.add(this.addedMessageHandler);
+                    this.replyMessageHandler = this::handleReply;
+                    awaitingRequests.add(this);
                     this.streamState = this::waitingForOutstanding;
                 }
                 else
                 {
-                    if(urlToPendingStream.containsKey(requestURLHash))
+                    boolean canBeUsedForPendingStream = !urlToPendingStream.containsKey(requestURLHash);
+                    if(canBeUsedForPendingStream)
                     {
                         this.requestCacheSlot = slab.acquire(requestURLHash);
                         storeRequest(headers, requestCacheSlot);
+                        urlToPendingStream.put(requestURLHash, this);
                     }
                     this.targetId = proxyRequest(correlationId, targetName,
-                            targetRef, httpBeginEx.headers());
+                            targetRef, httpBeginEx.headers(), canBeUsedForPendingStream);
                     this.streamState = this::afterBeginOrData;
                 }
                 this.sourceId = newSourceId;
@@ -322,14 +319,14 @@ public final class ProxyAcceptStreamFactory
 
         private int storeRequest(final ListFW<HttpHeaderFW> headers, int requestCacheSlot)
         {
+            // TODO, make method static when this.requestCacheBufferSize is not needed (i.e. when having streaming API)
+            // https://github.com/reaktivity/nukleus-maven-plugin/issues/16
             MutableDirectBuffer requestCacheBuffer = slab.buffer(requestCacheSlot);
             headers.forEach(h ->
             {
                 requestCacheBuffer.putBytes(this.requestSlabSize, h.buffer(), h.offset(), h.sizeof());
                 this.requestSlabSize += h.sizeof();
             });
-            // TODO, make method static when this.requestCacheBufferSize is not needed (i.e. when having streaming API)
-            // https://github.com/reaktivity/nukleus-maven-plugin/issues/16
             return this.requestSlabSize;
         }
 
@@ -337,14 +334,17 @@ public final class ProxyAcceptStreamFactory
                 final long correlationId,
                 final String targetName,
                 final long targetRef,
-                final ListFW<HttpHeaderFW> headers)
+                final ListFW<HttpHeaderFW> headers,
+                boolean canBeUsedForCache)
         {
             final Target newTarget = supplyTargetRoute.apply(targetName);
             final long newTargetId = supplyTargetId.getAsLong();
             final long targetCorrelationId = newTargetId;
-            final Correlation correlation = new Correlation(correlationId, source.routableName(),
-                                                OUTPUT_ESTABLISHED, requestURL, requestURLHash);
-                                        correlateNew.accept(targetCorrelationId, correlation);
+            // TODO, consider passing boolean in correlation, rather than magic value
+            final Correlation correlation = canBeUsedForCache ?
+                new Correlation(correlationId, source.routableName(), OUTPUT_ESTABLISHED, requestURLHash) :
+                new Correlation(correlationId, source.routableName(), OUTPUT_ESTABLISHED, -1);
+            correlateNew.accept(targetCorrelationId, correlation);
             newTarget.doHttpBegin(newTargetId, targetRef, targetCorrelationId, e ->
             {
                 headers.forEach(h ->
@@ -362,19 +362,9 @@ public final class ProxyAcceptStreamFactory
                 final int requestURLHash,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            // NOTE: we never store anything right now so this always returns false
-            // TODO remove if expired!!
-//            if(requestHeaders.anyMatch(h ->
-//            {
-//                final String name = h.name().asString();
-//                final String value = h.value().asString();
-//                return "cache-control".equals(name) && value.contains("no-cache");
-//            }))
-//            {
-//                return false;
-//            }
-              return false;
-
+            // NOTE: we never store anything right now so this always returns
+            // false
+            return false;
         }
 
         private boolean hasOutstandingRequestThatMaySatisfy(
@@ -488,19 +478,22 @@ public final class ProxyAcceptStreamFactory
                 int index,
                 int length)
         {
+
             beginRO.wrap(buffer, index, index + length);
             final OctetsFW extension = beginRO.extension();
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
-            final SourceInputStream pendingRequest = urlToPendingStream.get(requestURLHash);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
-            final ListFW<HttpHeaderFW> pendingRequestHeaders =
-                    pendingRequest.getRequestHeaders(pendingRequestHeadersRO);
-            final ListFW<HttpHeaderFW> myRequestHeadersRO = getRequestHeaders(requestHeadersRO);
 
-            String vary = HttpHeadersUtil.getHeader(responseHeaders, "vary");
-            String myAuthorizationHeader = getHeader(myRequestHeadersRO, "authorization");
-            String cachedAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+            final String vary = HttpHeadersUtil.getHeader(responseHeaders, "vary");
+            final String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+
+            final SourceInputStream pendingRequest = urlToPendingStream.get(requestURLHash);
+
+            pendingRequest.getRequestHeaders(headersRO);
+            final String pendingRequestAuthorizationHeader = getHeader(headersRO, "authorization");
+
+            getRequestHeaders(headersRO);
+            final String myAuthorizationHeader = getHeader(headersRO, "authorization");
 
             boolean useSharedResponse = true;
 
@@ -512,7 +505,7 @@ public final class ProxyAcceptStreamFactory
             {
                 useSharedResponse = false;
             }
-            else if(myAuthorizationHeader != null || cachedAuthorizationHeader != null)
+            else if(myAuthorizationHeader != null || pendingRequestAuthorizationHeader != null)
             {
                 useSharedResponse = false;
             }
@@ -520,34 +513,42 @@ public final class ProxyAcceptStreamFactory
             {
                 useSharedResponse = Arrays.stream(vary.split("\\s*,\\s*")).anyMatch(v ->
                 {
-                    String cachedHeaderValue = HttpHeadersUtil.getHeader(pendingRequestHeaders, v);
-                    String myHeaderValue = HttpHeadersUtil.getHeader(myRequestHeadersRO, v);
-                    return Objects.equals(cachedHeaderValue, myHeaderValue);
+                    pendingRequest.getRequestHeaders(headersRO);
+                    String pendingHeaderValue = HttpHeadersUtil.getHeader(headersRO, v);
+                    getRequestHeaders(headersRO);
+                    String myHeaderValue = HttpHeadersUtil.getHeader(headersRO, v);
+                    return Objects.equals(pendingHeaderValue, myHeaderValue);
                 });
             }
 
             if(useSharedResponse)
             {
                 clean();
-                this.replyTarget.doHttpBegin(this.sourceId, 0L, this.correlationId, e ->
+                this.targetId = supplyTargetId.getAsLong();
+                this.replyTarget.doHttpBegin(targetId, 0L, this.correlationId, e ->
                 {
                     responseHeaders.forEach(h ->
                     {
                         e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
                     });
                 });
+                this.replyTarget.addThrottle(this.targetId, this.replyThrottle::handleThrottle);
             }
             else
             {
+                this.replyThrottle.optOut();
                 this.usePendingRequest = false;
+                // TODO, consider allowing use in next cache, timing on clearing out stored
+                // request is needed for this to work though
+                getRequestHeaders(headersRO);
                 this.targetId = proxyRequest(correlationId, targetName, targetRef,
-                            myRequestHeadersRO);
+                        headersRO, false);
                 clean();
                 this.target.doHttpEnd(this.targetId);
             }
         }
 
-        private ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> headersFW)
+        private ListFW<HttpHeaderFW> getRequestHeaders(final ListFW<HttpHeaderFW> headersFW)
         {
             return headersFW.wrap(slab.buffer(this.requestCacheSlot), 0, this.requestSlabSize);
         }
@@ -558,7 +559,7 @@ public final class ProxyAcceptStreamFactory
                 int length)
         {
             dataRO.wrap(buffer, index, index + length);
-            this.replyTarget.doHttpData(this.sourceId, dataRO.payload());
+            this.replyTarget.doHttpData(this.targetId, dataRO.payload());
         }
 
         private void processEndReply(
@@ -566,7 +567,7 @@ public final class ProxyAcceptStreamFactory
             int index,
             int length)
         {
-            this.replyTarget.doHttpEnd(this.sourceId);
+            this.replyTarget.doHttpEnd(this.targetId);
         }
 
         public void clean()
@@ -575,6 +576,16 @@ public final class ProxyAcceptStreamFactory
             {
                 slab.release(this.requestCacheSlot);
             }
+        }
+
+        public MessageHandler replyMessageHandler()
+        {
+            return replyMessageHandler;
+        }
+
+        public void setReplyThrottle(GroupThrottle replyThrottle)
+        {
+            this.replyThrottle = replyThrottle;
         }
 
     }

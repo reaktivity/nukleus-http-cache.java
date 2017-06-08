@@ -25,6 +25,7 @@ import java.util.function.LongSupplier;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
+import org.agrona.collections.Long2LongHashMap;
 import org.agrona.concurrent.MessageHandler;
 import org.reaktivity.nukleus.http_cache.internal.routable.Source;
 import org.reaktivity.nukleus.http_cache.internal.routable.Target;
@@ -56,9 +57,8 @@ public final class ProxyConnectReplyStreamFactory
     private final Function<String, Target> supplyTarget;
     private final LongSupplier supplyStreamId;
     private final LongFunction<Correlation> correlateEstablished;
-    private final Slab slab;
 
-    private Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+    private Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches;
 
     private Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
 
@@ -68,8 +68,7 @@ public final class ProxyConnectReplyStreamFactory
         LongSupplier supplyStreamId,
         LongFunction<Correlation> correlateEstablished,
         Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
-        Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
-        Slab slab)
+        Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches)
     {
         this.source = source;
         this.supplyTarget = supplyTarget;
@@ -77,7 +76,6 @@ public final class ProxyConnectReplyStreamFactory
         this.correlateEstablished = correlateEstablished;
         this.awaitingRequestMatches = awaitingRequestMatches;
         this.urlToPendingStream = urlToPendingStream;
-        this.slab = slab;
     }
 
     public MessageHandler newStream()
@@ -93,7 +91,7 @@ public final class ProxyConnectReplyStreamFactory
 
         private Target target;
         private long targetId;
-        private List<MessageHandler> forwardResponsesTo;
+        private List<SourceInputStream> forwardResponsesTo;
 
         private TargetOutputEstablishedStream()
         {
@@ -133,7 +131,9 @@ public final class ProxyConnectReplyStreamFactory
         {
             if(forwardResponsesTo != null)
             {
-                this.forwardResponsesTo.stream().forEach(h -> h.onMessage(msgTypeId, buffer, index, length));
+                this.forwardResponsesTo.stream().forEach(
+                    h -> h.replyMessageHandler().onMessage(msgTypeId, buffer, index, length)
+                );
             }
             switch (msgTypeId)
             {
@@ -210,7 +210,7 @@ public final class ProxyConnectReplyStreamFactory
             int requestURLHash = correlation.requestURLHash();
 
             this.forwardResponsesTo = awaitingRequestMatches.remove(requestURLHash);
-            if(forwardResponsesTo == null)
+            if(requestURLHash == -1 || forwardResponsesTo == null)
             {
                 forwardResponsesTo = emptyList();
             }
@@ -231,14 +231,22 @@ public final class ProxyConnectReplyStreamFactory
                        e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
                     });
                 });
-                if(forwardResponsesTo != null)
+                GroupThrottle replyThrottle = new GroupThrottle(this.forwardResponsesTo.size() +1, source, newSourceId);
+
+                this.forwardResponsesTo.stream().forEach(sourceInputStream ->
+                    {
+                        sourceInputStream.setReplyThrottle(replyThrottle);
+                        sourceInputStream.replyMessageHandler().onMessage(BeginFW.TYPE_ID, buffer, index, length);
+                    }
+                );
+
+                SourceInputStream pendingStream = urlToPendingStream.remove(requestURLHash);
+                if(pendingStream != null)
                 {
-                    forwardResponsesTo.stream().forEach(h -> h.onMessage(BeginFW.TYPE_ID, buffer, index, length));
+                    pendingStream.clean();
                 }
 
-                urlToPendingStream.remove(requestURLHash).clean();
-
-                newTarget.addThrottle(newTargetId, this::handleThrottle);
+                newTarget.addThrottle(newTargetId, replyThrottle::handleThrottle);
 
                 this.sourceId = newSourceId;
                 this.target = newTarget;
@@ -272,8 +280,49 @@ public final class ProxyConnectReplyStreamFactory
             target.removeThrottle(targetId);
             source.removeStream(sourceId);
         }
+    }
 
-        private void handleThrottle(
+    public class GroupThrottle
+    {
+        long groupWaterMark = 0;
+        private final Long2LongHashMap streamToWaterMark;
+        private final long replyStreamId;
+        private int numParticipants;
+
+        private Source source;
+
+        GroupThrottle(
+            int numParticipants,
+            Source source,
+            long replyStreamId)
+        {
+            this.numParticipants = numParticipants;
+            this.replyStreamId = replyStreamId;
+            this.source = source;
+            streamToWaterMark = new Long2LongHashMap(0);
+        }
+
+        private void increment(long stream, long increment)
+        {
+            streamToWaterMark.put(stream, streamToWaterMark.get(stream) + increment);
+            updateThrottle();
+        }
+
+        private void updateThrottle()
+        {
+            if (numParticipants == streamToWaterMark.size())
+            {
+                long newLowWaterMark = streamToWaterMark.values().stream().min(Long::compare).get();
+                long diff = newLowWaterMark - groupWaterMark;
+                if (diff > 0)
+                {
+                    source.doWindow(replyStreamId, (int) diff);
+                    groupWaterMark = newLowWaterMark;
+                }
+            }
+        }
+
+        public void handleThrottle(
             int msgTypeId,
             DirectBuffer buffer,
             int index,
@@ -299,9 +348,10 @@ public final class ProxyConnectReplyStreamFactory
             int length)
         {
             windowRO.wrap(buffer, index, index + length);
-            if(windowRO.update() > 0)
+            int update = windowRO.update();
+            if(update > 0)
             {
-                source.doWindow(sourceId, windowRO.update());
+                increment(windowRO.streamId(), update);
             }
         }
 
@@ -311,9 +361,21 @@ public final class ProxyConnectReplyStreamFactory
             int length)
         {
             resetRO.wrap(buffer, index, index + length);
-
-            source.doReset(sourceId);
+            streamToWaterMark.remove(resetRO.streamId());
+            this.numParticipants--;
+            if(this.numParticipants == 0)
+            {
+                source.doReset(replyStreamId);
+            }
+            else
+            {
+                updateThrottle();
+            }
         }
 
+        public void optOut()
+        {
+            this.numParticipants--;
+        }
     }
 }

@@ -33,7 +33,6 @@ import org.agrona.LangUtil;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.AtomicBuffer;
-import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
@@ -64,7 +63,7 @@ public final class Routable extends Nukleus.Composite
     private final LongSupplier supplyTargetId;
     private final Slab slab;
     private final Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
-    private final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+    private final Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches;
 
     public Routable(
         Context context,
@@ -74,7 +73,7 @@ public final class Routable extends Nukleus.Composite
         LongFunction<Correlation> correlateEstablished,
         LongFunction<Correlation> lookupEstablished,
         Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
-        Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
+        Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches,
         Slab slab)
     {
         this.context = context;

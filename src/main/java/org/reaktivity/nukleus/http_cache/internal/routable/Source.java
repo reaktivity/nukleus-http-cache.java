@@ -74,7 +74,7 @@ public final class Source implements Nukleus
         LongFunction<Correlation> correlateEstablished,
         LongFunction<Correlation> lookupEstablished,
         Int2ObjectHashMap<SourceInputStream> urlToPendingStream,
-        Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches,
+        Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches,
         Slab slab)
     {
         this.sourceName = sourceName;
@@ -95,7 +95,7 @@ public final class Source implements Nukleus
                         slab)::newStream);
         this.streamFactories.put(RouteKind.OUTPUT_ESTABLISHED,
                 new ProxyConnectReplyStreamFactory(this, supplyTarget, supplyTargetId, correlateEstablished,
-                        urlToPendingStream, awaitingRequestMatches, slab)::newStream);
+                        urlToPendingStream, awaitingRequestMatches)::newStream);
 
         this.lookupEstablished = lookupEstablished;
     }

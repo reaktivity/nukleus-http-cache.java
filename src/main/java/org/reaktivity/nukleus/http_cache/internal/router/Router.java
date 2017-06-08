@@ -25,7 +25,6 @@ import java.util.regex.Pattern;
 
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
-import org.agrona.concurrent.MessageHandler;
 import org.agrona.concurrent.status.AtomicCounter;
 import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.Reaktive;
@@ -50,7 +49,7 @@ public class Router extends Nukleus.Composite
     private Slab slab;
 
     public final Int2ObjectHashMap<SourceInputStream> urlToPendingStream;
-    public final Int2ObjectHashMap<List<MessageHandler>> awaitingRequestMatches;
+    public final Int2ObjectHashMap<List<SourceInputStream>> awaitingRequestMatches;
 
     public Router(
         Context context)
@@ -61,7 +60,7 @@ public class Router extends Nukleus.Composite
         this.routesSourced = context.counters().routesSourced();
         this.slab = new Slab(context.memoryForRepeatRequests, context.maximumRequestSize);
         this.urlToPendingStream = new  Int2ObjectHashMap<SourceInputStream>();
-        this.awaitingRequestMatches = new Int2ObjectHashMap<List<MessageHandler>>();
+        this.awaitingRequestMatches = new Int2ObjectHashMap<List<SourceInputStream>>();
     }
 
     public void setConductor(Conductor conductor)
