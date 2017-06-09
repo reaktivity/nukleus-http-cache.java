@@ -35,11 +35,9 @@ import java.util.function.Consumer;
 
 import org.agrona.LangUtil;
 import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.Reaktive;
 import org.reaktivity.nukleus.http_cache.internal.Context;
 import org.reaktivity.nukleus.http_cache.internal.router.Router;
 
-@Reaktive
 public final class Watcher implements Nukleus
 {
     private final WatchService service;
