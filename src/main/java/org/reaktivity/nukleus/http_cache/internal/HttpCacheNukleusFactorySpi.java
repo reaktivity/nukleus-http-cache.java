@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal;
 
 import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
 import org.reaktivity.nukleus.http_cache.internal.conductor.Conductor;
 import org.reaktivity.nukleus.http_cache.internal.router.Router;
@@ -30,7 +31,9 @@ public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
     }
 
     @Override
-    public HttpCacheNukleus create(Configuration config)
+    public HttpCacheNukleus create(
+        Configuration config,
+        NukleusBuilder builder)
     {
         Context context = new Context();
         context.conclude(config);

@@ -34,7 +34,7 @@ public class HttpCacheNukleusFactorySpiTest
         Properties properties = new Properties();
         properties.setProperty(Configuration.DIRECTORY_PROPERTY_NAME, "target/nukleus-tests");
         Configuration config = new Configuration(properties);
-        Nukleus nukleus = factory.create("http-cache", config);
+        Nukleus nukleus = factory.create("http-cache", config, null);
         assertThat(nukleus, instanceOf(HttpCacheNukleus.class));
     }
 

@@ -17,10 +17,10 @@
 package org.reaktivity.nukleus.http_cache.internal;
 
 import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.Controller;
+import org.reaktivity.nukleus.ControllerBuilder;
 import org.reaktivity.nukleus.ControllerFactorySpi;
 
-public class HttpCacheControllerFactorySpi implements ControllerFactorySpi
+public class HttpCacheControllerFactorySpi implements ControllerFactorySpi<HttpCacheController>
 {
 
     @Override
@@ -30,21 +30,21 @@ public class HttpCacheControllerFactorySpi implements ControllerFactorySpi
     }
 
     @Override
-    public Class<? extends Controller> kind()
+    public Class<HttpCacheController> kind()
     {
         return HttpCacheController.class;
     }
 
     @Override
-    public <T extends Controller> T create(
-            Class<T> kind,
-            Configuration config)
+    public HttpCacheController create(
+            Configuration config,
+            ControllerBuilder<HttpCacheController> builder)
     {
         Context context = new Context();
         context.readonly(true)
             .conclude(config);
 
-        return kind.cast(new HttpCacheController(context));
+        return new HttpCacheController(context);
     }
 
 }
