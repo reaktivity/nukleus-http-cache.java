@@ -33,6 +33,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
+import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -148,13 +149,20 @@ public final class Target implements Nukleus
 
     public void doHttpData(
         long targetId,
-        OctetsFW payload)
+        OctetsFW payload,
+        OctetsFW extension)
     {
+        // TODO, bug in extension data where there if not present wrap() gives invalid data.
+        // Work around is use this explicitly: https://github.com/reaktivity/nukleus-maven-plugin/issues/23
+        Consumer<Builder> extensionMutator = extension.sizeof() > 0 ?
+            e -> e.set(extension.buffer(), extension.offset(), extension.sizeof()) :
+            e -> e.reset();
+
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetId)
-                .payload(p -> p.set(payload.buffer(), payload.offset(), payload.sizeof()))
-                .extension(e -> e.reset())
-                .build();
+            .streamId(targetId)
+            .payload(p -> p.set(payload.buffer(), payload.offset(), payload.sizeof()))
+            .extension(extensionMutator)
+            .build();
 
         streamsBuffer.write(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
