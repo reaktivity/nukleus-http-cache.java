@@ -266,7 +266,7 @@ public final class ProxyConnectReplyStreamFactory
             int length)
         {
             dataRO.wrap(buffer, index, index + length);
-            target.doHttpData(targetId, dataRO.payload());
+            target.doHttpData(targetId, dataRO.payload(), dataRO.extension());
         }
 
         private void processEnd(
