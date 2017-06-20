@@ -117,7 +117,7 @@ public final class ProxyAcceptStreamFactory
         private List<SourceInputStream> awaitingRequests;
         private String targetName;
         private long targetRef;
-        private int requestCacheSlot;
+        private int requestCacheSlot = NO_SLOT;
         private boolean usePendingRequest = true;
         private int requestURLHash;
         private String requestURL;
