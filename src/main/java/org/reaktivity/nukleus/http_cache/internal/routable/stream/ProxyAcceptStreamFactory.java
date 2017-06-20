@@ -169,9 +169,8 @@ public final class ProxyAcceptStreamFactory
                 processEnd(buffer, index, length);
                 break;
             case DataFW.TYPE_ID:
-                // TODO forward/proxy data!
-                long streamId = dataRO.wrap(buffer, index, length).streamId();
-                source.doReset(streamId);
+                dataRO.wrap(buffer, index, length);
+                target.doHttpData(this.targetId, dataRO.payload(), dataRO.extension());
                 break;
             default:
                 processUnexpected(buffer, index, length);
@@ -558,7 +557,7 @@ public final class ProxyAcceptStreamFactory
                 int length)
         {
             dataRO.wrap(buffer, index, index + length);
-            this.replyTarget.doHttpData(this.targetId, dataRO.payload());
+            this.replyTarget.doHttpData(this.targetId, dataRO.payload(), dataRO.extension());
         }
 
         private void processEndReply(
