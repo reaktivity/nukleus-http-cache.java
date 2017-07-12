@@ -91,11 +91,12 @@ public class Correlation
         result = 31 * result + slotIndex;
         result = 31 * result + slotLimit;
         result = 31 * result + bufferPool.hashCode();
+        result = 31 * result + requestURLHash;
+        result = 31 * result + awaitingRequestMatches.hashCode();
 
         return result;
     }
 
-    // DPW TODO Update equals
     @Override
     public boolean equals(Object obj)
     {
@@ -109,7 +110,9 @@ public class Correlation
                 this.slotIndex == that.slotIndex &&
                 this.slotLimit == that.slotLimit &&
                 Objects.equals(this.acceptName, that.acceptName) &&
-                Objects.equals(this.bufferPool, that.bufferPool);
+                Objects.equals(this.bufferPool, that.bufferPool) &&
+                this.requestURLHash == that.requestURLHash &&
+                this.awaitingRequestMatches.equals(that.awaitingRequestMatches);
     }
 
     @Override
