@@ -11,6 +11,8 @@
   <description>HTTP Cache Nukleus Implementation</description>
   <url>https://github.com/reaktivity/nukleus-http-cache.java</url>
 
+<inceptionYear>2016</inceptionYear>
+
   <licenses>
     <license>
       <name>The Apache Software License, Version 2.0</name>
@@ -50,10 +52,10 @@
     <k3po.nukleus.ext.version>0.7.1</k3po.nukleus.ext.version>
 
     <nukleus.plugin.version>0.10</nukleus.plugin.version>
-    <nukleus.version>0.6.2</nukleus.version>
+    <nukleus.version>0.7</nukleus.version>
 
     <nukleus.http.cache.spec.version>0.5</nukleus.http.cache.spec.version>
-    <reaktor.test.version>0.10</reaktor.test.version>
+    <reaktor.test.version>0.10.1</reaktor.test.version>
   </properties>
 
   <dependencies>

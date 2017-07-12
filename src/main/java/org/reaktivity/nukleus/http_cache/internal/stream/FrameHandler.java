@@ -13,31 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.util.function;
+package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import java.util.Objects;
-import java.util.function.BiConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
-@FunctionalInterface
-public interface LongObjectBiConsumer<T> extends BiConsumer<Long, T>
-{
-    void accept(long value, T t);
+public interface FrameHandler {
 
-    @Override
-    default void accept(Long value, T t)
-    {
-        this.accept(value.longValue(), t);
-    }
+    public void begin(BeginFW begin);
 
-    default LongObjectBiConsumer<T> andThen(
-        LongObjectBiConsumer<? super T> after)
-    {
-        Objects.requireNonNull(after);
-
-        return (l, r) ->
-        {
-            accept(l, r);
-            after.accept(l, r);
-        };
-    }
 }

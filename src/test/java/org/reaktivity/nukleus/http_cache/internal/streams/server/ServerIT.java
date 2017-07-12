@@ -25,23 +25,25 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.reaktor.test.NukleusRule;
+import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server")
-        .scriptProperty("routeTarget \"source\"")
+        .scriptProperty("routeTarget \"http-cache\"")
         .scriptProperty("newServerConnectRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final NukleusRule nukleus = new NukleusRule("http-cache")
-        .directory("target/nukleus-itests")
-        .commandBufferCapacity(1024)
-        .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024);
+    private final ReaktorRule nukleus = new ReaktorRule()
+            .directory("target/nukleus-itests")
+            .commandBufferCapacity(1024)
+            .responseBufferCapacity(1024)
+            .counterValuesBufferCapacity(1024)
+            .nukleus("http-cache"::equals)
+            .clean();
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);

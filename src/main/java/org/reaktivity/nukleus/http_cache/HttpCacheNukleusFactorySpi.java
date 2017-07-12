@@ -13,39 +13,41 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal;
+package org.reaktivity.nukleus.http_cache;
+
+import static org.reaktivity.nukleus.route.RouteKind.PROXY;
+import static org.reaktivity.nukleus.route.RouteKind.SERVER;
 
 import org.reaktivity.nukleus.Configuration;
+import org.reaktivity.nukleus.Nukleus;
 import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
-import org.reaktivity.nukleus.http_cache.internal.conductor.Conductor;
-import org.reaktivity.nukleus.http_cache.internal.router.Router;
-import org.reaktivity.nukleus.http_cache.internal.watcher.Watcher;
+import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactoryBuilder;
+import org.reaktivity.nukleus.http_cache.internal.stream.ServerStreamFactoryBuilder;
+import org.reaktivity.nukleus.http_cache.util.DelayedTaskScheduler;
 
 public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
 {
+
     @Override
     public String name()
     {
-        return HttpCacheNukleus.NAME;
+        return "http-cache";
     }
 
     @Override
-    public HttpCacheNukleus create(
+    public Nukleus create(
         Configuration config,
         NukleusBuilder builder)
     {
-        Context context = new Context();
-        context.conclude(config);
+        DelayedTaskScheduler scheduler = new DelayedTaskScheduler();
+        builder.inject(scheduler);
+        final ProxyStreamFactoryBuilder proxyFactoryBuilder = new ProxyStreamFactoryBuilder(scheduler::schedule);
+        final ServerStreamFactoryBuilder serverFactoryBuilder = new ServerStreamFactoryBuilder();
 
-        Conductor conductor = new Conductor(context);
-        Watcher watcher = new Watcher(context);
-        Router router = new Router(context);
-
-        conductor.setRouter(router);
-        watcher.setRouter(router);
-        router.setConductor(conductor);
-
-        return new HttpCacheNukleus(conductor, watcher, router, context);
+        return builder.streamFactory(PROXY, proxyFactoryBuilder)
+                      .streamFactory(SERVER, serverFactoryBuilder)
+                      .build();
     }
+
 }

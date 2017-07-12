@@ -13,16 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-
-package org.reaktivity.nukleus.http_cache.internal;
+package org.reaktivity.nukleus.http_cache;
 
 import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.ControllerBuilder;
 import org.reaktivity.nukleus.ControllerFactorySpi;
 
-public class HttpCacheControllerFactorySpi implements ControllerFactorySpi<HttpCacheController>
+public final class HttpCacheControllerFactorySpi implements ControllerFactorySpi<HttpCacheController>
 {
-
     @Override
     public String name()
     {
@@ -37,14 +35,11 @@ public class HttpCacheControllerFactorySpi implements ControllerFactorySpi<HttpC
 
     @Override
     public HttpCacheController create(
-            Configuration config,
-            ControllerBuilder<HttpCacheController> builder)
+        Configuration config,
+        ControllerBuilder<HttpCacheController> builder)
     {
-        Context context = new Context();
-        context.readonly(true)
-            .conclude(config);
-
-        return new HttpCacheController(context);
+        return builder.setName(name())
+                      .setFactory(HttpCacheController::new)
+                      .build();
     }
-
 }
