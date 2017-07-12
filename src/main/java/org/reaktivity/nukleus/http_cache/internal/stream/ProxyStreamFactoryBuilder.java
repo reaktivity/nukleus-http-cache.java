@@ -22,7 +22,6 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
-import org.reaktivity.nukleus.http_cache.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.route.RouteHandler;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
@@ -37,13 +36,10 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyStreamId;
     private LongSupplier supplyCorrelationId;
     private Supplier<BufferPool> supplyBufferPool;
-    private LongObjectBiConsumer<Runnable> scheduler;
 
-    public ProxyStreamFactoryBuilder(
-        LongObjectBiConsumer<Runnable> scheduler)
+    public ProxyStreamFactoryBuilder()
     {
         this.correlations = new Long2ObjectHashMap<>();
-        this.scheduler = scheduler;
     }
 
     @Override

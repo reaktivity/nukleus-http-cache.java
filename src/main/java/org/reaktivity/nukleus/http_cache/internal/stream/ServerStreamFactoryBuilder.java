@@ -30,10 +30,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     private MutableDirectBuffer writeBuffer;
     private LongSupplier supplyStreamId;
 
-    public ServerStreamFactoryBuilder()
-    {
-    }
-
     @Override
     public ServerStreamFactoryBuilder setRouteHandler(
         RouteHandler router)

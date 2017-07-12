@@ -52,7 +52,8 @@ import org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.route.RouteHandler;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
-public class ProxyStreamFactory implements StreamFactory {
+public class ProxyStreamFactory implements StreamFactory
+{
 
     private final BeginFW beginRO = new BeginFW();
     private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
@@ -90,7 +91,6 @@ public class ProxyStreamFactory implements StreamFactory {
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
 
         this.writer = new Writer(writeBuffer);
-        // DPW HMM,
         this.urlToPendingStream = new Long2ObjectHashMap<>();
         this.awaitingRequestMatches = new Int2ObjectHashMap<>();
     }
@@ -161,7 +161,6 @@ public class ProxyStreamFactory implements StreamFactory {
     {
         private final MessageConsumer acceptThrottle;
         private MessageConsumer streamState;
-        private int window;
 
         private MessageConsumer connect;
         private long connectStreamId;
@@ -244,21 +243,25 @@ public class ProxyStreamFactory implements StreamFactory {
                 final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
                 final ListFW<HttpHeaderFW> headers = httpBeginFW.headers();
 
-                final String requestURL = getRequestURL(headers); // DPW TODO canonicalize
+                final String requestURL = getRequestURL(headers); // TODO canonicalize
                 this.requestURLHash = requestURL.hashCode();
 
                 if (!canBeServedByCache(headers))
                 {
                     final Correlation correlation =
-                            new Correlation(acceptName, bufferPool, slotIndex, slotLimit, acceptCorrelationId, requestURLHash, awaitingRequestMatches);
+                            new Correlation(acceptName,
+                                            bufferPool,
+                                            slotIndex,
+                                            slotLimit,
+                                            acceptCorrelationId,
+                                            requestURLHash,
+                                            awaitingRequestMatches);
                     correlations.put(connectCorrelationId, correlation);
                     writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId, e ->
-                    {
                         headers.forEach(h ->
-                        {
-                            e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()));
-                        });
-                    });
+                            e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()))
+                        )
+                    );
                     router.setThrottle(connectName, connectStreamId, this::handleThrottle);
                     this.streamState = this::afterBegin;
                 }
@@ -272,7 +275,8 @@ public class ProxyStreamFactory implements StreamFactory {
 
                 else if (hasOutstandingRequestThatMaySatisfy(headers, requestURLHash))
                 {
-                    List<ProxyAcceptStream> awaitingRequests = awaitingRequestMatches.getOrDefault(requestURLHash, new ArrayList<ProxyAcceptStream>());
+                    List<ProxyAcceptStream> awaitingRequests = awaitingRequestMatches
+                                                              .getOrDefault(requestURLHash, new ArrayList<ProxyAcceptStream>());
                     awaitingRequestMatches.put(requestURLHash, awaitingRequests);
                     this.requestCacheSlot = bufferPool.acquire(acceptStreamId);
                     storeRequest(headers, requestCacheSlot);
@@ -292,16 +296,19 @@ public class ProxyStreamFactory implements StreamFactory {
                         storeRequest(headers, requestCacheSlot);
                         urlToPendingStream.put(requestURLHash, this);
                     }
-                    final Correlation correlation = 
-                            new Correlation(acceptName, bufferPool, slotIndex, slotLimit, acceptCorrelationId, requestURLHash, awaitingRequestMatches);
+                    final Correlation correlation = new Correlation(acceptName,
+                                                                    bufferPool,
+                                                                    slotIndex,
+                                                                    slotLimit,
+                                                                    acceptCorrelationId,
+                                                                    requestURLHash,
+                                                                    awaitingRequestMatches);
                     correlations.put(connectCorrelationId, correlation);
                     writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId, e ->
-                    {
-                        headers.forEach(h ->
-                        {
-                            e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()));
-                        });
-                    });
+                        headers.forEach(
+                            h -> e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()))
+                        )
+                    );
                     router.setThrottle(connectName, connectStreamId, this::handleThrottle);
                     this.streamState = this::afterBegin;
                 }
@@ -385,12 +392,10 @@ public class ProxyStreamFactory implements StreamFactory {
             {
                 router.setThrottle(acceptName, acceptReplyStreamId, this::handleGroupThrottle);
                 writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
-                {
-                    responseHeaders.forEach(h ->
-                    {
-                        e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()));
-                    });
-                });
+                    responseHeaders.forEach(
+                        h -> e.item(h2 -> h2.representation((byte)0).name(h.name().asString()).value(h.value().asString()))
+                    )
+                );
                 clean();
             }
             else
@@ -401,14 +406,18 @@ public class ProxyStreamFactory implements StreamFactory {
                 // request is needed for this to work though
                 final ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(headersRO);
                 writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId, e ->
-                {
                     requestHeaders.forEach(h ->
-                    {
-                        e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()));
-                    });
-                });
+                        e.item(h2 -> h2.name(h.name().asString()).value(h.value().asString()))
+                    )
+                );
 
-                Correlation correlation = new Correlation(acceptName, bufferPool, slotIndex, requestSize, acceptCorrelationId, requestURLHash, awaitingRequestMatches);
+                Correlation correlation = new Correlation(acceptName,
+                                                          bufferPool,
+                                                          slotIndex,
+                                                          requestSize,
+                                                          acceptCorrelationId,
+                                                          requestURLHash,
+                                                          awaitingRequestMatches);
                 correlations.put(connectCorrelationId, correlation);
 
                 writer.doHttpEnd(connect, connectStreamId);
@@ -438,7 +447,8 @@ public class ProxyStreamFactory implements StreamFactory {
             }
         }
 
-        private void clean() {
+        private void clean()
+        {
             if (this.requestCacheSlot != NO_SLOT)
             {
                 bufferPool.release(this.requestCacheSlot);
@@ -501,16 +511,8 @@ public class ProxyStreamFactory implements StreamFactory {
         private void handleData(
                 DataFW data)
         {
-            window -= dataRO.length();
-            if (window < 0)
-            {
-                writer.doReset(acceptThrottle, connectStreamId);
-            }
-            else
-            {
-                final OctetsFW payload = data.payload();
-                writer.doHttpData(connect, connectStreamId, payload.buffer(), payload.offset(), payload.sizeof());
-            }
+            final OctetsFW payload = data.payload();
+            writer.doHttpData(connect, connectStreamId, payload.buffer(), payload.offset(), payload.sizeof());
         }
 
         private void afterBegin(
@@ -583,11 +585,13 @@ public class ProxyStreamFactory implements StreamFactory {
             writer.doReset(acceptThrottle, connectStreamId);
         }
 
-        public void setReplyThrottle(GroupThrottle replyThrottle) {
+        public void setReplyThrottle(GroupThrottle replyThrottle)
+        {
             this.groupThrottle = replyThrottle;
         }
 
-        public MessageConsumer replyMessageHandler() {
+        public MessageConsumer replyMessageHandler()
+        {
             return this.replyMessageHandler;
         }
     }
@@ -657,7 +661,7 @@ public class ProxyStreamFactory implements StreamFactory {
                 int index,
                 int length)
         {
-            if(forwardResponsesTo != null)
+            if (forwardResponsesTo != null)
             {
                 this.forwardResponsesTo.stream().forEach(
                     h -> h.replyMessageHandler().accept(msgTypeId, buffer, index, length)
@@ -701,7 +705,7 @@ public class ProxyStreamFactory implements StreamFactory {
 
                 int requestURLHash = streamCorrelation.requestURLHash();
                 this.forwardResponsesTo = awaitingRequestMatches.remove(requestURLHash);
-                if(requestURLHash == -1 || forwardResponsesTo == null)
+                if (requestURLHash == -1 || forwardResponsesTo == null)
                 {
                     forwardResponsesTo = emptyList();
                 }
@@ -711,19 +715,17 @@ public class ProxyStreamFactory implements StreamFactory {
 
                 // What if this stream is RESET?
                 writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
-                {
                     httpBeginEx.headers().forEach(h ->
-                    {
                        e.item(h2 -> h2.representation((byte)0)
                                       .name(h.name().asString())
-                                      .value(h.value().asString()));
-                    });
-                });
+                                      .value(h.value().asString()))
+                    )
+                );
                 this.replyThrottle = new GroupThrottle(forwardResponsesTo.size() +1,
                         writer,
                         connectThrottle,
                         connectReplyStreamId);
-                
+
                 router.setThrottle(acceptReplyName, acceptReplyStreamId, this::handleThrottle);
                 this.forwardResponsesTo.stream().forEach(acceptStream ->
                 {

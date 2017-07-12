@@ -18,7 +18,13 @@ package org.reaktivity.nukleus.http_cache.util;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
-public class HttpCacheUtils {
+public final class HttpCacheUtils
+{
+
+    private HttpCacheUtils()
+    {
+        // utility class
+    }
 
     public static boolean canBeServedByCache(
         ListFW<HttpHeaderFW> headers)
@@ -30,13 +36,13 @@ public class HttpCacheUtils {
             switch (name)
             {
                 case "cache-control":
-                    if(value.contains("no-cache"))
+                    if (value.contains("no-cache"))
                     {
                         return false;
                     }
                     return true;
                 case ":method":
-                    if("GET".equalsIgnoreCase(value))
+                    if ("GET".equalsIgnoreCase(value))
                     {
                         return false;
                     }

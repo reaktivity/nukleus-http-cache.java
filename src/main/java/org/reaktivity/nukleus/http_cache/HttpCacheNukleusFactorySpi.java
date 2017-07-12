@@ -24,7 +24,6 @@ import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
 import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactoryBuilder;
 import org.reaktivity.nukleus.http_cache.internal.stream.ServerStreamFactoryBuilder;
-import org.reaktivity.nukleus.http_cache.util.DelayedTaskScheduler;
 
 public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
 {
@@ -40,9 +39,7 @@ public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
         Configuration config,
         NukleusBuilder builder)
     {
-        DelayedTaskScheduler scheduler = new DelayedTaskScheduler();
-        builder.inject(scheduler);
-        final ProxyStreamFactoryBuilder proxyFactoryBuilder = new ProxyStreamFactoryBuilder(scheduler::schedule);
+        final ProxyStreamFactoryBuilder proxyFactoryBuilder = new ProxyStreamFactoryBuilder();
         final ServerStreamFactoryBuilder serverFactoryBuilder = new ServerStreamFactoryBuilder();
 
         return builder.streamFactory(PROXY, proxyFactoryBuilder)

@@ -24,8 +24,8 @@ import org.agrona.collections.Int2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactory.ProxyAcceptStream;
 
-public class Correlation {
-
+public class Correlation
+{
     private final String acceptName;
     private final int slotIndex;
     private final int slotLimit;
@@ -63,7 +63,8 @@ public class Correlation {
         return acceptCorrelation;
     }
 
-    public int slotIndex() {
+    public int slotIndex()
+    {
         return slotIndex;
     }
 
@@ -72,7 +73,8 @@ public class Correlation {
         return slotLimit;
     }
 
-    public BufferPool bufferPool() {
+    public BufferPool bufferPool()
+    {
         return bufferPool;
     }
 
@@ -85,10 +87,10 @@ public class Correlation {
     public int hashCode()
     {
         int result = Long.hashCode(acceptCorrelation);
-        result = 31 * acceptName.hashCode();
-        result = 31 * slotIndex;
-        result = 31 * slotLimit;
-        result = 31 * bufferPool.hashCode();
+        result = 31 * result + acceptName.hashCode();
+        result = 31 * result + slotIndex;
+        result = 31 * result + slotLimit;
+        result = 31 * result + bufferPool.hashCode();
 
         return result;
     }
@@ -117,7 +119,8 @@ public class Correlation {
                 acceptCorrelation, slotIndex, slotLimit, acceptName, bufferPool);
     }
 
-    public Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches() {
+    public Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches()
+    {
         return awaitingRequestMatches;
     }
 

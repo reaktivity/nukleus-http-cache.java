@@ -21,7 +21,13 @@ import java.util.function.Predicate;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
-public class HttpHeadersUtil {
+public final class HttpHeadersUtil
+{
+
+    private HttpHeadersUtil()
+    {
+        // utility class
+    }
 
     public static final String CACHE_SYNC = "x-http-cache-sync";
     public static final String INJECTED_HEADER_NAME = "x-poll-injected";
@@ -43,7 +49,7 @@ public class HttpHeadersUtil {
     {
         headers.forEach(header ->
         {
-            if(predicate.test(header))
+            if (predicate.test(header))
             {
                 consumer.accept(header);
             }
@@ -105,7 +111,7 @@ public class HttpHeadersUtil {
         final StringBuilder header = new StringBuilder();
         cachedRequestHeadersRO.forEach(h ->
         {
-            if(headerName.equals(h.name().asString()))
+            if (headerName.equals(h.name().asString()))
             {
                 // TODO multiple list values?
                 header.append(h.value().asString());

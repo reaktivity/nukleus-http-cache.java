@@ -52,7 +52,7 @@ public class GroupThrottle
     {
         if (numParticipants == streamToWaterMark.size())
         {
-            long newLowWaterMark = streamToWaterMark.values().stream().min(Long::compare).get();
+            long newLowWaterMark = streamToWaterMark.values().stream().min(Long::compare).orElse(groupWaterMark);
             long diff = newLowWaterMark - groupWaterMark;
             if (diff > 0)
             {

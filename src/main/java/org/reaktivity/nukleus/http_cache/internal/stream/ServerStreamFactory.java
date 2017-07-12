@@ -33,7 +33,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteHandler;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
-public class ServerStreamFactory implements StreamFactory {
+public class ServerStreamFactory implements StreamFactory
+{
 
     private final BeginFW beginRO = new BeginFW();
     private final RouteFW routeRO = new RouteFW();
@@ -66,7 +67,7 @@ public class ServerStreamFactory implements StreamFactory {
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
 
-        MessageConsumer newStream = newAcceptStream(begin, throttle);
+        final MessageConsumer newStream = newAcceptStream(begin, throttle);
 
         return newStream;
     }
@@ -147,9 +148,8 @@ public class ServerStreamFactory implements StreamFactory {
             final long acceptRef = beginRO.sourceRef();
             final String acceptName = begin.source().asString();
             final RouteFW connectRoute = resolveTarget(acceptRef, acceptName);
-            long acceptStreamId = begin.streamId();
 
-            if(connectRoute == null)
+            if (connectRoute == null)
             {
                 writer.doReset(acceptThrottle, acceptStreamId);
             }
@@ -167,7 +167,6 @@ public class ServerStreamFactory implements StreamFactory {
                 writer.doWindow(acceptThrottle, acceptStreamId, 0, 0);
                 this.streamState = this::afterBegin;
                 router.setThrottle(acceptName, acceptReplyStreamId, this::handleThrottle);
-                
             }
         }
 

@@ -15,58 +15,16 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.bench;
 
-import static java.nio.ByteBuffer.allocateDirect;
-import static java.nio.file.FileVisitOption.FOLLOW_LINKS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.agrona.BitUtil.SIZE_OF_INT;
-import static org.agrona.BitUtil.SIZE_OF_LONG;
-import static org.reaktivity.nukleus.Configuration.DIRECTORY_PROPERTY_NAME;
-import static org.reaktivity.nukleus.Configuration.STREAMS_BUFFER_CAPACITY_PROPERTY_NAME;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Properties;
-import java.util.Random;
-import java.util.function.Consumer;
-
-import org.agrona.LangUtil;
-import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.AtomicBuffer;
-import org.agrona.concurrent.MessageHandler;
-import org.agrona.concurrent.UnsafeBuffer;
-import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Group;
-import org.openjdk.jmh.annotations.GroupThreads;
-import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.Control;
-import org.openjdk.jmh.runner.Runner;
-import org.openjdk.jmh.runner.RunnerException;
-import org.openjdk.jmh.runner.options.Options;
-import org.openjdk.jmh.runner.options.OptionsBuilder;
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.http_cache.HttpCacheController;
-import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
-import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.reaktor.Reaktor;
 
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.Throughput)

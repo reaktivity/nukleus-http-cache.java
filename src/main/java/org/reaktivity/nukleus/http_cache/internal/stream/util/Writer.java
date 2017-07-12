@@ -41,7 +41,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-public class Writer {
+public class Writer
+{
 
     private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer("http-cache".getBytes(UTF_8));
 
@@ -196,11 +197,11 @@ public class Writer {
             Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
             ListFW<HttpHeaderFW> headers)
     {
-        if(headers.anyMatch(INJECTED_DEFAULT_HEADER) || headers.anyMatch(INJECTED_HEADER_AND_NO_CACHE))
+        if (headers.anyMatch(INJECTED_DEFAULT_HEADER) || headers.anyMatch(INJECTED_HEADER_AND_NO_CACHE))
         {
             // Already injected, NOOP
         }
-        else if(headers.anyMatch(NO_CACHE_CACHE_CONTROL))
+        else if (headers.anyMatch(NO_CACHE_CACHE_CONTROL))
         {
             // INJECT HEADER
             mutator = mutator.andThen(

@@ -17,8 +17,9 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
-public interface FrameHandler {
+public interface FrameHandler
+{
 
-    public void begin(BeginFW begin);
+    void begin(BeginFW begin);
 
 }
