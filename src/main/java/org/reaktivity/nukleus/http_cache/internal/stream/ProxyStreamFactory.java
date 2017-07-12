@@ -160,24 +160,23 @@ public class ProxyStreamFactory implements StreamFactory
     public final class ProxyAcceptStream
     {
         private final MessageConsumer acceptThrottle;
-        private MessageConsumer streamState;
-
-        private MessageConsumer connect;
-        private long connectStreamId;
-        private int slotIndex = NO_SLOT;
-        private int slotLimit = -1;
-        private int requestCacheSlot;
-        private int requestSize;
-        private boolean usePendingRequest;
-        private MessageConsumer replyMessageHandler;
-        private int requestURLHash;
+        private String acceptName;
         private MessageConsumer acceptReply;
         private long acceptReplyStreamId;
         private long acceptCorrelationId;
-        private String acceptName;
+
+        private MessageConsumer connect;
         private long connectRef;
         private long connectCorrelationId;
-        private String connectName;
+        private long connectStreamId;
+
+        private MessageConsumer streamState;
+
+        private int requestCacheSlot = NO_SLOT;
+        private int requestSize;
+        private boolean usePendingRequest;
+        private MessageConsumer responseMessageHandler;
+        private int requestURLHash;
         private GroupThrottle groupThrottle;
 
         private ProxyAcceptStream(
@@ -230,7 +229,7 @@ public class ProxyStreamFactory implements StreamFactory
             }
             else
             {
-                this.connectName = connectRoute.target().asString();
+                final String connectName = connectRoute.target().asString();
                 this.connect = router.supplyTarget(connectName);
                 this.connectRef = connectRoute.targetRef();
                 this.connectCorrelationId = supplyCorrelationId.getAsLong();
@@ -243,19 +242,13 @@ public class ProxyStreamFactory implements StreamFactory
                 final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
                 final ListFW<HttpHeaderFW> headers = httpBeginFW.headers();
 
-                final String requestURL = getRequestURL(headers); // TODO canonicalize
+                final String requestURL = getRequestURL(headers); // TODO canonicalize or will http / http2 nuklei do that for us
                 this.requestURLHash = requestURL.hashCode();
 
                 if (!canBeServedByCache(headers))
                 {
                     final Correlation correlation =
-                            new Correlation(acceptName,
-                                            bufferPool,
-                                            slotIndex,
-                                            slotLimit,
-                                            acceptCorrelationId,
-                                            requestURLHash,
-                                            awaitingRequestMatches);
+                            new Correlation(acceptName, acceptCorrelationId, requestURLHash, awaitingRequestMatches);
                     correlations.put(connectCorrelationId, correlation);
                     writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId, e ->
                         headers.forEach(h ->
@@ -280,7 +273,7 @@ public class ProxyStreamFactory implements StreamFactory
                     awaitingRequestMatches.put(requestURLHash, awaitingRequests);
                     this.requestCacheSlot = bufferPool.acquire(acceptStreamId);
                     storeRequest(headers, requestCacheSlot);
-                    this.replyMessageHandler = this::handleReply;
+                    this.responseMessageHandler = this::handleReply;
                     this.usePendingRequest = true;
                     awaitingRequests.add(this);
                     this.streamState = this::waitingForOutstanding;
@@ -296,13 +289,8 @@ public class ProxyStreamFactory implements StreamFactory
                         storeRequest(headers, requestCacheSlot);
                         urlToPendingStream.put(requestURLHash, this);
                     }
-                    final Correlation correlation = new Correlation(acceptName,
-                                                                    bufferPool,
-                                                                    slotIndex,
-                                                                    slotLimit,
-                                                                    acceptCorrelationId,
-                                                                    requestURLHash,
-                                                                    awaitingRequestMatches);
+                    final Correlation correlation =
+                            new Correlation(acceptName, acceptCorrelationId, requestURLHash, awaitingRequestMatches);
                     correlations.put(connectCorrelationId, correlation);
                     writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId, e ->
                         headers.forEach(
@@ -411,13 +399,8 @@ public class ProxyStreamFactory implements StreamFactory
                     )
                 );
 
-                Correlation correlation = new Correlation(acceptName,
-                                                          bufferPool,
-                                                          slotIndex,
-                                                          requestSize,
-                                                          acceptCorrelationId,
-                                                          requestURLHash,
-                                                          awaitingRequestMatches);
+                Correlation correlation =
+                        new Correlation(acceptName, acceptCorrelationId, requestURLHash, awaitingRequestMatches);
                 correlations.put(connectCorrelationId, correlation);
 
                 writer.doHttpEnd(connect, connectStreamId);
@@ -592,7 +575,7 @@ public class ProxyStreamFactory implements StreamFactory
 
         public MessageConsumer replyMessageHandler()
         {
-            return this.replyMessageHandler;
+            return this.responseMessageHandler;
         }
     }
 

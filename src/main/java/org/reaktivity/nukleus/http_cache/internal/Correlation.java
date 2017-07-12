@@ -21,34 +21,24 @@ import java.util.List;
 import java.util.Objects;
 
 import org.agrona.collections.Int2ObjectHashMap;
-import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactory.ProxyAcceptStream;
 
 public class Correlation
 {
     private final String acceptName;
-    private final int slotIndex;
-    private final int slotLimit;
     private long acceptCorrelation;
-    private final BufferPool bufferPool;
     private final int requestURLHash;
     private final Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches;
 
     public Correlation(
         String acceptName,
-        BufferPool bufferPool,
-        int slotIndex,
-        int slotLimit,
         long acceptCorrelation,
         int requestURLHash,
         Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches
     )
     {
         this.acceptName = requireNonNull(acceptName);
-        this.slotIndex = slotIndex;
-        this.slotLimit = slotLimit;
         this.acceptCorrelation = acceptCorrelation;
-        this.bufferPool = bufferPool;
         this.requestURLHash = requestURLHash;
         this.awaitingRequestMatches = awaitingRequestMatches;
     }
@@ -63,21 +53,6 @@ public class Correlation
         return acceptCorrelation;
     }
 
-    public int slotIndex()
-    {
-        return slotIndex;
-    }
-
-    public int slotLimit()
-    {
-        return slotLimit;
-    }
-
-    public BufferPool bufferPool()
-    {
-        return bufferPool;
-    }
-
     public int requestURLHash()
     {
         return requestURLHash;
@@ -88,9 +63,6 @@ public class Correlation
     {
         int result = Long.hashCode(acceptCorrelation);
         result = 31 * result + acceptName.hashCode();
-        result = 31 * result + slotIndex;
-        result = 31 * result + slotLimit;
-        result = 31 * result + bufferPool.hashCode();
         result = 31 * result + requestURLHash;
         result = 31 * result + awaitingRequestMatches.hashCode();
 
@@ -107,10 +79,7 @@ public class Correlation
 
         Correlation that = (Correlation) obj;
         return this.acceptCorrelation == that.acceptCorrelation &&
-                this.slotIndex == that.slotIndex &&
-                this.slotLimit == that.slotLimit &&
                 Objects.equals(this.acceptName, that.acceptName) &&
-                Objects.equals(this.bufferPool, that.bufferPool) &&
                 this.requestURLHash == that.requestURLHash &&
                 this.awaitingRequestMatches.equals(that.awaitingRequestMatches);
     }
@@ -118,8 +87,8 @@ public class Correlation
     @Override
     public String toString()
     {
-        return String.format("[connectCorrelation=%d, slotIndex=%d slotLimit=%d connectSource=\"%s\", bufferPool=%s]",
-                acceptCorrelation, slotIndex, slotLimit, acceptName, bufferPool);
+        return String.format("[acceptCorrelation=\"%s\", acceptName=\"%s\" requestURLHash=%d]",
+                acceptCorrelation, acceptName, requestURLHash);
     }
 
     public Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches()
