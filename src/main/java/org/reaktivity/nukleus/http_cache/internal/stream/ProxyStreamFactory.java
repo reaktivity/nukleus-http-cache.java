@@ -579,7 +579,6 @@ public class ProxyStreamFactory implements StreamFactory
         }
     }
 
-
     private final class ProxyConnectReplyStream
     {
         private MessageConsumer streamState;
@@ -587,21 +586,13 @@ public class ProxyStreamFactory implements StreamFactory
         private final MessageConsumer connectThrottle;
         private final long connectReplyStreamId;
 
-        private Correlation streamCorrelation;
         private MessageConsumer acceptReply;
         private long acceptReplyStreamId;
 
-        private long connectCorrelationId;
-
-        private String acceptReplyName;
-
-        private long acceptCorrelationId;
-
         private List<ProxyAcceptStream> forwardResponsesTo;
+        private Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches;
 
         private GroupThrottle replyThrottle;
-
-        private Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches;
 
         private ProxyConnectReplyStream(
                 MessageConsumer connectReplyThrottle,
@@ -675,15 +666,15 @@ public class ProxyStreamFactory implements StreamFactory
                 BeginFW begin)
         {
             final long connectRef = begin.sourceRef();
-            this.connectCorrelationId = begin.correlationId();
-            streamCorrelation = connectRef == 0L ? correlations.remove(connectCorrelationId) : null;
+            final long connectCorrelationId = begin.correlationId();
+            final Correlation streamCorrelation = connectRef == 0L ? correlations.remove(connectCorrelationId) : null;
 
             if (streamCorrelation != null)
             {
-                this.acceptReplyName = streamCorrelation.acceptName();
+                final String acceptReplyName = streamCorrelation.acceptName();
                 this.acceptReply = router.supplyTarget(acceptReplyName);
                 this.acceptReplyStreamId = supplyStreamId.getAsLong();
-                this.acceptCorrelationId = streamCorrelation.acceptCorrelation();
+                final long acceptCorrelationId = streamCorrelation.acceptCorrelation();
                 this.awaitingRequestMatches = streamCorrelation.awaitingRequestMatches();
 
                 int requestURLHash = streamCorrelation.requestURLHash();

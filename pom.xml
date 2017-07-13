@@ -11,7 +11,7 @@
   <description>HTTP Cache Nukleus Implementation</description>
   <url>https://github.com/reaktivity/nukleus-http-cache.java</url>
 
-<inceptionYear>2016</inceptionYear>
+  <inceptionYear>2016</inceptionYear>
 
   <licenses>
     <license>

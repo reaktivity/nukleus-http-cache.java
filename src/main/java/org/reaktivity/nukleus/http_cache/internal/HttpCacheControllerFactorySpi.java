@@ -13,11 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache;
+package org.reaktivity.nukleus.http_cache.internal;
 
 import org.reaktivity.nukleus.Configuration;
 import org.reaktivity.nukleus.ControllerBuilder;
 import org.reaktivity.nukleus.ControllerFactorySpi;
+import org.reaktivity.nukleus.http_cache.HttpCacheController;
 
 public final class HttpCacheControllerFactorySpi implements ControllerFactorySpi<HttpCacheController>
 {
