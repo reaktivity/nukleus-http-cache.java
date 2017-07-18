@@ -27,19 +27,25 @@ public class Correlation
 {
     private final int requestURLHash;
     private final MessageConsumer consumer;
+    private final boolean follow304;
 
     private MessageConsumer connectReplyThrottle;
     private BufferPool bufferPool;
     private int correlationRequestHeadersSlot;
     private int requestSize;
     private long connectReplyStreamId;
+    private final String connectName;
+    private final long connectRef;
 
     public Correlation(
         int requestURLHash,
         MessageConsumer consumer,
         BufferPool bufferPool,
         int correlationRequestHeadersSlot,
-        int requestSize
+        int requestSize,
+        boolean follow304,
+        String connectName,
+        long connectRef
     )
     {
         this.requestURLHash = requireNonNull(requestURLHash);
@@ -47,6 +53,9 @@ public class Correlation
         this.bufferPool = bufferPool;
         this.correlationRequestHeadersSlot = correlationRequestHeadersSlot;
         this.requestSize = requestSize;
+        this.follow304 = follow304;
+        this.connectName = connectName;
+        this.connectRef = connectRef;
     }
 
     public int requestURLHash()
@@ -121,5 +130,20 @@ public class Correlation
     public void cleanUp()
     {
         bufferPool.release(correlationRequestHeadersSlot);
+    }
+
+    public boolean follow304()
+    {
+        return follow304;
+    }
+
+    public String connectName()
+    {
+        return connectName;
+    }
+
+    public long connectRef()
+    {
+        return connectRef;
     }
 }

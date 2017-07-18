@@ -60,7 +60,27 @@ public class ProxyIT
     {
         k3po.finish();
     }
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/proxy.request.and.304/accept/client",
+        "${streams}/proxy.request.and.304/connect/server",
+    })
+    public void shouldProxyRequestWith304() throws Exception
+    {
+        k3po.finish();
+    }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/proxy.request.and.follow.304/accept/client",
+        "${streams}/proxy.request.and.follow.304/connect/server",
+    })
+    public void shouldProxyAndFollow304() throws Exception
+    {
+        k3po.finish();
+    }
 
     @Test
     @Specification({

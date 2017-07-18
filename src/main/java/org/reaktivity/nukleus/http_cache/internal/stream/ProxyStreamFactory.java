@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -282,16 +283,15 @@ public class ProxyStreamFactory implements StreamFactory
 
                     this.junction = new FanOut();
 
-                    System.out.println("Storing Request");
-                    requestHeaders.forEach(h -> System.out.println(h.name().asString() + ": " + h.value().asString()));
-                    System.out.println("WHAT!");
-
                     Correlation correlation = new Correlation(
                         requestURLHash,
                         junction,
                         bufferPool,
                         correlationRequestHeadersSlot,
-                        requestSize);
+                        requestSize,
+                        true,
+                        connectName,
+                        connectRef);
 
                     correlations.put(connectCorrelationId, correlation);
 
@@ -321,7 +321,10 @@ public class ProxyStreamFactory implements StreamFactory
                     this::proxyBack,
                     null,
                     NO_SLOT,
-                    -1);
+                    -1,
+                    false,
+                    connectName,
+                    connectRef);
 
             correlations.put(connectCorrelationId, streamCorrelation);
 
@@ -379,10 +382,18 @@ public class ProxyStreamFactory implements StreamFactory
 
                     this.streamCorrelation = this.junction.getStreamCorrelation();
 
-                    final ListFW<HttpHeaderFW> pendingRequestHeaders = streamCorrelation.headers(pendingRequestHeadersRO);
-                    final ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
+                    // both user buffer pool and buffer pool counters are singletons...
+                    Supplier<ListFW<HttpHeaderFW>> pendingRequestHeaders = () ->
+                    {
+                        return streamCorrelation.headers(pendingRequestHeadersRO);
+                    };
 
-                    if(responseCanSatisfyRequest(pendingRequestHeaders, responseHeaders))
+                    Supplier<ListFW<HttpHeaderFW>> myRequestHeaders = () ->
+                    {
+                        return getRequestHeaders(myRequestHeadersRO);
+                    };
+
+                    if (responseCanSatisfyRequest(pendingRequestHeaders, myRequestHeaders, responseHeaders))
                     {
                         writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
                             responseHeaders.forEach(h ->
@@ -396,7 +407,7 @@ public class ProxyStreamFactory implements StreamFactory
                     {
                         this.junction = null;
                         this.connectCorrelationId = supplyCorrelationId.getAsLong();
-                        proxyRequest(myRequestHeaders);
+                        proxyRequest(myRequestHeaders.get());
                         writer.doHttpEnd(connect, connectStreamId);
                         return false;
                     }
@@ -463,23 +474,17 @@ public class ProxyStreamFactory implements StreamFactory
         }
 
         private boolean responseCanSatisfyRequest(
-                final ListFW<HttpHeaderFW> pendingRequestHeaders,
+                final Supplier<ListFW<HttpHeaderFW>> pendingRequestHeaders,
+                final Supplier<ListFW<HttpHeaderFW>> myRequestHeaders,
                 final ListFW<HttpHeaderFW> responseHeaders)
         {
 
-            System.out.println("pending");
-            pendingRequestHeaders.forEach(h -> System.out.println(h.name().asString() + ": " + h.value().asString()));
-            ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
-            System.out.println("mine");
-            myRequestHeaders.forEach(h -> System.out.println(h.name().asString() + ": " + h.value().asString()));
             final String vary = getHeader(responseHeaders, "vary");
             final String cacheControl = getHeader(responseHeaders, "cache-control");
-            System.out.println("");
-            System.out.println("");
 
-            final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
+            final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders.get(), "authorization");
 
-            final String myAuthorizationHeader = getHeader(myRequestHeaders, "authorization");
+            final String myAuthorizationHeader = getHeader(myRequestHeaders.get(), "authorization");
 
             boolean useSharedResponse = true;
 
@@ -499,10 +504,8 @@ public class ProxyStreamFactory implements StreamFactory
             {
                 useSharedResponse = stream(vary.split("\\s*,\\s*")).anyMatch(v ->
                 {
-                    String pendingHeaderValue = getHeader(pendingRequestHeaders, v);
-                    String myHeaderValue = getHeader(myRequestHeaders, v);
-                    System.out.println(pendingHeaderValue);
-                    System.out.println(myHeaderValue);
+                    String pendingHeaderValue = getHeader(pendingRequestHeaders.get(), v);
+                    String myHeaderValue = getHeader(myRequestHeaders.get(), v);
                     return Objects.equals(pendingHeaderValue, myHeaderValue);
                 });
             }
@@ -736,24 +739,68 @@ public class ProxyStreamFactory implements StreamFactory
         private void handleBegin(
                 BeginFW begin)
         {
-            final long connectRef = begin.sourceRef();
+            final long connectReplyRef = begin.sourceRef();
             final long connectCorrelationId = begin.correlationId();
 
-            final Correlation streamCorrelation = connectRef == 0L ?
+            final Correlation streamCorrelation = connectReplyRef == 0L ?
                 correlations.remove(connectCorrelationId) : null;
 
             if (streamCorrelation != null)
             {
-                streamCorrelation.setConnectReplyThrottle(connectReplyThrottle);
-                streamCorrelation.setConnectReplyStreamId(connectReplyStreamId);
-                final MessageConsumer consumer = streamCorrelation.consumer();
-                consumer.accept(BeginFW.TYPE_ID, begin.buffer(), begin.offset(), begin.sizeof());
-                streamState = consumer;
+                if (streamCorrelation.follow304())
+                {
+                    final OctetsFW extension = begin.extension();
+                    final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
+                    final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+                    final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.headers(pendingRequestHeadersRO);
+                    if (responseHeaders.anyMatch(h -> ":status".equals(h.name().asString())
+                                                && "304".equals(h.value().asString())) &&
+                        requestHeaders.anyMatch(h -> "x-poll-injected".equals(h.name().asString()))
+                        )
+                    {
+                        writer.doWindow(connectReplyThrottle, connectReplyStreamId, 0, 0);
+                        final String connectName = streamCorrelation.connectName();
+                        final long connectRef = streamCorrelation.connectRef();
+                        final MessageConsumer newConnect = router.supplyTarget(connectName);
+                        final long newConnectStreamId = supplyStreamId.getAsLong();
+                        final long newConnectCorrelationId = supplyCorrelationId.getAsLong();
+                        writer.doHttpBegin(newConnect, newConnectStreamId, connectRef, newConnectCorrelationId, e ->
+                            requestHeaders.forEach(
+                                    h -> e.item(h2 -> h2.representation((byte) 0).name(h.name()).value(h.value()))
+                                )
+                            );
+                        correlations.put(newConnectCorrelationId, streamCorrelation);
+                        writer.doHttpEnd(newConnect, newConnectStreamId);
+                        streamState = this::ignoreRest;
+                    }
+                    else
+                    {
+                        forwardConnectReply(begin, streamCorrelation);
+                    }
+                }
+                else
+                {
+                    forwardConnectReply(begin, streamCorrelation);
+                }
             }
             else
             {
                 writer.doReset(connectReplyThrottle, connectReplyStreamId);
             }
+        }
+
+        private void forwardConnectReply(BeginFW begin, final Correlation streamCorrelation)
+        {
+            streamCorrelation.setConnectReplyThrottle(connectReplyThrottle);
+            streamCorrelation.setConnectReplyStreamId(connectReplyStreamId);
+            final MessageConsumer consumer = streamCorrelation.consumer();
+            consumer.accept(BeginFW.TYPE_ID, begin.buffer(), begin.offset(), begin.sizeof());
+            streamState = consumer;
+        }
+
+        private void ignoreRest(int msgTypeId, DirectBuffer buffer, int index, int length)
+        {
+            // NOOP
         }
     }
 
@@ -797,7 +844,7 @@ public class ProxyStreamFactory implements StreamFactory
             for (Iterator<BooleanMessageConsumer> i = outs.iterator(); i.hasNext();)
             {
                 BooleanMessageConsumer messageConsumer = i.next();
-                if(!messageConsumer.accept(msgTypeId, buffer, index, length))
+                if (!messageConsumer.accept(msgTypeId, buffer, index, length))
                 {
                     i.remove();
                 }
