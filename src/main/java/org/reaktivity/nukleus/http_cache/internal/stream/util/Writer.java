@@ -34,6 +34,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -52,6 +53,7 @@ public class Writer
     private final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
+    private final AbortFW.Builder abortRW = new AbortFW.Builder();
 
     private final MutableDirectBuffer writeBuffer;
 
@@ -155,6 +157,18 @@ public class Writer
                          .build();
 
         target.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+    }
+
+    public void doAbort(
+            MessageConsumer target,
+            long targetStreamId)
+    {
+        AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .streamId(targetStreamId)
+                .extension(e -> e.reset())
+                .build();
+
+        target.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
     }
 
     public void doWindow(

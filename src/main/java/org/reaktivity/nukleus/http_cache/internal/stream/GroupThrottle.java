@@ -65,11 +65,12 @@ public class GroupThrottle
 
     public void processWindow(
         long streamId,
-        int update)
+        int bytes,
+        int frames)
     {
-        if (update > 0)
+        if (bytes > 0)
         {
-            increment(streamId, update);
+            increment(streamId, bytes);
         }
     }
 

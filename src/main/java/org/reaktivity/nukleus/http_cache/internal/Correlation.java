@@ -17,40 +17,36 @@ package org.reaktivity.nukleus.http_cache.internal;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.List;
-import java.util.Objects;
-
-import org.agrona.collections.Int2ObjectHashMap;
-import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactory.ProxyAcceptStream;
+import org.agrona.MutableDirectBuffer;
+import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public class Correlation
 {
-    private final String acceptName;
-    private long acceptCorrelation;
     private final int requestURLHash;
-    private final Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches;
+    private final MessageConsumer consumer;
+
+    private MessageConsumer connectReplyThrottle;
+    private BufferPool bufferPool;
+    private int correlationRequestHeadersSlot;
+    private int requestSize;
+    private long connectReplyStreamId;
 
     public Correlation(
-        String acceptName,
-        long acceptCorrelation,
         int requestURLHash,
-        Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches
+        MessageConsumer consumer,
+        BufferPool bufferPool,
+        int correlationRequestHeadersSlot,
+        int requestSize
     )
     {
-        this.acceptName = requireNonNull(acceptName);
-        this.acceptCorrelation = acceptCorrelation;
-        this.requestURLHash = requestURLHash;
-        this.awaitingRequestMatches = awaitingRequestMatches;
-    }
-
-    public String acceptName()
-    {
-        return acceptName;
-    }
-
-    public long acceptCorrelation()
-    {
-        return acceptCorrelation;
+        this.requestURLHash = requireNonNull(requestURLHash);
+        this.consumer = consumer;
+        this.bufferPool = bufferPool;
+        this.correlationRequestHeadersSlot = correlationRequestHeadersSlot;
+        this.requestSize = requestSize;
     }
 
     public int requestURLHash()
@@ -58,42 +54,72 @@ public class Correlation
         return requestURLHash;
     }
 
-    @Override
-    public int hashCode()
+    public ListFW<HttpHeaderFW> headers(ListFW<HttpHeaderFW> headersRO)
     {
-        int result = Long.hashCode(acceptCorrelation);
-        result = 31 * result + acceptName.hashCode();
-        result = 31 * result + requestURLHash;
-        result = 31 * result + awaitingRequestMatches.hashCode();
-
-        return result;
+        final MutableDirectBuffer buffer = bufferPool.buffer(correlationRequestHeadersSlot);
+        return headersRO.wrap(buffer, 0, requestSize);
     }
 
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (!(obj instanceof Correlation))
-        {
-            return false;
-        }
+//    @Override
+//    public int hashCode()
+//    {
+//        int result = Long.hashCode(acceptCorrelation);
+//        result = 31 * result + acceptName.hashCode();
+//        result = 31 * result + requestURLHash;
+//        result = 31 * result + awaitingRequestMatches.hashCode();
+//
+//        return result;
+//    }
+//
+//    @Override
+//    public boolean equals(Object obj)
+//    {
+//        if (!(obj instanceof Correlation))
+//        {
+//            return false;
+//        }
+//
+//        Correlation that = (Correlation) obj;
+//        return this.acceptCorrelation == that.acceptCorrelation &&
+//                Objects.equals(this.acceptName, that.acceptName) &&
+//                this.requestURLHash == that.requestURLHash &&
+//                this.awaitingRequestMatches.equals(that.awaitingRequestMatches);
+//    }
+//
+//    @Override
+//    public String toString()
+//    {
+//        return String.format("[acceptCorrelation=\"%s\", acceptName=\"%s\" requestURLHash=%d]",
+//                acceptCorrelation, acceptName, requestURLHash);
+//    }
 
-        Correlation that = (Correlation) obj;
-        return this.acceptCorrelation == that.acceptCorrelation &&
-                Objects.equals(this.acceptName, that.acceptName) &&
-                this.requestURLHash == that.requestURLHash &&
-                this.awaitingRequestMatches.equals(that.awaitingRequestMatches);
+    public MessageConsumer consumer()
+    {
+        return this.consumer;
     }
 
-    @Override
-    public String toString()
+    public void setConnectReplyThrottle(MessageConsumer connectReplyThrottle)
     {
-        return String.format("[acceptCorrelation=\"%s\", acceptName=\"%s\" requestURLHash=%d]",
-                acceptCorrelation, acceptName, requestURLHash);
+        this.connectReplyThrottle = connectReplyThrottle;
     }
 
-    public Int2ObjectHashMap<List<ProxyAcceptStream>> awaitingRequestMatches()
+    public MessageConsumer getConnectReplyThrottle()
     {
-        return awaitingRequestMatches;
+        return this.connectReplyThrottle;
     }
 
+    public void setConnectReplyStreamId(long streamId)
+    {
+        this.connectReplyStreamId = streamId;
+    }
+
+    public long getConnectReplyStreamId()
+    {
+        return this.connectReplyStreamId;
+    }
+
+    public void cleanUp()
+    {
+        bufferPool.release(correlationRequestHeadersSlot);
+    }
 }
