@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.ABORT_STREAM_FRAME_TYPE_ID;
 
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -26,6 +27,7 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class ProxyIT
@@ -42,6 +44,7 @@ public class ProxyIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024)
             .nukleus("http-cache"::equals)
+            .configure(ABORT_STREAM_FRAME_TYPE_ID, AbortFW.TYPE_ID)
             .clean();
 
     @Rule
@@ -66,6 +69,50 @@ public class ProxyIT
         "${streams}/debounce.cache.sync/connect/server",
     })
     public void shouldDebounceCacheSync() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/accept/client",
+        "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/connect/server",
+    })
+    public void shouldDebounceCacheSyncAndInjectIndividualizedPushPromise() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/debounce.cache.sync.and.individualize.push.promise/accept/client",
+        "${streams}/debounce.cache.sync.and.individualize.push.promise/connect/server",
+    })
+    public void shouldDebounceCacheSyncAndIndividualizePushPromise() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/debounce.cache.sync.but.not.forward.304/accept/client",
+        "${streams}/debounce.cache.sync.but.not.forward.304/connect/server",
+    })
+    public void shouldDebounceCacheSyncButNotForward304() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/debounce.cache.sync.but.not.forward.304.without.pp/accept/client",
+        "${streams}/debounce.cache.sync.but.not.forward.304.without.pp/connect/server",
+    })
+    public void shouldDebounceCacheSyncButNotForward304WithoutPP() throws Exception
     {
         k3po.finish();
     }
@@ -128,6 +175,7 @@ public class ProxyIT
     @Test
     @Ignore("not implemented")
     @Specification({
+        "${route}/proxy/controller",
         "${streams}/cache.response/accept/client",
         "${streams}/cache.response/connect/server",
     })
@@ -139,10 +187,66 @@ public class ProxyIT
     @Test
     @Ignore("not implemented")
     @Specification({
+        "${route}/proxy/controller",
         "${streams}/cache.response.and.push.promise/accept/client",
         "${streams}/cache.response.and.push.promise/connect/server",
     })
     public void shouldCacheResponseAndPushPromise() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/proxy.post.request/accept/client",
+        "${streams}/proxy.post.request/connect/server",
+    })
+    public void shouldProxyPostRequest() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/accept.sent.abort/accept/client",
+        "${streams}/accept.sent.abort/connect/server",
+    })
+    public void acceptSentAbort() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/connect.reply.sent.abort/accept/client",
+        "${streams}/connect.reply.sent.abort/connect/server",
+    })
+    public void connectReplySentAbort() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/connect.sent.reset/accept/client",
+        "${streams}/connect.sent.reset/connect/server",
+    })
+    public void connectSentReset() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/accept.reply.sent.reset/accept/client",
+        "${streams}/accept.reply.sent.reset/connect/server",
+    })
+    public void acceptReplySentReset() throws Exception
     {
         k3po.finish();
     }
