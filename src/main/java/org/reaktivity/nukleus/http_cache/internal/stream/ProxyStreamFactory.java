@@ -330,7 +330,7 @@ public class ProxyStreamFactory implements StreamFactory
                     junctions.put(requestURLHash, junction);
                     junction.addSubscriber(this::handleMyInitiatedFanout);
 
-                    sendRequest(requestHeaders);
+                    sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
 
                     // send 0 window back to complete handshake
                     writer.doWindow(acceptThrottle, acceptStreamId, 0, 0);
@@ -441,69 +441,13 @@ public class ProxyStreamFactory implements StreamFactory
                         this.connectStreamId = supplyStreamId.getAsLong();
 
                         final ListFW<HttpHeaderFW> requestHeaders = myRequestHeaders.get();
-                        sendRequest(requestHeaders);
+                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
                         return false;
                     }
                 default:
                     proxyBackAfterBegin(msgTypeId, buffer, index, length);
                     return true;
             }
-        }
-
-        private void sendRequest(final ListFW<HttpHeaderFW> requestHeaders)
-        {
-            boolean stripNoCacheValue = false;
-
-            Predicate<HttpHeaderFW> isInjected = h -> INJECTED_HEADER_NAME.equals(h.name().asString());
-            isInjected.or(h -> "x-http-cache-sync".equals(h.name().asString()));
-            isInjected.or(h -> "x-http-cache-sync".equals(h.name().asString()));
-            if (requestHeaders.anyMatch(INJECTED_HEADER_AND_NO_CACHE) && requestHeaders.anyMatch(NO_CACHE_CACHE_CONTROL))
-                {
-                    isInjected = isInjected.or(h -> CACHE_CONTROL.equals(h.name().asString()));
-                    if (requestHeaders.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())))
-                    {
-                        stripNoCacheValue = true;
-                    }
-            }
-            final Predicate<HttpHeaderFW> forwardHeader = isInjected.negate();
-            final boolean stripNoCacheValue2 = stripNoCacheValue;
-
-            writer.doHttpBegin2(
-                connect,
-                connectStreamId,
-                connectRef,
-                connectCorrelationId,
-                hs -> requestHeaders.forEach(h ->
-                {
-                    final StringFW nameRO = h.name();
-                    final String name = nameRO.asString();
-                    final String16FW valueRO = h.value();
-                    final String value = valueRO.asString();
-                    if (forwardHeader.test(h))
-                    {
-                        System.out.println("Forwarding: " + name + ": " + value);
-                        hs.item(b ->
-                            b.representation((byte) 0).name(nameRO).value(valueRO)
-                        );
-                    }
-                    else if (stripNoCacheValue2 && CACHE_CONTROL.equals(name))
-                    {
-                        System.out.println("Stripping no cache " + name + ": " + value);
-                        hs.item(b ->
-                            {
-                                String replaceFirst = value.replaceFirst(",?\\s*no-cache", "");
-                                b.representation((byte) 0)
-                                        .name(nameRO)
-                                        .value(replaceFirst);
-                            }
-                        );
-                    }
-                    else
-                    {
-                        System.out.println(" stripping: " + name + ": " + value);
-                    }
-            }));
-            writer.doHttpEnd(connect, connectStreamId);
         }
 
         private void proxyBack(
@@ -549,7 +493,7 @@ public class ProxyStreamFactory implements StreamFactory
                     writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L,
                             acceptCorrelationId, injectStaleWhileRevalidate(headersToExtensions(responseHeaders)));
                 }
-                injectPushPromiseIfNeeded(requestHeaders, responseHeaders);
+                injectPushPromise(requestHeaders, responseHeaders);
             }
             else
             {
@@ -616,19 +560,18 @@ public class ProxyStreamFactory implements StreamFactory
                             .value(h.value())));
         }
 
-        private void injectPushPromiseIfNeeded(
+        private void injectPushPromise(
             ListFW<HttpHeaderFW> requestHeaders,
             ListFW<HttpHeaderFW> responseHeaders)
         {
-            if (!requestHeaders.anyMatch(
-                    h -> INJECTED_HEADER_NAME.equals(h.name().asString())))
-            {
+            System.out.println("Request Headers");
+            requestHeaders.forEach(h -> System.out.println("\t" + h.name().asString() + ": " + h.value().asString()));
+            System.out.println("Response Headers");
+            responseHeaders.forEach(h -> System.out.println("\t" + h.name().asString() + ": " + h.value().asString()));
                 writer.doH2PushPromise(
                         acceptReply,
                         acceptReplyStreamId,
-                        injectPushHeaders(requestHeaders, responseHeaders));
-            }
-
+                        setPushPromiseHeaders(requestHeaders, responseHeaders));
         }
 
         private void proxyBackAfterBegin(
@@ -697,8 +640,9 @@ public class ProxyStreamFactory implements StreamFactory
             return useSharedResponse;
         }
 
-        private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> injectPushHeaders(
-                ListFW<HttpHeaderFW> requestHeadersFW, ListFW<HttpHeaderFW> responseHeadersFW)
+        private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
+                ListFW<HttpHeaderFW> requestHeadersFW,
+                ListFW<HttpHeaderFW> responseHeadersFW)
         {
             Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result;
 
@@ -1066,13 +1010,8 @@ public class ProxyStreamFactory implements StreamFactory
                         final MessageConsumer newConnect = router.supplyTarget(connectName);
                         final long newConnectStreamId = supplyStreamId.getAsLong();
                         final long newConnectCorrelationId = supplyCorrelationId.getAsLong();
-                        writer.doHttpBegin(newConnect, newConnectStreamId, connectRef, newConnectCorrelationId, e ->
-                            requestHeaders.forEach(
-                                    h -> e.item(h2 -> h2.representation((byte) 0).name(h.name()).value(h.value()))
-                                )
-                            );
+                        sendRequest(newConnect, newConnectStreamId, connectRef, newConnectCorrelationId, requestHeaders);
                         correlations.put(newConnectCorrelationId, streamCorrelation);
-                        writer.doHttpEnd(newConnect, newConnectStreamId);
                         streamState = this::ignoreRest;
                     }
                     else
@@ -1226,5 +1165,65 @@ public class ProxyStreamFactory implements StreamFactory
             int length)
     {
         return routeRO.wrap(buffer, index, index + length);
+    }
+
+    private void sendRequest(
+            final MessageConsumer connect,
+            final long connectStreamId,
+            final long connectRef,
+            final long connectCorrelationId,
+            final ListFW<HttpHeaderFW> requestHeaders)
+    {
+        boolean stripNoCacheValue = false;
+
+        Predicate<HttpHeaderFW> isInjected = h -> INJECTED_HEADER_NAME.equals(h.name().asString());
+        isInjected = isInjected.or(h -> "x-http-cache-sync".equals(h.name().asString()));
+        if (requestHeaders.anyMatch(INJECTED_HEADER_AND_NO_CACHE) && requestHeaders.anyMatch(NO_CACHE_CACHE_CONTROL))
+            {
+                isInjected = isInjected.or(h -> CACHE_CONTROL.equals(h.name().asString()));
+                if (requestHeaders.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())))
+                {
+                    stripNoCacheValue = true;
+                }
+        }
+        final Predicate<HttpHeaderFW> forwardHeader = isInjected.negate();
+        final boolean stripNoCacheValue2 = stripNoCacheValue;
+
+        writer.doHttpBegin2(
+            connect,
+            connectStreamId,
+            connectRef,
+            connectCorrelationId,
+            hs -> requestHeaders.forEach(h ->
+            {
+                final StringFW nameRO = h.name();
+                final String name = nameRO.asString();
+                final String16FW valueRO = h.value();
+                final String value = valueRO.asString();
+                if (forwardHeader.test(h))
+                {
+                    System.out.println("Forwarding: " + name + ": " + value);
+                    hs.item(b ->
+                        b.representation((byte) 0).name(nameRO).value(valueRO)
+                    );
+                }
+                else if (stripNoCacheValue2 && CACHE_CONTROL.equals(name) && !"no-cache".equals(value))
+                {
+                    System.out.println("Stripping no cache " + name + ": " + value);
+                    hs.item(b ->
+                        {
+                            String replaceFirst = value.replaceFirst(",?\\s*no-cache", "");
+                            b.representation((byte) 0)
+                                    .name(nameRO)
+                                    .value(replaceFirst);
+                        }
+                    );
+                }
+                else
+                {
+                    System.out.println(" stripping: " + name + ": " + value);
+                }
+        }));
+        writer.doHttpEnd(connect, connectStreamId);
     }
 }
