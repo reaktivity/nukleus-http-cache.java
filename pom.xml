@@ -48,7 +48,7 @@
     <junit.version>4.12</junit.version>
     <jmh.version>1.12</jmh.version>
 
-    <k3po.version>3.0.0-alpha-77</k3po.version>
+    <k3po.version>3.0.0-alpha-79</k3po.version>
     <k3po.nukleus.ext.version>develop-SNAPSHOT</k3po.nukleus.ext.version>
 
     <nukleus.plugin.version>0.10</nukleus.plugin.version>
@@ -157,7 +157,7 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
+      <!--<plugin>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>2.17</version>
         <configuration>
@@ -171,7 +171,7 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
+      </plugin>-->
       <plugin>
         <groupId>org.kaazing</groupId>
         <artifactId>k3po-maven-plugin</artifactId>

@@ -19,6 +19,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.reaktor.internal.ReaktorConfiguration.ABORT_STREAM_FRAME_TYPE_ID;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -35,7 +36,7 @@ public class ProxyWithSystemConfigurationIT
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
     private final ReaktorRule nukleus = new ReaktorRule()
             .directory("target/nukleus-itests")
@@ -50,21 +51,11 @@ public class ProxyWithSystemConfigurationIT
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
 
+    @Ignore("ABORT vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/proxy.request/accept/client",
-        "${streams}/proxy.request/connect/server",
-        })
-    public void shouldProxyRequest() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
         "${streams}/nukleus.overloaded/accept/client",
-        "${streams}/nukleus.overloaded/connect/server",
     })
     public void shouldResetIfOOM() throws Exception
     {

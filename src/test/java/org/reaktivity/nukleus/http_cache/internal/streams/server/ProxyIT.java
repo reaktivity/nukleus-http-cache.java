@@ -36,7 +36,7 @@ public class ProxyIT
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
     private final ReaktorRule nukleus = new ReaktorRule()
             .directory("target/nukleus-itests")
@@ -265,8 +265,8 @@ public class ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/client.sent.abort.on.scheduled.poll/accept/client",
-        "${streams}/client.sent.abort.on.scheduled.poll/accept/server"})
+        "${streams}/client.sent.abort.on.scheduled.poll/accept/client"
+    })
     public void clientSentAbortOnScheduledPoll() throws Exception
     {
         k3po.finish();
