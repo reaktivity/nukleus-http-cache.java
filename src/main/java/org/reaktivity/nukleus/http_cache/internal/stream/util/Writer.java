@@ -16,13 +16,6 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.CACHE_SYNC;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.INJECTED_DEFAULT_HEADER;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.INJECTED_HEADER_AND_NO_CACHE;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.INJECTED_HEADER_AND_NO_CACHE_VALUE;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.INJECTED_HEADER_DEFAULT_VALUE;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.INJECTED_HEADER_NAME;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.NO_CACHE_CACHE_CONTROL;
 
 import java.util.function.Consumer;
 
@@ -33,7 +26,6 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -101,13 +93,12 @@ public class Writer
     public void doH2PushPromise(
         MessageConsumer target,
         long targetId,
-        ListFW<HttpHeaderFW> headers,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetId)
             .payload(e -> e.reset())
-            .extension(e -> e.set(injectSyncHeaders(mutator, headers)))
+            .extension(e -> e.set(visitHttpBeginEx(mutator)))
             .build();
 
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
@@ -205,41 +196,6 @@ public class Writer
                              .headers(headers)
                              .build()
                              .sizeof();
-    }
-
-    private Flyweight.Builder.Visitor injectSyncHeaders(
-            Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
-            ListFW<HttpHeaderFW> headers)
-    {
-        if (headers.anyMatch(INJECTED_DEFAULT_HEADER) || headers.anyMatch(INJECTED_HEADER_AND_NO_CACHE))
-        {
-            // Already injected, NOOP
-        }
-        else if (headers.anyMatch(NO_CACHE_CACHE_CONTROL))
-        {
-            // INJECT HEADER
-            mutator = mutator.andThen(
-                x ->  x.item(h -> h.representation((byte) 0).name(INJECTED_HEADER_NAME).value(INJECTED_HEADER_DEFAULT_VALUE))
-            );
-            mutator = mutator.andThen(
-                x ->  x.item(h -> h.representation((byte) 0).name(CACHE_SYNC).value("always"))
-            );
-        }
-        else
-        {
-            // INJECT HEADER AND NO-CACHE
-            mutator = mutator.andThen(
-                x ->  x.item(h -> h.representation((byte) 0).name(INJECTED_HEADER_NAME).value(INJECTED_HEADER_AND_NO_CACHE_VALUE))
-            );
-            mutator = mutator.andThen(
-                    x ->  x.item(h -> h.representation((byte) 0).name("cache-control").value("no-cache"))
-            );
-            mutator = mutator.andThen(
-                x ->  x.item(h -> h.representation((byte) 0).name(CACHE_SYNC).value("always"))
-            );
-        }
-        return visitHttpBeginEx(mutator);
-
     }
 
 }

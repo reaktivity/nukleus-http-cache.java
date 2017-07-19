@@ -105,17 +105,7 @@ public class ProxyIT
     }
 
     @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/debounce.cache.sync.and.individualize.push.promise/accept/client",
-        "${streams}/debounce.cache.sync.and.individualize.push.promise/connect/server",
-    })
-    public void shouldDebounceCacheSyncAndIndividualizePushPromise() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
+    @Ignore("TODO remove this as it forwards push promise")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/debounce.cache.sync.but.not.forward.304/accept/client",
@@ -271,4 +261,80 @@ public class ProxyIT
         k3po.finish();
     }
 
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/client.sent.abort.on.scheduled.poll/accept/client",
+        "${streams}/client.sent.abort.on.scheduled.poll/accept/server"})
+    public void clientSentAbortOnScheduledPoll() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/inject.header.values/accept/client",
+        "${streams}/inject.header.values/connect/server",
+    })
+    public void injectHeaderValues() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/inject.missing.header.values/accept/client",
+        "${streams}/inject.missing.header.values/connect/server",
+    })
+    public void injectMissingHeaderValues() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/inject.push.promise/accept/client",
+        "${streams}/inject.push.promise/connect/server",
+    })
+    public void injectPushPromise() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/strip.injected.headers/accept/client",
+        "${streams}/strip.injected.headers/connect/server",
+    })
+    public void stripInjectedHeaders() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/strip.injected.header.values/accept/client",
+        "${streams}/strip.injected.header.values/connect/server",
+    })
+    public void stripInjectedHeaderValues() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/strip.missing.injected.header.values/accept/client",
+        "${streams}/strip.missing.injected.header.values/connect/server",
+    })
+    public void stripMissingInjectedHeaderValues() throws Exception
+    {
+        k3po.finish();
+    }
 }

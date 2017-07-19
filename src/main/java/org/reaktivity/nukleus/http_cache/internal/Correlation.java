@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal;
 
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -129,7 +130,11 @@ public class Correlation
 
     public void cleanUp()
     {
-        bufferPool.release(correlationRequestHeadersSlot);
+        if(correlationRequestHeadersSlot != NO_SLOT)
+        {
+            bufferPool.release(correlationRequestHeadersSlot);
+            correlationRequestHeadersSlot = NO_SLOT;
+        }
     }
 
     public boolean follow304()
