@@ -57,7 +57,7 @@ public class ProxyWithSystemConfigurationIT
         "${route}/proxy/controller",
         "${streams}/nukleus.overloaded/accept/client",
     })
-    public void shouldResetIfOOM() throws Exception
+    public void resetIfOOM() throws Exception
     {
         k3po.finish();
     }

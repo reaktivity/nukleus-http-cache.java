@@ -18,6 +18,8 @@ package org.reaktivity.nukleus.http_cache.internal;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 
+import java.util.Objects;
+
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -31,7 +33,7 @@ public class Correlation
     private final boolean follow304;
 
     private MessageConsumer connectReplyThrottle;
-    private BufferPool bufferPool;
+    private final BufferPool bufferPool;
     private int correlationRequestHeadersSlot;
     private int requestSize;
     private long connectReplyStreamId;
@@ -69,39 +71,6 @@ public class Correlation
         final MutableDirectBuffer buffer = bufferPool.buffer(correlationRequestHeadersSlot);
         return headersRO.wrap(buffer, 0, requestSize);
     }
-
-//    @Override
-//    public int hashCode()
-//    {
-//        int result = Long.hashCode(acceptCorrelation);
-//        result = 31 * result + acceptName.hashCode();
-//        result = 31 * result + requestURLHash;
-//        result = 31 * result + awaitingRequestMatches.hashCode();
-//
-//        return result;
-//    }
-//
-//    @Override
-//    public boolean equals(Object obj)
-//    {
-//        if (!(obj instanceof Correlation))
-//        {
-//            return false;
-//        }
-//
-//        Correlation that = (Correlation) obj;
-//        return this.acceptCorrelation == that.acceptCorrelation &&
-//                Objects.equals(this.acceptName, that.acceptName) &&
-//                this.requestURLHash == that.requestURLHash &&
-//                this.awaitingRequestMatches.equals(that.awaitingRequestMatches);
-//    }
-//
-//    @Override
-//    public String toString()
-//    {
-//        return String.format("[acceptCorrelation=\"%s\", acceptName=\"%s\" requestURLHash=%d]",
-//                acceptCorrelation, acceptName, requestURLHash);
-//    }
 
     public MessageConsumer consumer()
     {
@@ -151,4 +120,33 @@ public class Correlation
     {
         return connectRef;
     }
+
+  @Override
+  public int hashCode()
+  {
+      int result = requestURLHash;
+      result = 31 * result + consumer.hashCode();
+      return result;
+  }
+
+  @Override
+  public boolean equals(Object obj)
+  {
+      if (!(obj instanceof Correlation))
+      {
+          return false;
+      }
+
+      Correlation that = (Correlation) obj;
+      return this.requestURLHash == that.requestURLHash &&
+              Objects.equals(this.consumer, that.consumer);
+  }
+
+  @Override
+  public String toString()
+  {
+      return String.format("[requestURLHash=\"%s\", consumer=\"%s\"]",
+              requestURLHash,
+              consumer.toString());
+  }
 }

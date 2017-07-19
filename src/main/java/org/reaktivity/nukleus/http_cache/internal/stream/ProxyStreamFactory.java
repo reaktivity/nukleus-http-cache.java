@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -99,7 +98,8 @@ public class ProxyStreamFactory implements StreamFactory
     private final RouteHandler router;
 
     private final LongSupplier supplyStreamId;
-    private final BufferPool bufferPool;
+    private final BufferPool streamBufferPool;
+    private final BufferPool correlationBufferPool;
     private final Long2ObjectHashMap<Correlation> correlations;
     private final LongSupplier supplyCorrelationId;
     private final LongObjectBiConsumer<Runnable> scheduler;
@@ -118,7 +118,8 @@ public class ProxyStreamFactory implements StreamFactory
     {
         this.router = requireNonNull(router);
         this.supplyStreamId = requireNonNull(supplyStreamId);
-        this.bufferPool = requireNonNull(bufferPool);
+        this.streamBufferPool = requireNonNull(bufferPool);
+        this.correlationBufferPool = bufferPool.duplicate();
         this.correlations = requireNonNull(correlations);
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.scheduler = requireNonNull(scheduler);
@@ -310,7 +311,7 @@ public class ProxyStreamFactory implements StreamFactory
         private void proxyStraightThrough(
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            this.myRequestSlot = bufferPool.acquire(acceptStreamId);
+            this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
             if (myRequestSlot == NO_SLOT)
             {
                 send503AndReset();
@@ -328,16 +329,16 @@ public class ProxyStreamFactory implements StreamFactory
             final ListFW<HttpHeaderFW> requestHeaders)
         {
             // create connection
-            this.myRequestSlot = bufferPool.acquire(acceptStreamId);
+            this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
             if (myRequestSlot == NO_SLOT)
             {
                 send503AndReset();
                 return;
             }
-            int correlationRequestHeadersSlot = bufferPool.acquire(requestURLHash);
+            int correlationRequestHeadersSlot = streamBufferPool.acquire(requestURLHash);
             if (correlationRequestHeadersSlot == NO_SLOT)
             {
-                bufferPool.release(myRequestSlot);
+                streamBufferPool.release(myRequestSlot);
                 send503AndReset();
                 return;
             }
@@ -351,7 +352,7 @@ public class ProxyStreamFactory implements StreamFactory
             Correlation correlation = new Correlation(
                 requestURLHash,
                 junction,
-                bufferPool,
+                correlationBufferPool,
                 correlationRequestHeadersSlot,
                 requestSize,
                 true,
@@ -392,7 +393,7 @@ public class ProxyStreamFactory implements StreamFactory
 
         private void latchOnToFanout(final ListFW<HttpHeaderFW> requestHeaders)
         {
-            this.myRequestSlot = bufferPool.acquire(acceptStreamId);
+            this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
             if (myRequestSlot == NO_SLOT)
             {
                 send503AndReset();
@@ -483,21 +484,13 @@ public class ProxyStreamFactory implements StreamFactory
 
                     this.streamCorrelation = this.junction.getStreamCorrelation();
 
-                    // both user buffer pool and buffer pool counters are singletons...
-                    // TODO change to using 2 different buffer pools
-                    Supplier<ListFW<HttpHeaderFW>> pendingRequestHeaders = () ->
-                    {
-                        return streamCorrelation.headers(pendingRequestHeadersRO);
-                    };
+                    ListFW<HttpHeaderFW> pendingRequestHeaders = streamCorrelation.headers(pendingRequestHeadersRO);
 
-                    Supplier<ListFW<HttpHeaderFW>> myRequestHeaders = () ->
-                    {
-                        return getRequestHeaders(myRequestHeadersRO);
-                    };
+                    ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
 
                     if (responseCanSatisfyRequest(pendingRequestHeaders, myRequestHeaders, responseHeaders))
                     {
-                        sendHttpResponse(responseHeaders, myRequestHeaders.get());
+                        sendHttpResponse(responseHeaders, myRequestHeaders);
                         router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());
                         return true;
                     }
@@ -520,7 +513,7 @@ public class ProxyStreamFactory implements StreamFactory
 
                         this.connectStreamId = supplyStreamId.getAsLong();
 
-                        final ListFW<HttpHeaderFW> requestHeaders = myRequestHeaders.get();
+                        final ListFW<HttpHeaderFW> requestHeaders = myRequestHeaders;
                         sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
                         return false;
                     }
@@ -677,17 +670,17 @@ public class ProxyStreamFactory implements StreamFactory
         }
 
         private boolean responseCanSatisfyRequest(
-                final Supplier<ListFW<HttpHeaderFW>> pendingRequestHeaders,
-                final Supplier<ListFW<HttpHeaderFW>> myRequestHeaders,
+                final ListFW<HttpHeaderFW> pendingRequestHeaders,
+                final ListFW<HttpHeaderFW> myRequestHeaders,
                 final ListFW<HttpHeaderFW> responseHeaders)
         {
 
             final String vary = getHeader(responseHeaders, "vary");
             final String cacheControl = getHeader(responseHeaders, "cache-control");
 
-            final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders.get(), "authorization");
+            final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
 
-            final String myAuthorizationHeader = getHeader(myRequestHeaders.get(), "authorization");
+            final String myAuthorizationHeader = getHeader(myRequestHeaders, "authorization");
 
             boolean useSharedResponse = true;
 
@@ -707,8 +700,8 @@ public class ProxyStreamFactory implements StreamFactory
             {
                 useSharedResponse = stream(vary.split("\\s*,\\s*")).anyMatch(v ->
                 {
-                    String pendingHeaderValue = getHeader(pendingRequestHeaders.get(), v);
-                    String myHeaderValue = getHeader(myRequestHeaders.get(), v);
+                    String pendingHeaderValue = getHeader(pendingRequestHeaders, v);
+                    String myHeaderValue = getHeader(myRequestHeaders, v);
                     return Objects.equals(pendingHeaderValue, myHeaderValue);
                 });
             }
@@ -839,19 +832,19 @@ public class ProxyStreamFactory implements StreamFactory
         {
             if (this.myRequestSlot != NO_SLOT)
             {
-                bufferPool.release(this.myRequestSlot);
+                streamBufferPool.release(this.myRequestSlot);
             }
         }
 
         private ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> headersRO)
         {
-            return headersRO.wrap(bufferPool.buffer(this.myRequestSlot), 0, requestSize);
+            return headersRO.wrap(streamBufferPool.buffer(this.myRequestSlot), 0, requestSize);
         }
 
         private int storeRequest(final ListFW<HttpHeaderFW> headers, int requestCacheSlot)
         {
             this.requestSize = 0;
-            MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestCacheSlot);
+            MutableDirectBuffer requestCacheBuffer = streamBufferPool.buffer(requestCacheSlot);
             headers.forEach(h ->
             {
                 requestCacheBuffer.putBytes(this.requestSize, h.buffer(), h.offset(), h.sizeof());
@@ -919,12 +912,12 @@ public class ProxyStreamFactory implements StreamFactory
                 break;
             case DataFW.TYPE_ID:
             default:
-                if (this.streamState instanceof BooleanMessageConsumer)
+                if (this.streamState instanceof MessagePredicate)
                 {
                     // needed because could be handleMyInitatedFanOut or handleFanout
                     // or it could already be processed in which case this doesn't mean
                     // much...
-                    junction.unsubscribe((BooleanMessageConsumer) this.streamState);
+                    junction.unsubscribe((MessagePredicate) this.streamState);
                 }
                 writer.doReset(acceptThrottle, acceptStreamId);
                 break;
@@ -1132,7 +1125,7 @@ public class ProxyStreamFactory implements StreamFactory
     private final class FanOut implements MessageConsumer
     {
 
-        private final Set<BooleanMessageConsumer> outs;
+        private final Set<MessagePredicate> outs;
         private Correlation streamCorrelation;
         private GroupThrottle connectReplyThrottle;
         private long connectReplyStreamId;
@@ -1142,7 +1135,7 @@ public class ProxyStreamFactory implements StreamFactory
             this.outs = new HashSet<>();
         }
 
-        public Set<BooleanMessageConsumer> getOuts()
+        public Set<MessagePredicate> getOuts()
         {
             return outs;
         }
@@ -1162,12 +1155,12 @@ public class ProxyStreamFactory implements StreamFactory
             return this.streamCorrelation;
         }
 
-        private void addSubscriber(BooleanMessageConsumer out)
+        private void addSubscriber(MessagePredicate out)
         {
             outs.add(out);
         }
 
-        private void unsubscribe(BooleanMessageConsumer out)
+        private void unsubscribe(MessagePredicate out)
         {
             outs.remove(out);
         }
@@ -1176,10 +1169,10 @@ public class ProxyStreamFactory implements StreamFactory
         public void accept(int msgTypeId, DirectBuffer buffer, int index, int length)
         {
 
-            for (Iterator<BooleanMessageConsumer> i = outs.iterator(); i.hasNext();)
+            for (Iterator<MessagePredicate> i = outs.iterator(); i.hasNext();)
             {
-                BooleanMessageConsumer messageConsumer = i.next();
-                if (!messageConsumer.accept(msgTypeId, buffer, index, length))
+                MessagePredicate messageConsumer = i.next();
+                if (!messageConsumer.test(msgTypeId, buffer, index, length))
                 {
                     i.remove();
                 }

@@ -56,7 +56,7 @@ public class ProxyIT
         "${streams}/proxy.request/accept/client",
         "${streams}/proxy.request/connect/server",
         })
-    public void shouldProxyRequest() throws Exception
+    public void proxyRequest() throws Exception
     {
         k3po.finish();
     }
@@ -66,7 +66,7 @@ public class ProxyIT
         "${streams}/proxy.request.and.304/accept/client",
         "${streams}/proxy.request.and.304/connect/server",
     })
-    public void shouldProxyRequestWith304() throws Exception
+    public void proxyRequestWith304() throws Exception
     {
         k3po.finish();
     }
@@ -77,7 +77,7 @@ public class ProxyIT
         "${streams}/proxy.request.and.follow.304/accept/client",
         "${streams}/proxy.request.and.follow.304/connect/server",
     })
-    public void shouldProxyAndFollow304() throws Exception
+    public void proxyAndFollow304() throws Exception
     {
         k3po.finish();
     }
@@ -88,7 +88,7 @@ public class ProxyIT
         "${streams}/debounce.cache.sync/accept/client",
         "${streams}/debounce.cache.sync/connect/server",
     })
-    public void shouldDebounceCacheSync() throws Exception
+    public void debounceCacheSync() throws Exception
     {
         k3po.finish();
     }
@@ -99,7 +99,7 @@ public class ProxyIT
         "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/accept/client",
         "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/connect/server",
     })
-    public void shouldDebounceCacheSyncAndInjectIndividualizedPushPromise() throws Exception
+    public void debounceCacheSyncAndInjectIndividualizedPushPromise() throws Exception
     {
         k3po.finish();
     }
@@ -111,7 +111,7 @@ public class ProxyIT
         "${streams}/debounce.cache.sync.but.not.forward.304/accept/client",
         "${streams}/debounce.cache.sync.but.not.forward.304/connect/server",
     })
-    public void shouldDebounceCacheSyncButNotForward304() throws Exception
+    public void debounceCacheSyncButNotForward304() throws Exception
     {
         k3po.finish();
     }
@@ -122,7 +122,7 @@ public class ProxyIT
         "${streams}/debounce.cache.sync.but.not.forward.304.without.pp/accept/client",
         "${streams}/debounce.cache.sync.but.not.forward.304.without.pp/connect/server",
     })
-    public void shouldDebounceCacheSyncButNotForward304WithoutPP() throws Exception
+    public void debounceCacheSyncButNotForward304WithoutPP() throws Exception
     {
         k3po.finish();
     }
@@ -133,7 +133,7 @@ public class ProxyIT
         "${streams}/not.debounce.multiple.requests/accept/client",
         "${streams}/not.debounce.multiple.requests/connect/server",
     })
-    public void shouldNotDebounceMultipleRequests() throws Exception
+    public void notDebounceMultipleRequests() throws Exception
     {
         k3po.finish();
     }
@@ -144,7 +144,7 @@ public class ProxyIT
         "${streams}/not.debounce.private.cache/accept/client",
         "${streams}/not.debounce.private.cache/connect/server",
     })
-    public void shouldNotDebounceWhenCacheSyncPrivateCacheControl() throws Exception
+    public void notDebounceWhenCacheSyncPrivateCacheControl() throws Exception
     {
         k3po.finish();
     }
@@ -155,7 +155,7 @@ public class ProxyIT
         "${streams}/not.debounce.implied.private/accept/client",
         "${streams}/not.debounce.implied.private/connect/server",
     })
-    public void shouldNotDebounceWhenImpliedCacheSyncPrivate() throws Exception
+    public void notDebounceWhenImpliedCacheSyncPrivate() throws Exception
     {
         k3po.finish();
     }
@@ -166,7 +166,7 @@ public class ProxyIT
         "${streams}/debounce.when.explicitly.public/accept/client",
         "${streams}/debounce.when.explicitly.public/connect/server",
     })
-    public void shouldDebounceExplicitlyPublic() throws Exception
+    public void debounceExplicitlyPublic() throws Exception
     {
         k3po.finish();
     }
@@ -177,7 +177,7 @@ public class ProxyIT
         "${streams}/not.debounce.varys/accept/client",
         "${streams}/not.debounce.varys/connect/server",
     })
-    public void shouldNotDebounceWhenVarys() throws Exception
+    public void notDebounceWhenVarys() throws Exception
     {
         k3po.finish();
     }
@@ -189,7 +189,7 @@ public class ProxyIT
         "${streams}/cache.response/accept/client",
         "${streams}/cache.response/connect/server",
     })
-    public void shouldCacheResponse() throws Exception
+    public void cacheResponse() throws Exception
     {
         k3po.finish();
     }
@@ -201,7 +201,7 @@ public class ProxyIT
         "${streams}/cache.response.and.push.promise/accept/client",
         "${streams}/cache.response.and.push.promise/connect/server",
     })
-    public void shouldCacheResponseAndPushPromise() throws Exception
+    public void cacheResponseAndPushPromise() throws Exception
     {
         k3po.finish();
     }
@@ -212,7 +212,7 @@ public class ProxyIT
         "${streams}/proxy.post.request/accept/client",
         "${streams}/proxy.post.request/connect/server",
     })
-    public void shouldProxyPostRequest() throws Exception
+    public void proxyPostRequest() throws Exception
     {
         k3po.finish();
     }
