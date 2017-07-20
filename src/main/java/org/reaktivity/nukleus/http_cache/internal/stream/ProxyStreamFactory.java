@@ -322,7 +322,7 @@ public class ProxyStreamFactory implements StreamFactory
             proxyRequestStraightThrough(requestHeaders);
 
             router.setThrottle(connectName, connectStreamId, this::handleConnectThrottle);
-            this.streamState = this::proxyBack;
+            this.streamState = this::afterProxyBegin;
         }
 
         private void fanout(
@@ -372,7 +372,8 @@ public class ProxyStreamFactory implements StreamFactory
                 {
                     if (!junction.getOuts().isEmpty())
                     {
-                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
+                        final ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
+                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, myRequestHeaders);
                     }
                     else
                     {
