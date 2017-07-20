@@ -322,7 +322,7 @@ public class ProxyStreamFactory implements StreamFactory
             proxyRequestStraightThrough(requestHeaders);
 
             router.setThrottle(connectName, connectStreamId, this::handleConnectThrottle);
-            this.streamState = this::afterProxyBegin;
+            this.streamState = this::proxyBack;
         }
 
         private void fanout(
@@ -539,7 +539,7 @@ public class ProxyStreamFactory implements StreamFactory
                     final ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(myRequestHeadersRO);
                     sendHttpResponse(responseHeaders, requestHeaders);
                     this.connectReplyStreamId = streamCorrelation.getConnectReplyStreamId();
-                    this.connectReplyThrottle = streamCorrelation.getConnectReplyThrottle();
+                    this.connectReplyThrottle = streamCorrelation.connectReplyThrottle();
                     router.setThrottle(acceptName, acceptReplyStreamId, this::handleAcceptReplyThrottle);
 
                     break;
@@ -1109,7 +1109,7 @@ public class ProxyStreamFactory implements StreamFactory
         private void forwardConnectReply(BeginFW begin, final Correlation streamCorrelation)
         {
             streamCorrelation.setConnectReplyThrottle(connectReplyThrottle);
-            streamCorrelation.setConnectReplyStreamId(connectReplyStreamId);
+            streamCorrelation.connectReplyStreamId(connectReplyStreamId);
             final MessageConsumer consumer = streamCorrelation.consumer();
             consumer.accept(BeginFW.TYPE_ID, begin.buffer(), begin.offset(), begin.sizeof());
             streamState = consumer;
@@ -1176,8 +1176,9 @@ public class ProxyStreamFactory implements StreamFactory
                 {
                     i.remove();
                 }
+                junctions.remove(this.streamCorrelation.requestURLHash());
 
-                final MessageConsumer connectReply = streamCorrelation.getConnectReplyThrottle();
+                final MessageConsumer connectReply = streamCorrelation.connectReplyThrottle();
                 this.connectReplyStreamId = streamCorrelation.getConnectReplyStreamId();
                 this.connectReplyThrottle = new GroupThrottle(outs.size(), writer, connectReply, connectReplyStreamId);
             }

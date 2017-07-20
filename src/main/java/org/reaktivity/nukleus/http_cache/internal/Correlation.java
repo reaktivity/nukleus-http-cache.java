@@ -82,12 +82,12 @@ public class Correlation
         this.connectReplyThrottle = connectReplyThrottle;
     }
 
-    public MessageConsumer getConnectReplyThrottle()
+    public MessageConsumer connectReplyThrottle()
     {
         return this.connectReplyThrottle;
     }
 
-    public void setConnectReplyStreamId(long streamId)
+    public void connectReplyStreamId(long streamId)
     {
         this.connectReplyStreamId = streamId;
     }
