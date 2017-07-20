@@ -13,15 +13,31 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.layouts;
+package org.reaktivity.nukleus.http_cache.util;
 
-public abstract class Layout implements AutoCloseable
+import java.util.Objects;
+import java.util.function.BiConsumer;
+
+@FunctionalInterface
+public interface LongObjectBiConsumer<T> extends BiConsumer<Long, T>
 {
-    @Override
-    public abstract void close();
+    void accept(long value, T t);
 
-    public abstract static class Builder<T extends Layout>
+    @Override
+    default void accept(Long value, T t)
     {
-        public abstract T build();
+        this.accept(value.longValue(), t);
+    }
+
+    default LongObjectBiConsumer<T> andThen(
+        LongObjectBiConsumer<? super T> after)
+    {
+        Objects.requireNonNull(after);
+
+        return (l, r) ->
+        {
+            accept(l, r);
+            after.accept(l, r);
+        };
     }
 }
