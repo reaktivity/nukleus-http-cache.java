@@ -17,7 +17,9 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.ABORT_STREAM_FRAME_TYPE_ID;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -25,17 +27,16 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ServerIT
+public class ProxyWithSystemConfigurationIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server")
-        .scriptProperty("routeTarget \"http-cache\"")
-        .scriptProperty("newServerConnectRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
     private final ReaktorRule nukleus = new ReaktorRule()
             .directory("target/nukleus-itests")
@@ -43,16 +44,20 @@ public class ServerIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024)
             .nukleus("http-cache"::equals)
+            .configure("nukleus.http-cache.buffer.slot.capacity", 0)
+            .configure(ABORT_STREAM_FRAME_TYPE_ID, AbortFW.TYPE_ID)
             .clean();
 
     @Rule
     public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
 
+    @Ignore("ABORT vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
-        "${route}/server/controller",
-        "${streams}/connection.established/client"})
-    public void shouldEstablishConnection() throws Exception
+        "${route}/proxy/controller",
+        "${streams}/nukleus.overloaded/accept/client",
+    })
+    public void resetIfOOM() throws Exception
     {
         k3po.finish();
     }
