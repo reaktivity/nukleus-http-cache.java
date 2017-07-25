@@ -134,18 +134,23 @@ public final class HttpHeadersUtil
                 String directive = iter.next();
                 switch(directive)
                 {
+                    // TODO expires
                     case "no-cache":
                         return false;
                     case "private":
                         return false;
                     case "public":
                         return true;
+                    case "max-age":
+                        return true;
+                    case "s-maxage":
+                        return true;
                     default:
                         break;
                 }
             }
         }
-        return !responseHeaders.anyMatch(h ->
+        return responseHeaders.anyMatch(h ->
         {
             final String name = h.name().asString();
             final String value = h.value().asString();

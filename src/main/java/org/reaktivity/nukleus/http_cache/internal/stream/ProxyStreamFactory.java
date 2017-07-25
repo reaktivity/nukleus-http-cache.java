@@ -1169,24 +1169,27 @@ public class ProxyStreamFactory implements StreamFactory
             int index,
             int length)
         {
-            switch (msgTypeId)
+            if (this.cacheResponse)
             {
-                case BeginFW.TYPE_ID:
-                    BeginFW begin = beginRO.wrap(buffer, index, index + length);
-                    this.cacheResponse = cache(begin);
-                    break;
-                case DataFW.TYPE_ID:
-                    DataFW data = dataRO.wrap(buffer, index, index + length);
-                    this.cacheResponse = cache(data);
-                    break;
-                case EndFW.TYPE_ID:
-                    EndFW end = endRO.wrap(buffer, index, index + length);
-                    this.cacheResponse = cache(end);
-                    break;
-                case AbortFW.TYPE_ID:
-                    AbortFW abort = abortRO.wrap(buffer, index, index + length);
-                    this.cacheResponse = cache(abort);
-                    break;
+                switch (msgTypeId)
+                {
+                    case BeginFW.TYPE_ID:
+                        BeginFW begin = beginRO.wrap(buffer, index, index + length);
+                        this.cacheResponse = cache(begin);
+                        break;
+                    case DataFW.TYPE_ID:
+                        DataFW data = dataRO.wrap(buffer, index, index + length);
+                        this.cacheResponse = cache(data);
+                        break;
+                    case EndFW.TYPE_ID:
+                        EndFW end = endRO.wrap(buffer, index, index + length);
+                        this.cacheResponse = cache(end);
+                        break;
+                    case AbortFW.TYPE_ID:
+                        AbortFW abort = abortRO.wrap(buffer, index, index + length);
+                        this.cacheResponse = cache(abort);
+                        break;
+                }
             }
 
             for (Iterator<MessagePredicate> i = outs.iterator(); i.hasNext();)
