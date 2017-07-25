@@ -136,6 +136,7 @@ public class Writer
                             .payload(p -> p.set(payload, offset, length))
                             .extension(e -> e.reset())
                             .build();
+
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 

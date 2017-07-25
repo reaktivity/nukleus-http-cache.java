@@ -39,8 +39,10 @@ public final class HttpCacheUtils
 {
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
-    public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(asList(
-            "200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
+
+    public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
+            asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
+
     private HttpCacheUtils()
     {
         // utility class
@@ -129,13 +131,17 @@ public final class HttpCacheUtils
         {
             Date receivedDate = DATE_FORMAT.parse(dateHeader);
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
-            CacheControlParser parsedCacheControl = new CacheControlParser(cacheControl);
-            String ageExpires = parsedCacheControl.getValue("s-maxage");
-            int ageExpiresInt = 0;
-            if (ageExpires == null)
+            String ageExpires = null;
+            if (cacheControl != null)
             {
-                ageExpires = parsedCacheControl.getValue("maxage");
+                CacheControlParser parsedCacheControl = new CacheControlParser(cacheControl);
+                ageExpires = parsedCacheControl.getValue("s-maxage");
+                if (ageExpires == null)
+                {
+                    ageExpires = parsedCacheControl.getValue("max-age");
+                }
             }
+            int ageExpiresInt;
             if (ageExpires == null)
             {
                 String lastModified = getHeader(responseHeaders, "last-modified");
@@ -151,14 +157,15 @@ public final class HttpCacheUtils
             }
             else
             {
-                ageExpiresInt = Integer.parseInt(ageExpires);
+                ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
             }
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
-            return expires.after(receivedDate);
+            boolean expired = expires.after(receivedDate);
+            return expired;
         }
         catch (Exception e)
         {
-            System.out.println("DPW TODO");
+            // Error so just expire it
             return true;
         }
     }

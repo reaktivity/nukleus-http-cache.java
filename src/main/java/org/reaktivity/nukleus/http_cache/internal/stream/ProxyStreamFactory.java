@@ -78,7 +78,7 @@ public class ProxyStreamFactory implements StreamFactory
     private static final String NO_CACHE = "no-cache";
     private static final String IF_NONE_MATCH = "if-none-match";
     private static final String IF_MODIFIED_SINCE = "if-modified-since";
-    private static final String STALE_WHILE_REVALIDATE_31536000 = "stale-while-revalidate=31536000";
+    private static final String STALE_WHILE_REVALIDATE_2147483648 = "stale-while-revalidate=2147483648";
 
     // TODO, remove need for RW in simplification of inject headers
     private final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
@@ -338,8 +338,17 @@ public class ProxyStreamFactory implements StreamFactory
                 }
                 storeRequest(requestHeaders, myRequestSlot);
                 this.streamCorrelation =
-                        new Correlation(requestURLHash, this::proxyBack, null, NO_SLOT, -1, false, requestURL, connectRef);
+                        new Correlation(
+                            requestURLHash,
+                            this::handleResponseFromProxy,
+                            null,
+                            NO_SLOT,
+                            -1,
+                            false,
+                            requestURL,
+                            connectRef);
                 responseServer.serverClient(streamCorrelation);
+                this.streamState = this::waitingForOutstanding;
             }
             else
             {
@@ -361,7 +370,7 @@ public class ProxyStreamFactory implements StreamFactory
             this.connectStreamId = supplyStreamId.getAsLong();
             this.streamCorrelation = new Correlation(
                     requestURLHash,
-                    this::proxyBack,
+                    this::handleResponseFromProxy,
                     null,
                     NO_SLOT,
                     -1,
@@ -424,7 +433,7 @@ public class ProxyStreamFactory implements StreamFactory
 
             junction.setStreamCorrelation(correlation);
             long2ObjectPutIfAbsent(junctions, requestURLHash, junction);
-            junction.addSubscriber(this::handleMyInitiatedFanout);
+            junction.addSubscriber(this::handleResponseFromMyInitiatedFanout);
 
             String pollTime = getHeader(requestHeaders, "x-retry-after");
             if (pollTime != null)
@@ -463,7 +472,7 @@ public class ProxyStreamFactory implements StreamFactory
             storeRequest(requestHeaders, myRequestSlot);
 
             this.junction = junctions.get(requestURLHash);
-            junction.addSubscriber(this::handleFanout);
+            junction.addSubscriber(this::handleResponseFromFanout);
 
             // send 0 window back to complete handshake
 
@@ -480,7 +489,7 @@ public class ProxyStreamFactory implements StreamFactory
             writer.doAbort(acceptReply, acceptReplyStreamId);
         }
 
-        private boolean handleMyInitiatedFanout(
+        private boolean handleResponseFromMyInitiatedFanout(
             int msgTypeId,
             DirectBuffer buffer,
             int index,
@@ -503,7 +512,7 @@ public class ProxyStreamFactory implements StreamFactory
             return true;
         }
 
-        private boolean handleFanout(
+        private boolean handleResponseFromFanout(
             int msgTypeId,
             DirectBuffer buffer,
             int index,
@@ -536,7 +545,7 @@ public class ProxyStreamFactory implements StreamFactory
 
                         this.streamCorrelation = new Correlation(
                                 requestURLHash,
-                                this::proxyBack,
+                                this::handleResponseFromProxy,
                                 null,
                                 NO_SLOT,
                                 -1,
@@ -558,7 +567,7 @@ public class ProxyStreamFactory implements StreamFactory
             }
         }
 
-        private void proxyBack(
+        private void handleResponseFromProxy(
                 int msgTypeId,
                 DirectBuffer buffer,
                 int index,
@@ -624,11 +633,11 @@ public class ProxyStreamFactory implements StreamFactory
                             final String16FW valueRO = h.value();
                             final String name = nameRO.asString();
                             final String value = valueRO.asString();
-                            if (CACHE_CONTROL.equals(name) && !value.contains(STALE_WHILE_REVALIDATE_31536000))
+                            if (CACHE_CONTROL.equals(name) && !value.contains(STALE_WHILE_REVALIDATE_2147483648))
                             {
                                 x.item(y -> y.representation((byte) 0)
                                         .name(nameRO)
-                                        .value(value + ", " + STALE_WHILE_REVALIDATE_31536000));
+                                        .value(value + ", " + STALE_WHILE_REVALIDATE_2147483648));
                             }
                             else
                             {
@@ -642,7 +651,7 @@ public class ProxyStreamFactory implements StreamFactory
             Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
         {
             mutator = mutator.andThen(
-                    x ->  x.item(h -> h.representation((byte) 0).name("cache-control").value(STALE_WHILE_REVALIDATE_31536000))
+                    x ->  x.item(h -> h.representation((byte) 0).name("cache-control").value(STALE_WHILE_REVALIDATE_2147483648))
                 );
             return visitHttpBeginEx(mutator);
         }
@@ -907,12 +916,12 @@ public class ProxyStreamFactory implements StreamFactory
                 break;
             case DataFW.TYPE_ID:
             default:
-                if (this.streamState instanceof MessagePredicate)
+                if (junction != null)
                 {
                     // needed because could be handleMyInitatedFanOut or handleFanout
                     // or it could already be processed in which case this doesn't mean
                     // much...
-                    junction.unsubscribe((MessagePredicate) this.streamState);
+                    junction.unsubscribe(this::handleResponseFromMyInitiatedFanout);
                 }
                 writer.doReset(acceptThrottle, acceptStreamId);
                 break;
@@ -1191,6 +1200,18 @@ public class ProxyStreamFactory implements StreamFactory
                         break;
                 }
             }
+            else
+            {
+                switch (msgTypeId)
+                {
+                    case EndFW.TYPE_ID:
+                    case AbortFW.TYPE_ID:
+                        this.streamCorrelation.cleanUp();
+                        break;
+                    default:
+                        break;
+                }
+            }
 
             for (Iterator<MessagePredicate> i = outs.iterator(); i.hasNext();)
             {
@@ -1206,10 +1227,6 @@ public class ProxyStreamFactory implements StreamFactory
                 this.connectReplyThrottle = new GroupThrottle(outs.size(), writer, connectReply, connectReplyStreamId);
             }
 
-            if (!this.cacheResponse)
-            {
-                this.streamCorrelation.cleanUp();
-            }
         }
 
         private boolean cache(BeginFW begin)
