@@ -90,6 +90,11 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactory build()
     {
         final BufferPool bufferPool = supplyBufferPool.get();
+        final Cache cache = new Cache(
+                writeBuffer,
+                supplyStreamId,
+                supplyCorrelationId,
+                bufferPool);
 
         return new ProxyStreamFactory(
                 router,
@@ -98,7 +103,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyStreamId,
                 supplyCorrelationId,
                 correlations,
-                scheduler);
+                scheduler,
+                cache);
     }
 
 }

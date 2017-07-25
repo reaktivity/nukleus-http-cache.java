@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.util;
 
+import java.util.Iterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -119,5 +120,40 @@ public final class HttpHeadersUtil
         });
 
         return header.length() == 0 ? null : header.toString();
+    }
+
+    public static boolean cacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+        if (cacheControl != null)
+        {
+            HttpCacheUtils.CacheControlParser parser = new  HttpCacheUtils.CacheControlParser(cacheControl);
+            Iterator<String> iter = parser.iterator();
+            while(iter.hasNext())
+            {
+                String directive = iter.next();
+                switch(directive)
+                {
+                    case "no-cache":
+                        return false;
+                    case "private":
+                        return false;
+                    case "public":
+                        return true;
+                    default:
+                        break;
+                }
+            }
+        }
+        return !responseHeaders.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            if (":status".equals(name))
+            {
+                return HttpCacheUtils.CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
+            }
+            return false;
+        });
     }
 }

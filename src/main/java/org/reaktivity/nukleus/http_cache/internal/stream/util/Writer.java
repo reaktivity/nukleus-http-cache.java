@@ -70,6 +70,7 @@ public class Writer
                                .build();
 
         target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+
     }
 
     public void doHttpBegin(
