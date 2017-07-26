@@ -1200,14 +1200,17 @@ public class ProxyStreamFactory implements StreamFactory
                         break;
                 }
             }
-            switch (msgTypeId)
+            else
             {
-                case EndFW.TYPE_ID:
-                case AbortFW.TYPE_ID:
-                    this.streamCorrelation.cleanUp();
-                    break;
-                default:
-                    break;
+                switch (msgTypeId)
+                {
+                    case EndFW.TYPE_ID:
+                    case AbortFW.TYPE_ID:
+                        this.streamCorrelation.cleanUp();
+                        break;
+                    default:
+                        break;
+                }
             }
 
             for (Iterator<MessagePredicate> i = outs.iterator(); i.hasNext();)
