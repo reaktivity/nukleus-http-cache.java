@@ -1200,17 +1200,14 @@ public class ProxyStreamFactory implements StreamFactory
                         break;
                 }
             }
-            else
+            switch (msgTypeId)
             {
-                switch (msgTypeId)
-                {
-                    case EndFW.TYPE_ID:
-                    case AbortFW.TYPE_ID:
-                        this.streamCorrelation.cleanUp();
-                        break;
-                    default:
-                        break;
-                }
+                case EndFW.TYPE_ID:
+                case AbortFW.TYPE_ID:
+                    this.streamCorrelation.cleanUp();
+                    break;
+                default:
+                    break;
             }
 
             for (Iterator<MessagePredicate> i = outs.iterator(); i.hasNext();)
@@ -1222,11 +1219,13 @@ public class ProxyStreamFactory implements StreamFactory
                 }
                 junctions.remove(this.streamCorrelation.requestURLHash());
 
+            }
+            if (msgTypeId == BeginFW.TYPE_ID)
+            {
                 final MessageConsumer connectReply = streamCorrelation.connectReplyThrottle();
                 this.connectReplyStreamId = streamCorrelation.getConnectReplyStreamId();
                 this.connectReplyThrottle = new GroupThrottle(outs.size(), writer, connectReply, connectReplyStreamId);
             }
-
         }
 
         private boolean cache(BeginFW begin)
