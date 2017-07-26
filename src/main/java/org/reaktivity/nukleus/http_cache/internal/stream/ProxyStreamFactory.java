@@ -1358,11 +1358,13 @@ public class ProxyStreamFactory implements StreamFactory
                 }
                 junctions.remove(this.streamCorrelation.requestURLHash());
 
+            }
+            if (msgTypeId == BeginFW.TYPE_ID)
+            {
                 final MessageConsumer connectReply = streamCorrelation.connectReplyThrottle();
                 this.connectReplyStreamId = streamCorrelation.getConnectReplyStreamId();
                 this.connectReplyThrottle = new GroupThrottle(outs.size(), writer, connectReply, connectReplyStreamId);
             }
-
         }
 
         private boolean cache(BeginFW begin)
