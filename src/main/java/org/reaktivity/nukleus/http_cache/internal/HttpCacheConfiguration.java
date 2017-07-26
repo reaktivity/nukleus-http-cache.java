@@ -19,7 +19,7 @@ import org.reaktivity.nukleus.Configuration;
 
 public class HttpCacheConfiguration extends Configuration
 {
-    public static final String HTTP_CACHE_CAPACITY = "nukleus.http.cache.capacity";
+    public static final String HTTP_CACHE_CAPACITY = "nukleus.http_cache.capacity";
 
     private static final int HTTP_CACHE_CAPACITY_DEFAULT = 65536 * 64;
 

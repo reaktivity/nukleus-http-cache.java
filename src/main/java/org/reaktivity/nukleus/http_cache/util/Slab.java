@@ -31,6 +31,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
  * to store data in it, and releasing the slot once it is no longer needed.
  * <b>Each instance of this class is assumed to be used by one and only one thread.</b>
  */
+@Deprecated
 public class Slab implements BufferPool
 {
     private final MutableDirectBuffer slotBuffer = new UnsafeBuffer(new byte[0]);
