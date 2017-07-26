@@ -21,7 +21,7 @@ public class HttpCacheConfiguration extends Configuration
 {
     public static final String HTTP_CACHE_CAPACITY = "nukleus.http.cache.capacity";
 
-    private static final int MAXIMUM_CACHED_RESPONSES_DEFAULT = 65536 * 64;
+    private static final int HTTP_CACHE_CAPACITY_DEFAULT = 65536 * 64;
 
     public HttpCacheConfiguration(
         Configuration config)
@@ -31,7 +31,7 @@ public class HttpCacheConfiguration extends Configuration
 
     public int httpCacheCapacity()
     {
-        return getInteger(HTTP_CACHE_CAPACITY, MAXIMUM_CACHED_RESPONSES_DEFAULT);
+        return getInteger(HTTP_CACHE_CAPACITY, HTTP_CACHE_CAPACITY_DEFAULT);
     }
 
 }
