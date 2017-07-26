@@ -118,6 +118,17 @@ public class ProxyCacheSyncIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/not.forward.response.to.push.promise.if.unchanged/accept/client",
+        "${streams}/not.forward.response.to.push.promise.if.unchanged/connect/server",
+    })
+    public void shouldNotForwardResponseToPushPromiseIfUnchanged() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/accept/client",
         "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/connect/server",
     })

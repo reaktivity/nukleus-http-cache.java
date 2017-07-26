@@ -69,7 +69,7 @@ public class Correlation
         return requestURLHash;
     }
 
-    public ListFW<HttpHeaderFW> headers(ListFW<HttpHeaderFW> headersRO)
+    public ListFW<HttpHeaderFW> requestHeaders(ListFW<HttpHeaderFW> headersRO)
     {
         final MutableDirectBuffer buffer = bufferPool.buffer(requestSlot);
         return headersRO.wrap(buffer, 0, requestSize);

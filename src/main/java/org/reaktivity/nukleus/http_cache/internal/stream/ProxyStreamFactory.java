@@ -35,6 +35,7 @@ import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.getRequestU
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -43,6 +44,7 @@ import java.util.function.Predicate;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
@@ -88,8 +90,10 @@ public class ProxyStreamFactory implements StreamFactory
     private final ListFW<HttpHeaderFW> myRequestHeadersRO = new HttpBeginExFW().headers();
     private final ListFW<HttpHeaderFW> pendingRequestHeadersRO = new HttpBeginExFW().headers();
     private final DataFW dataRO = new DataFW();
+    private final OctetsFW octetsRO = new OctetsFW();
     private final EndFW endRO = new EndFW();
     private final RouteFW routeRO = new RouteFW();
+    private final UnsafeBuffer bufferRO = new UnsafeBuffer(new byte[]{});
 
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
@@ -528,7 +532,7 @@ public class ProxyStreamFactory implements StreamFactory
 
                     this.streamCorrelation = this.junction.getStreamCorrelation();
 
-                    ListFW<HttpHeaderFW> pendingRequestHeaders = streamCorrelation.headers(pendingRequestHeadersRO);
+                    ListFW<HttpHeaderFW> pendingRequestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
 
                     ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
 
@@ -1027,6 +1031,14 @@ public class ProxyStreamFactory implements StreamFactory
         private final MessageConsumer connectReplyThrottle;
         private final long connectReplyStreamId;
 
+        private int cachedResponseSize;
+
+        private int processedResponseSize;
+
+        private CacheResponseServer cacheServer;
+
+        private Correlation streamCorrelation;
+
         private ProxyConnectReplyStream(
                 MessageConsumer connectReplyThrottle,
                 long connectReplyId)
@@ -1068,7 +1080,7 @@ public class ProxyStreamFactory implements StreamFactory
             final long connectReplyRef = begin.sourceRef();
             final long connectCorrelationId = begin.correlationId();
 
-            final Correlation streamCorrelation = connectReplyRef == 0L ?
+            this.streamCorrelation = connectReplyRef == 0L ?
                 correlations.remove(connectCorrelationId) : null;
 
             if (streamCorrelation != null)
@@ -1078,24 +1090,27 @@ public class ProxyStreamFactory implements StreamFactory
                     final OctetsFW extension = begin.extension();
                     final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
                     final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
-                    final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.headers(pendingRequestHeadersRO);
-                    if (responseHeaders.anyMatch(h -> ":status".equals(h.name().asString())
-                                                && "304".equals(h.value().asString())) &&
-                        requestHeaders.anyMatch(h -> "x-poll-injected".equals(h.name().asString()))
-                        )
+                    final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
+                    if (requestHeaders.anyMatch(h -> "x-poll-injected".equals(h.name().asString())) &&
+                        responseHeaders.anyMatch(h -> ":status".equals(h.name().asString())
+                                            && "304".equals(h.value().asString())))
                     {
-                        final String connectName = streamCorrelation.connectName();
-                        final long connectRef = streamCorrelation.connectRef();
-                        final MessageConsumer newConnect = router.supplyTarget(connectName);
-                        final long newConnectStreamId = supplyStreamId.getAsLong();
-                        final long newConnectCorrelationId = supplyCorrelationId.getAsLong();
-                        sendRequest(newConnect, newConnectStreamId, connectRef, newConnectCorrelationId, requestHeaders);
-                        correlations.put(newConnectCorrelationId, streamCorrelation);
-                        streamState = this::ignoreRest;
+                        redoRequest(streamCorrelation, requestHeaders);
                     }
                     else
                     {
-                        forwardConnectReply(begin, streamCorrelation);
+                        int requestURLHash = streamCorrelation.requestURLHash();
+                        if(cache.hasStoredResponseThatSatisfies(
+                            requestURLHash,
+                            requestHeaders) != null)
+                        {
+                            this.cacheServer = cache.hasStoredResponseThatSatisfies(requestURLHash, requestHeaders);
+                            forwardIfModified(begin, streamCorrelation, cacheServer, responseHeaders);
+                        }
+                        else
+                        {
+                            forwardConnectReply(begin, streamCorrelation);
+                        }
                     }
                 }
                 else
@@ -1109,7 +1124,35 @@ public class ProxyStreamFactory implements StreamFactory
             }
         }
 
-        private void forwardConnectReply(BeginFW begin, final Correlation streamCorrelation)
+        private void redoRequest(
+                final Correlation streamCorrelation,
+                final ListFW<HttpHeaderFW> requestHeaders)
+        {
+            final String connectName = streamCorrelation.connectName();
+            final long connectRef = streamCorrelation.connectRef();
+            final MessageConsumer newConnect = router.supplyTarget(connectName);
+            final long newConnectStreamId = supplyStreamId.getAsLong();
+            final long newConnectCorrelationId = supplyCorrelationId.getAsLong();
+
+            String pollTime = getHeader(requestHeaders, "x-retry-after");
+            if (pollTime != null)
+            {
+                scheduler.accept(currentTimeMillis() + parseInt(pollTime) * 1000, () ->
+                {
+                    sendRequest(newConnect, newConnectStreamId, connectRef, newConnectCorrelationId, requestHeaders);
+                });
+            }
+            else
+            {
+                sendRequest(newConnect, newConnectStreamId, connectRef, newConnectCorrelationId, requestHeaders);
+            }
+            correlations.put(newConnectCorrelationId, streamCorrelation);
+            streamState = this::ignoreRest;
+        }
+
+        private void forwardConnectReply(
+                final BeginFW begin,
+                final Correlation streamCorrelation)
         {
             streamCorrelation.setConnectReplyThrottle(connectReplyThrottle);
             streamCorrelation.connectReplyStreamId(connectReplyStreamId);
@@ -1121,6 +1164,99 @@ public class ProxyStreamFactory implements StreamFactory
         private void ignoreRest(int msgTypeId, DirectBuffer buffer, int index, int length)
         {
             // NOOP
+        }
+
+        private void forwardIfModified(
+                final BeginFW begin,
+                final Correlation streamCorrelation,
+                CacheResponseServer cacheServer,
+                ListFW<HttpHeaderFW> responseHeaders)
+        {
+            ListFW<HttpHeaderFW> cachedResponseHeaders = cacheServer.getResponseHeaders();
+            String cachedStatus = getHeader(cachedResponseHeaders, ":status");
+            String status = getHeader(responseHeaders, ":status");
+            String cachedContentLength = getHeader(cachedResponseHeaders, "content-length");
+            String contentLength = getHeader(cachedResponseHeaders, "content-length");
+            if (cachedStatus.equals(status) && Objects.equals(contentLength, cachedContentLength))
+            {
+                this.cacheServer = cacheServer;
+                cacheServer.addClient();
+                // TODO store response headers
+                this.cachedResponseSize = cacheServer.getResponse(octetsRO).sizeof();
+                this.processedResponseSize = 0;
+                writer.doWindow(connectReplyThrottle, connectReplyStreamId, cachedResponseSize, 1);
+                this.streamState = this::attemptCacheMatch;
+            }
+            else
+            {
+                forwardConnectReply(begin, streamCorrelation);
+            }
+        }
+
+        private void attemptCacheMatch(
+                int msgTypeId,
+                DirectBuffer buffer,
+                int index,
+                int length)
+        {
+            switch (msgTypeId)
+            {
+                case DataFW.TYPE_ID:
+                    final DataFW data = dataRO.wrap(buffer, index, index + length);
+                    final OctetsFW payload = data.payload();
+                    final int sizeofData = data.sizeof();
+                    final OctetsFW cachedPayload = cacheServer.getResponse(octetsRO);
+                    boolean matches = (this.cachedResponseSize - this.processedResponseSize >= sizeofData) &&
+                    confirmMatch(payload, cachedPayload, this.processedResponseSize);
+                    if (!matches)
+                    {
+                        forwardHalfCachedRequestResponse();
+                    }
+                    else
+                    {
+                        this.processedResponseSize += sizeofData;
+                    }
+                    break;
+                case EndFW.TYPE_ID:
+                    if (this.processedResponseSize == this.cachedResponseSize)
+                    {
+                        final ListFW<HttpHeaderFW> requestHeaders =
+                                this.streamCorrelation.requestHeaders(pendingRequestHeadersRO);
+                        redoRequest(this.streamCorrelation, requestHeaders);
+                    }
+                    else
+                    {
+                        forwardHalfCachedRequestResponse();
+                    }
+                    break;
+                case BeginFW.TYPE_ID:
+                case AbortFW.TYPE_ID:
+                    //error cases// Forward 503.
+            }
+        }
+
+        private void forwardHalfCachedRequestResponse()
+        {
+            {
+                streamCorrelation.setConnectReplyThrottle(connectReplyThrottle);
+                streamCorrelation.connectReplyStreamId(connectReplyStreamId);
+                final MessageConsumer consumer = streamCorrelation.consumer();
+
+                // load begin;
+                consumer.accept(BeginFW.TYPE_ID, begin.buffer(), begin.offset(), begin.sizeof());
+                streamState = consumer;
+        }
+
+        private boolean confirmMatch(
+                OctetsFW payload,
+                OctetsFW cachedPayload,
+                int processedResponseSize)
+        {
+            int payloadSize = payload.sizeof();
+            DirectBuffer payloadBuffer = payload.buffer();
+            DirectBuffer cachedPayloadBuffer = cachedPayload.buffer();
+            bufferRO.wrap(cachedPayloadBuffer, processedResponseSize, payloadSize);
+            return bufferRO.compareTo(payloadBuffer) == 0;
         }
     }
 
