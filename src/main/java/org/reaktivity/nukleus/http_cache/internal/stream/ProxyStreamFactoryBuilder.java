@@ -22,7 +22,9 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
+import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.util.LongObjectBiConsumer;
+import org.reaktivity.nukleus.http_cache.util.Slab;
 import org.reaktivity.nukleus.route.RouteHandler;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
@@ -30,7 +32,9 @@ import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 {
 
-   private final Long2ObjectHashMap<Correlation> correlations;
+    private final HttpCacheConfiguration config;
+    private final LongObjectBiConsumer<Runnable> scheduler;
+    private final Long2ObjectHashMap<Correlation> correlations;
 
     private RouteHandler router;
     private MutableDirectBuffer writeBuffer;
@@ -38,10 +42,11 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyCorrelationId;
     private Supplier<BufferPool> supplyBufferPool;
 
-    private LongObjectBiConsumer<Runnable> scheduler;
-
-    public ProxyStreamFactoryBuilder(LongObjectBiConsumer<Runnable> scheduler)
+    public ProxyStreamFactoryBuilder(
+            HttpCacheConfiguration config,
+            LongObjectBiConsumer<Runnable> scheduler)
     {
+        this.config = config;
         this.correlations = new Long2ObjectHashMap<>();
         this.scheduler = scheduler;
     }
@@ -89,13 +94,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        final BufferPool bufferPool = supplyBufferPool.get();
-        final Cache cache = new Cache(
+        final int slotCapacity = supplyBufferPool.get().slotCapacity();
+        final int httpCacheCapacity = config.httpCacheCapacity();
+        BufferPool bufferPool = new Slab(httpCacheCapacity, slotCapacity);
+        Cache cache = new Cache(
                 writeBuffer,
                 supplyStreamId,
                 supplyCorrelationId,
                 bufferPool);
-
         return new ProxyStreamFactory(
                 router,
                 writeBuffer,
@@ -106,5 +112,4 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 scheduler,
                 cache);
     }
-
 }
