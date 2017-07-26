@@ -65,7 +65,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.http_cache.util.LongObjectBiConsumer;
-import org.reaktivity.nukleus.route.RouteHandler;
+import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class ProxyStreamFactory implements StreamFactory
@@ -95,7 +95,7 @@ public class ProxyStreamFactory implements StreamFactory
     private final ResetFW resetRO = new ResetFW();
     private final AbortFW abortRO = new AbortFW();
 
-    private final RouteHandler router;
+    private final RouteManager router;
 
     private final LongSupplier supplyStreamId;
     private final BufferPool streamBufferPool;
@@ -112,7 +112,7 @@ public class ProxyStreamFactory implements StreamFactory
     private final Cache cache;
 
     public ProxyStreamFactory(
-        RouteHandler router,
+        RouteManager router,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
         LongSupplier supplyStreamId,
