@@ -25,7 +25,7 @@ import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.util.Slab;
-import org.reaktivity.nukleus.route.RouteHandler;
+import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 
@@ -36,7 +36,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private final LongObjectBiConsumer<Runnable> scheduler;
     private final Long2ObjectHashMap<Correlation> correlations;
 
-    private RouteHandler router;
+    private RouteManager router;
     private MutableDirectBuffer writeBuffer;
     private LongSupplier supplyStreamId;
     private LongSupplier supplyCorrelationId;
@@ -54,8 +54,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setRouteHandler(
-        RouteHandler router)
+    public ProxyStreamFactoryBuilder setRouteManager(
+        RouteManager router)
     {
         this.router = router;
         return this;
@@ -101,7 +101,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             final int slotCapacity = supplyBufferPool.get().slotCapacity();
             final int httpCacheCapacity = config.httpCacheCapacity();
             this.bufferPool = new Slab(httpCacheCapacity, slotCapacity);
-            System.out.println("new BufferPool");
             this.cache = new Cache(
                     writeBuffer,
                     supplyStreamId,

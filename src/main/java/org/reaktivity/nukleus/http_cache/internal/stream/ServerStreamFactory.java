@@ -30,7 +30,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.route.RouteHandler;
+import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class ServerStreamFactory implements StreamFactory
@@ -42,13 +42,13 @@ public class ServerStreamFactory implements StreamFactory
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
 
-    private final RouteHandler router;
+    private final RouteManager router;
 
     private final LongSupplier supplyStreamId;
     private final Writer writer;
 
     public ServerStreamFactory(
-        RouteHandler router,
+        RouteManager router,
         MutableDirectBuffer writeBuffer,
         LongSupplier supplyStreamId)
     {
