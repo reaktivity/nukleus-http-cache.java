@@ -61,6 +61,8 @@ public final class HttpCacheUtils
                     return value.contains("no-cache");
                 case ":method":
                     return !"GET".equalsIgnoreCase(value);
+                case "content-length":
+                    return true;
                 default:
                     return false;
                 }
