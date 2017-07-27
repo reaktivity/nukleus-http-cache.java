@@ -164,7 +164,6 @@ public class ServerStreamFactory implements StreamFactory
                     hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                     hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
                 });
-                writer.doWindow(acceptThrottle, acceptStreamId, 0, 0);
                 this.streamState = this::afterBegin;
                 router.setThrottle(acceptName, acceptReplyStreamId, this::handleThrottle);
             }
