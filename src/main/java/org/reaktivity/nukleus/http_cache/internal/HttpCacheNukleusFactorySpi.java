@@ -42,7 +42,10 @@ public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
     {
         DelayedTaskScheduler scheduler = new DelayedTaskScheduler();
         builder.inject(scheduler);
-        final ProxyStreamFactoryBuilder proxyFactoryBuilder = new ProxyStreamFactoryBuilder(scheduler::schedule);
+        HttpCacheConfiguration httpCacheConfig = new HttpCacheConfiguration(config);
+        final ProxyStreamFactoryBuilder proxyFactoryBuilder = new ProxyStreamFactoryBuilder(
+                httpCacheConfig,
+                scheduler::schedule);
         final ServerStreamFactoryBuilder serverFactoryBuilder = new ServerStreamFactoryBuilder();
 
         return builder.streamFactory(PROXY, proxyFactoryBuilder)

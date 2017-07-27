@@ -34,17 +34,20 @@ public class Correlation
 
     private MessageConsumer connectReplyThrottle;
     private final BufferPool bufferPool;
-    private int correlationRequestHeadersSlot;
+    private int requestSlot;
     private int requestSize;
     private long connectReplyStreamId;
     private final String connectName;
     private final long connectRef;
 
+    // Note: TODO fix hidden/tight coupling on presence of bufferPool,
+    // which is only set in case of fanout.  Thus cleanUp only needs to be
+    // called in case of fanout
     public Correlation(
         int requestURLHash,
         MessageConsumer consumer,
         BufferPool bufferPool,
-        int correlationRequestHeadersSlot,
+        int requestSlot,
         int requestSize,
         boolean follow304,
         String connectName,
@@ -54,7 +57,7 @@ public class Correlation
         this.requestURLHash = requireNonNull(requestURLHash);
         this.consumer = consumer;
         this.bufferPool = bufferPool;
-        this.correlationRequestHeadersSlot = correlationRequestHeadersSlot;
+        this.requestSlot = requestSlot;
         this.requestSize = requestSize;
         this.follow304 = follow304;
         this.connectName = connectName;
@@ -66,9 +69,9 @@ public class Correlation
         return requestURLHash;
     }
 
-    public ListFW<HttpHeaderFW> headers(ListFW<HttpHeaderFW> headersRO)
+    public ListFW<HttpHeaderFW> requestHeaders(ListFW<HttpHeaderFW> headersRO)
     {
-        final MutableDirectBuffer buffer = bufferPool.buffer(correlationRequestHeadersSlot);
+        final MutableDirectBuffer buffer = bufferPool.buffer(requestSlot);
         return headersRO.wrap(buffer, 0, requestSize);
     }
 
@@ -99,11 +102,8 @@ public class Correlation
 
     public void cleanUp()
     {
-        if(correlationRequestHeadersSlot != NO_SLOT)
-        {
-            bufferPool.release(correlationRequestHeadersSlot);
-            correlationRequestHeadersSlot = NO_SLOT;
-        }
+        bufferPool.release(requestSlot);
+        requestSlot = NO_SLOT;
     }
 
     public boolean follow304()
@@ -121,32 +121,42 @@ public class Correlation
         return connectRef;
     }
 
-  @Override
-  public int hashCode()
-  {
-      int result = requestURLHash;
-      result = 31 * result + consumer.hashCode();
-      return result;
+    public int requestSlot()
+    {
+        return requestSlot;
+    }
+
+    public int requestSize()
+    {
+        return requestSize;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        int result = requestURLHash;
+        result = 31 * result + consumer.hashCode();
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (!(obj instanceof Correlation))
+        {
+            return false;
+        }
+
+        Correlation that = (Correlation) obj;
+        return this.requestURLHash == that.requestURLHash &&
+               Objects.equals(this.consumer, that.consumer);
   }
 
-  @Override
-  public boolean equals(Object obj)
-  {
-      if (!(obj instanceof Correlation))
-      {
-          return false;
-      }
-
-      Correlation that = (Correlation) obj;
-      return this.requestURLHash == that.requestURLHash &&
-              Objects.equals(this.consumer, that.consumer);
-  }
-
-  @Override
-  public String toString()
-  {
-      return String.format("[requestURLHash=\"%s\", consumer=\"%s\"]",
-              requestURLHash,
-              consumer.toString());
-  }
+    @Override
+    public String toString()
+    {
+        return String.format("[requestURLHash=\"%s\", consumer=\"%s\"]",
+                requestURLHash,
+                consumer.toString());
+    }
 }
