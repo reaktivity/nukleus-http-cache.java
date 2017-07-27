@@ -1473,7 +1473,6 @@ public class ProxyStreamFactory implements StreamFactory
 
         private boolean cache(EndFW end)
         {
-            System.out.println("Cacached");
             // TODO H2 end headers
             final int requestURLHash = this.streamCorrelation.requestURLHash();
             final int requestSlot = this.streamCorrelation.requestSlot();
