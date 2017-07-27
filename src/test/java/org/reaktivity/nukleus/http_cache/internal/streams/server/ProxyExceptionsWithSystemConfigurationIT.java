@@ -44,7 +44,7 @@ public class ProxyExceptionsWithSystemConfigurationIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024)
             .nukleus("http-cache"::equals)
-            .configure("nukleus.http-cache.buffer.slot.capacity", 0)
+            .configure("nukleus.http_cache.buffer.slot.capacity", 0)
             .configure(ABORT_STREAM_FRAME_TYPE_ID, AbortFW.TYPE_ID)
             .clean();
 

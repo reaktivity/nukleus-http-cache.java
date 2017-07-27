@@ -118,6 +118,50 @@ public class ProxyCacheSyncIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/not.forward.response.to.push.promise.if.unchanged/accept/client",
+        "${streams}/not.forward.response.to.push.promise.if.unchanged/connect/server",
+    })
+    public void shouldNotForwardResponseToPushPromiseIfUnchanged() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.forward.fragmented.response.to.push.promise.if.unchanged/accept/client",
+        "${streams}/not.forward.fragmented.response.to.push.promise.if.unchanged/connect/server",
+    })
+    public void shouldNotForwardFragmentedResponseToPushPromiseIfUnchanged() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/forward.appended.cache.update/accept/client",
+        "${streams}/forward.appended.cache.update/connect/server",
+    })
+    public void shouldForwardAppendedCacheUpdate() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/cache.is.not.stale.if.revalidating/accept/client",
+        "${streams}/cache.is.not.stale.if.revalidating/connect/server",
+    })
+    public void shouldServeFromCacheWhenNotStaleIfRevalidating() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/accept/client",
         "${streams}/debounce.cache.sync.and.inject.individualized.push.promise/connect/server",
     })

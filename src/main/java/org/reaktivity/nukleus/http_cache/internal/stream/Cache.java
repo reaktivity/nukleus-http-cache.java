@@ -28,6 +28,7 @@ import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
 import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -86,6 +87,11 @@ public class Cache
         }
     }
 
+    public CacheResponseServer get(int requestURLHash)
+    {
+        return requestURLToResponse.get(requestURLHash);
+    }
+
     public class CacheResponseServer
     {
 
@@ -120,19 +126,13 @@ public class Cache
                 int index,
                 int length)
         {
-            clientCount--;
-            if (clientCount == 0 && cleanUp)
-            {
-                responseBufferPool.release(responseSlot);
-                requestBufferPool.release(requestSlot);
-            }
+            this.removeClient();
         }
 
-        // Will write to the client and return the throttle
-        public void serverClient(
+        public void serveClient(
                 Correlation streamCorrelation)
         {
-            clientCount++;
+            addClient();
             MutableDirectBuffer buffer = requestBufferPool.buffer(responseSlot);
             ListFW<HttpHeaderFW> responseHeaders = responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
 
@@ -246,11 +246,33 @@ public class Cache
             DirectBuffer buffer = responseBufferPool.buffer(responseSlot);
             return responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
         }
+
+        public OctetsFW getResponse(OctetsFW octetsFW)
+        {
+            DirectBuffer buffer = responseBufferPool.buffer(responseSlot);
+            return octetsFW.wrap(buffer, responseHeaderSize, responseSize);
+        }
+
+        public void addClient()
+        {
+            this.clientCount++;
+        }
+
+        public void removeClient()
+        {
+            clientCount--;
+            if (clientCount == 0 && cleanUp)
+            {
+                responseBufferPool.release(responseSlot);
+                requestBufferPool.release(requestSlot);
+            }
+        }
     }
 
     public CacheResponseServer hasStoredResponseThatSatisfies(
             int requestURLHash,
-            ListFW<HttpHeaderFW> myRequestHeaders)
+            ListFW<HttpHeaderFW> myRequestHeaders,
+            boolean isRevalidating)
     {
         CacheResponseServer responseServer = requestURLToResponse.get(requestURLHash);
         if (responseServer == null)
@@ -260,7 +282,7 @@ public class Cache
 
         ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (HttpCacheUtils.isExpired(responseHeaders))
+        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders))
         {
             responseServer.cleanUp();
             requestURLToResponse.remove(requestURLHash);
