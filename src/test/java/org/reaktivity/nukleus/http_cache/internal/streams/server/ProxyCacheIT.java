@@ -247,4 +247,14 @@ public class ProxyCacheIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/proxy.response.too.large.to.cache/accept/client",
+        "${streams}/proxy.response.too.large.to.cache/connect/server",
+    })
+    public void shouldProxyResponseTooLargeToCache() throws Exception
+    {
+        k3po.finish();
+    }
 }

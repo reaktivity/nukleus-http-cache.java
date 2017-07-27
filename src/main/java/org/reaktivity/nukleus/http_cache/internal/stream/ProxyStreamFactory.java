@@ -44,7 +44,6 @@ import java.util.function.Predicate;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
@@ -93,7 +92,6 @@ public class ProxyStreamFactory implements StreamFactory
     private final OctetsFW octetsRO = new OctetsFW();
     private final EndFW endRO = new EndFW();
     private final RouteFW routeRO = new RouteFW();
-    private final UnsafeBuffer bufferRO = new UnsafeBuffer(new byte[]{});
 
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
@@ -1251,7 +1249,8 @@ public class ProxyStreamFactory implements StreamFactory
 
                 this.cachedResponseSize = cacheServer.getResponse(octetsRO).sizeof();
                 this.processedResponseSize = 0;
-                writer.doWindow(connectReplyThrottle, connectReplyStreamId, cachedResponseSize + 8024, 1);
+                final int bytes = cachedResponseSize + 8024;
+                writer.doWindow(connectReplyThrottle, connectReplyStreamId, bytes, bytes);
                 streamState = this::attemptCacheMatch;
             }
             else
@@ -1285,7 +1284,6 @@ public class ProxyStreamFactory implements StreamFactory
                     }
                     // consider removing window update when
                     // https://github.com/reaktivity/k3po-nukleus-ext.java/issues/16
-                    writer.doWindow(connectReplyThrottle, connectReplyStreamId, sizeofData, 1);
                     break;
                 case EndFW.TYPE_ID:
                     if (processedResponseSize == cachedResponseSize)
