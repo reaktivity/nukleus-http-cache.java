@@ -64,6 +64,17 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/proxy.get.request.with.body/accept/client",
+        "${streams}/proxy.get.request.with.body/connect/server",
+        })
+    public void shouldProxyGetRequestWithBody() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/proxy.post.request/accept/client",
         "${streams}/proxy.post.request/connect/server",
     })
@@ -107,6 +118,17 @@ public class ProxyCacheIT
         k3po.awaitBarrier("REQUEST_CACHED");
         sleep(1000);
         k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/should.bypass.cache.on.no.cache/accept/client",
+        "${streams}/should.bypass.cache.on.no.cache/connect/server",
+    })
+    public void shouldBypassCacheOnNoCache() throws Exception
+    {
         k3po.finish();
     }
 

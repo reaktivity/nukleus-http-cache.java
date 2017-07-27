@@ -25,6 +25,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -67,9 +68,7 @@ public class ServerStreamFactory implements StreamFactory
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
 
-        final MessageConsumer newStream = newAcceptStream(begin, throttle);
-
-        return newStream;
+        return newAcceptStream(begin, throttle);
     }
 
     private MessageConsumer newAcceptStream(
@@ -106,6 +105,8 @@ public class ServerStreamFactory implements StreamFactory
         private final long acceptStreamId;
 
         private MessageConsumer streamState;
+        private MessageConsumer acceptReply;
+        private long acceptReplyStreamId;
 
         private ProxyAcceptStream(
                 MessageConsumer acceptThrottle,
@@ -155,8 +156,8 @@ public class ServerStreamFactory implements StreamFactory
             }
             else
             {
-                final MessageConsumer acceptReply = router.supplyTarget(acceptName);
-                final long acceptReplyStreamId =  supplyStreamId.getAsLong();
+                this.acceptReply = router.supplyTarget(acceptName);
+                this.acceptReplyStreamId =  supplyStreamId.getAsLong();
                 final long acceptCorrelationId = begin.correlationId();
 
                 writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, hs ->
@@ -164,7 +165,6 @@ public class ServerStreamFactory implements StreamFactory
                     hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                     hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
                 });
-                writer.doWindow(acceptThrottle, acceptStreamId, 0, 0);
                 this.streamState = this::afterBegin;
                 router.setThrottle(acceptName, acceptReplyStreamId, this::handleThrottle);
             }
@@ -181,11 +181,9 @@ public class ServerStreamFactory implements StreamFactory
             case EndFW.TYPE_ID:
                 break;
 
-//          TODO
-//            case AbortFW.TYPE_ID:
-//                final AbortFW abort = abortRO.wrap(buffer, index, index + length);
-//                handleAbort(abort);
-//                break;
+            case AbortFW.TYPE_ID:
+                writer.doAbort(acceptReply, acceptReplyStreamId);
+                break;
             case DataFW.TYPE_ID:
             default:
                 writer.doReset(acceptThrottle, acceptStreamId);
@@ -218,7 +216,7 @@ public class ServerStreamFactory implements StreamFactory
         private void handleWindow(
             WindowFW window)
         {
-            // NOOP, TODO this means we can send data,
+            // NOOP, this means we can send data,
             // but (for now) we don't want to...
         }
 
