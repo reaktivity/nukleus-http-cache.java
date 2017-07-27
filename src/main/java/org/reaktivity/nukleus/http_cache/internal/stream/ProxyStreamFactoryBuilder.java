@@ -41,6 +41,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyStreamId;
     private LongSupplier supplyCorrelationId;
     private Supplier<BufferPool> supplyBufferPool;
+    private Slab bufferPool;
+    private Cache cache;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -94,14 +96,18 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        final int slotCapacity = supplyBufferPool.get().slotCapacity();
-        final int httpCacheCapacity = config.httpCacheCapacity();
-        BufferPool bufferPool = new Slab(httpCacheCapacity, slotCapacity);
-        Cache cache = new Cache(
-                writeBuffer,
-                supplyStreamId,
-                supplyCorrelationId,
-                bufferPool);
+        if (cache == null)
+        {
+            final int slotCapacity = supplyBufferPool.get().slotCapacity();
+            final int httpCacheCapacity = config.httpCacheCapacity();
+            this.bufferPool = new Slab(httpCacheCapacity, slotCapacity);
+            System.out.println("new BufferPool");
+            this.cache = new Cache(
+                    writeBuffer,
+                    supplyStreamId,
+                    supplyCorrelationId,
+                    bufferPool);
+        }
         return new ProxyStreamFactory(
                 router,
                 writeBuffer,

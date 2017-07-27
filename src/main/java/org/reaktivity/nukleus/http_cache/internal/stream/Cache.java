@@ -87,6 +87,11 @@ public class Cache
         }
     }
 
+    public CacheResponseServer get(int requestURLHash)
+    {
+        return requestURLToResponse.get(requestURLHash);
+    }
+
     public class CacheResponseServer
     {
 
@@ -124,8 +129,7 @@ public class Cache
             this.removeClient();
         }
 
-        // Will write to the client and return the throttle
-        public void serverClient(
+        public void serveClient(
                 Correlation streamCorrelation)
         {
             addClient();
@@ -267,7 +271,8 @@ public class Cache
 
     public CacheResponseServer hasStoredResponseThatSatisfies(
             int requestURLHash,
-            ListFW<HttpHeaderFW> myRequestHeaders)
+            ListFW<HttpHeaderFW> myRequestHeaders,
+            boolean isRevalidating)
     {
         CacheResponseServer responseServer = requestURLToResponse.get(requestURLHash);
         if (responseServer == null)
@@ -277,7 +282,7 @@ public class Cache
 
         ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (HttpCacheUtils.isExpired(responseHeaders))
+        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders))
         {
             responseServer.cleanUp();
             requestURLToResponse.remove(requestURLHash);

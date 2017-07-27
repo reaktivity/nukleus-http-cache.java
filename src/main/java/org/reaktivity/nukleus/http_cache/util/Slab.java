@@ -92,6 +92,7 @@ public class Slab implements BufferPool
         }
         used.set(slot);
         availableSlots[0]--;
+        System.out.println("acquire " + slot);
 
         return slot;
     }
@@ -132,6 +133,7 @@ public class Slab implements BufferPool
     @Override
     public void release(int slot)
     {
+        System.out.println("Releasing " + slot);
         assert used.get(slot);
         used.clear(slot);
         availableSlots[0]++;
