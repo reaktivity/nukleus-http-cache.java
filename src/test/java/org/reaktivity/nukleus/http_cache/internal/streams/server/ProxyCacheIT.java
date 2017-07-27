@@ -113,6 +113,17 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/should.bypass.cache.on.no.cache/accept/client",
+        "${streams}/should.bypass.cache.on.no.cache/connect/server",
+    })
+    public void shouldBypassCacheOnNoCache() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/cache.s-maxage/accept/client",
         "${streams}/cache.s-maxage/connect/server",
     })

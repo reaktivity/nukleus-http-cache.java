@@ -58,17 +58,9 @@ public final class HttpCacheUtils
             switch (name)
             {
                 case "cache-control":
-                    if (value.contains("no-cache"))
-                    {
-                        return false;
-                    }
-                    return true;
+                    return value.contains("no-cache");
                 case ":method":
-                    if ("GET".equalsIgnoreCase(value))
-                    {
-                        return false;
-                    }
-                    return true;
+                    return !"GET".equalsIgnoreCase(value);
                 default:
                     return false;
                 }
