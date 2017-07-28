@@ -13,12 +13,17 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.util;
+package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -57,15 +62,34 @@ public final class HttpCacheUtils
             final String value = h.value().asString();
             switch (name)
             {
-                case "cache-control":
+                case CACHE_CONTROL:
                     return value.contains("no-cache");
-                case ":method":
+                case METHOD:
                     return !"GET".equalsIgnoreCase(value);
-                case "content-length":
+                case CONTENT_LENGTH:
                     return true;
                 default:
                     return false;
                 }
+        });
+    }
+
+    public static boolean canInjectPushPromise(
+            ListFW<HttpHeaderFW> headers)
+    {
+        return !headers.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            switch (name)
+            {
+            case METHOD:
+                return !"GET".equalsIgnoreCase(value);
+            case CONTENT_LENGTH:
+                return true;
+            default:
+                return false;
+            }
         });
     }
 
@@ -154,8 +178,7 @@ public final class HttpCacheUtils
                 ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
             }
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
-            boolean expired = expires.after(receivedDate);
-            return expired;
+            return expires.after(receivedDate);
         }
         catch (Exception e)
         {
@@ -176,7 +199,7 @@ public final class HttpCacheUtils
 
         private static final Pattern CACHE_DIRECTIVES = Pattern.compile(REGEX);
 
-        private HashMap<String, String> values = new HashMap<String, String>();
+        private HashMap<String, String> values = new HashMap<>();
 
         public CacheControlParser(String value)
         {
@@ -206,12 +229,12 @@ public final class HttpCacheUtils
 
         public List<String> getValues(String directive)
         {
-            String values = getValue(directive);
-            if (values != null)
+            String dValues = getValue(directive);
+            if (dValues != null)
             {
                 return Arrays
-                        .stream(values.split(","))
-                        .map(v -> v.trim())
+                        .stream(dValues.split(","))
+                        .map(String::trim)
                         .collect(Collectors.toList());
             }
             return null;
@@ -219,4 +242,52 @@ public final class HttpCacheUtils
 
     }
 
+    public static boolean isPublicCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        if (responseHeaders.anyMatch(h ->
+                "cache-control".equals(h.name().asString())
+                && h.value().asString().contains("private")))
+        {
+            return false;
+        }
+        return HttpCacheUtils.isPrivateCacheableResponse(responseHeaders);
+    }
+
+    public static boolean isPrivateCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+        if (cacheControl != null)
+        {
+            CacheControlParser parser = new  CacheControlParser(cacheControl);
+            Iterator<String> iter = parser.iterator();
+            while(iter.hasNext())
+            {
+                String directive = iter.next();
+                switch(directive)
+                {
+                    // TODO expires
+                    case NO_CACHE:
+                        return false;
+                    case CacheDirectives.PUBLIC:
+                        return true;
+                    case CacheDirectives.MAX_AGE:
+                        return true;
+                    case CacheDirectives.S_MAXAGE:
+                        return true;
+                    default:
+                        break;
+                }
+            }
+        }
+        return responseHeaders.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            if (STATUS.equals(name))
+            {
+                return CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
+            }
+            return false;
+        });
+    }
 }

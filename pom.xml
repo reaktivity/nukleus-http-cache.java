@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
   <artifactId>nukleus-http-cache</artifactId>
-  <version>0.9</version>
+  <version>0.10</version>
   <name>HTTP Cache Nukleus Implementation</name>
   <description>HTTP Cache Nukleus Implementation</description>
   <url>https://github.com/reaktivity/nukleus-http-cache.java</url>
@@ -54,8 +54,8 @@
     <nukleus.plugin.version>0.10</nukleus.plugin.version>
     <nukleus.version>0.10</nukleus.version>
 
-    <nukleus.http.cache.spec.version>0.11</nukleus.http.cache.spec.version>
-    <reaktor.test.version>0.14</reaktor.test.version>
+    <nukleus.http.cache.spec.version>0.12</nukleus.http.cache.spec.version>
+    <reaktor.test.version>0.15</reaktor.test.version>
   </properties>
 
   <dependencies>
