@@ -15,12 +15,8 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.CACHEABLE_BY_DEFAULT_STATUS_CODES;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
 
-import java.util.Iterator;
 import java.util.function.Predicate;
 
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -96,46 +92,6 @@ public final class HttpHeadersUtil
         });
 
         return header.length() == 0 ? null : header.toString();
-    }
-
-    public static boolean isCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
-    {
-        String cacheControl = getHeader(responseHeaders, "cache-control");
-        if (cacheControl != null)
-        {
-            HttpCacheUtils.CacheControlParser parser = new  HttpCacheUtils.CacheControlParser(cacheControl);
-            Iterator<String> iter = parser.iterator();
-            while(iter.hasNext())
-            {
-                String directive = iter.next();
-                switch(directive)
-                {
-                    // TODO expires
-                    case NO_CACHE:
-                        return false;
-                    case CacheDirectives.PRIVATE:
-                        return false;
-                    case CacheDirectives.PUBLIC:
-                        return true;
-                    case CacheDirectives.MAX_AGE:
-                        return true;
-                    case CacheDirectives.S_MAXAGE:
-                        return true;
-                    default:
-                        break;
-                }
-            }
-        }
-        return responseHeaders.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            if (STATUS.equals(name))
-            {
-                return CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
-            }
-            return false;
-        });
     }
 
     private HttpHeadersUtil()

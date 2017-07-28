@@ -29,7 +29,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.INJECTED_HEADER_AND_NO_CACHE_VALUE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.NO_CACHE_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.SHOULD_POLL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -49,13 +48,14 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache.CacheResponseServer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.GroupThrottle;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache.CacheResponseServer;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -602,7 +602,8 @@ public class ProxyStreamFactory implements StreamFactory
                 final ListFW<HttpHeaderFW> responseHeaders,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            if (requestHeaders.anyMatch(SHOULD_POLL))
+            if (requestHeaders.anyMatch(SHOULD_POLL)
+                    && (HttpCacheUtils.canInjectPushPromise(requestHeaders)))
             {
 
                 if (responseHeaders.anyMatch(h -> HttpHeaders.CACHE_CONTROL.equals(h.name().asString())))
@@ -1427,7 +1428,7 @@ public class ProxyStreamFactory implements StreamFactory
             final OctetsFW extension = begin.extension();
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
-            final boolean isCacheable = isCacheableResponse(responseHeaders);
+            final boolean isCacheable = HttpCacheUtils.isPublicCacheableResponse(responseHeaders);
             if (isCacheable)
             {
                 this.cacheResponseSlot = cacheBufferPool.acquire(this.connectReplyStreamId);
