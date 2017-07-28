@@ -13,12 +13,12 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.util;
+package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
-import static org.reaktivity.nukleus.http_cache.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.text.SimpleDateFormat;
 import java.util.Arrays;

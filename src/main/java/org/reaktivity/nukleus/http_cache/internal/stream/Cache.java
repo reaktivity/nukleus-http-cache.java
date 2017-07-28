@@ -15,7 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static org.reaktivity.nukleus.http_cache.util.HttpCacheUtils.responseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
 
 import java.util.function.LongSupplier;
 
@@ -25,6 +25,7 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -35,7 +36,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.http_cache.util.HttpCacheUtils;
 
 public class Cache
 {
