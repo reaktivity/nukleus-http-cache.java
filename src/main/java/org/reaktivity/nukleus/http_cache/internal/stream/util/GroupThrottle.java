@@ -13,11 +13,10 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.stream;
+package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import org.agrona.collections.Long2LongHashMap;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
 public class GroupThrottle
 {
@@ -29,7 +28,7 @@ public class GroupThrottle
     private long groupWaterMark = 0;
     private int numParticipants;
 
-    GroupThrottle(
+    public GroupThrottle(
         int numParticipants,
         Writer writer,
         MessageConsumer connectReply,
@@ -88,9 +87,5 @@ public class GroupThrottle
         }
     }
 
-    public void optOut()
-    {
-        this.numParticipants--;
-    }
 }
 
