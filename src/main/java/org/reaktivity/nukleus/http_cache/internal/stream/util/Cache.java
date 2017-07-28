@@ -13,9 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.stream;
+package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.http_cache.util.HttpCacheUtils.responseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
 
 import java.util.function.LongSupplier;
 
@@ -25,7 +25,6 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -35,7 +34,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.http_cache.util.HttpCacheUtils;
 
 public class Cache
 {
@@ -73,7 +71,6 @@ public class Cache
         int responseSize)
     {
         CacheResponseServer responseServer = new CacheResponseServer(
-                requestURLHash,
                 requestSlot,
                 requestSize,
                 responseSlot,
@@ -92,10 +89,9 @@ public class Cache
         return requestURLToResponse.get(requestURLHash);
     }
 
-    public class CacheResponseServer
+    public final class CacheResponseServer
     {
 
-        private final int requestURLHash;
         private final int requestSlot;
         private final int requestSize;
         private final int responseSlot;
@@ -104,15 +100,13 @@ public class Cache
         private int clientCount = 0;
         private boolean cleanUp = false;
 
-        public CacheResponseServer(
-            int requestURLHash,
+        private CacheResponseServer(
             int requestSlot,
             int requestSize,
             int responseSlot,
             int responseHeaderSize,
             int responseSize)
         {
-            this.requestURLHash = requestURLHash;
             this.requestSlot = requestSlot;
             this.requestSize = requestSize;
             this.responseSlot = responseSlot;
@@ -120,7 +114,7 @@ public class Cache
             this.responseSize = responseSize;
         }
 
-        public void handleEndOfStream(
+        private void handleEndOfStream(
                 int msgTypeId,
                 DirectBuffer buffer,
                 int index,
@@ -213,6 +207,7 @@ public class Cache
                         writePayload(update);
                         break;
                     case ResetFW.TYPE_ID:
+                    default:
                         this.onEnd.accept(msgTypeId, buffer, index, length);
                         break;
                 }
@@ -228,8 +223,6 @@ public class Cache
                 if (payloadWritten == responseSize)
                 {
                     writer.doHttpEnd(messageConsumer, streamId);
-
-                    // TODO these values don't make sense but aren't used
                     this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
                 }
             }

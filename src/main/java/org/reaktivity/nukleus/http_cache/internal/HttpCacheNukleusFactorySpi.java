@@ -24,7 +24,7 @@ import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
 import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactoryBuilder;
 import org.reaktivity.nukleus.http_cache.internal.stream.ServerStreamFactoryBuilder;
-import org.reaktivity.nukleus.http_cache.util.DelayedTaskScheduler;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.DelayedTaskScheduler;
 
 public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
 {

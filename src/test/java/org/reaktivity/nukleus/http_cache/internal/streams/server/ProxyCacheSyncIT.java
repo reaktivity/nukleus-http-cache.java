@@ -52,6 +52,17 @@ public class ProxyCacheSyncIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/proxy.post.request.with.cache.sync/accept/client",
+        "${streams}/proxy.post.request.with.cache.sync/connect/server",
+        })
+    public void shouldProxyPostRequestWithCacheSync() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/cache.response.and.push.promise/accept/client",
         "${streams}/cache.response.and.push.promise/connect/server",
     })
