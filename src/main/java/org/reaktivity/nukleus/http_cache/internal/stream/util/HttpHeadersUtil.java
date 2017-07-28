@@ -15,8 +15,12 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.CACHEABLE_BY_DEFAULT_STATUS_CODES;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
+
 import java.util.Iterator;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -24,51 +28,24 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class HttpHeadersUtil
 {
+    public static final String INJECTED_HEADER_AND_NO_CACHE_VALUE = X_HTTP_CACHE_SYNC + ", no-cache";
 
-    private HttpHeadersUtil()
-    {
-        // utility class
-    }
+    public static final Predicate<HttpHeaderFW> SHOULD_POLL =
+                    h -> HttpHeaders.X_RETRY_AFTER.equals(h.name().asString());
 
-    public static final String CACHE_SYNC = "x-http-cache-sync";
-    public static final String INJECTED_HEADER_NAME = "x-poll-injected";
-    public static final String INJECTED_HEADER_DEFAULT_VALUE = CACHE_SYNC;
-    public static final String INJECTED_HEADER_AND_NO_CACHE_VALUE = INJECTED_HEADER_DEFAULT_VALUE + ", no-cache";
-    public static final String POLL_HEADER_NAME = "x-retry-after";
-
-    public static final Predicate<? super HttpHeaderFW> IS_INJECTED_HEADER =
-            h -> INJECTED_HEADER_NAME.equals(h.name().asString());
-
-    public static final Predicate<HttpHeaderFW> PUSH_TIMER_FILTER =
-            h -> INJECTED_HEADER_NAME.equals(h.name().toString());
-
-    public static final Predicate<HttpHeaderFW> IS_POLL_HEADER =
-                    h -> POLL_HEADER_NAME.equals(h.name().asString());
-
-    public static void forEachMatch(ListFW<HttpHeaderFW> headers, Predicate<HttpHeaderFW> predicate,
-            Consumer<HttpHeaderFW> consumer)
-    {
-        headers.forEach(header ->
-        {
-            if (predicate.test(header))
-            {
-                consumer.accept(header);
-            }
-        });
-    }
 
     public static final Predicate<? super HttpHeaderFW> INJECTED_DEFAULT_HEADER = h ->
     {
         String name = h.name().asString();
         String value = h.value().asString();
-        return INJECTED_HEADER_NAME.equals(name) && INJECTED_HEADER_DEFAULT_VALUE.equals(value);
+        return HttpHeaders.X_POLL_INJECTED.equals(name) && X_HTTP_CACHE_SYNC.equals(value);
     };
 
     public static final Predicate<? super HttpHeaderFW> INJECTED_HEADER_AND_NO_CACHE = h ->
     {
         String name = h.name().asString();
         String value = h.value().asString();
-        return INJECTED_HEADER_NAME.equals(name) && INJECTED_HEADER_AND_NO_CACHE_VALUE.equals(value);
+        return HttpHeaders.X_POLL_INJECTED.equals(name) && INJECTED_HEADER_AND_NO_CACHE_VALUE.equals(value);
     };
 
     public static final Predicate<? super HttpHeaderFW> NO_CACHE_CACHE_CONTROL = h ->
@@ -90,13 +67,13 @@ public final class HttpHeadersUtil
         {
             switch (h.name().asString())
             {
-                case ":authority":
+                case HttpHeaders.AUTHORITY:
                     authority.append(h.value().asString());
                     break;
-                case ":path":
+                case HttpHeaders.PATH:
                     path.append(h.value().asString());
                     break;
-                case ":scheme":
+                case HttpHeaders.SCHEME:
                     scheme.append(h.value().asString());
                     break;
                 default:
@@ -114,7 +91,6 @@ public final class HttpHeadersUtil
         {
             if (headerName.equals(h.name().asString()))
             {
-                // TODO multiple list values?
                 header.append(h.value().asString());
             }
         });
@@ -122,9 +98,9 @@ public final class HttpHeadersUtil
         return header.length() == 0 ? null : header.toString();
     }
 
-    public static boolean cacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
+    public static boolean isCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
-        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+        String cacheControl = getHeader(responseHeaders, "cache-control");
         if (cacheControl != null)
         {
             HttpCacheUtils.CacheControlParser parser = new  HttpCacheUtils.CacheControlParser(cacheControl);
@@ -135,15 +111,15 @@ public final class HttpHeadersUtil
                 switch(directive)
                 {
                     // TODO expires
-                    case "no-cache":
+                    case NO_CACHE:
                         return false;
-                    case "private":
+                    case CacheDirectives.PRIVATE:
                         return false;
-                    case "public":
+                    case CacheDirectives.PUBLIC:
                         return true;
-                    case "max-age":
+                    case CacheDirectives.MAX_AGE:
                         return true;
-                    case "s-maxage":
+                    case CacheDirectives.S_MAXAGE:
                         return true;
                     default:
                         break;
@@ -154,11 +130,16 @@ public final class HttpHeadersUtil
         {
             final String name = h.name().asString();
             final String value = h.value().asString();
-            if (":status".equals(name))
+            if (STATUS.equals(name))
             {
-                return HttpCacheUtils.CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
+                return CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
             }
             return false;
         });
+    }
+
+    private HttpHeadersUtil()
+    {
+        // utility class
     }
 }

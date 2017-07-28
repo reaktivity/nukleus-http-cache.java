@@ -18,6 +18,9 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.text.SimpleDateFormat;
@@ -57,11 +60,11 @@ public final class HttpCacheUtils
             final String value = h.value().asString();
             switch (name)
             {
-                case "cache-control":
+                case CACHE_CONTROL:
                     return value.contains("no-cache");
-                case ":method":
+                case METHOD:
                     return !"GET".equalsIgnoreCase(value);
-                case "content-length":
+                case CONTENT_LENGTH:
                     return true;
                 default:
                     return false;
@@ -154,8 +157,7 @@ public final class HttpCacheUtils
                 ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
             }
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
-            boolean expired = expires.after(receivedDate);
-            return expired;
+            return expires.after(receivedDate);
         }
         catch (Exception e)
         {
@@ -176,7 +178,7 @@ public final class HttpCacheUtils
 
         private static final Pattern CACHE_DIRECTIVES = Pattern.compile(REGEX);
 
-        private HashMap<String, String> values = new HashMap<String, String>();
+        private HashMap<String, String> values = new HashMap<>();
 
         public CacheControlParser(String value)
         {
@@ -206,12 +208,12 @@ public final class HttpCacheUtils
 
         public List<String> getValues(String directive)
         {
-            String values = getValue(directive);
-            if (values != null)
+            String dValues = getValue(directive);
+            if (dValues != null)
             {
                 return Arrays
-                        .stream(values.split(","))
-                        .map(v -> v.trim())
+                        .stream(dValues.split(","))
+                        .map(String::trim)
                         .collect(Collectors.toList());
             }
             return null;

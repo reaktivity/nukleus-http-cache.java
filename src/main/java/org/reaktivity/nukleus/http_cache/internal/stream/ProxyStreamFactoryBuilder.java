@@ -23,6 +23,7 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.route.RouteManager;
