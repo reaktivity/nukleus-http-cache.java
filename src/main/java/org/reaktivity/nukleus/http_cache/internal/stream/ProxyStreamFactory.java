@@ -441,7 +441,9 @@ public class ProxyStreamFactory implements StreamFactory
             junction.addSubscriber(this::handleResponseFromMyInitiatedFanout);
 
             String pollTime = getHeader(requestHeaders, "x-retry-after");
-            if (pollTime != null)
+            Predicate<HttpHeaderFW> isInjected = h -> X_POLL_INJECTED.equals(h.name().asString())
+                    || "x-http-cache-sync".equals(h.name().asString());
+            if (pollTime != null && requestHeaders.anyMatch(isInjected))
             {
                 scheduler.accept(currentTimeMillis() + parseInt(pollTime) * 1000, () ->
                 {
@@ -1639,8 +1641,8 @@ public class ProxyStreamFactory implements StreamFactory
     {
         boolean stripNoCacheValue = false;
 
-        Predicate<HttpHeaderFW> isInjected = h -> HttpHeaders.X_POLL_INJECTED.equals(h.name().asString());
-        isInjected = isInjected.or(h -> "x-http-cache-sync".equals(h.name().asString()));
+        Predicate<HttpHeaderFW> isInjected = h -> X_POLL_INJECTED.equals(h.name().asString())
+                || "x-http-cache-sync".equals(h.name().asString());
         if (requestHeaders.anyMatch(INJECTED_HEADER_AND_NO_CACHE) && requestHeaders.anyMatch(NO_CACHE_CACHE_CONTROL))
             {
                 isInjected = isInjected.or(h -> HttpHeaders.CACHE_CONTROL.equals(h.name().asString()));
