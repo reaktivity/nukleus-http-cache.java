@@ -37,7 +37,7 @@ public class ServerIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
-    private final ReaktorRule nukleus = new ReaktorRule()
+    private final ReaktorRule reaktor = new ReaktorRule()
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
@@ -46,7 +46,7 @@ public class ServerIT
             .clean();
 
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({

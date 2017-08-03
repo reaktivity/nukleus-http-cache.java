@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.ABORT_STREAM_FRAME_TYPE_ID;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY;
 
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -27,10 +27,9 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-public class ProxyExceptionsWithSystemConfigurationIT
+public class ProxyExceptionsWithConfigurationIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
@@ -38,24 +37,23 @@ public class ProxyExceptionsWithSystemConfigurationIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
-    private final ReaktorRule nukleus = new ReaktorRule()
+    private final ReaktorRule reaktor = new ReaktorRule()
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024)
             .nukleus("http-cache"::equals)
-            .configure("nukleus.http_cache.buffer.slot.capacity", 0)
-            .configure(ABORT_STREAM_FRAME_TYPE_ID, AbortFW.TYPE_ID)
+            .configure(BUFFER_SLOT_CAPACITY_PROPERTY, 0)
             .clean();
 
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Ignore("ABORT vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/nukleus.overloaded/accept/client",
+        "${streams}/reaktor.overloaded/accept/client",
     })
     public void resetIfOOM() throws Exception
     {
