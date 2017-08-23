@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.BiFunction;
@@ -51,13 +52,13 @@ public class DelayedTaskScheduler implements Nukleus
         {
             long c = System.currentTimeMillis();
             SortedSet<Long> past = scheduledTimes.headSet(c);
-            past.stream().forEach(t ->
-                {
-                    Runnable task = taskLookup.remove(t);
-                    task.run();
-                }
-            );
-            scheduledTimes.removeAll(past);
+            Iterator<Long> iter = past.iterator();
+            while(iter.hasNext())
+            {
+                Long time = iter.next();
+                iter.remove();
+                taskLookup.remove(time).run();
+            }
             return past.size();
         }
         return 0;

@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.ABORT_STREAM_FRAME_TYPE_ID;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -26,7 +25,6 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class ProxyExceptionsIT
@@ -37,17 +35,16 @@ public class ProxyExceptionsIT
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 
-    private final ReaktorRule nukleus = new ReaktorRule()
+    private final ReaktorRule reaktor = new ReaktorRule()
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024)
             .nukleus("http-cache"::equals)
-            .configure(ABORT_STREAM_FRAME_TYPE_ID, AbortFW.TYPE_ID)
             .clean();
 
     @Rule
-    public final TestRule chain = outerRule(nukleus).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
     @Specification({
