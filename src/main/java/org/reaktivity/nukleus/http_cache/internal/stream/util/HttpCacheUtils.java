@@ -63,7 +63,7 @@ public final class HttpCacheUtils
             switch (name)
             {
                 case CACHE_CONTROL:
-                    return value.contains("no-cache");
+                    return value.contains("no-cache") || value.equals("max-age=0");
                 case METHOD:
                     return !"GET".equalsIgnoreCase(value);
                 case CONTENT_LENGTH:

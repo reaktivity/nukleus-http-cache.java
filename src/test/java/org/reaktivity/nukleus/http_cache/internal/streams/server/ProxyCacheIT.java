@@ -105,6 +105,28 @@ public class ProxyCacheIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.cache.max-age=0/accept/client",
+            "${streams}/request.cache.max-age=0/connect/server",
+    })
+    public void shouldRequestCacheMaxAgeZero() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.cache.max-age=0.and.304/accept/client",
+            "${streams}/request.cache.max-age=0.and.304/connect/server",
+    })
+    public void shouldRequestCacheMaxAgeZeroAnd304() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/expire.max-age/accept/client",
         "${streams}/expire.max-age/connect/server",
