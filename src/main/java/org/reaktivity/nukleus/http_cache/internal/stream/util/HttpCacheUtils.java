@@ -63,7 +63,15 @@ public final class HttpCacheUtils
             switch (name)
             {
                 case CACHE_CONTROL:
-                    return value.contains("no-cache") || value.equals("max-age=0");
+                    if(value.contains("no-cache")){
+                        return true;
+                    }
+                    CacheControlParser parsedCacheControl = new CacheControlParser(value);
+                    String ageExpires = parsedCacheControl.getValue("max-age");
+                    if(ageExpires == null){
+                       return false;
+                    }
+                    return Integer.parseInt(ageExpires) == 0 ? true : false;
                 case METHOD:
                     return !"GET".equalsIgnoreCase(value);
                 case CONTENT_LENGTH:
@@ -100,7 +108,7 @@ public final class HttpCacheUtils
     {
 
         final String vary = getHeader(responseHeaders, "vary");
-        final String cacheControl = getHeader(responseHeaders, "cache-control");
+        final String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
 
         final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
 
@@ -148,7 +156,7 @@ public final class HttpCacheUtils
         try
         {
             Date receivedDate = DATE_FORMAT.parse(dateHeader);
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
             String ageExpires = null;
             if (cacheControl != null)
             {
@@ -245,7 +253,7 @@ public final class HttpCacheUtils
     public static boolean isPublicCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
         if (responseHeaders.anyMatch(h ->
-                "cache-control".equals(h.name().asString())
+                CACHE_CONTROL.equals(h.name().asString())
                 && h.value().asString().contains("private")))
         {
             return false;
@@ -255,7 +263,7 @@ public final class HttpCacheUtils
 
     public static boolean isPrivateCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
-        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
         if (cacheControl != null)
         {
             CacheControlParser parser = new  CacheControlParser(cacheControl);
