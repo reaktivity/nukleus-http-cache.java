@@ -15,7 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.LongSupplier;
 
@@ -281,8 +284,18 @@ public class Cache
             requestURLToResponse.remove(requestURLHash);
             return null;
         }
-        if (responseCanSatisfyRequest(cacheRequestHeaders, myRequestHeaders, responseHeaders))
-        {
+
+        final String cacheControlRequest = getHeader(myRequestHeaders, CACHE_CONTROL);
+        String ageExpires = null;
+        if (cacheControlRequest != null) {
+            HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(cacheControlRequest);
+            ageExpires = parsedCacheControl.getValue(MAX_AGE);
+        }
+
+        if (responseCanSatisfyRequest(cacheRequestHeaders, myRequestHeaders, responseHeaders)) {
+            if (ageExpires != null && !(Integer.parseInt(ageExpires) > 0)) {
+                return null;
+            }
             return responseServer;
         }
         else

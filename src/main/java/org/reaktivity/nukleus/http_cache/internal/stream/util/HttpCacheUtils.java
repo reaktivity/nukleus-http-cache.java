@@ -63,15 +63,7 @@ public final class HttpCacheUtils
             switch (name)
             {
                 case CACHE_CONTROL:
-                    if(value.contains("no-cache")){
-                        return true;
-                    }
-                    CacheControlParser parsedCacheControl = new CacheControlParser(value);
-                    String ageExpires = parsedCacheControl.getValue("max-age");
-                    if(ageExpires == null){
-                       return false;
-                    }
-                    return Integer.parseInt(ageExpires) == 0 ? true : false;
+                    return value.contains("no-cache");
                 case METHOD:
                     return !"GET".equalsIgnoreCase(value);
                 case CONTENT_LENGTH:
