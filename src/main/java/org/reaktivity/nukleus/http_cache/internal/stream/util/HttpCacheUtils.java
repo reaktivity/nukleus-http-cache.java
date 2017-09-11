@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
@@ -37,6 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.agrona.LangUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -106,6 +108,15 @@ public final class HttpCacheUtils
 
         final String myAuthorizationHeader = getHeader(myRequestHeaders, "authorization");
 
+        final String myRequestCacheControl = getHeader(myRequestHeaders, CACHE_CONTROL);
+        if (myRequestCacheControl != null)
+        {
+            if(!responseSatisfiesRequestDirectives(responseHeaders, myRequestCacheControl))
+            {
+                return false;
+            }
+        }
+
         boolean useSharedResponse = true;
 
         if (cacheControl != null && cacheControl.contains("public"))
@@ -131,6 +142,45 @@ public final class HttpCacheUtils
         }
 
         return useSharedResponse;
+    }
+
+    private static boolean responseSatisfiesRequestDirectives(
+            final ListFW<HttpHeaderFW> responseHeaders,
+            final String myRequestCacheControl)
+    {
+        // TODO in future, clean up GC/Object creation
+
+        // Check max-age=0;
+        HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(myRequestCacheControl);
+        String requestMaxAge = parsedCacheControl.getValue(MAX_AGE);
+        if(requestMaxAge != null)
+        {
+            String dateHeader = getHeader(responseHeaders, "date");
+            if (dateHeader == null)
+            {
+                dateHeader = getHeader(responseHeaders, "last-modified");
+            }
+            if (dateHeader == null)
+            {
+                // invalid response, so say no
+                return false;
+            }
+            try
+            {
+                Date receivedDate = DATE_FORMAT.parse(dateHeader);
+                final int timeWhenExpires = Integer.parseInt(requestMaxAge) * 1000;
+                if(new Date(System.currentTimeMillis() - timeWhenExpires).after(receivedDate))
+                {
+                    return false;
+                }
+            }
+            catch(Exception e)
+            {
+                // Should never get here;
+                LangUtil.rethrowUnchecked(e);
+            }
+        }
+        return true;
     }
 
     public static boolean isExpired(ListFW<HttpHeaderFW> responseHeaders)
