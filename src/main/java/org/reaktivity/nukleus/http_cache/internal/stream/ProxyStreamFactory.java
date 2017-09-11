@@ -21,6 +21,8 @@ import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canStore;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivateCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -605,8 +607,9 @@ public class ProxyStreamFactory implements StreamFactory
                 final ListFW<HttpHeaderFW> responseHeaders,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            if (requestHeaders.anyMatch(SHOULD_POLL)
-                    && (HttpCacheUtils.canInjectPushPromise(requestHeaders)))
+            if (isPrivateCacheableResponse(responseHeaders)
+                    && requestHeaders.anyMatch(SHOULD_POLL)
+                    && canInjectPushPromise(requestHeaders))
             {
 
                 if (responseHeaders.anyMatch(h -> HttpHeaders.CACHE_CONTROL.equals(h.name().asString())))
