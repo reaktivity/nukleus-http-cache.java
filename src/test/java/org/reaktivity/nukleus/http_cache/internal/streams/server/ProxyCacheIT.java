@@ -105,6 +105,28 @@ public class ProxyCacheIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+            "${streams}/cache.get.request.with.no-store/accept/client",
+            "${streams}/cache.get.request.with.no-store/connect/server",
+    })
+    public void shouldCacheGetRequestWithNoStore() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
+            "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/connect/server",
+    })
+    public void shouldCacheGetRequestWithNoStoreAndResponeMarkedCacheable() throws Exception
+    {
+        k3po.start();
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/expire.max-age/accept/client",
         "${streams}/expire.max-age/connect/server",

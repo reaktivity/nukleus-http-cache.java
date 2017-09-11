@@ -19,6 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
@@ -289,5 +290,15 @@ public final class HttpCacheUtils
             }
             return false;
         });
+    }
+
+    public static boolean canStore(ListFW<HttpHeaderFW> responseHeaders){
+        if (responseHeaders.anyMatch(h ->
+                "cache-control".equals(h.name().asString())
+                        && h.value().asString().contains(NO_STORE)))
+        {
+            return false;
+        }
+        return true;
     }
 }

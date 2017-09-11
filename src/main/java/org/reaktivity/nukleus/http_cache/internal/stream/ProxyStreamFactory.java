@@ -20,6 +20,7 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canStore;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -1431,7 +1432,8 @@ public class ProxyStreamFactory implements StreamFactory
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
             final boolean isCacheable = HttpCacheUtils.isPublicCacheableResponse(responseHeaders);
-            if (isCacheable)
+            final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
+            if (isCacheable && canStore(requestHeaders))
             {
                 this.cacheResponseSlot = cacheBufferPool.acquire(this.connectReplyStreamId);
                 if (cacheResponseSlot == NO_SLOT)
