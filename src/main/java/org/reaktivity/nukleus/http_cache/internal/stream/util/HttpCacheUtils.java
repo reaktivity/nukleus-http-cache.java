@@ -300,12 +300,12 @@ public final class HttpCacheUtils
         {
             return false;
         }
-        return HttpCacheUtils.isPrivateCacheableResponse(responseHeaders);
+        return isPrivateCacheableResponse(responseHeaders);
     }
 
     public static boolean isPrivateCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
-        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
+        String cacheControl = getHeader(responseHeaders, "cache-control");
         if (cacheControl != null)
         {
             CacheControlParser parser = new  CacheControlParser(cacheControl);
