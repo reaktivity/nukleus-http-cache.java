@@ -292,13 +292,10 @@ public final class HttpCacheUtils
         });
     }
 
-    public static boolean canStore(ListFW<HttpHeaderFW> responseHeaders){
-        if (responseHeaders.anyMatch(h ->
-                "cache-control".equals(h.name().asString())
-                        && h.value().asString().contains(NO_STORE)))
-        {
-            return false;
-        }
-        return true;
+    public static final boolean isCacheControlNoStore(HttpHeaderFW header)
+    {
+        final String name = header.name().asString();
+        final String value = header.value().asString();
+        return HttpHeaders.CACHE_CONTROL.equals(name) && value.contains(NO_STORE);
     }
 }
