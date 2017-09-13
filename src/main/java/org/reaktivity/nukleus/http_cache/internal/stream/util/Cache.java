@@ -203,8 +203,8 @@ public class Cache
                 {
                     case WindowFW.TYPE_ID:
                         final WindowFW window = windowRO.wrap(buffer, index, index + length);
-                        int update = window.update();
-                        writePayload(update);
+                        int credit = window.credit();
+                        writePayload(credit);
                         break;
                     case ResetFW.TYPE_ID:
                     default:
@@ -213,9 +213,9 @@ public class Cache
                 }
             }
 
-            private void writePayload(int update)
+            private void writePayload(int credit)
             {
-                final int toWrite = Math.min(update, responseSize - payloadWritten);
+                final int toWrite = Math.min(credit, responseSize - payloadWritten);
                 final int offset = responseHeaderSize + payloadWritten;
                 MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
                 writer.doHttpData(messageConsumer, streamId, buffer, offset, toWrite);

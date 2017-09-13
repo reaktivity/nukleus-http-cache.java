@@ -41,9 +41,9 @@ public class GroupThrottle
         streamToWaterMark = new Long2LongHashMap(0);
     }
 
-    private void increment(long stream, long increment)
+    private void increment(long stream, long credit)
     {
-        streamToWaterMark.put(stream, streamToWaterMark.get(stream) + increment);
+        streamToWaterMark.put(stream, streamToWaterMark.get(stream) + credit);
         updateThrottle();
     }
 
@@ -56,7 +56,7 @@ public class GroupThrottle
             if (diff > 0)
             {
                 // TODO, track frames?
-                writer.doWindow(connectReply, connectReplyStreamId, (int)diff, (int)diff);
+                writer.doWindow(connectReply, connectReplyStreamId, (int)diff, 0);
                 groupWaterMark = newLowWaterMark;
             }
         }
@@ -64,12 +64,12 @@ public class GroupThrottle
 
     public void processWindow(
         long streamId,
-        int bytes,
-        int frames)
+        int credit,
+        int padding)
     {
-        if (bytes > 0)
+        if (credit > 0)
         {
-            increment(streamId, bytes);
+            increment(streamId, credit);
         }
     }
 

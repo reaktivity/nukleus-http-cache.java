@@ -167,13 +167,13 @@ public class Writer
     public void doWindow(
         final MessageConsumer throttle,
         final long throttleStreamId,
-        final int writableBytes,
-        final int writableFrames)
+        final int credit,
+        final int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(throttleStreamId)
-                .update(writableBytes)
-                .frames(writableFrames)
+                .credit(credit)
+                .padding(padding)
                 .build();
 
         throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());

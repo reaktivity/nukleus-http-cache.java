@@ -982,10 +982,10 @@ public class ProxyStreamFactory implements StreamFactory
         private void handleAcceptReplyWindow(
             WindowFW window)
         {
-            final int bytes = windowRO.update();
-            final int frames = windowRO.frames();
+            final int credit = windowRO.credit();
+            final int padding = windowRO.padding();
 
-            writer.doWindow(connectReplyThrottle, this.connectReplyStreamId, bytes, frames);
+            writer.doWindow(connectReplyThrottle, this.connectReplyStreamId, credit, padding);
         }
 
         private void handleAcceptReplyReset(
@@ -1019,10 +1019,10 @@ public class ProxyStreamFactory implements StreamFactory
         private void handleConnectWindow(
             WindowFW window)
         {
-            final int bytes = windowRO.update();
-            final int frames = windowRO.frames();
+            final int credit = windowRO.credit();
+            final int padding = windowRO.padding();
 
-            writer.doWindow(acceptThrottle, acceptStreamId, bytes, frames);
+            writer.doWindow(acceptThrottle, acceptStreamId, credit, padding);
         }
 
         private void handleConnectReset(
@@ -1259,7 +1259,7 @@ public class ProxyStreamFactory implements StreamFactory
                 this.cachedResponseSize = cacheServer.getResponse(octetsRO).sizeof();
                 this.processedResponseSize = 0;
                 final int bytes = cachedResponseSize + 8024;
-                writer.doWindow(connectReplyThrottle, connectReplyStreamId, bytes, bytes);
+                writer.doWindow(connectReplyThrottle, connectReplyStreamId, bytes, 0);
                 streamState = this::attemptCacheMatch;
             }
             else
@@ -1599,10 +1599,10 @@ public class ProxyStreamFactory implements StreamFactory
         private void handleConnectWindow(
             WindowFW window)
         {
-            final int bytes = windowRO.update();
-            final int frames = windowRO.frames();
+            final int credit = windowRO.credit();
+            final int padding = windowRO.padding();
             final long streamId = window.streamId();
-            connectReplyThrottle.processWindow(streamId, bytes, frames);
+            connectReplyThrottle.processWindow(streamId, credit, padding);
         }
 
         private void handleConnectReset(
