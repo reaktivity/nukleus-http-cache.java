@@ -1433,7 +1433,8 @@ public class ProxyStreamFactory implements StreamFactory
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
             final boolean isCacheable = HttpCacheUtils.isPublicCacheableResponse(responseHeaders);
-            if (isCacheable)
+            final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
+            if (isCacheable && !requestHeaders.anyMatch(HttpCacheUtils::isCacheControlNoStore))
             {
                 this.cacheResponseSlot = cacheBufferPool.acquire(this.connectReplyStreamId);
                 if (cacheResponseSlot == NO_SLOT)

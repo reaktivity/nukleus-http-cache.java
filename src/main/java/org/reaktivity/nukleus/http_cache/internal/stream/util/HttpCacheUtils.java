@@ -20,6 +20,7 @@ import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
@@ -338,5 +339,12 @@ public final class HttpCacheUtils
             }
             return false;
         });
+    }
+
+    public static boolean isCacheControlNoStore(HttpHeaderFW header)
+    {
+        final String name = header.name().asString();
+        final String value = header.value().asString();
+        return HttpHeaders.CACHE_CONTROL.equals(name) && value.contains(NO_STORE);
     }
 }
