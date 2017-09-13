@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
@@ -37,6 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.agrona.LangUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -93,44 +95,91 @@ public final class HttpCacheUtils
         });
     }
 
-    public static boolean responseCanSatisfyRequest(
-            final ListFW<HttpHeaderFW> pendingRequestHeaders,
-            final ListFW<HttpHeaderFW> myRequestHeaders,
-            final ListFW<HttpHeaderFW> responseHeaders)
+    public static boolean cachedResponseCanSatisfyRequest(
+            final ListFW<HttpHeaderFW> cachedRequestHeaders,
+            final ListFW<HttpHeaderFW> cachedResponseHeaders,
+            final ListFW<HttpHeaderFW> requestHeaders)
     {
 
-        final String vary = getHeader(responseHeaders, "vary");
-        final String cacheControl = getHeader(responseHeaders, "cache-control");
+        final String cachedVaryHeader = getHeader(cachedResponseHeaders, "vary");
+        final String cachedAuthorizationHeader = getHeader(cachedRequestHeaders, "authorization");
+        final String cachedCacheControlHeader = getHeader(cachedResponseHeaders, CACHE_CONTROL);
 
-        final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
+        final String requestAuthorizationHeader = getHeader(requestHeaders, "authorization");
+        final String requestCacheControlHeader = getHeader(requestHeaders, CACHE_CONTROL);
 
-        final String myAuthorizationHeader = getHeader(myRequestHeaders, "authorization");
+        if (requestCacheControlHeader != null)
+        {
+            if(!responseSatisfiesRequestDirectives(cachedResponseHeaders, requestCacheControlHeader))
+            {
+                return false;
+            }
+        }
 
         boolean useSharedResponse = true;
 
-        if (cacheControl != null && cacheControl.contains("public"))
+        if (cachedCacheControlHeader != null && cachedCacheControlHeader.contains("public"))
         {
             useSharedResponse = true;
         }
-        else if (cacheControl != null && cacheControl.contains("private"))
+        else if (cachedCacheControlHeader != null && cachedCacheControlHeader.contains("private"))
         {
             useSharedResponse = false;
         }
-        else if (myAuthorizationHeader != null || pendingRequestAuthorizationHeader != null)
+        else if (requestAuthorizationHeader != null || cachedAuthorizationHeader != null)
         {
             useSharedResponse = false;
         }
-        else if (vary != null)
+        else if (cachedVaryHeader != null)
         {
-            useSharedResponse = stream(vary.split("\\s*,\\s*")).anyMatch(v ->
+            useSharedResponse = stream(cachedVaryHeader.split("\\s*,\\s*")).anyMatch(v ->
             {
-                String pendingHeaderValue = getHeader(pendingRequestHeaders, v);
-                String myHeaderValue = getHeader(myRequestHeaders, v);
+                String pendingHeaderValue = getHeader(cachedRequestHeaders, v);
+                String myHeaderValue = getHeader(requestHeaders, v);
                 return Objects.equals(pendingHeaderValue, myHeaderValue);
             });
         }
 
         return useSharedResponse;
+    }
+
+    private static boolean responseSatisfiesRequestDirectives(
+            final ListFW<HttpHeaderFW> responseHeaders,
+            final String myRequestCacheControl)
+    {
+        // TODO in future, clean up GC/Object creation
+
+        // Check max-age=0;
+        HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(myRequestCacheControl);
+        String requestMaxAge = parsedCacheControl.getValue(MAX_AGE);
+        if(requestMaxAge != null)
+        {
+            String dateHeader = getHeader(responseHeaders, "date");
+            if (dateHeader == null)
+            {
+                dateHeader = getHeader(responseHeaders, "last-modified");
+            }
+            if (dateHeader == null)
+            {
+                // invalid response, so say no
+                return false;
+            }
+            try
+            {
+                Date receivedDate = DATE_FORMAT.parse(dateHeader);
+                final int timeWhenExpires = Integer.parseInt(requestMaxAge) * 1000;
+                if(new Date(System.currentTimeMillis() - timeWhenExpires).after(receivedDate))
+                {
+                    return false;
+                }
+            }
+            catch(Exception e)
+            {
+                // Should never get here;
+                LangUtil.rethrowUnchecked(e);
+            }
+        }
+        return true;
     }
 
     public static boolean isExpired(ListFW<HttpHeaderFW> responseHeaders)
@@ -148,7 +197,7 @@ public final class HttpCacheUtils
         try
         {
             Date receivedDate = DATE_FORMAT.parse(dateHeader);
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
             String ageExpires = null;
             if (cacheControl != null)
             {
@@ -245,7 +294,7 @@ public final class HttpCacheUtils
     public static boolean isPublicCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
         if (responseHeaders.anyMatch(h ->
-                "cache-control".equals(h.name().asString())
+                CACHE_CONTROL.equals(h.name().asString())
                 && h.value().asString().contains("private")))
         {
             return false;
