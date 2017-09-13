@@ -22,7 +22,7 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivateCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
@@ -87,7 +87,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     private final BeginFW beginRO = new BeginFW();
     private final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
-    private final ListFW<HttpHeaderFW> myRequestHeadersRO = new HttpBeginExFW().headers();
+    private final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     private final ListFW<HttpHeaderFW> pendingRequestHeadersRO = new HttpBeginExFW().headers();
     private final DataFW dataRO = new DataFW();
     private final OctetsFW octetsRO = new OctetsFW();
@@ -217,7 +217,7 @@ public class ProxyStreamFactory implements StreamFactory
 
         private MessageConsumer streamState;
 
-        private int myRequestSlot = NO_SLOT;
+        private int requestSlot = NO_SLOT;
         private int requestSize;
         private Correlation streamCorrelation;
         private MessageConsumer connectReplyThrottle;
@@ -337,13 +337,13 @@ public class ProxyStreamFactory implements StreamFactory
                     isRevalidating);
             if (responseServer != null)
             {
-                this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
-                if (myRequestSlot == NO_SLOT)
+                this.requestSlot = streamBufferPool.acquire(acceptStreamId);
+                if (requestSlot == NO_SLOT)
                 {
                     send503AndReset();
                     return;
                 }
-                storeRequest(requestHeaders, myRequestSlot);
+                storeRequest(requestHeaders, requestSlot);
                 this.streamCorrelation =
                         new Correlation(
                             requestURLHash,
@@ -366,14 +366,14 @@ public class ProxyStreamFactory implements StreamFactory
         private void proxyRequest(
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
-            if (myRequestSlot == NO_SLOT)
+            this.requestSlot = streamBufferPool.acquire(acceptStreamId);
+            if (requestSlot == NO_SLOT)
             {
                 send503AndReset();
                 return;
             }
 
-            storeRequest(requestHeaders, myRequestSlot);
+            storeRequest(requestHeaders, requestSlot);
             this.connectStreamId = supplyStreamId.getAsLong();
             this.streamCorrelation = new Correlation(
                     requestURLHash,
@@ -405,18 +405,18 @@ public class ProxyStreamFactory implements StreamFactory
             final boolean follow304)
         {
             // create connection
-            this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
-            if (myRequestSlot == NO_SLOT)
+            this.requestSlot = streamBufferPool.acquire(acceptStreamId);
+            if (requestSlot == NO_SLOT)
             {
                 send503AndReset();
                 return;
             }
-            storeRequest(requestHeaders, myRequestSlot);
+            storeRequest(requestHeaders, requestSlot);
 
             int correlationRequestHeadersSlot = streamBufferPool.acquire(requestURLHash);
             if (correlationRequestHeadersSlot == NO_SLOT)
             {
-                streamBufferPool.release(myRequestSlot);
+                streamBufferPool.release(requestSlot);
                 send503AndReset();
                 return;
             }
@@ -451,8 +451,8 @@ public class ProxyStreamFactory implements StreamFactory
                 {
                     if (!junction.getOuts().isEmpty())
                     {
-                        final ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
-                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, myRequestHeaders);
+                        final ListFW<HttpHeaderFW> scheduledRequestHeaders = getRequestHeaders(requestHeadersRO);
+                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, scheduledRequestHeaders);
                     }
                     else
                     {
@@ -472,13 +472,13 @@ public class ProxyStreamFactory implements StreamFactory
 
         private void latchOnToFanout(final ListFW<HttpHeaderFW> requestHeaders)
         {
-            this.myRequestSlot = streamBufferPool.acquire(acceptStreamId);
-            if (myRequestSlot == NO_SLOT)
+            this.requestSlot = streamBufferPool.acquire(acceptStreamId);
+            if (requestSlot == NO_SLOT)
             {
                 send503AndReset();
                 return;
             }
-            storeRequest(requestHeaders, myRequestSlot);
+            storeRequest(requestHeaders, requestSlot);
 
             this.junction = junctions.get(requestURLHash);
             junction.addSubscriber(this::handleResponseFromFanout);
@@ -511,8 +511,8 @@ public class ProxyStreamFactory implements StreamFactory
                     final OctetsFW extension = begin.extension();
                     final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
                     final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
-                    final ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
-                    sendHttpResponse(responseHeaders, myRequestHeaders);
+                    final ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(requestHeadersRO);
+                    sendHttpResponse(responseHeaders, requestHeaders);
                     router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());
                     break;
                 default:
@@ -539,11 +539,11 @@ public class ProxyStreamFactory implements StreamFactory
 
                     ListFW<HttpHeaderFW> pendingRequestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
 
-                    ListFW<HttpHeaderFW> myRequestHeaders = getRequestHeaders(myRequestHeadersRO);
+                    ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(requestHeadersRO);
 
-                    if (responseCanSatisfyRequest(pendingRequestHeaders, myRequestHeaders, responseHeaders))
+                    if (cachedResponseCanSatisfyRequest(pendingRequestHeaders, responseHeaders, requestHeaders))
                     {
-                        sendHttpResponse(responseHeaders, myRequestHeaders);
+                        sendHttpResponse(responseHeaders, requestHeaders);
                         router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());
                         return true;
                     }
@@ -566,7 +566,6 @@ public class ProxyStreamFactory implements StreamFactory
 
                         this.connectStreamId = supplyStreamId.getAsLong();
 
-                        final ListFW<HttpHeaderFW> requestHeaders = myRequestHeaders;
                         sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
                         return false;
                     }
@@ -589,7 +588,7 @@ public class ProxyStreamFactory implements StreamFactory
                     final OctetsFW extension = begin.extension();
                     final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
                     final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
-                    final ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(myRequestHeadersRO);
+                    final ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(requestHeadersRO);
                     sendHttpResponse(responseHeaders, requestHeaders);
                     this.connectReplyStreamId = streamCorrelation.getConnectReplyStreamId();
                     this.connectReplyThrottle = streamCorrelation.connectReplyThrottle();
@@ -846,16 +845,16 @@ public class ProxyStreamFactory implements StreamFactory
 
         private void clean()
         {
-            if (this.myRequestSlot != NO_SLOT)
+            if (this.requestSlot != NO_SLOT)
             {
-                streamBufferPool.release(this.myRequestSlot);
-                this.myRequestSlot = NO_SLOT;
+                streamBufferPool.release(this.requestSlot);
+                this.requestSlot = NO_SLOT;
             }
         }
 
         private ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> headersRO)
         {
-            return headersRO.wrap(streamBufferPool.buffer(this.myRequestSlot), 0, requestSize);
+            return headersRO.wrap(streamBufferPool.buffer(this.requestSlot), 0, requestSize);
         }
 
         private int storeRequest(final ListFW<HttpHeaderFW> headers, int requestCacheSlot)

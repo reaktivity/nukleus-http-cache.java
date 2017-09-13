@@ -15,7 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.responseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
 
 import java.util.function.LongSupplier;
 
@@ -281,7 +281,7 @@ public class Cache
             requestURLToResponse.remove(requestURLHash);
             return null;
         }
-        if (responseCanSatisfyRequest(cacheRequestHeaders, myRequestHeaders, responseHeaders))
+        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders))
         {
             return responseServer;
         }
