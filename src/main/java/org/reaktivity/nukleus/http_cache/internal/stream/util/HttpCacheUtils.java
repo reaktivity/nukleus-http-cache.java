@@ -95,23 +95,22 @@ public final class HttpCacheUtils
         });
     }
 
-    public static boolean responseCanSatisfyRequest(
-            final ListFW<HttpHeaderFW> pendingRequestHeaders,
-            final ListFW<HttpHeaderFW> myRequestHeaders,
-            final ListFW<HttpHeaderFW> responseHeaders)
+    public static boolean cachedResponseCanSatisfyRequest(
+            final ListFW<HttpHeaderFW> cachedRequestHeaders,
+            final ListFW<HttpHeaderFW> cachedResponseHeaders,
+            final ListFW<HttpHeaderFW> requestHeaders)
     {
 
-        final String vary = getHeader(responseHeaders, "vary");
-        final String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
+        final String cachedVaryHeader = getHeader(cachedResponseHeaders, "vary");
+        final String cachedAuthorizationHeader = getHeader(cachedRequestHeaders, "authorization");
+        final String cachedCacheControlHeader = getHeader(cachedResponseHeaders, CACHE_CONTROL);
 
-        final String pendingRequestAuthorizationHeader = getHeader(pendingRequestHeaders, "authorization");
+        final String requestAuthorizationHeader = getHeader(requestHeaders, "authorization");
+        final String requestCacheControlHeader = getHeader(requestHeaders, CACHE_CONTROL);
 
-        final String myAuthorizationHeader = getHeader(myRequestHeaders, "authorization");
-
-        final String myRequestCacheControl = getHeader(myRequestHeaders, CACHE_CONTROL);
-        if (myRequestCacheControl != null)
+        if (requestCacheControlHeader != null)
         {
-            if(!responseSatisfiesRequestDirectives(responseHeaders, myRequestCacheControl))
+            if(!responseSatisfiesRequestDirectives(cachedResponseHeaders, requestCacheControlHeader))
             {
                 return false;
             }
@@ -119,24 +118,24 @@ public final class HttpCacheUtils
 
         boolean useSharedResponse = true;
 
-        if (cacheControl != null && cacheControl.contains("public"))
+        if (cachedCacheControlHeader != null && cachedCacheControlHeader.contains("public"))
         {
             useSharedResponse = true;
         }
-        else if (cacheControl != null && cacheControl.contains("private"))
+        else if (cachedCacheControlHeader != null && cachedCacheControlHeader.contains("private"))
         {
             useSharedResponse = false;
         }
-        else if (myAuthorizationHeader != null || pendingRequestAuthorizationHeader != null)
+        else if (requestAuthorizationHeader != null || cachedAuthorizationHeader != null)
         {
             useSharedResponse = false;
         }
-        else if (vary != null)
+        else if (cachedVaryHeader != null)
         {
-            useSharedResponse = stream(vary.split("\\s*,\\s*")).anyMatch(v ->
+            useSharedResponse = stream(cachedVaryHeader.split("\\s*,\\s*")).anyMatch(v ->
             {
-                String pendingHeaderValue = getHeader(pendingRequestHeaders, v);
-                String myHeaderValue = getHeader(myRequestHeaders, v);
+                String pendingHeaderValue = getHeader(cachedRequestHeaders, v);
+                String myHeaderValue = getHeader(requestHeaders, v);
                 return Objects.equals(pendingHeaderValue, myHeaderValue);
             });
         }
