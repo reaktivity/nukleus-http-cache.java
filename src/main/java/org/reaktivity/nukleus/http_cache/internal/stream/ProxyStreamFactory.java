@@ -19,12 +19,14 @@ import static java.lang.Integer.parseInt;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivateCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_POLL_INJECTED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.INJECTED_HEADER_AND_NO_CACHE;
@@ -81,6 +83,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     private static final String IF_UNMODIFIED_SINCE = "if-unmodified-since";
     private static final String STALE_WHILE_REVALIDATE_2147483648 = "stale-while-revalidate=2147483648";
+    private static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     // TODO, remove need for RW in simplification of inject headers
     private final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
@@ -605,6 +608,19 @@ public class ProxyStreamFactory implements StreamFactory
                 final ListFW<HttpHeaderFW> responseHeaders,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
+            if (canInjectPushPromise(requestHeaders)
+                    && requestHeaders.anyMatch(
+                    h ->
+                    {
+                        String name = h.name().asString();
+                        String value = h.value().asString();
+                        return name.equals(CACHE_CONTROL) && value.contains("max-stale");
+                    }))
+            {
+                writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L,
+                        acceptCorrelationId, injectWarningWhenStaleResponseIsUsed(headersToExtensions(responseHeaders)));
+            }
+
             if (isPrivateCacheableResponse(responseHeaders)
                     && requestHeaders.anyMatch(SHOULD_POLL)
                     && canInjectPushPromise(requestHeaders))
@@ -663,6 +679,15 @@ public class ProxyStreamFactory implements StreamFactory
             mutator = mutator.andThen(
                     x ->  x.item(h -> h.representation((byte) 0).name("cache-control").value(STALE_WHILE_REVALIDATE_2147483648))
                 );
+            return visitHttpBeginEx(mutator);
+        }
+
+        private Flyweight.Builder.Visitor injectWarningWhenStaleResponseIsUsed(
+                Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        {
+            mutator = mutator.andThen(
+                    x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(RESPONSE_IS_STALE))
+            );
             return visitHttpBeginEx(mutator);
         }
 

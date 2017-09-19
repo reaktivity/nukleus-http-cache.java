@@ -275,7 +275,7 @@ public class Cache
 
         ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders))
+        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders, myRequestHeaders))
         {
             responseServer.cleanUp();
             requestURLToResponse.remove(requestURLHash);

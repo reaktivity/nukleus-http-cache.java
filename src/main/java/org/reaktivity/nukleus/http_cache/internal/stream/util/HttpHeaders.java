@@ -30,6 +30,7 @@ public final class HttpHeaders
     public static final String PATH = ":path";
     public static final String CONTENT_LENGTH = "content-length";
     public static final String METHOD = ":method";
+    public static final String WARNING = "warning";
 
     // values
     public static final String X_HTTP_CACHE_SYNC_ALWAYS = "always";

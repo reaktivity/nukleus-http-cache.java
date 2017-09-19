@@ -19,6 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
@@ -153,6 +154,7 @@ public final class HttpCacheUtils
         // Check max-age=0;
         HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(myRequestCacheControl);
         String requestMaxAge = parsedCacheControl.getValue(MAX_AGE);
+        String requestMaxStale = parsedCacheControl.getValue(MAX_STALE);
         if(requestMaxAge != null)
         {
             String dateHeader = getHeader(responseHeaders, "date");
@@ -169,10 +171,19 @@ public final class HttpCacheUtils
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeader);
                 final int timeWhenExpires = Integer.parseInt(requestMaxAge) * 1000;
-                if(new Date(System.currentTimeMillis() - timeWhenExpires).after(receivedDate))
+                final Date expires = new Date(System.currentTimeMillis() - timeWhenExpires);
+                if(requestMaxStale != null)
                 {
-                    return false;
+                    final int timeWhenStales = Integer.parseInt(requestMaxStale) * 1000;
+                    final Date stale = new Date(System.currentTimeMillis() - timeWhenExpires - timeWhenStales);
+
+                    if(stale.before(expires))
+                    {
+                        return expires.after(receivedDate);
+                    }
                 }
+
+                return !expires.after(receivedDate);
             }
             catch(Exception e)
             {
@@ -183,7 +194,7 @@ public final class HttpCacheUtils
         return true;
     }
 
-    public static boolean isExpired(ListFW<HttpHeaderFW> responseHeaders)
+    public static boolean isExpired(ListFW<HttpHeaderFW> responseHeaders, ListFW<HttpHeaderFW> requestHeaders)
     {
         String dateHeader = getHeader(responseHeaders, "date");
         if (dateHeader == null)
@@ -199,7 +210,10 @@ public final class HttpCacheUtils
         {
             Date receivedDate = DATE_FORMAT.parse(dateHeader);
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
+            String cacheControlRequest = HttpHeadersUtil.getHeader(requestHeaders, CACHE_CONTROL);
             String ageExpires = null;
+            String ageStale = null;
+            String requestMaxAge = null;
             if (cacheControl != null)
             {
                 CacheControlParser parsedCacheControl = new CacheControlParser(cacheControl);
@@ -209,6 +223,13 @@ public final class HttpCacheUtils
                     ageExpires = parsedCacheControl.getValue("max-age");
                 }
             }
+            if (cacheControlRequest != null)
+            {
+                CacheControlParser parsedCacheControl = new CacheControlParser(cacheControlRequest);
+                ageStale = parsedCacheControl.getValue(MAX_STALE);
+                requestMaxAge = parsedCacheControl.getValue(MAX_AGE);
+            }
+            int ageStaleInt;
             int ageExpiresInt;
             if (ageExpires == null)
             {
@@ -228,6 +249,19 @@ public final class HttpCacheUtils
                 ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
             }
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
+            if (ageStale != null)
+            {
+                if (requestMaxAge != null)
+                {
+                    return false;
+                }
+                ageStaleInt = Integer.parseInt(ageStale) * 1000;
+                final Date stale = new Date(System.currentTimeMillis() - ageExpiresInt - ageStaleInt);
+                if (stale.before(receivedDate))
+                {
+                    return !expires.after(receivedDate);
+                }
+            }
             return expires.after(receivedDate);
         }
         catch (Exception e)
