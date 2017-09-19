@@ -121,6 +121,21 @@ public class ProxyCacheIT
     @Test
     @Specification({
             "${route}/proxy/controller",
+            "${streams}/cache.max-stale.no.value/accept/client",
+            "${streams}/cache.max-stale.no.value/connect/server",
+    })
+    public void shouldCacheMaxStaleWithNoValue() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
             "${streams}/cache.max-stale.with.max-age/accept/client",
             "${streams}/cache.max-stale.with.max-age/connect/server",
     })

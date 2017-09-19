@@ -182,6 +182,10 @@ public final class HttpCacheUtils
                         return expires.after(receivedDate);
                     }
                 }
+                if(myRequestCacheControl.contains(MAX_STALE) && requestMaxStale == null)
+                {
+                    return true;
+                }
 
                 return !expires.after(receivedDate);
             }
@@ -228,6 +232,10 @@ public final class HttpCacheUtils
                 CacheControlParser parsedCacheControl = new CacheControlParser(cacheControlRequest);
                 ageStale = parsedCacheControl.getValue(MAX_STALE);
                 requestMaxAge = parsedCacheControl.getValue(MAX_AGE);
+                if(cacheControlRequest.contains(MAX_STALE) && ageStale == null)
+                {
+                    return false;
+                }
             }
             int ageStaleInt;
             int ageExpiresInt;
