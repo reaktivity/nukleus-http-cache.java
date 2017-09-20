@@ -19,6 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
@@ -27,6 +28,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -183,7 +185,55 @@ public final class HttpCacheUtils
         return true;
     }
 
-    public static boolean isExpired(ListFW<HttpHeaderFW> responseHeaders)
+    public static boolean checkFreshnessLifetime(
+            ListFW<HttpHeaderFW> responseHeaders,
+            ListFW<HttpHeaderFW> requestHeaders
+    )
+    {
+        String dateHeader = getHeader(responseHeaders, "date");
+        if (dateHeader == null)
+        {
+            dateHeader = getHeader(responseHeaders, "last-modified");
+        }
+
+        String requestCacheControl = HttpHeadersUtil.getHeader(requestHeaders, CACHE_CONTROL);
+        String responseCacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
+        String requestMinFresh = null;
+        String maxAge = null;
+        if(requestCacheControl != null)
+        {
+            HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(requestCacheControl);
+            requestMinFresh = parsedCacheControl.getValue(MIN_FRESH);
+        }
+        if(responseCacheControl != null)
+        {
+            HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(responseCacheControl);
+            maxAge = parsedCacheControl.getValue(MAX_AGE);
+        }
+        if (requestMinFresh != null && maxAge !=null)
+        {
+            int minFreshInt = Integer.parseInt(requestMinFresh);
+            try
+            {
+                Date receivedDate = DATE_FORMAT.parse(dateHeader);
+                int age = (int) ((System.currentTimeMillis() - receivedDate.getTime()) * (1.0f/1000.0f));
+                if(age + minFreshInt > Integer.parseInt(maxAge))
+                {
+                    return false;
+                }
+            }
+            catch (ParseException e)
+            {
+                e.printStackTrace();
+            }
+
+        }
+        return true;
+    }
+
+    public static boolean isExpired(
+            ListFW<HttpHeaderFW> responseHeaders,
+            ListFW<HttpHeaderFW> requestHeaders)
     {
         String dateHeader = getHeader(responseHeaders, "date");
         if (dateHeader == null)
@@ -228,6 +278,10 @@ public final class HttpCacheUtils
                 ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
             }
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
+            if(!checkFreshnessLifetime(responseHeaders, requestHeaders))
+            {
+                return true;
+            }
             return expires.after(receivedDate);
         }
         catch (Exception e)

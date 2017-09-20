@@ -24,6 +24,7 @@ public final class CacheDirectives
     public static final String PUBLIC = "public";
     public static final String PRIVATE = "private";
     public static final String NO_STORE = "no-store";
+    public static final String MIN_FRESH = "min-fresh";
 
     private CacheDirectives()
     {
