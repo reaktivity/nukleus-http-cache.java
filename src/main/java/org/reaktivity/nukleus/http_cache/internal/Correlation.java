@@ -131,32 +131,4 @@ public class Correlation
         return requestSize;
     }
 
-    @Override
-    public int hashCode()
-    {
-        int result = requestURLHash;
-        result = 31 * result + consumer.hashCode();
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (!(obj instanceof Correlation))
-        {
-            return false;
-        }
-
-        Correlation that = (Correlation) obj;
-        return this.requestURLHash == that.requestURLHash &&
-               Objects.equals(this.consumer, that.consumer);
-  }
-
-    @Override
-    public String toString()
-    {
-        return String.format("[requestURLHash=\"%s\", consumer=\"%s\"]",
-                requestURLHash,
-                consumer.toString());
-    }
 }
