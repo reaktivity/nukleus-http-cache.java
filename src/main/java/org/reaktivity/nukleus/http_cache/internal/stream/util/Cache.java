@@ -264,7 +264,7 @@ public class Cache
 
     public CacheResponseServer hasStoredResponseThatSatisfies(
             int requestURLHash,
-            ListFW<HttpHeaderFW> myRequestHeaders,
+            ListFW<HttpHeaderFW> requestHeaders,
             boolean isRevalidating)
     {
         CacheResponseServer responseServer = requestURLToResponse.get(requestURLHash);
@@ -275,13 +275,13 @@ public class Cache
 
         ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders, myRequestHeaders))
+        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders, requestHeaders))
         {
             responseServer.cleanUp();
             requestURLToResponse.remove(requestURLHash);
             return null;
         }
-        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders))
+        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, requestHeaders))
         {
             return responseServer;
         }

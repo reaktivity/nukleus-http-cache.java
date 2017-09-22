@@ -53,6 +53,8 @@ public final class HttpCacheUtils
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
 
+    public static final String LAST_MODIFIED = "last-modified";
+
     private HttpCacheUtils()
     {
         // utility class
@@ -160,7 +162,7 @@ public final class HttpCacheUtils
             String dateHeader = getHeader(responseHeaders, "date");
             if (dateHeader == null)
             {
-                dateHeader = getHeader(responseHeaders, "last-modified");
+                dateHeader = getHeader(responseHeaders, LAST_MODIFIED);
             }
             if (dateHeader == null)
             {
@@ -185,48 +187,26 @@ public final class HttpCacheUtils
         return true;
     }
 
-    public static boolean checkFreshnessLifetime(
-            ListFW<HttpHeaderFW> responseHeaders,
-            ListFW<HttpHeaderFW> requestHeaders
-    )
+    public static boolean isResponseFresh(
+            final ListFW<HttpHeaderFW> requestHeaders,
+            final Date receivedResponseDate,
+            final int ageExpires)
     {
-        String dateHeader = getHeader(responseHeaders, "date");
-        if (dateHeader == null)
-        {
-            dateHeader = getHeader(responseHeaders, "last-modified");
-        }
-
         String requestCacheControl = HttpHeadersUtil.getHeader(requestHeaders, CACHE_CONTROL);
-        String responseCacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
         String requestMinFresh = null;
-        String maxAge = null;
         if(requestCacheControl != null)
         {
             HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(requestCacheControl);
             requestMinFresh = parsedCacheControl.getValue(MIN_FRESH);
         }
-        if(responseCacheControl != null)
+        if (requestMinFresh != null)
         {
-            HttpCacheUtils.CacheControlParser parsedCacheControl = new HttpCacheUtils.CacheControlParser(responseCacheControl);
-            maxAge = parsedCacheControl.getValue(MAX_AGE);
-        }
-        if (requestMinFresh != null && maxAge !=null)
-        {
-            int minFreshInt = Integer.parseInt(requestMinFresh);
-            try
+            int minFreshInt = Integer.parseInt(requestMinFresh) * 1000;
+            int ageResponse = (int) ((System.currentTimeMillis() - receivedResponseDate.getTime()) * (10.0f/100.0f));
+            if(ageResponse + minFreshInt > ageExpires)
             {
-                Date receivedDate = DATE_FORMAT.parse(dateHeader);
-                int age = (int) ((System.currentTimeMillis() - receivedDate.getTime()) * (1.0f/1000.0f));
-                if(age + minFreshInt > Integer.parseInt(maxAge))
-                {
-                    return false;
-                }
+                return false;
             }
-            catch (ParseException e)
-            {
-                e.printStackTrace();
-            }
-
         }
         return true;
     }
@@ -235,50 +215,18 @@ public final class HttpCacheUtils
             ListFW<HttpHeaderFW> responseHeaders,
             ListFW<HttpHeaderFW> requestHeaders)
     {
-        String dateHeader = getHeader(responseHeaders, "date");
-        if (dateHeader == null)
+        ReceivedDateHolder receivedDateHolder = getReceivedDate(responseHeaders);
+        if (receivedDateHolder == null)
         {
-            dateHeader = getHeader(responseHeaders, "last-modified");
-        }
-        if (dateHeader == null)
-        {
-            // invalid response, so say it is expired
             return true;
         }
+        Date receivedDate = receivedDateHolder.receivedDate;
+        String ageExpires = getAgeExpires(responseHeaders);
         try
         {
-            Date receivedDate = DATE_FORMAT.parse(dateHeader);
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
-            String ageExpires = null;
-            if (cacheControl != null)
-            {
-                CacheControlParser parsedCacheControl = new CacheControlParser(cacheControl);
-                ageExpires = parsedCacheControl.getValue("s-maxage");
-                if (ageExpires == null)
-                {
-                    ageExpires = parsedCacheControl.getValue("max-age");
-                }
-            }
-            int ageExpiresInt;
-            if (ageExpires == null)
-            {
-                String lastModified = getHeader(responseHeaders, "last-modified");
-                if (lastModified == null)
-                {
-                    ageExpiresInt = 5000; // default to 5
-                }
-                else
-                {
-                    Date lastModifiedDate = DATE_FORMAT.parse(lastModified);
-                    ageExpiresInt = (int) ((receivedDate.getTime() - lastModifiedDate.getTime()) * (10.0f/100.0f));
-                }
-            }
-            else
-            {
-                ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
-            }
+            int ageExpiresInt = getAgeExpiresInt(responseHeaders, receivedDateHolder, receivedDate, ageExpires);
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
-            if(!checkFreshnessLifetime(responseHeaders, requestHeaders))
+            if (!isResponseFresh(requestHeaders, receivedDate, ageExpiresInt))
             {
                 return true;
             }
@@ -290,6 +238,80 @@ public final class HttpCacheUtils
             return true;
         }
     }
+
+    public static int getAgeExpiresInt(
+            ListFW<HttpHeaderFW> responseHeaders,
+            ReceivedDateHolder receivedDateHolder,
+            Date receivedDate,
+            String ageExpires) throws ParseException
+    {
+        if (ageExpires == null)
+        {
+            String lastModified = getHeader(responseHeaders, LAST_MODIFIED);
+            if (lastModified == null)
+            {
+                return 5000; // default to 5
+            }
+            else
+            {
+                if (!receivedDateHolder.usedLastModifiedHeader)
+                {
+                    Date lastModifiedDate = DATE_FORMAT.parse(lastModified);
+                    return (int) ((receivedDate.getTime() - lastModifiedDate.getTime()) * (10.0f/100.0f));
+                }
+                return 0; // receivedDate was parsed from "last-modified" header
+            }
+        }
+        return Integer.parseInt(ageExpires) * 1000;
+    }
+
+    public static String getAgeExpires(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        String ageExpires = null;
+        String responseCacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
+        if (responseCacheControl != null)
+        {
+            CacheControlParser parsedCacheControl = new CacheControlParser(responseCacheControl);
+            ageExpires = parsedCacheControl.getValue("s-maxage");
+            if (ageExpires == null)
+            {
+                ageExpires = parsedCacheControl.getValue("max-age");
+            }
+        }
+        return ageExpires;
+    }
+
+    public static ReceivedDateHolder getReceivedDate(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        ReceivedDateHolder result = new ReceivedDateHolder();
+        String dateHeader = getHeader(responseHeaders, "date");
+        if (dateHeader == null)
+        {
+            dateHeader = getHeader(responseHeaders, LAST_MODIFIED);
+            result.usedLastModifiedHeader = true;
+        }
+        if (dateHeader == null)
+        {
+            // invalid response, so say it is expired
+            return null;
+        }
+        try
+        {
+            result.receivedDate = DATE_FORMAT.parse(dateHeader);
+            return result;
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+    }
+
+    private static class ReceivedDateHolder
+    {
+        protected Date receivedDate;
+        protected boolean usedLastModifiedHeader;
+    }
+
 
     // Apache Version 2.0 (July 25, 2017)
     // https://svn.apache.org/repos/asf/abdera/java/trunk/
