@@ -72,6 +72,17 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/proxy.get.request.with.transfer.encoding/accept/client",
+        "${streams}/proxy.get.request.with.transfer.encoding/connect/server",
+    })
+    public void shouldProxyGetRequestWithTransferEncoding() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/proxy.post.request/accept/client",
         "${streams}/proxy.post.request/connect/server",
     })
