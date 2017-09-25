@@ -470,7 +470,7 @@ public class ProxyStreamFactory implements StreamFactory
 
             // send 0 window back to complete handshake
 
-            this.streamState = this::waitingForOutstanding;
+            this.streamState = this::waitingForOutstandingResponseFromMyInitiatedFanout;
         }
 
         private void latchOnToFanout(final ListFW<HttpHeaderFW> requestHeaders)
@@ -488,7 +488,7 @@ public class ProxyStreamFactory implements StreamFactory
 
             // send 0 window back to complete handshake
 
-            this.streamState = this::waitingForOutstanding;
+            this.streamState = this::waitingForOutstandingResponseFromLatchedOnFanout;
         }
 
         private void send503AndReset()
@@ -951,15 +951,66 @@ public class ProxyStreamFactory implements StreamFactory
                 // TODO H2 late headers?? RFC might say can't affect caching, but
                 // probably should still forward should expected request not match...
                 break;
+            case AbortFW.TYPE_ID:
+                if (junction != null)
+                {
+                    junction.unsubscribe(this::handleResponseFromMyInitiatedFanout);
+                }
+                break;
             case DataFW.TYPE_ID:
             default:
                 if (junction != null)
                 {
-                    // needed because could be handleMyInitatedFanOut or handleFanout
-                    // or it could already be processed in which case this doesn't mean
+                    // needed because could be handleMyInitatedFanOut OR handleFanout
+                    //  it could already be processed in which case this doesn't mean
                     // much...
                     junction.unsubscribe(this::handleResponseFromMyInitiatedFanout);
                 }
+                writer.doReset(acceptThrottle, acceptStreamId);
+                break;
+            }
+        }
+
+        private void waitingForOutstandingResponseFromLatchedOnFanout(
+                int msgTypeId,
+                DirectBuffer buffer,
+                int index,
+                int length)
+        {
+            switch (msgTypeId)
+            {
+            case EndFW.TYPE_ID:
+                // TODO H2 late headers?? RFC might say can't affect caching, but
+                // probably should still forward should expected request not match...
+                break;
+            case AbortFW.TYPE_ID:
+                junction.unsubscribe(this::handleResponseFromFanout);
+                break;
+            case DataFW.TYPE_ID:
+            default:
+                junction.unsubscribe(this::handleResponseFromFanout);
+                writer.doReset(acceptThrottle, acceptStreamId);
+                break;
+            }
+        }
+
+        private void waitingForOutstandingResponseFromMyInitiatedFanout(
+                int msgTypeId,
+                DirectBuffer buffer,
+                int index,
+                int length)
+        {
+            switch (msgTypeId)
+            {
+            case EndFW.TYPE_ID:
+                // TODO H2 late headers?? RFC might say can't affect caching, but
+                // probably should still forward should expected request not match...
+                break;
+            case AbortFW.TYPE_ID:
+                junction.unsubscribe(this::handleResponseFromMyInitiatedFanout);
+                break;
+            default:
+                junction.unsubscribe(this::handleResponseFromMyInitiatedFanout);
                 writer.doReset(acceptThrottle, acceptStreamId);
                 break;
             }

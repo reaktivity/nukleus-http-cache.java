@@ -26,6 +26,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.text.SimpleDateFormat;
@@ -71,6 +72,8 @@ public final class HttpCacheUtils
                 case METHOD:
                     return !"GET".equalsIgnoreCase(value);
                 case CONTENT_LENGTH:
+                    return true;
+                case TRANSFER_ENCODING:
                     return true;
                 default:
                     return false;
