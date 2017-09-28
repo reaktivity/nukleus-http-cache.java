@@ -41,7 +41,7 @@ public class Cache
 {
 
     private final Writer writer;
-    private final Long2ObjectHashMap<CacheResponseServer> requestURLToResponse;
+    private final Long2ObjectHashMap<CacheEntry> requestURLToResponse;
     private final BufferPool requestBufferPool;
     private final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     private final BufferPool responseBufferPool;
@@ -80,16 +80,22 @@ public class Cache
                 responseHeaderSize,
                 responseSize);
 
-        CacheResponseServer oldResponseServer = requestURLToResponse.put(requestURLHash, responseServer);
-        if (oldResponseServer != null)
+        CacheEntry oldCacheEntry = requestURLToResponse.put(requestURLHash, new CacheEntry(responseServer));
+        if (oldCacheEntry != null)
         {
+            CacheResponseServer oldResponseServer = oldCacheEntry.getResponseServer();
             oldResponseServer.cleanUp();
         }
     }
 
     public CacheResponseServer get(int requestURLHash)
     {
-        return requestURLToResponse.get(requestURLHash);
+        CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
+        if (cacheEntry == null)
+        {
+            return null;
+        }
+        return cacheEntry.getResponseServer();
     }
 
     public final class CacheResponseServer
@@ -102,7 +108,6 @@ public class Cache
         private final int responseSize;
         private int clientCount = 0;
         private boolean cleanUp = false;
-        protected boolean staleResponse = false;
 
         private CacheResponseServer(
             int requestSlot,
@@ -134,7 +139,7 @@ public class Cache
             MutableDirectBuffer buffer = requestBufferPool.buffer(responseSlot);
             ListFW<HttpHeaderFW> responseHeaders = responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
 
-            CacheResponseServer responseServer = requestURLToResponse.get(streamCorrelation.requestURLHash());
+            CacheEntry cacheEntry = requestURLToResponse.get(streamCorrelation.requestURLHash());
             final long correlation = supplyCorrelationId.getAsLong();
             final MessageConsumer messageConsumer = streamCorrelation.consumer();
             final long streamId = streamSupplier.getAsLong();
@@ -148,7 +153,7 @@ public class Cache
                             this::handleEndOfStream));
 
 
-            if(responseServer.staleResponse)
+            if(cacheEntry.isStale)
             {
                 writer.doHttpBegin(messageConsumer, streamId, 0L, correlation, injectWarningHeader(responseHeaders));
             }
@@ -293,21 +298,22 @@ public class Cache
             ListFW<HttpHeaderFW> myRequestHeaders,
             boolean isRevalidating)
     {
-        CacheResponseServer responseServer = requestURLToResponse.get(requestURLHash);
-        if (responseServer == null)
+        CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
+        if (cacheEntry == null)
         {
             return null;
         }
 
+        CacheResponseServer responseServer = cacheEntry.getResponseServer();
         ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (!isRevalidating && HttpCacheUtils.isExpired(responseServer, myRequestHeaders))
+        if (!isRevalidating && HttpCacheUtils.updateExpiredOrStaleStateCache(cacheEntry, myRequestHeaders))
         {
             responseServer.cleanUp();
             requestURLToResponse.remove(requestURLHash);
             return null;
         }
-        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders, responseServer))
+        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders, cacheEntry))
         {
             return responseServer;
         }

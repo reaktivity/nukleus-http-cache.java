@@ -52,6 +52,7 @@ import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache.CacheResponseServer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.GroupThrottle;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -541,8 +542,8 @@ public class ProxyStreamFactory implements StreamFactory
 
                     ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(requestHeadersRO);
 
-                    CacheResponseServer responseServer = cache.get(streamCorrelation.requestURLHash());
-                    if (cachedResponseCanSatisfyRequest(pendingRequestHeaders, responseHeaders, requestHeaders, responseServer))
+                    CacheEntry cacheEntry = new CacheEntry(cache.get(streamCorrelation.requestURLHash()));
+                    if (cachedResponseCanSatisfyRequest(pendingRequestHeaders, responseHeaders, requestHeaders, cacheEntry))
                     {
                         sendHttpResponse(responseHeaders, requestHeaders);
                         router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());

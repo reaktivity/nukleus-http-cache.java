@@ -105,7 +105,7 @@ public final class HttpCacheUtils
             final ListFW<HttpHeaderFW> cachedRequestHeaders,
             final ListFW<HttpHeaderFW> cachedResponseHeaders,
             final ListFW<HttpHeaderFW> requestHeaders,
-            final Cache.CacheResponseServer responseServer)
+            final CacheEntry cacheEntry)
     {
 
         final String cachedVaryHeader = getHeader(cachedResponseHeaders, "vary");
@@ -117,7 +117,7 @@ public final class HttpCacheUtils
 
         if (requestCacheControlHeader != null)
         {
-            if(!responseSatisfiesRequestDirectives(cachedResponseHeaders, requestCacheControlHeader, responseServer))
+            if(!responseSatisfiesRequestDirectives(cachedResponseHeaders, requestCacheControlHeader, cacheEntry))
             {
                 return false;
             }
@@ -153,7 +153,7 @@ public final class HttpCacheUtils
     private static boolean responseSatisfiesRequestDirectives(
             final ListFW<HttpHeaderFW> responseHeaders,
             final String myRequestCacheControl,
-            final Cache.CacheResponseServer responseServer)
+            final CacheEntry cacheEntry)
     {
         // TODO in future, clean up GC/Object creation
 
@@ -181,7 +181,7 @@ public final class HttpCacheUtils
                 {
                     if (expires.after(receivedDate))
                     {
-                        responseServer.staleResponse = true;
+                        cacheEntry.isStale = true;
                         return true;
                     }
                     return false;
@@ -189,7 +189,7 @@ public final class HttpCacheUtils
 
                 if(myRequestCacheControl.contains(MAX_STALE))
                 {
-                    responseServer.staleResponse = true;
+                    cacheEntry.isStale = true;
                     return true;
                 }
 
@@ -204,10 +204,11 @@ public final class HttpCacheUtils
         return true;
     }
 
-    public static boolean isExpired(
-            Cache.CacheResponseServer responseServer,
+    public static boolean updateExpiredOrStaleStateCache(
+            CacheEntry cacheEntry,
             ListFW<HttpHeaderFW> requestHeaders)
     {
+        Cache.CacheResponseServer responseServer = cacheEntry.getResponseServer();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
         Date receivedDate = getReceivedDate(responseHeaders);
         if (receivedDate == null)
@@ -232,18 +233,19 @@ public final class HttpCacheUtils
                 {
                     if(expires.after(receivedDate))
                     {
-                        responseServer.staleResponse = true;
+                        cacheEntry.isStale = true;
                         return false;
                     }
                     return true;
                 }
                 if (cacheControlRequest.contains(MAX_STALE))
                 {
-                    responseServer.staleResponse = true;
+                    cacheEntry.isStale = true;
                     return false;
                 }
             }
-            return expires.after(receivedDate);
+            cacheEntry.isExpired = expires.after(receivedDate);
+            return cacheEntry.isExpired;
         }
         catch (Exception e)
         {
