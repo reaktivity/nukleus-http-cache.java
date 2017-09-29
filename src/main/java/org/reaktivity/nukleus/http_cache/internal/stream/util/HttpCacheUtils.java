@@ -31,6 +31,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -218,16 +219,14 @@ public final class HttpCacheUtils
             ListFW<HttpHeaderFW> responseHeaders,
             ListFW<HttpHeaderFW> requestHeaders)
     {
-        ReceivedDateHolder receivedDateHolder = getReceivedDate(responseHeaders);
-        if (receivedDateHolder == null)
+        Date receivedDate = getReceivedDate(responseHeaders);
+        if (receivedDate == null)
         {
             return true;
         }
-        Date receivedDate = receivedDateHolder.receivedDate;
-        String ageExpires = getAgeExpires(responseHeaders);
         try
         {
-            int ageExpiresInt = getAgeExpiresInt(responseHeaders, receivedDateHolder, receivedDate, ageExpires);
+            int ageExpiresInt = getAgeExpires(responseHeaders, receivedDate);
             final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
             if (!isResponseFresh(requestHeaders, receivedDate, ageExpiresInt))
             {
@@ -242,33 +241,9 @@ public final class HttpCacheUtils
         }
     }
 
-    public static int getAgeExpiresInt(
+    public static int getAgeExpires(
             ListFW<HttpHeaderFW> responseHeaders,
-            ReceivedDateHolder receivedDateHolder,
-            Date receivedDate,
-            String ageExpires) throws ParseException
-    {
-        if (ageExpires == null)
-        {
-            String lastModified = getHeader(responseHeaders, LAST_MODIFIED);
-            if (lastModified == null)
-            {
-                return 5000; // default to 5
-            }
-            else
-            {
-                if (!receivedDateHolder.usedLastModifiedHeader)
-                {
-                    Date lastModifiedDate = DATE_FORMAT.parse(lastModified);
-                    return (int) ((receivedDate.getTime() - lastModifiedDate.getTime()) * (10.0f/100.0f));
-                }
-                return 0; // receivedDate was parsed from "last-modified" header
-            }
-        }
-        return Integer.parseInt(ageExpires) * 1000;
-    }
-
-    public static String getAgeExpires(ListFW<HttpHeaderFW> responseHeaders)
+            Date receivedDate) throws ParseException
     {
         String ageExpires = null;
         String responseCacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
@@ -281,40 +256,38 @@ public final class HttpCacheUtils
                 ageExpires = parsedCacheControl.getValue("max-age");
             }
         }
-        return ageExpires;
+        if (ageExpires == null)
+        {
+            String lastModified = getHeader(responseHeaders, LAST_MODIFIED);
+            if (lastModified == null)
+            {
+                return 5000; // default to 5
+            }
+            else
+            {
+                Date lastModifiedDate = DATE_FORMAT.parse(lastModified);
+                return (int) ((receivedDate.getTime() - lastModifiedDate.getTime()) * (10.0f/100.0f));
+            }
+        }
+        return Integer.parseInt(ageExpires) * 1000;
     }
 
-    public static ReceivedDateHolder getReceivedDate(ListFW<HttpHeaderFW> responseHeaders)
+    public static Date getReceivedDate(ListFW<HttpHeaderFW> responseHeaders)
     {
-        ReceivedDateHolder result = new ReceivedDateHolder();
         String dateHeader = getHeader(responseHeaders, "date");
         if (dateHeader == null)
         {
             dateHeader = getHeader(responseHeaders, LAST_MODIFIED);
-            result.usedLastModifiedHeader = true;
-        }
-        if (dateHeader == null)
-        {
-            // invalid response, so say it is expired
-            return null;
         }
         try
         {
-            result.receivedDate = DATE_FORMAT.parse(dateHeader);
-            return result;
+            return DATE_FORMAT.parse(dateHeader);
         }
         catch (Exception e)
         {
-            return null;
+            return Date.from(Instant.EPOCH);
         }
     }
-
-    private static class ReceivedDateHolder
-    {
-        protected Date receivedDate;
-        protected boolean usedLastModifiedHeader;
-    }
-
 
     // Apache Version 2.0 (July 25, 2017)
     // https://svn.apache.org/repos/asf/abdera/java/trunk/
