@@ -19,6 +19,7 @@ import static java.lang.Integer.parseInt;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.ONLY_IF_CACHED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivateCacheableResponse;
@@ -359,6 +360,17 @@ public class ProxyStreamFactory implements StreamFactory
             }
             else
             {
+                if(requestHeaders.anyMatch(
+                        h ->
+                        {
+                            String name = h.name().asString();
+                            String value = h.value().asString();
+                            return name.equals(HttpHeaders.CACHE_CONTROL) && value.contains(ONLY_IF_CACHED);
+                        }))
+                {
+                    send504();
+                    return;
+                }
                 fanout(requestHeaders, false);
             }
         }
@@ -495,6 +507,15 @@ public class ProxyStreamFactory implements StreamFactory
             e.item(h -> h.representation((byte) 0)
                     .name(STATUS)
                     .value("503")));
+            writer.doAbort(acceptReply, acceptReplyStreamId);
+        }
+
+        private void send504()
+        {
+            writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+                    e.item(h -> h.representation((byte) 0)
+                            .name(STATUS)
+                            .value("504")));
             writer.doAbort(acceptReply, acceptReplyStreamId);
         }
 

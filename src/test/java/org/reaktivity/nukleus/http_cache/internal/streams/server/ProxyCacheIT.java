@@ -175,6 +175,42 @@ public class ProxyCacheIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.only-if-cached/accept/client",
+            "${streams}/request.only-if-cached/connect/server",
+    })
+    public void shouldRequestOnlyIfCached() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.only-if-cached.and.504/accept/client"
+    })
+    public void shouldRequestOnlyIfCachedAnd504() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.expire.only-if-cached/accept/client",
+            "${streams}/request.expire.only-if-cached/connect/server",
+    })
+    public void shouldRequestExpireOnlyIfCached() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/should.bypass.cache.on.no.cache/accept/client",
         "${streams}/should.bypass.cache.on.no.cache/connect/server",
