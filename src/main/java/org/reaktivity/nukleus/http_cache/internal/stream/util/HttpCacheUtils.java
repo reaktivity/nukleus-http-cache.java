@@ -19,6 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
@@ -28,6 +29,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -102,7 +104,8 @@ public final class HttpCacheUtils
     public static boolean cachedResponseCanSatisfyRequest(
             final ListFW<HttpHeaderFW> cachedRequestHeaders,
             final ListFW<HttpHeaderFW> cachedResponseHeaders,
-            final ListFW<HttpHeaderFW> requestHeaders)
+            final ListFW<HttpHeaderFW> requestHeaders,
+            final CacheEntry cacheEntry)
     {
 
         final String cachedVaryHeader = getHeader(cachedResponseHeaders, "vary");
@@ -114,7 +117,7 @@ public final class HttpCacheUtils
 
         if (requestCacheControlHeader != null)
         {
-            if(!responseSatisfiesRequestDirectives(cachedResponseHeaders, requestCacheControlHeader))
+            if(!responseSatisfiesRequestDirectives(cachedResponseHeaders, requestCacheControlHeader, cacheEntry))
             {
                 return false;
             }
@@ -149,7 +152,8 @@ public final class HttpCacheUtils
 
     private static boolean responseSatisfiesRequestDirectives(
             final ListFW<HttpHeaderFW> responseHeaders,
-            final String myRequestCacheControl)
+            final String myRequestCacheControl,
+            final CacheEntry cacheEntry)
     {
         // TODO in future, clean up GC/Object creation
 
@@ -172,10 +176,24 @@ public final class HttpCacheUtils
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeader);
                 final int timeWhenExpires = Integer.parseInt(requestMaxAge) * 1000;
-                if(new Date(System.currentTimeMillis() - timeWhenExpires).after(receivedDate))
+                final Date expires = new Date(System.currentTimeMillis() - timeWhenExpires);
+                if(isResponseStale(parsedCacheControl, expires, timeWhenExpires))
                 {
+                    if (expires.after(receivedDate))
+                    {
+                        cacheEntry.isStale = true;
+                        return true;
+                    }
                     return false;
                 }
+
+                if(myRequestCacheControl.contains(MAX_STALE))
+                {
+                    cacheEntry.isStale = true;
+                    return true;
+                }
+
+                return !expires.after(receivedDate);
             }
             catch(Exception e)
             {
@@ -186,8 +204,96 @@ public final class HttpCacheUtils
         return true;
     }
 
-    public static boolean isExpired(ListFW<HttpHeaderFW> responseHeaders)
+    public static boolean updateExpiredOrStaleStateCache(
+            CacheEntry cacheEntry,
+            ListFW<HttpHeaderFW> requestHeaders)
     {
+        Cache.CacheResponseServer responseServer = cacheEntry.getResponseServer();
+        ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
+        Date receivedDate = getReceivedDate(responseHeaders);
+        if (receivedDate == null)
+        {
+            return true;
+        }
+        String ageExpires = getAgeExpires(responseHeaders);
+        String cacheControlRequest = HttpHeadersUtil.getHeader(requestHeaders, CACHE_CONTROL);
+        try
+        {
+            int ageExpiresInt = getAgeExpiresInt(responseHeaders, receivedDate, ageExpires);
+            final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
+            if (cacheControlRequest != null)
+            {
+                CacheControlParser parsedCacheControl = new CacheControlParser(cacheControlRequest);
+                String requestMaxAge = parsedCacheControl.getValue(MAX_AGE);
+                if (requestMaxAge != null)
+                {
+                    return false;
+                }
+                if (isResponseStale(parsedCacheControl, receivedDate, ageExpiresInt))
+                {
+                    if(expires.after(receivedDate))
+                    {
+                        cacheEntry.isStale = true;
+                        return false;
+                    }
+                    return true;
+                }
+                if (cacheControlRequest.contains(MAX_STALE))
+                {
+                    cacheEntry.isStale = true;
+                    return false;
+                }
+            }
+            cacheEntry.isExpired = expires.after(receivedDate);
+            return cacheEntry.isExpired;
+        }
+        catch (Exception e)
+        {
+            // Error so just expire it
+            return true;
+        }
+    }
+
+    public static int getAgeExpiresInt(
+            ListFW<HttpHeaderFW> responseHeaders,
+            Date receivedDate,
+            String ageExpires) throws ParseException
+    {
+        if (ageExpires == null)
+        {
+            String lastModified = getHeader(responseHeaders, "last-modified");
+            if (lastModified == null)
+            {
+                return 5000; // default to 5
+            }
+            else
+            {
+                Date lastModifiedDate = DATE_FORMAT.parse(lastModified);
+                return (int) ((receivedDate.getTime() - lastModifiedDate.getTime()) * (10.0f/100.0f));
+            }
+        }
+        return Integer.parseInt(ageExpires) * 1000;
+    }
+
+    public static String getAgeExpires(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        String ageExpires = null;
+        String responseCacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
+        if (responseCacheControl != null)
+        {
+            CacheControlParser parsedCacheControl = new CacheControlParser(responseCacheControl);
+            ageExpires = parsedCacheControl.getValue("s-maxage");
+            if (ageExpires == null)
+            {
+                ageExpires = parsedCacheControl.getValue("max-age");
+            }
+        }
+        return ageExpires;
+    }
+
+    public static Date getReceivedDate(ListFW<HttpHeaderFW> responseHeaders)
+    {
+
         String dateHeader = getHeader(responseHeaders, "date");
         if (dateHeader == null)
         {
@@ -196,48 +302,35 @@ public final class HttpCacheUtils
         if (dateHeader == null)
         {
             // invalid response, so say it is expired
-            return true;
+            return null;
         }
         try
         {
-            Date receivedDate = DATE_FORMAT.parse(dateHeader);
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, CACHE_CONTROL);
-            String ageExpires = null;
-            if (cacheControl != null)
-            {
-                CacheControlParser parsedCacheControl = new CacheControlParser(cacheControl);
-                ageExpires = parsedCacheControl.getValue("s-maxage");
-                if (ageExpires == null)
-                {
-                    ageExpires = parsedCacheControl.getValue("max-age");
-                }
-            }
-            int ageExpiresInt;
-            if (ageExpires == null)
-            {
-                String lastModified = getHeader(responseHeaders, "last-modified");
-                if (lastModified == null)
-                {
-                    ageExpiresInt = 5000; // default to 5
-                }
-                else
-                {
-                    Date lastModifiedDate = DATE_FORMAT.parse(lastModified);
-                    ageExpiresInt = (int) ((receivedDate.getTime() - lastModifiedDate.getTime()) * (10.0f/100.0f));
-                }
-            }
-            else
-            {
-                ageExpiresInt = Integer.parseInt(ageExpires) * 1000;
-            }
-            final Date expires = new Date(System.currentTimeMillis() - ageExpiresInt);
-            return expires.after(receivedDate);
+            return DATE_FORMAT.parse(dateHeader);
         }
         catch (Exception e)
         {
-            // Error so just expire it
-            return true;
+            return null;
         }
+    }
+
+    public static boolean isResponseStale(
+            final CacheControlParser parsedCacheControl,
+            final Date date,
+            final int ageExpires)
+    {
+        String ageStale = parsedCacheControl.getValue(MAX_STALE);
+        if (ageStale != null)
+        {
+            int ageStaleInt = Integer.parseInt(ageStale) * 1000;
+            final Date stale = new Date(System.currentTimeMillis() - ageExpires - ageStaleInt);
+            if (stale.before(date))
+            {
+                return true;
+            }
+
+        }
+        return false;
     }
 
     // Apache Version 2.0 (July 25, 2017)

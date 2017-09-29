@@ -15,20 +15,22 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-public final class CacheDirectives
+public class CacheEntry
 {
 
-    public static final String NO_CACHE = "no-cache";
-    public static final String S_MAXAGE = "s-maxage";
-    public static final String MAX_AGE = "max-age";
-    public static final String PUBLIC = "public";
-    public static final String PRIVATE = "private";
-    public static final String NO_STORE = "no-store";
-    public static final String ONLY_IF_CACHED = "only-if-cached";
-    public static final String MAX_STALE = "max-stale";
+    private Cache.CacheResponseServer responseServer;
 
-    private CacheDirectives()
+    public boolean isExpired = false;
+    public boolean isStale = false;
+
+    public CacheEntry(Cache.CacheResponseServer responseServer)
     {
-        // Utility class
+        this.responseServer = responseServer;
     }
+
+    public Cache.CacheResponseServer getResponseServer()
+    {
+        return responseServer;
+    }
+
 }

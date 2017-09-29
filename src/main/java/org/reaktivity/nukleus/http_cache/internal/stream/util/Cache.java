@@ -16,7 +16,9 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
@@ -39,7 +41,7 @@ public class Cache
 {
 
     private final Writer writer;
-    private final Long2ObjectHashMap<CacheResponseServer> requestURLToResponse;
+    private final Long2ObjectHashMap<CacheEntry> requestURLToResponse;
     private final BufferPool requestBufferPool;
     private final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     private final BufferPool responseBufferPool;
@@ -47,6 +49,7 @@ public class Cache
     private final LongSupplier streamSupplier;
     private final LongSupplier supplyCorrelationId;
     private final WindowFW windowRO = new WindowFW();
+    private static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     public Cache(
             MutableDirectBuffer writeBuffer,
@@ -77,16 +80,22 @@ public class Cache
                 responseHeaderSize,
                 responseSize);
 
-        CacheResponseServer oldResponseServer = requestURLToResponse.put(requestURLHash, responseServer);
-        if (oldResponseServer != null)
+        CacheEntry oldCacheEntry = requestURLToResponse.put(requestURLHash, new CacheEntry(responseServer));
+        if (oldCacheEntry != null)
         {
+            CacheResponseServer oldResponseServer = oldCacheEntry.getResponseServer();
             oldResponseServer.cleanUp();
         }
     }
 
     public CacheResponseServer get(int requestURLHash)
     {
-        return requestURLToResponse.get(requestURLHash);
+        CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
+        if (cacheEntry == null)
+        {
+            return null;
+        }
+        return cacheEntry.getResponseServer();
     }
 
     public final class CacheResponseServer
@@ -130,6 +139,7 @@ public class Cache
             MutableDirectBuffer buffer = requestBufferPool.buffer(responseSlot);
             ListFW<HttpHeaderFW> responseHeaders = responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
 
+            CacheEntry cacheEntry = requestURLToResponse.get(streamCorrelation.requestURLHash());
             final long correlation = supplyCorrelationId.getAsLong();
             final MessageConsumer messageConsumer = streamCorrelation.consumer();
             final long streamId = streamSupplier.getAsLong();
@@ -142,16 +152,37 @@ public class Cache
                             responseSize,
                             this::handleEndOfStream));
 
-            writer.doHttpBegin(messageConsumer, streamId, 0L, correlation,
-                    e -> responseHeaders.forEach(h ->
-                    e.item(h2 ->
-                    {
-                        StringFW name = h.name();
-                        String16FW value = h.value();
-                        h2.representation((byte) 0)
-                                        .name(name)
-                                        .value(value);
-                    })));
+
+            if(cacheEntry.isStale)
+            {
+                writer.doHttpBegin(messageConsumer, streamId, 0L, correlation, injectWarningHeader(responseHeaders));
+            }
+            else
+            {
+                writer.doHttpBegin(messageConsumer, streamId, 0L, correlation,
+                        e -> responseHeaders.forEach(h ->
+                                e.item(h2 ->
+                                {
+                                    StringFW name = h.name();
+                                    String16FW value = h.value();
+                                    h2.representation((byte) 0)
+                                            .name(name)
+                                            .value(value);
+                                })));
+            }
+        }
+
+        private Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> injectWarningHeader(ListFW<HttpHeaderFW> headersFW)
+        {
+            Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator = x -> headersFW
+                    .forEach(h ->
+                            x.item(y -> y.representation((byte) 0)
+                                    .name(h.name())
+                                    .value(h.value())));
+            return mutator.andThen(
+                    x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(RESPONSE_IS_STALE))
+            );
+
         }
 
         public void cleanUp()
@@ -267,21 +298,22 @@ public class Cache
             ListFW<HttpHeaderFW> myRequestHeaders,
             boolean isRevalidating)
     {
-        CacheResponseServer responseServer = requestURLToResponse.get(requestURLHash);
-        if (responseServer == null)
+        CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
+        if (cacheEntry == null)
         {
             return null;
         }
 
+        CacheResponseServer responseServer = cacheEntry.getResponseServer();
         ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
         ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders))
+        if (!isRevalidating && HttpCacheUtils.updateExpiredOrStaleStateCache(cacheEntry, myRequestHeaders))
         {
             responseServer.cleanUp();
             requestURLToResponse.remove(requestURLHash);
             return null;
         }
-        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders))
+        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders, cacheEntry))
         {
             return responseServer;
         }

@@ -20,10 +20,10 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.ONLY_IF_CACHED;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivateCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
@@ -53,6 +53,7 @@ import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache.CacheResponseServer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.GroupThrottle;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -562,7 +563,8 @@ public class ProxyStreamFactory implements StreamFactory
 
                     ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(requestHeadersRO);
 
-                    if (cachedResponseCanSatisfyRequest(pendingRequestHeaders, responseHeaders, requestHeaders))
+                    CacheEntry cacheEntry = new CacheEntry(cache.get(streamCorrelation.requestURLHash()));
+                    if (cachedResponseCanSatisfyRequest(pendingRequestHeaders, responseHeaders, requestHeaders, cacheEntry))
                     {
                         sendHttpResponse(responseHeaders, requestHeaders);
                         router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());
