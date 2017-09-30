@@ -19,6 +19,7 @@ import static java.lang.Thread.sleep;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -131,6 +132,17 @@ public class ProxyCacheIT
 
     @Test
     @Specification({
+        "${route}/proxy/controller",
+            "${streams}/cache.min-fresh/accept/client",
+            "${streams}/cache.min-fresh/connect/server",
+    })
+    public void shouldCacheMinFresh() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.max-stale.no.value/accept/client",
             "${streams}/cache.max-stale.no.value/connect/server",
@@ -171,6 +183,17 @@ public class ProxyCacheIT
         k3po.awaitBarrier("REQUEST_CACHED");
         sleep(2000);
         k3po.notifyBarrier("CACHE_EXPIRED_AND_STALE_FOR_2_SECONDS");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/expire.min-fresh/accept/client",
+            "${streams}/expire.min-fresh/connect/server",
+    })
+    public void shouldExpireMinFresh() throws Exception
+    {
         k3po.finish();
     }
 
@@ -306,10 +329,7 @@ public class ProxyCacheIT
         k3po.finish();
     }
 
-    // TODO expires headers
-    // TODO quoted maxage header
-    // TODO quoted smaxage header
-
+    @Ignore("Change to 0")
     @Test
     @Specification({
         "${route}/proxy/controller",

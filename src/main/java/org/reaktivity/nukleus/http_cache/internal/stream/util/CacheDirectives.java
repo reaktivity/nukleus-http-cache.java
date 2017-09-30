@@ -26,6 +26,7 @@ public final class CacheDirectives
     public static final String NO_STORE = "no-store";
     public static final String ONLY_IF_CACHED = "only-if-cached";
     public static final String MAX_STALE = "max-stale";
+    public static final String MIN_FRESH = "min-fresh";
 
     private CacheDirectives()
     {
