@@ -15,9 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
 import static java.util.Arrays.stream;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
@@ -277,48 +279,78 @@ public final class CacheEntry
         {
             return true;
         }
-        return stream(cachedVaryHeader.split("\\s*,\\s*")).anyMatch(v ->
+        final ListFW<HttpHeaderFW> cachedRequest = getRequest();
+        return stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
         {
             String pendingHeaderValue = getHeader(request, v);
-            String myHeaderValue = getHeader(request, v);
+            String myHeaderValue = getHeader(cachedRequest, v);
             return !Objects.equals(pendingHeaderValue, myHeaderValue);
         });
     }
 
-    private boolean satisfiesAgeAndStalenessRequirementsOf(ListFW<HttpHeaderFW> request)
+
+    private boolean satisfiesFreshnessRequirementsOf(
+            ListFW<HttpHeaderFW> request,
+            Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
         final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
-        final CacheControl responseCacheControl = responseCacheControl();
-        final CacheControl cachedRequestCacheControl = responseCacheControl();
 
         Instant staleAt = staleAt();
-        Instant receivedAt = responseReceivedAt();
-        Instant now = Instant.now();
         if (requestCacheControl.contains(MIN_FRESH))
         {
-            if (now.plusSeconds(parseInt(requestCacheControl.getValue(MIN_FRESH))).isBefore(staleAt))
+            final String minFresh = requestCacheControl.getValue(MIN_FRESH);
+            if (! now.plusSeconds(parseInt(minFresh)).isBefore(staleAt))
             {
-                return true;
+                return false;
             }
-            return false;
+        }
+        return true;
+    }
+
+    private boolean satisfiesStalenessRequirementsOf(
+            ListFW<HttpHeaderFW> request,
+            Instant now)
+    {
+        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+
+        Instant staleAt = staleAt();
+        if (requestCacheControl.contains(MAX_STALE))
+        {
+            final String maxStale = requestCacheControl.getValue(MAX_STALE);
+            final int maxStaleSec = (maxStale != null) ? parseInt(maxStale): MAX_VALUE;
+            final Instant acceptable = staleAt.plusSeconds(maxStaleSec);
+            if (now.isAfter(acceptable))
+            {
+                return false;
+            }
         }
         else if (now.isAfter(staleAt))
         {
             return false;
         }
 
+        return true;
+    }
+
+    private boolean satisfiesAgeRequirementsOf(
+        ListFW<HttpHeaderFW> request,
+        Instant now)
+    {
+        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        Instant receivedAt = responseReceivedAt();
+
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
             if (receivedAt.plusSeconds(requestMaxAge).isBefore(now))
             {
-                System.out.println(receivedAt + " --- " + now);
                 return false;
             }
         }
         return true;
-
     }
 
     private Instant staleAt()
@@ -375,15 +407,18 @@ public final class CacheEntry
         ListFW<HttpHeaderFW> request,
         boolean isRevalidating)
     {
+        Instant now = Instant.now();
+
         return canBeServedToAuthorized(request) &&
                 doesNotVaryBy(request) &&
-                satisfiesAgeAndStalenessRequirementsOf(request);
+                satisfiesFreshnessRequirementsOf(request, now) &&
+                satisfiesStalenessRequirementsOf(request, now) &&
+                satisfiesAgeRequirementsOf(request, now);
     }
 
     private boolean isStale()
     {
-        // TODO
-        return false;
+        return Instant.now().isAfter(staleAt());
     }
 
 }

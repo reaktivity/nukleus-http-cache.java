@@ -268,6 +268,7 @@ public class ProxyCacheIT
     }
 
     @Test
+    @Ignore("Can not guarantee race between RESET and ABORT")
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.only-if-cached.and.504/accept/client"
