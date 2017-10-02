@@ -1,3 +1,18 @@
+/**
+ * Copyright 2016-2017 The Reaktivity Project
+ *
+ * The Reaktivity Project licenses this file to you under the Apache License,
+ * version 2.0 (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.lang.Integer.parseInt;
@@ -278,11 +293,14 @@ public final class CacheEntry
         final CacheControl cachedRequestCacheControl = responseCacheControl();
 
         Instant staleAt = staleAt();
-        Instant recievedAt = responseReceivedAt();
+        Instant receivedAt = responseReceivedAt();
         Instant now = Instant.now();
         if (requestCacheControl.contains(MIN_FRESH))
         {
-            // todo
+            if (now.plusSeconds(parseInt(requestCacheControl.getValue(MIN_FRESH))).isBefore(staleAt))
+            {
+                return true;
+            }
             return false;
         }
         else if (now.isAfter(staleAt))
@@ -293,9 +311,9 @@ public final class CacheEntry
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
-            if (recievedAt.plusSeconds(requestMaxAge).isBefore(now))
+            if (receivedAt.plusSeconds(requestMaxAge).isBefore(now))
             {
-                System.out.println(recievedAt + " --- " + now);
+                System.out.println(receivedAt + " --- " + now);
                 return false;
             }
         }
@@ -322,7 +340,8 @@ public final class CacheEntry
         if (lazyInitiedResponseReceivedAt == null)
         {
             final ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
-            final String dateHeaderValue = getHeader(responseHeaders, "date");
+            final String dateHeaderValue = getHeader(responseHeaders, "date") != null ?
+                    getHeader(responseHeaders, "date") : getHeader(responseHeaders, "last-modified");
             try
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeaderValue);
