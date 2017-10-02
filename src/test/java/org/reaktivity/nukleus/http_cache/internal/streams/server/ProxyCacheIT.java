@@ -19,6 +19,7 @@ import static java.lang.Thread.sleep;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -72,6 +73,17 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/proxy.get.request.with.transfer.encoding/accept/client",
+        "${streams}/proxy.get.request.with.transfer.encoding/connect/server",
+    })
+    public void shouldProxyGetRequestWithTransferEncoding() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/proxy.post.request/accept/client",
         "${streams}/proxy.post.request/connect/server",
     })
@@ -99,6 +111,88 @@ public class ProxyCacheIT
         "${streams}/cache.max-age/connect/server",
     })
     public void shouldCacheMaxAge() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/cache.max-stale.with.value/accept/client",
+            "${streams}/cache.max-stale.with.value/connect/server",
+    })
+    public void shouldCacheMaxStale() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+            "${streams}/cache.min-fresh/accept/client",
+            "${streams}/cache.min-fresh/connect/server",
+    })
+    public void shouldCacheMinFresh() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/cache.max-stale.no.value/accept/client",
+            "${streams}/cache.max-stale.no.value/connect/server",
+    })
+    public void shouldCacheMaxStaleWithNoValue() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/cache.max-stale.with.max-age/accept/client",
+            "${streams}/cache.max-stale.with.max-age/connect/server",
+    })
+    public void shouldCacheMaxStaleWithMaxAge() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/expire.max-stale/accept/client",
+            "${streams}/expire.max-stale/connect/server",
+    })
+    public void shouldExpireMaxStale() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(2000);
+        k3po.notifyBarrier("CACHE_EXPIRED_AND_STALE_FOR_2_SECONDS");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/expire.min-fresh/accept/client",
+            "${streams}/expire.min-fresh/connect/server",
+    })
+    public void shouldExpireMinFresh() throws Exception
     {
         k3po.finish();
     }
@@ -164,6 +258,42 @@ public class ProxyCacheIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.only-if-cached/accept/client",
+            "${streams}/request.only-if-cached/connect/server",
+    })
+    public void shouldRequestOnlyIfCached() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.only-if-cached.and.504/accept/client"
+    })
+    public void shouldRequestOnlyIfCachedAnd504() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.expire.only-if-cached/accept/client",
+            "${streams}/request.expire.only-if-cached/connect/server",
+    })
+    public void shouldRequestExpireOnlyIfCached() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/should.bypass.cache.on.no.cache/accept/client",
         "${streams}/should.bypass.cache.on.no.cache/connect/server",
@@ -199,10 +329,7 @@ public class ProxyCacheIT
         k3po.finish();
     }
 
-    // TODO expires headers
-    // TODO quoted maxage header
-    // TODO quoted smaxage header
-
+    @Ignore("Change to 0")
     @Test
     @Specification({
         "${route}/proxy/controller",
