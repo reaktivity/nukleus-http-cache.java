@@ -29,6 +29,7 @@ public final class HttpHeaders
     public static final String AUTHORITY = ":authority";
     public static final String PATH = ":path";
     public static final String CONTENT_LENGTH = "content-length";
+    public static final String TRANSFER_ENCODING = "transfer-encoding";
     public static final String METHOD = ":method";
 
     // values
