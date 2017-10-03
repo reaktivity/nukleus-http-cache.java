@@ -17,11 +17,11 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
-import static java.util.Arrays.stream;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.S_MAXAGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -29,7 +29,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
-import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
@@ -247,45 +246,19 @@ public final class CacheEntry
         }
     }
 
-    private boolean canBeServedToAuthorized(ListFW<HttpHeaderFW> request)
+    private boolean canBeServedToAuthorized(
+        ListFW<HttpHeaderFW> request)
     {
-        CacheControl responseCacheControl = responseCacheControl();
-
-        if (responseCacheControl.contains("public"))
-        {
-            return true;
-        }
-
-        if (responseCacheControl.contains("private"))
-        {
-            return false;
-        }
-
+        final CacheControl responseCacheControl = responseCacheControl();
         final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getRequest();
-        final String cachedAuthorizationHeader = getHeader(cachedRequestHeaders, "authorization");
-        final String requestAuthorizationHeader = getHeader(request, "authorization");
-        if (cachedAuthorizationHeader != null || requestAuthorizationHeader != null)
-        {
-            return false;
-        }
-        return true;
+        return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
     }
 
     private boolean doesNotVaryBy(ListFW<HttpHeaderFW> request)
     {
         final ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders();
-        final String cachedVaryHeader = getHeader(responseHeaders, "vary");
-        if (cachedVaryHeader == null)
-        {
-            return true;
-        }
         final ListFW<HttpHeaderFW> cachedRequest = getRequest();
-        return stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
-        {
-            String pendingHeaderValue = getHeader(request, v);
-            String myHeaderValue = getHeader(cachedRequest, v);
-            return !Objects.equals(pendingHeaderValue, myHeaderValue);
-        });
+        return HttpCacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
 
@@ -395,13 +368,6 @@ public final class CacheEntry
         return responseCacheControlParser.parse(cacheControl);
     }
 
-    private CacheControl requestCacheControl()
-    {
-        ListFW<HttpHeaderFW> requestHeaders = getResponseHeaders();
-        String cacheControl = getHeader(requestHeaders, CACHE_CONTROL);
-        return cachedRequestCacheControlParser.parse(cacheControl);
-    }
-
     public boolean canServeRequest(
         int requestURLHash,
         ListFW<HttpHeaderFW> request,
@@ -409,11 +375,11 @@ public final class CacheEntry
     {
         Instant now = Instant.now();
 
-        return canBeServedToAuthorized(request) &&
-                doesNotVaryBy(request) &&
-                satisfiesFreshnessRequirementsOf(request, now) &&
-                satisfiesStalenessRequirementsOf(request, now) &&
-                satisfiesAgeRequirementsOf(request, now);
+        return canBeServedToAuthorized(request)
+               && doesNotVaryBy(request)
+               && satisfiesFreshnessRequirementsOf(request, now)
+               && (satisfiesStalenessRequirementsOf(request, now) || isRevalidating)
+               && satisfiesAgeRequirementsOf(request, now);
     }
 
     private boolean isStale()

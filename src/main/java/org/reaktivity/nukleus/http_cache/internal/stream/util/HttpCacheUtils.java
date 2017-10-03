@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.util.Arrays.asList;
+import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.NO_CACHE;
@@ -31,6 +32,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -145,4 +147,48 @@ public final class HttpCacheUtils
             return false;
         });
     }
+
+    public static boolean sameAuthorizationScope(
+        ListFW<HttpHeaderFW> request,
+        ListFW<HttpHeaderFW> cachedRequest,
+        CacheControl cachedResponse)
+    {
+        if (cachedResponse.contains("public"))
+        {
+            return true;
+        }
+
+        if (cachedResponse.contains("private"))
+        {
+            return false;
+        }
+
+        final String cachedAuthorizationHeader = getHeader(cachedRequest, "authorization");
+        final String requestAuthorizationHeader = getHeader(request, "authorization");
+        if (cachedAuthorizationHeader != null || requestAuthorizationHeader != null)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean doesNotVary(
+        ListFW<HttpHeaderFW> request,
+        ListFW<HttpHeaderFW> cachedResponse,
+        ListFW<HttpHeaderFW> cachedRequest)
+    {
+        final String cachedVaryHeader = getHeader(cachedResponse, "vary");
+        if (cachedVaryHeader == null)
+        {
+            return true;
+        }
+
+        return stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
+        {
+            String pendingHeaderValue = getHeader(request, v);
+            String myHeaderValue = getHeader(cachedRequest, v);
+            return !Objects.equals(pendingHeaderValue, myHeaderValue);
+        });
+    }
+
 }

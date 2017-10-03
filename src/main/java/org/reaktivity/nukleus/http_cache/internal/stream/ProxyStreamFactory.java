@@ -22,8 +22,10 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.ONLY_IF_CACHED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.doesNotVary;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isCacheable;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivatelyCacheable;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
@@ -51,6 +53,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.GroupThrottle;
@@ -111,6 +114,8 @@ public class ProxyStreamFactory implements StreamFactory
 
     private final Writer writer;
     private final Long2ObjectHashMap<FanOut> junctions;
+
+    private final CacheControl cacheControlParser = new CacheControl();
 
 
     private final Cache cache;
@@ -558,13 +563,15 @@ public class ProxyStreamFactory implements StreamFactory
 
                     this.streamCorrelation = this.junction.getStreamCorrelation();
 
-                    ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
-
                     final int requestURLHash = streamCorrelation.requestURLHash();
-                    CacheEntry cacheEntry = cache.getCachedResponseThatSatisfies(requestURLHash, requestHeaders, true);
-                    if (cacheEntry != null)
+                    final ListFW<HttpHeaderFW> request =  getRequestHeaders(requestHeadersRO);
+                    final ListFW<HttpHeaderFW> cachedRequest = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
+                    final String responseCacheControlValue = getHeader(responseHeaders, "cache-control");
+                    final CacheControl responseCacheContro = cacheControlParser.parse(responseCacheControlValue);
+                    if (sameAuthorizationScope(request, cachedRequest, responseCacheContro)
+                            && doesNotVary(request, responseHeaders, cachedRequest))
                     {
-                        sendHttpResponse(responseHeaders, requestHeaders);
+                        sendHttpResponse(responseHeaders, request);
                         router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());
                         return true;
                     }
@@ -587,7 +594,7 @@ public class ProxyStreamFactory implements StreamFactory
 
                         this.connectStreamId = supplyStreamId.getAsLong();
 
-                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
+                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, request);
                         return false;
                     }
                 default:
@@ -1635,9 +1642,10 @@ public class ProxyStreamFactory implements StreamFactory
                 {
                     i.remove();
                 }
-                junctions.remove(this.streamCorrelation.requestURLHash());
-
             }
+
+            junctions.remove(this.streamCorrelation.requestURLHash());
+
             if (msgTypeId == BeginFW.TYPE_ID)
             {
                 final MessageConsumer connectReply = streamCorrelation.connectReplyThrottle();
