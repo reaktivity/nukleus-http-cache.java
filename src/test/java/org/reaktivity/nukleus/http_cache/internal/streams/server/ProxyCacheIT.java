@@ -379,14 +379,14 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/expire.cache.by.default.for.5.seconds/accept/client",
-        "${streams}/expire.cache.by.default.for.5.seconds/connect/server",
+        "${streams}/expire.cache.by.default.for.0.seconds/accept/client",
+        "${streams}/expire.cache.by.default.for.0.seconds/connect/server",
     })
     public void shouldExpireCacheDefaultCacheableFor5Seconds() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(5000);
+        sleep(10);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
     }

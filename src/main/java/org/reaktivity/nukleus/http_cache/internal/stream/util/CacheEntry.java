@@ -37,10 +37,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
-import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
@@ -60,12 +57,6 @@ public final class CacheEntry
 
     private Instant lazyInitiedResponseReceivedAt;
     private Instant lazyInitiedResponseStaleAt;
-
-    // TODO move values to Cache so only created once (maybe by moving to innerclass)
-    CacheControl responseCacheControlParser = new CacheControl();
-    CacheControl cachedRequestCacheControlParser = new CacheControl();
-    CacheControl requestCacheControlParser = new CacheControl();
-
 
     CacheEntry(
         Cache cache, int requestSlot,
@@ -91,8 +82,22 @@ public final class CacheEntry
         this.removeClient();
     }
 
+    // forwards response to client once cached (No need to inject warnings)
+    public void forwardToClient(Correlation streamCorrelation)
+    {
+        sendResponseToClient(streamCorrelation, false);
+    }
+
+    // serves client from cache (need to inject warnings
     public void serveClient(
             Correlation streamCorrelation)
+    {
+        sendResponseToClient(streamCorrelation, true);
+    }
+
+    private void sendResponseToClient(
+        Correlation streamCorrelation,
+        boolean injectWarnings)
     {
         addClient();
         MutableDirectBuffer buffer = this.cache.requestBufferPool.buffer(responseSlot);
@@ -111,32 +116,19 @@ public final class CacheEntry
                         responseSize,
                         this::handleEndOfStream));
 
-        final Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers =
-                cacheEntry.isStale() ?
-                injectWarningHeader(responseHeaders) :
-                    e -> responseHeaders.forEach(h ->
-                    e.item(h2 ->
-                    {
-                        StringFW name = h.name();
-                        String16FW value = h.value();
-                        h2.representation((byte) 0)
-                                .name(name)
-                                .value(value);
-                    }));
-        this.cache.writer.doHttpBegin(messageConsumer, streamId, 0L, correlation, headers);
-    }
-
-    private Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> injectWarningHeader(ListFW<HttpHeaderFW> headersFW)
-    {
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator = x -> headersFW
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
                 .forEach(h ->
                         x.item(y -> y.representation((byte) 0)
                                 .name(h.name())
                                 .value(h.value())));
-        return mutator.andThen(
-                x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
-        );
 
+        if (injectWarnings && cacheEntry.isStale())
+        {
+            headers = headers.andThen(
+                    x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
+            );
+        }
+        this.cache.writer.doHttpBegin(messageConsumer, streamId, 0L, correlation, headers);
     }
 
     public void cleanUp()
@@ -267,7 +259,7 @@ public final class CacheEntry
             Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeacerValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MIN_FRESH))
@@ -286,7 +278,7 @@ public final class CacheEntry
             Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeacerValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MAX_STALE))
@@ -312,7 +304,7 @@ public final class CacheEntry
         Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeacerValue);
         Instant receivedAt = responseReceivedAt();
 
         if (requestCacheControl.contains(MAX_AGE))
@@ -365,7 +357,7 @@ public final class CacheEntry
     {
         ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
         String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
-        return responseCacheControlParser.parse(cacheControl);
+        return cache.responseCacheControlParser.parse(cacheControl);
     }
 
     public boolean canServeRequest(
