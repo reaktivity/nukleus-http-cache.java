@@ -121,12 +121,12 @@ public class ProxyCacheIT
             "${streams}/request.greater.max-age/accept/client",
             "${streams}/request.greater.max-age/connect/server",
     })
-    public void shouldNotCacheWhenResponseAgeIsGreaterThanMaxAge() throws Exception
+    public void shouldNotCacheWhenResponseAgeIsGreaterThanRequestMaxAge() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
         sleep(2000);
-        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.notifyBarrier("WAIT_2_SECONDS");
         k3po.finish();
     }
 
@@ -136,12 +136,12 @@ public class ProxyCacheIT
             "${streams}/request.lesser.max-age/accept/client",
             "${streams}/request.lesser.max-age/connect/server",
     })
-    public void shouldCacheRequestMaxAge() throws Exception
+    public void shouldCacheWhenResponseAgeIsLessthanRequestMaxAge() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
         sleep(1000);
-        k3po.notifyBarrier("CACHE_WAITS");
+        k3po.notifyBarrier("CACHE_WAITS_1_SEC");
         k3po.finish();
     }
 
@@ -163,15 +163,15 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-            "${streams}/cache.min-fresh/accept/client",
-            "${streams}/cache.min-fresh/connect/server",
+        "${streams}/cache.min-fresh/accept/client",
+        "${streams}/cache.min-fresh/connect/server",
     })
     public void shouldCacheMinFresh() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
         sleep(1000);
-        k3po.notifyBarrier("CACHE_WAIT");
+        k3po.notifyBarrier("CACHE_WAIT_1_SEC");
         k3po.finish();
     }
 
@@ -364,14 +364,13 @@ public class ProxyCacheIT
         k3po.finish();
     }
 
-    @Ignore("Change to 0")
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/cache.by.default.for.5.seconds/accept/client",
-        "${streams}/cache.by.default.for.5.seconds/connect/server",
+        "${streams}/cache.by.default.for.0.seconds/accept/client",
+        "${streams}/cache.by.default.for.0.seconds/connect/server",
     })
-    public void shouldCacheDefaultCacheableFor5Seconds() throws Exception
+    public void shouldCacheDefaultCacheableFor0Seconds() throws Exception
     {
         k3po.finish();
     }
