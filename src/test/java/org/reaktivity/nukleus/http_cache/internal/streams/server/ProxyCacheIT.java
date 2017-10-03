@@ -140,8 +140,8 @@ public class ProxyCacheIT
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(2000);
-        k3po.notifyBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_WAITS");
         k3po.finish();
     }
 
@@ -153,6 +153,10 @@ public class ProxyCacheIT
     })
     public void shouldCacheMaxStale() throws Exception
     {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
     }
 
