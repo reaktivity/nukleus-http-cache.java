@@ -168,6 +168,10 @@ public class ProxyCacheIT
     })
     public void shouldCacheMinFresh() throws Exception
     {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_WAIT");
         k3po.finish();
     }
 
@@ -181,7 +185,7 @@ public class ProxyCacheIT
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(1000);
+        sleep(2000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
     }
