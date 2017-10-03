@@ -1406,7 +1406,7 @@ public class ProxyStreamFactory implements StreamFactory
             cache(endRO.wrap(buffer, index, index + length));
             int requstURLHash = streamCorrelation.requestURLHash();
             CacheEntry serverStream = cache.get(requstURLHash);
-            serverStream.serveClient(streamCorrelation);
+            serverStream.forwardToClient(streamCorrelation);
         }
 
         private boolean confirmMatch(
@@ -1480,7 +1480,7 @@ public class ProxyStreamFactory implements StreamFactory
                     {
                         int requstURLHash = streamCorrelation.requestURLHash();
                         CacheEntry serverStream = cache.get(requstURLHash);
-                        serverStream.serveClient(streamCorrelation);
+                        serverStream.forwardToClient(streamCorrelation);
                     }
                     break;
                 case AbortFW.TYPE_ID:
