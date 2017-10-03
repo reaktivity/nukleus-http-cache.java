@@ -1,10 +1,27 @@
+/**
+ * Copyright 2016-2017 The Reaktivity Project
+ *
+ * The Reaktivity Project licenses this file to you under the Apache License,
+ * version 2.0 (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
-import static java.util.Arrays.stream;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.S_MAXAGE;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -12,7 +29,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
-import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
@@ -230,77 +246,84 @@ public final class CacheEntry
         }
     }
 
-    private boolean canBeServedToAuthorized(ListFW<HttpHeaderFW> request)
+    private boolean canBeServedToAuthorized(
+        ListFW<HttpHeaderFW> request)
     {
-        CacheControl responseCacheControl = responseCacheControl();
-
-        if (responseCacheControl.contains("public"))
-        {
-            return true;
-        }
-
-        if (responseCacheControl.contains("private"))
-        {
-            return false;
-        }
-
+        final CacheControl responseCacheControl = responseCacheControl();
         final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getRequest();
-        final String cachedAuthorizationHeader = getHeader(cachedRequestHeaders, "authorization");
-        final String requestAuthorizationHeader = getHeader(request, "authorization");
-        if (cachedAuthorizationHeader != null || requestAuthorizationHeader != null)
-        {
-            return false;
-        }
-        return true;
+        return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
     }
 
     private boolean doesNotVaryBy(ListFW<HttpHeaderFW> request)
     {
         final ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders();
-        final String cachedVaryHeader = getHeader(responseHeaders, "vary");
-        if (cachedVaryHeader == null)
-        {
-            return true;
-        }
-        return stream(cachedVaryHeader.split("\\s*,\\s*")).anyMatch(v ->
-        {
-            String pendingHeaderValue = getHeader(request, v);
-            String myHeaderValue = getHeader(request, v);
-            return !Objects.equals(pendingHeaderValue, myHeaderValue);
-        });
+        final ListFW<HttpHeaderFW> cachedRequest = getRequest();
+        return HttpCacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
-    private boolean satisfiesAgeAndStalenessRequirementsOf(ListFW<HttpHeaderFW> request)
+
+    private boolean satisfiesFreshnessRequirementsOf(
+            ListFW<HttpHeaderFW> request,
+            Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
         final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
-        final CacheControl responseCacheControl = responseCacheControl();
-        final CacheControl cachedRequestCacheControl = responseCacheControl();
 
         Instant staleAt = staleAt();
-        Instant recievedAt = responseReceivedAt();
-        Instant now = Instant.now();
         if (requestCacheControl.contains(MIN_FRESH))
         {
-            // todo
-            return false;
+            final String minFresh = requestCacheControl.getValue(MIN_FRESH);
+            if (! now.plusSeconds(parseInt(minFresh)).isBefore(staleAt))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean satisfiesStalenessRequirementsOf(
+            ListFW<HttpHeaderFW> request,
+            Instant now)
+    {
+        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+
+        Instant staleAt = staleAt();
+        if (requestCacheControl.contains(MAX_STALE))
+        {
+            final String maxStale = requestCacheControl.getValue(MAX_STALE);
+            final int maxStaleSec = (maxStale != null) ? parseInt(maxStale): MAX_VALUE;
+            final Instant acceptable = staleAt.plusSeconds(maxStaleSec);
+            if (now.isAfter(acceptable))
+            {
+                return false;
+            }
         }
         else if (now.isAfter(staleAt))
         {
             return false;
         }
 
+        return true;
+    }
+
+    private boolean satisfiesAgeRequirementsOf(
+        ListFW<HttpHeaderFW> request,
+        Instant now)
+    {
+        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        Instant receivedAt = responseReceivedAt();
+
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
-            if (recievedAt.plusSeconds(requestMaxAge).isBefore(now))
+            if (receivedAt.plusSeconds(requestMaxAge).isBefore(now))
             {
-                System.out.println(recievedAt + " --- " + now);
                 return false;
             }
         }
         return true;
-
     }
 
     private Instant staleAt()
@@ -322,7 +345,8 @@ public final class CacheEntry
         if (lazyInitiedResponseReceivedAt == null)
         {
             final ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
-            final String dateHeaderValue = getHeader(responseHeaders, "date");
+            final String dateHeaderValue = getHeader(responseHeaders, "date") != null ?
+                    getHeader(responseHeaders, "date") : getHeader(responseHeaders, "last-modified");
             try
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeaderValue);
@@ -344,27 +368,23 @@ public final class CacheEntry
         return responseCacheControlParser.parse(cacheControl);
     }
 
-    private CacheControl requestCacheControl()
-    {
-        ListFW<HttpHeaderFW> requestHeaders = getResponseHeaders();
-        String cacheControl = getHeader(requestHeaders, CACHE_CONTROL);
-        return cachedRequestCacheControlParser.parse(cacheControl);
-    }
-
     public boolean canServeRequest(
         int requestURLHash,
         ListFW<HttpHeaderFW> request,
         boolean isRevalidating)
     {
-        return canBeServedToAuthorized(request) &&
-                doesNotVaryBy(request) &&
-                satisfiesAgeAndStalenessRequirementsOf(request);
+        Instant now = Instant.now();
+
+        return canBeServedToAuthorized(request)
+               && doesNotVaryBy(request)
+               && satisfiesFreshnessRequirementsOf(request, now)
+               && (satisfiesStalenessRequirementsOf(request, now) || isRevalidating)
+               && satisfiesAgeRequirementsOf(request, now);
     }
 
     private boolean isStale()
     {
-        // TODO
-        return false;
+        return Instant.now().isAfter(staleAt());
     }
 
 }

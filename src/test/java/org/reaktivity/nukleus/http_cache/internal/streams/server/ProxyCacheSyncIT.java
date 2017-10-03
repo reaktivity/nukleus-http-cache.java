@@ -151,6 +151,7 @@ public class ProxyCacheSyncIT
         "${streams}/not.forward.response.to.push.promise.if.unchanged/accept/client",
         "${streams}/not.forward.response.to.push.promise.if.unchanged/connect/server",
     })
+    // BUGGY
     public void shouldNotForwardResponseToPushPromiseIfUnchanged() throws Exception
     {
         k3po.finish();
@@ -162,6 +163,7 @@ public class ProxyCacheSyncIT
         "${streams}/not.forward.fragmented.response.to.push.promise.if.unchanged/accept/client",
         "${streams}/not.forward.fragmented.response.to.push.promise.if.unchanged/connect/server",
     })
+    // BUGGY
     public void shouldNotForwardFragmentedResponseToPushPromiseIfUnchanged() throws Exception
     {
         k3po.finish();
@@ -184,6 +186,7 @@ public class ProxyCacheSyncIT
         "${streams}/cache.is.not.stale.if.revalidating/accept/client",
         "${streams}/cache.is.not.stale.if.revalidating/connect/server",
     })
+    // BUGGY
     public void shouldServeFromCacheWhenNotStaleIfRevalidating() throws Exception
     {
         k3po.finish();
