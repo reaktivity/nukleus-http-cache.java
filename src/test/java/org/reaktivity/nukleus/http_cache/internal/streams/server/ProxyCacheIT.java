@@ -118,15 +118,41 @@ public class ProxyCacheIT
     @Test
     @Specification({
             "${route}/proxy/controller",
+            "${streams}/request.greater.max-age/accept/client",
+            "${streams}/request.greater.max-age/connect/server",
+    })
+    public void shouldNotCacheWhenResponseAgeIsGreaterThanMaxAge() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(2000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/request.lesser.max-age/accept/client",
+            "${streams}/request.lesser.max-age/connect/server",
+    })
+    public void shouldCacheRequestMaxAge() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(2000);
+        k3po.notifyBarrier("REQUEST_CACHED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
             "${streams}/cache.max-stale.with.value/accept/client",
             "${streams}/cache.max-stale.with.value/connect/server",
     })
     public void shouldCacheMaxStale() throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(1000);
-        k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
     }
 
