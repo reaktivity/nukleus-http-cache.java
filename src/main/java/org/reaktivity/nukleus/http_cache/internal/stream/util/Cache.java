@@ -39,9 +39,9 @@ public class Cache
     final WindowFW windowRO = new WindowFW();
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
-    CacheControl responseCacheControlParser = new CacheControl();
-    CacheControl cachedRequestCacheControlParser = new CacheControl();
-    CacheControl requestCacheControlParser = new CacheControl();
+    final CacheControl responseCacheControlParser = new CacheControl();
+    final CacheControl cachedRequestCacheControlParser = new CacheControl();
+    final CacheControl requestCacheControlParser = new CacheControl();
 
     public Cache(
             MutableDirectBuffer writeBuffer,
