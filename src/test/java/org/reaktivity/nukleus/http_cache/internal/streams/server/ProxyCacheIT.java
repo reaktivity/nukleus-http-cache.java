@@ -293,6 +293,17 @@ public class ProxyCacheIT
     @Test
     @Specification({
             "${route}/proxy/controller",
+            "${streams}/request.no-cache/accept/client",
+            "${streams}/request.no-cache/connect/server",
+    })
+    public void shouldRequestNoCache() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
             "${streams}/request.only-if-cached/accept/client",
             "${streams}/request.only-if-cached/connect/server",
     })

@@ -567,8 +567,8 @@ public class ProxyStreamFactory implements StreamFactory
                     final ListFW<HttpHeaderFW> request =  getRequestHeaders(requestHeadersRO);
                     final ListFW<HttpHeaderFW> cachedRequest = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
                     final String responseCacheControlValue = getHeader(responseHeaders, "cache-control");
-                    final CacheControl responseCacheContro = cacheControlParser.parse(responseCacheControlValue);
-                    if (sameAuthorizationScope(request, cachedRequest, responseCacheContro)
+                    final CacheControl responseCacheControl = cacheControlParser.parse(responseCacheControlValue);
+                    if (sameAuthorizationScope(request, cachedRequest, responseCacheControl)
                             && doesNotVary(request, responseHeaders, cachedRequest))
                     {
                         sendHttpResponse(responseHeaders, request);
@@ -1381,7 +1381,7 @@ public class ProxyStreamFactory implements StreamFactory
                     }
                     else
                     {
-                        forwardCompletelyCachedRespone(buffer, index, length);
+                        forwardCompletelyCachedResponse(buffer, index, length);
                     }
                     break;
                 case BeginFW.TYPE_ID:
@@ -1391,7 +1391,7 @@ public class ProxyStreamFactory implements StreamFactory
             }
         }
 
-        private void forwardCompletelyCachedRespone(
+        private void forwardCompletelyCachedResponse(
                 DirectBuffer buffer,
                 int index,
                 int length)
@@ -1404,8 +1404,8 @@ public class ProxyStreamFactory implements StreamFactory
                     processedResponseSize);
             this.cachedResponseSize += processedResponseSize;
             cache(endRO.wrap(buffer, index, index + length));
-            int requstURLHash = streamCorrelation.requestURLHash();
-            CacheEntry serverStream = cache.get(requstURLHash);
+            int requestURLHash = streamCorrelation.requestURLHash();
+            CacheEntry serverStream = cache.get(requestURLHash);
             serverStream.forwardToClient(streamCorrelation);
         }
 
