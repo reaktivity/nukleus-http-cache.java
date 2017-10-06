@@ -381,7 +381,7 @@ public class ProxyCacheIT
         "${streams}/expire.cache.by.default.for.0.seconds/accept/client",
         "${streams}/expire.cache.by.default.for.0.seconds/connect/server",
     })
-    public void shouldExpireCacheDefaultCacheableFor5Seconds() throws Exception
+    public void shouldExpireCacheDefaultCacheableFor0Second() throws Exception
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
