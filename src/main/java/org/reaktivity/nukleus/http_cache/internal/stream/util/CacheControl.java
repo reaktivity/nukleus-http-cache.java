@@ -15,14 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 // Apache Version 2.0 (July 25, 2017)
 // https://svn.apache.org/repos/asf/abdera/java/trunk/
@@ -75,18 +72,5 @@ public class CacheControl
     public String getValue(String directive)
     {
         return values.get(directive);
-    }
-
-    public List<String> getValues(String directive)
-    {
-        String dValues = getValue(directive);
-        if (dValues != null)
-        {
-            return Arrays
-                    .stream(dValues.split(","))
-                    .map(String::trim)
-                    .collect(Collectors.toList());
-        }
-        return null;
     }
 }
