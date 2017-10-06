@@ -378,17 +378,6 @@ public class ProxyCacheIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/cache.by.default.for.0.seconds/accept/client",
-        "${streams}/cache.by.default.for.0.seconds/connect/server",
-    })
-    public void shouldCacheDefaultCacheableFor0Seconds() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
         "${streams}/expire.cache.by.default.for.0.seconds/accept/client",
         "${streams}/expire.cache.by.default.for.0.seconds/connect/server",
     })
