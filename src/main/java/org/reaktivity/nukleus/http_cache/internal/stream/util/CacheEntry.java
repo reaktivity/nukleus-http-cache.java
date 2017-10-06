@@ -55,8 +55,8 @@ public final class CacheEntry
     private int clientCount = 0;
     private boolean cleanUp = false;
 
-    private Instant lazyInitiedResponseReceivedAt;
-    private Instant lazyInitiedResponseStaleAt;
+    private Instant lazyInitiatedResponseReceivedAt;
+    private Instant lazyInitiatedResponseStaleAt;
 
     CacheEntry(
         Cache cache, int requestSlot,
@@ -258,8 +258,8 @@ public final class CacheEntry
             ListFW<HttpHeaderFW> request,
             Instant now)
     {
-        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeaderValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MIN_FRESH))
@@ -303,8 +303,8 @@ public final class CacheEntry
         ListFW<HttpHeaderFW> request,
         Instant now)
     {
-        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeaderValue);
         Instant receivedAt = responseReceivedAt();
 
         if (requestCacheControl.contains(MAX_AGE))
@@ -320,21 +320,21 @@ public final class CacheEntry
 
     private Instant staleAt()
     {
-        if (lazyInitiedResponseStaleAt == null)
+        if (lazyInitiatedResponseStaleAt == null)
         {
             CacheControl cacheControl = responseCacheControl();
             Instant receivedAt = responseReceivedAt();
             int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-            lazyInitiedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
+            lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
-        return lazyInitiedResponseStaleAt;
+        return lazyInitiatedResponseStaleAt;
     }
 
     private Instant responseReceivedAt()
     {
-        if (lazyInitiedResponseReceivedAt == null)
+        if (lazyInitiatedResponseReceivedAt == null)
         {
             final ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
             final String dateHeaderValue = getHeader(responseHeaders, "date") != null ?
@@ -342,14 +342,14 @@ public final class CacheEntry
             try
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeaderValue);
-                lazyInitiedResponseReceivedAt = receivedDate.toInstant();
+                lazyInitiatedResponseReceivedAt = receivedDate.toInstant();
             }
             catch (Exception e)
             {
-                lazyInitiedResponseReceivedAt = Instant.EPOCH;
+                lazyInitiatedResponseReceivedAt = Instant.EPOCH;
             }
         }
-        return lazyInitiedResponseReceivedAt;
+        return lazyInitiatedResponseReceivedAt;
     }
 
 

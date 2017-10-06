@@ -40,7 +40,6 @@ public class Cache
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     final CacheControl responseCacheControlParser = new CacheControl();
-    final CacheControl cachedRequestCacheControlParser = new CacheControl();
     final CacheControl requestCacheControlParser = new CacheControl();
 
     public Cache(
