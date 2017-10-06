@@ -44,8 +44,8 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <checkstyle.config.location>src/conf/checkstyle/configuration.xml</checkstyle.config.location>
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
-    <jacoco.coverage.ratio>0.67</jacoco.coverage.ratio>
-    <jacoco.missed.count>30</jacoco.missed.count>
+    <jacoco.coverage.ratio>0.60</jacoco.coverage.ratio>
+    <jacoco.missed.count>45</jacoco.missed.count>
 
     <junit.version>4.12</junit.version>
     <jmh.version>1.12</jmh.version>
