@@ -50,7 +50,7 @@
     <junit.version>4.12</junit.version>
     <jmh.version>1.12</jmh.version>
 
-    <k3po.version>3.0.0-alpha-80</k3po.version>
+    <k3po.version>3.0.0-alpha-83</k3po.version>
     <k3po.nukleus.ext.version>develop-SNAPSHOT</k3po.nukleus.ext.version>
 
     <nukleus.plugin.version>0.12</nukleus.plugin.version>
@@ -58,8 +58,6 @@
 
     <nukleus.http.cache.spec.version>develop-SNAPSHOT</nukleus.http.cache.spec.version>
     <reaktor.version>develop-SNAPSHOT</reaktor.version>
-    <nukleus.http.cache.spec.version>0.17</nukleus.http.cache.spec.version>
-    <reaktor.version>0.26</reaktor.version>
   </properties>
 
   <dependencies>
