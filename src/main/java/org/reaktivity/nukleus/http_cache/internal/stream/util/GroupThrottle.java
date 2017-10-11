@@ -55,7 +55,6 @@ public class GroupThrottle
             long diff = newLowWaterMark - groupWaterMark;
             if (diff > 0)
             {
-                // TODO, track frames?
                 writer.doWindow(connectReply, connectReplyStreamId, (int)diff, 0);
                 groupWaterMark = newLowWaterMark;
             }
