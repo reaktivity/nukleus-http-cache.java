@@ -27,6 +27,7 @@ public class GroupThrottle
 
     private long groupWaterMark = 0;
     private int numParticipants;
+    private int padding;
 
     public GroupThrottle(
         int numParticipants,
@@ -41,8 +42,11 @@ public class GroupThrottle
         streamToWaterMark = new Long2LongHashMap(0);
     }
 
-    private void increment(long stream, long credit)
+    private void increment(long stream, long credit, int padding)
     {
+        // The padding should be same across all streams for now.
+        // TODO may need to keep track of padding across all streams
+        this.padding = padding;
         streamToWaterMark.put(stream, streamToWaterMark.get(stream) + credit);
         updateThrottle();
     }
@@ -55,7 +59,7 @@ public class GroupThrottle
             long diff = newLowWaterMark - groupWaterMark;
             if (diff > 0)
             {
-                writer.doWindow(connectReply, connectReplyStreamId, (int)diff, 0);
+                writer.doWindow(connectReply, connectReplyStreamId, (int)diff, padding);
                 groupWaterMark = newLowWaterMark;
             }
         }
@@ -68,7 +72,7 @@ public class GroupThrottle
     {
         if (credit > 0)
         {
-            increment(streamId, credit);
+            increment(streamId, credit, padding);
         }
     }
 
