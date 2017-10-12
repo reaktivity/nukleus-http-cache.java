@@ -15,38 +15,32 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
-
 import java.util.function.LongSupplier;
 
-import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
-import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public class Cache
 {
 
-    private final Writer writer;
-    private final Long2ObjectHashMap<CacheResponseServer> requestURLToResponse;
-    private final BufferPool requestBufferPool;
-    private final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    private final BufferPool responseBufferPool;
-    private final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
-    private final LongSupplier streamSupplier;
-    private final LongSupplier supplyCorrelationId;
-    private final WindowFW windowRO = new WindowFW();
+    final Writer writer;
+    final Long2ObjectHashMap<CacheEntry> requestURLToResponse;
+    final BufferPool requestBufferPool;
+    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final BufferPool responseBufferPool;
+    final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
+    final LongSupplier streamSupplier;
+    final LongSupplier supplyCorrelationId;
+    final WindowFW windowRO = new WindowFW();
+    static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
+
+    final CacheControl responseCacheControlParser = new CacheControl();
+    final CacheControl requestCacheControlParser = new CacheControl();
 
     public Cache(
             MutableDirectBuffer writeBuffer,
@@ -70,220 +64,36 @@ public class Cache
         int responseHeaderSize,
         int responseSize)
     {
-        CacheResponseServer responseServer = new CacheResponseServer(
-                requestSlot,
+        CacheEntry responseServer = new CacheEntry(
+                this, requestSlot,
                 requestSize,
                 responseSlot,
                 responseHeaderSize,
                 responseSize);
 
-        CacheResponseServer oldResponseServer = requestURLToResponse.put(requestURLHash, responseServer);
-        if (oldResponseServer != null)
+        CacheEntry oldCacheEntry = requestURLToResponse.put(requestURLHash, responseServer);
+        if (oldCacheEntry != null)
         {
-            oldResponseServer.cleanUp();
+            oldCacheEntry.cleanUp();
         }
     }
 
-    public CacheResponseServer get(int requestURLHash)
+    public CacheEntry get(int requestURLHash)
     {
         return requestURLToResponse.get(requestURLHash);
     }
 
-    public final class CacheResponseServer
-    {
-
-        private final int requestSlot;
-        private final int requestSize;
-        private final int responseSlot;
-        private final int responseHeaderSize;
-        private final int responseSize;
-        private int clientCount = 0;
-        private boolean cleanUp = false;
-
-        private CacheResponseServer(
-            int requestSlot,
-            int requestSize,
-            int responseSlot,
-            int responseHeaderSize,
-            int responseSize)
-        {
-            this.requestSlot = requestSlot;
-            this.requestSize = requestSize;
-            this.responseSlot = responseSlot;
-            this.responseHeaderSize = responseHeaderSize;
-            this.responseSize = responseSize;
-        }
-
-        private void handleEndOfStream(
-                int msgTypeId,
-                DirectBuffer buffer,
-                int index,
-                int length)
-        {
-            this.removeClient();
-        }
-
-        public void serveClient(
-                Correlation streamCorrelation)
-        {
-            addClient();
-            MutableDirectBuffer buffer = requestBufferPool.buffer(responseSlot);
-            ListFW<HttpHeaderFW> responseHeaders = responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
-
-            final long correlation = supplyCorrelationId.getAsLong();
-            final MessageConsumer messageConsumer = streamCorrelation.consumer();
-            final long streamId = streamSupplier.getAsLong();
-            streamCorrelation.setConnectReplyThrottle(
-                    new ServeFromCacheStream(
-                            messageConsumer,
-                            streamId,
-                            responseSlot,
-                            responseHeaderSize,
-                            responseSize,
-                            this::handleEndOfStream));
-
-            writer.doHttpBegin(messageConsumer, streamId, 0L, correlation,
-                    e -> responseHeaders.forEach(h ->
-                    e.item(h2 ->
-                    {
-                        StringFW name = h.name();
-                        String16FW value = h.value();
-                        h2.representation((byte) 0)
-                                        .name(name)
-                                        .value(value);
-                    })));
-        }
-
-        public void cleanUp()
-        {
-            cleanUp = true;
-            if (clientCount == 0)
-            {
-                responseBufferPool.release(responseSlot);
-                requestBufferPool.release(requestSlot);
-            }
-        }
-
-        class ServeFromCacheStream implements MessageConsumer
-        {
-            private final  MessageConsumer messageConsumer;
-            private final long streamId;
-
-            private int payloadWritten;
-            private int responseSlot;
-            private int responseHeaderSize;
-            private int responseSize;
-            private MessageConsumer onEnd;
-
-             ServeFromCacheStream(
-                MessageConsumer messageConsumer,
-                long streamId,
-                int responseSlot,
-                int responseHeaderSize,
-                int responseSize,
-                MessageConsumer onEnd)
-            {
-                this.payloadWritten = 0;
-                this.messageConsumer = messageConsumer;
-                this.streamId = streamId;
-                this.responseSlot = responseSlot;
-                this.responseHeaderSize = responseHeaderSize;
-                this.responseSize = responseSize - responseHeaderSize;
-                this.onEnd = onEnd;
-            }
-
-            @Override
-            public void accept(
-                    int msgTypeId,
-                    DirectBuffer buffer,
-                    int index,
-                    int length)
-            {
-                switch(msgTypeId)
-                {
-                    case WindowFW.TYPE_ID:
-                        final WindowFW window = windowRO.wrap(buffer, index, index + length);
-                        int credit = window.credit();
-                        writePayload(credit);
-                        break;
-                    case ResetFW.TYPE_ID:
-                    default:
-                        this.onEnd.accept(msgTypeId, buffer, index, length);
-                        break;
-                }
-            }
-
-            private void writePayload(int credit)
-            {
-                final int toWrite = Math.min(credit, responseSize - payloadWritten);
-                final int offset = responseHeaderSize + payloadWritten;
-                MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
-                writer.doHttpData(messageConsumer, streamId, buffer, offset, toWrite);
-                payloadWritten += toWrite;
-                if (payloadWritten == responseSize)
-                {
-                    writer.doHttpEnd(messageConsumer, streamId);
-                    this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
-                }
-            }
-        }
-
-        public ListFW<HttpHeaderFW> getRequest()
-        {
-            DirectBuffer buffer = requestBufferPool.buffer(requestSlot);
-            return requestHeadersRO.wrap(buffer, 0, requestSize);
-        }
-
-        public ListFW<HttpHeaderFW> getResponseHeaders()
-        {
-            DirectBuffer buffer = responseBufferPool.buffer(responseSlot);
-            return responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
-        }
-
-        public OctetsFW getResponse(OctetsFW octetsFW)
-        {
-            DirectBuffer buffer = responseBufferPool.buffer(responseSlot);
-            return octetsFW.wrap(buffer, responseHeaderSize, responseSize);
-        }
-
-        public void addClient()
-        {
-            this.clientCount++;
-        }
-
-        public void removeClient()
-        {
-            clientCount--;
-            if (clientCount == 0 && cleanUp)
-            {
-                responseBufferPool.release(responseSlot);
-                requestBufferPool.release(requestSlot);
-            }
-        }
-    }
-
-    public CacheResponseServer hasStoredResponseThatSatisfies(
+    public CacheEntry getCachedResponseThatSatisfies(
             int requestURLHash,
-            ListFW<HttpHeaderFW> myRequestHeaders,
+            ListFW<HttpHeaderFW> request,
             boolean isRevalidating)
     {
-        CacheResponseServer responseServer = requestURLToResponse.get(requestURLHash);
-        if (responseServer == null)
-        {
-            return null;
-        }
+        // Will be stream of responses in near future, so coding it as now.
+        final CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
 
-        ListFW<HttpHeaderFW> cacheRequestHeaders = responseServer.getRequest();
-        ListFW<HttpHeaderFW> responseHeaders = responseServer.getResponseHeaders();
-        if (!isRevalidating && HttpCacheUtils.isExpired(responseHeaders))
+        if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, isRevalidating))
         {
-            responseServer.cleanUp();
-            requestURLToResponse.remove(requestURLHash);
-            return null;
-        }
-        if (cachedResponseCanSatisfyRequest(cacheRequestHeaders, responseHeaders, myRequestHeaders))
-        {
-            return responseServer;
+            return cacheEntry;
         }
         else
         {

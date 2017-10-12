@@ -19,10 +19,13 @@ import static java.lang.Integer.parseInt;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.ONLY_IF_CACHED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.canInjectPushPromise;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivateCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.cachedResponseCanSatisfyRequest;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.doesNotVary;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isCacheable;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.isPrivatelyCacheable;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
@@ -50,8 +53,9 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache.CacheResponseServer;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.GroupThrottle;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -110,6 +114,8 @@ public class ProxyStreamFactory implements StreamFactory
 
     private final Writer writer;
     private final Long2ObjectHashMap<FanOut> junctions;
+
+    private final CacheControl cacheControlParser = new CacheControl();
 
 
     private final Cache cache;
@@ -331,7 +337,7 @@ public class ProxyStreamFactory implements StreamFactory
                 final String requestURL)
         {
             boolean isRevalidating = junctions.containsKey(this.requestURLHash);
-            CacheResponseServer responseServer = cache.hasStoredResponseThatSatisfies(
+            CacheEntry responseServer = cache.getCachedResponseThatSatisfies(
                     requestURLHash,
                     requestHeaders,
                     isRevalidating);
@@ -359,6 +365,17 @@ public class ProxyStreamFactory implements StreamFactory
             }
             else
             {
+                if(requestHeaders.anyMatch(
+                        h ->
+                        {
+                            String name = h.name().asString();
+                            String value = h.value().asString();
+                            return name.equals(HttpHeaders.CACHE_CONTROL) && value.contains(ONLY_IF_CACHED);
+                        }))
+                {
+                    send504();
+                    return;
+                }
                 fanout(requestHeaders, false);
             }
         }
@@ -498,6 +515,15 @@ public class ProxyStreamFactory implements StreamFactory
             writer.doAbort(acceptReply, acceptReplyStreamId);
         }
 
+        private void send504()
+        {
+            writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+                    e.item(h -> h.representation((byte) 0)
+                            .name(STATUS)
+                            .value("504")));
+            writer.doAbort(acceptReply, acceptReplyStreamId);
+        }
+
         private boolean handleResponseFromMyInitiatedFanout(
             int msgTypeId,
             DirectBuffer buffer,
@@ -537,13 +563,15 @@ public class ProxyStreamFactory implements StreamFactory
 
                     this.streamCorrelation = this.junction.getStreamCorrelation();
 
-                    ListFW<HttpHeaderFW> pendingRequestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
-
-                    ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(requestHeadersRO);
-
-                    if (cachedResponseCanSatisfyRequest(pendingRequestHeaders, responseHeaders, requestHeaders))
+                    final int requestURLHash = streamCorrelation.requestURLHash();
+                    final ListFW<HttpHeaderFW> request =  getRequestHeaders(requestHeadersRO);
+                    final ListFW<HttpHeaderFW> cachedRequest = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
+                    final String responseCacheControlValue = getHeader(responseHeaders, "cache-control");
+                    final CacheControl responseCacheControl = cacheControlParser.parse(responseCacheControlValue);
+                    if (sameAuthorizationScope(request, cachedRequest, responseCacheControl)
+                            && doesNotVary(request, responseHeaders, cachedRequest))
                     {
-                        sendHttpResponse(responseHeaders, requestHeaders);
+                        sendHttpResponse(responseHeaders, request);
                         router.setThrottle(acceptName, acceptReplyStreamId, junction.getHandleAcceptReplyThrottle());
                         return true;
                     }
@@ -566,7 +594,7 @@ public class ProxyStreamFactory implements StreamFactory
 
                         this.connectStreamId = supplyStreamId.getAsLong();
 
-                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
+                        sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, request);
                         return false;
                     }
                 default:
@@ -605,7 +633,7 @@ public class ProxyStreamFactory implements StreamFactory
                 final ListFW<HttpHeaderFW> responseHeaders,
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
-            if (isPrivateCacheableResponse(responseHeaders)
+            if (isPrivatelyCacheable(responseHeaders)
                     && requestHeaders.anyMatch(SHOULD_POLL)
                     && canInjectPushPromise(requestHeaders))
             {
@@ -1101,7 +1129,7 @@ public class ProxyStreamFactory implements StreamFactory
         // For trying to match existing cache
         private int cachedResponseSize;
         private int processedResponseSize;
-        private CacheResponseServer cacheServer;
+        private CacheEntry cacheServer;
 
         private ProxyConnectReplyStream(
                 MessageConsumer connectReplyThrottle,
@@ -1164,9 +1192,9 @@ public class ProxyStreamFactory implements StreamFactory
                     else
                     {
                         int requestURLHash = streamCorrelation.requestURLHash();
-                        if(cache.hasStoredResponseThatSatisfies(requestURLHash, requestHeaders, true) != null)
+                        if(cache.getCachedResponseThatSatisfies(requestURLHash, requestHeaders, true) != null)
                         {
-                            this.cacheServer = cache.hasStoredResponseThatSatisfies(requestURLHash, requestHeaders, true);
+                            this.cacheServer = cache.getCachedResponseThatSatisfies(requestURLHash, requestHeaders, true);
                             forwardIfModified(begin, streamCorrelation, cacheServer, responseHeaders);
                         }
                         else
@@ -1290,7 +1318,7 @@ public class ProxyStreamFactory implements StreamFactory
         private void forwardIfModified(
                 final BeginFW begin,
                 final Correlation streamCorrelation,
-                CacheResponseServer cacheServer,
+                CacheEntry cacheServer,
                 ListFW<HttpHeaderFW> responseHeaders)
         {
             ListFW<HttpHeaderFW> cachedResponseHeaders = cacheServer.getResponseHeaders();
@@ -1353,7 +1381,7 @@ public class ProxyStreamFactory implements StreamFactory
                     }
                     else
                     {
-                        forwardCompletelyCachedRespone(buffer, index, length);
+                        forwardCompletelyCachedResponse(buffer, index, length);
                     }
                     break;
                 case BeginFW.TYPE_ID:
@@ -1363,7 +1391,7 @@ public class ProxyStreamFactory implements StreamFactory
             }
         }
 
-        private void forwardCompletelyCachedRespone(
+        private void forwardCompletelyCachedResponse(
                 DirectBuffer buffer,
                 int index,
                 int length)
@@ -1376,9 +1404,9 @@ public class ProxyStreamFactory implements StreamFactory
                     processedResponseSize);
             this.cachedResponseSize += processedResponseSize;
             cache(endRO.wrap(buffer, index, index + length));
-            int requstURLHash = streamCorrelation.requestURLHash();
-            CacheResponseServer serverStream = cache.get(requstURLHash);
-            serverStream.serveClient(streamCorrelation);
+            int requestURLHash = streamCorrelation.requestURLHash();
+            CacheEntry serverStream = cache.get(requestURLHash);
+            serverStream.forwardToClient(streamCorrelation);
         }
 
         private boolean confirmMatch(
@@ -1451,8 +1479,8 @@ public class ProxyStreamFactory implements StreamFactory
                     if (cachedSuccessfully)
                     {
                         int requstURLHash = streamCorrelation.requestURLHash();
-                        CacheResponseServer serverStream = cache.get(requstURLHash);
-                        serverStream.serveClient(streamCorrelation);
+                        CacheEntry serverStream = cache.get(requstURLHash);
+                        serverStream.forwardToClient(streamCorrelation);
                     }
                     break;
                 case AbortFW.TYPE_ID:
@@ -1483,7 +1511,7 @@ public class ProxyStreamFactory implements StreamFactory
             final OctetsFW extension = begin.extension();
             final HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginEx.headers();
-            final boolean isCacheable = HttpCacheUtils.isPublicCacheableResponse(responseHeaders);
+            final boolean isCacheable = isCacheable(responseHeaders);
             final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
             if (isCacheable && !requestHeaders.anyMatch(HttpCacheUtils::isCacheControlNoStore))
             {
@@ -1614,9 +1642,10 @@ public class ProxyStreamFactory implements StreamFactory
                 {
                     i.remove();
                 }
-                junctions.remove(this.streamCorrelation.requestURLHash());
-
             }
+
+            junctions.remove(this.streamCorrelation.requestURLHash());
+
             if (msgTypeId == BeginFW.TYPE_ID)
             {
                 final MessageConsumer connectReply = streamCorrelation.connectReplyThrottle();
