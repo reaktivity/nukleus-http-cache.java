@@ -151,6 +151,7 @@ public final class CacheEntry
         private int responseHeaderSize;
         private int responseSize;
         private MessageConsumer onEnd;
+        private int budget;
 
          ServeFromCacheStream(
             MessageConsumer messageConsumer,
@@ -180,8 +181,7 @@ public final class CacheEntry
             {
                 case WindowFW.TYPE_ID:
                     final WindowFW window = CacheEntry.this.cache.windowRO.wrap(buffer, index, index + length);
-                    int update = window.update();
-                    writePayload(update);
+                    writePayload(window.credit(), window.padding());
                     break;
                 case ResetFW.TYPE_ID:
                 default:
@@ -190,17 +190,21 @@ public final class CacheEntry
             }
         }
 
-        private void writePayload(int update)
+        private void writePayload(int credit, int padding)
         {
-            final int toWrite = Math.min(update, responseSize - payloadWritten);
-            final int offset = responseHeaderSize + payloadWritten;
-            MutableDirectBuffer buffer = CacheEntry.this.cache.responseBufferPool.buffer(responseSlot);
-            CacheEntry.this.cache.writer.doHttpData(messageConsumer, streamId, buffer, offset, toWrite);
-            payloadWritten += toWrite;
-            if (payloadWritten == responseSize)
+            budget += credit;
+            if (budget > padding)
             {
-                CacheEntry.this.cache.writer.doHttpEnd(messageConsumer, streamId);
-                this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
+                final int toWrite = Math.min(budget - padding, responseSize - payloadWritten);
+                final int offset = responseHeaderSize + payloadWritten;
+                MutableDirectBuffer buffer = CacheEntry.this.cache.responseBufferPool.buffer(responseSlot);
+                CacheEntry.this.cache.writer.doHttpData(messageConsumer, streamId, buffer, offset, toWrite);
+                payloadWritten += toWrite;
+                if (payloadWritten == responseSize)
+                {
+                    CacheEntry.this.cache.writer.doHttpEnd(messageConsumer, streamId);
+                    this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
+                }
             }
         }
     }
