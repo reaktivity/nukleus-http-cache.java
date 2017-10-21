@@ -85,7 +85,7 @@ public class ServerStreamFactory implements StreamFactory
                     acceptName.equals(route.source().asString());
         };
 
-        final RouteFW route = router.resolve(filter, this::wrapRoute);
+        final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
@@ -148,7 +148,7 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long acceptRef = beginRO.sourceRef();
             final String acceptName = begin.source().asString();
-            final RouteFW connectRoute = resolveTarget(acceptRef, acceptName);
+            final RouteFW connectRoute = resolveTarget(begin.authorization(), acceptRef, acceptName);
 
             if (connectRoute == null)
             {
@@ -229,6 +229,7 @@ public class ServerStreamFactory implements StreamFactory
 
     RouteFW resolveTarget(
             long sourceRef,
+            long authorization,
             String sourceName)
     {
         MessagePredicate filter = (t, b, o, l) ->
@@ -237,7 +238,7 @@ public class ServerStreamFactory implements StreamFactory
             return sourceRef == route.sourceRef() && sourceName.equals(route.source().asString());
         };
 
-        return router.resolve(filter, this::wrapRoute);
+        return router.resolve(authorization, filter, this::wrapRoute);
     }
 
     private RouteFW wrapRoute(
