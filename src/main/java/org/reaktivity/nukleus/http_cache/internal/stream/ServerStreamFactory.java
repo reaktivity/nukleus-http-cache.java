@@ -148,7 +148,7 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long acceptRef = beginRO.sourceRef();
             final String acceptName = begin.source().asString();
-            final RouteFW connectRoute = resolveTarget(begin.authorization(), acceptRef, acceptName);
+            final RouteFW connectRoute = resolveTarget(acceptRef, begin.authorization(), acceptName);
 
             if (connectRoute == null)
             {

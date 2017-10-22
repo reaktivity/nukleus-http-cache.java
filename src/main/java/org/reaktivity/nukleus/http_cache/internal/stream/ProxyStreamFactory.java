@@ -270,7 +270,7 @@ public class ProxyStreamFactory implements StreamFactory
         private void handleBegin(BeginFW begin)
         {
             final long acceptRef = beginRO.sourceRef();
-            final RouteFW connectRoute = resolveTarget(begin.authorization(), acceptRef, acceptName);
+            final RouteFW connectRoute = resolveTarget(acceptRef, begin.authorization(), acceptName);
 
             if (connectRoute == null)
             {
