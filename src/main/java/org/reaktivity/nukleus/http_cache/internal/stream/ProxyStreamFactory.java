@@ -28,14 +28,10 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUt
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_POLL_INJECTED;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.INJECTED_HEADER_AND_NO_CACHE;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.INJECTED_HEADER_AND_NO_CACHE_VALUE;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.NO_CACHE_CACHE_CONTROL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.SHOULD_POLL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.PreferHeader.PREFER_RESPONSE_WHEN_MODIFIED;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.SurrogateControl.getMaxAgeFreshnessExtension;
 
 import java.util.HashSet;
 import java.util.Iterator;
@@ -43,7 +39,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
-import java.util.function.Predicate;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -59,8 +54,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.GroupThrottle;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -83,7 +78,6 @@ import org.reaktivity.nukleus.stream.StreamFactory;
 public class ProxyStreamFactory implements StreamFactory
 {
 
-    private static final String IF_UNMODIFIED_SINCE = "if-unmodified-since";
     private static final String STALE_WHILE_REVALIDATE_2147483648 = "stale-while-revalidate=2147483648";
 
     // TODO, remove need for RW in simplification of inject headers
@@ -297,23 +291,20 @@ public class ProxyStreamFactory implements StreamFactory
 
                 this.requestURLHash = requestURL.hashCode();
 
-                if (!requestHeaders.anyMatch(
-                        h ->
-                        {
-                            String name = h.name().asString();
-                            return  X_POLL_INJECTED.equals(name) ||
-                                    X_HTTP_CACHE_SYNC.equals(name);
-                        }))
+                if (requestHeaders.anyMatch(PREFER_RESPONSE_WHEN_MODIFIED))
                 {
-                    handleClientInitiatedRequest(requestHeaders, requestURL);
-                }
-                else if (hasOutstandingRequestThatMaySatisfy(requestHeaders, requestURLHash))
-                {
-                    latchOnToFanout(requestHeaders);
+                    if (hasOutstandingRequestThatMaySatisfy(requestHeaders, requestURLHash))
+                    {
+                        latchOnToFanout(requestHeaders);
+                    }
+                    else
+                    {
+                        fanout(requestHeaders, true);
+                    }
                 }
                 else
                 {
-                    fanout(requestHeaders, true);
+                    handleClientInitiatedRequest(requestHeaders, requestURL);
                 }
             }
         }
@@ -459,12 +450,11 @@ public class ProxyStreamFactory implements StreamFactory
             long2ObjectPutIfAbsent(junctions, requestURLHash, junction);
             junction.addSubscriber(this::handleResponseFromMyInitiatedFanout);
 
-            String pollTime = getHeader(requestHeaders, "x-retry-after");
-            Predicate<HttpHeaderFW> isInjected = h -> X_POLL_INJECTED.equals(h.name().asString())
-                    || "x-http-cache-sync".equals(h.name().asString());
-            if (pollTime != null && requestHeaders.anyMatch(isInjected))
+            String wait = PreferHeader.getWait(requestHeaders, cacheControlParser);
+
+            if (wait != null)
             {
-                scheduler.accept(currentTimeMillis() + parseInt(pollTime) * 1000, () ->
+                scheduler.accept(currentTimeMillis() + parseInt(wait) * 1000, () ->
                 {
                     if (!junction.getOuts().isEmpty())
                     {
@@ -481,8 +471,6 @@ public class ProxyStreamFactory implements StreamFactory
             {
                 sendRequest(connect, connectStreamId, connectRef, connectCorrelationId, requestHeaders);
             }
-
-            // send 0 window back to complete handshake
 
             this.streamState = this::waitingForOutstandingResponseFromMyInitiatedFanout;
         }
@@ -634,7 +622,7 @@ public class ProxyStreamFactory implements StreamFactory
                 final ListFW<HttpHeaderFW> requestHeaders)
         {
             if (isPrivatelyCacheable(responseHeaders)
-                    && requestHeaders.anyMatch(SHOULD_POLL)
+                    && requestHeaders.anyMatch(PreferHeader.PREFER_RESPONSE_WHEN_MODIFIED)
                     && canInjectPushPromise(requestHeaders))
             {
 
@@ -752,64 +740,18 @@ public class ProxyStreamFactory implements StreamFactory
         }
 
         private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-                ListFW<HttpHeaderFW> requestHeadersFW,
-                ListFW<HttpHeaderFW> responseHeadersFW)
+                ListFW<HttpHeaderFW> requestHeadersRO,
+                ListFW<HttpHeaderFW> responseHeadersRO)
         {
-            Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result;
+            Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
+                    x -> addRequestHeaders(requestHeadersRO, responseHeadersRO, x);
 
-            if (requestHeadersFW.anyMatch(
-                    HttpHeadersUtil.INJECTED_DEFAULT_HEADER) || requestHeadersFW.anyMatch(INJECTED_HEADER_AND_NO_CACHE))
+            // TODO allow modifying with new prefer header rather than reuse old value
+            if (!requestHeadersRO.anyMatch(PreferHeader.HAS_HEADER))
             {
-               result = x -> addRequestHeaders(requestHeadersFW, responseHeadersFW, x);
-            }
-            else if (requestHeadersFW.anyMatch(NO_CACHE_CACHE_CONTROL))
-            {
-                result = x ->
-                {
-                    addRequestHeaders(requestHeadersFW, responseHeadersFW, x);
-
-                    x.item(y -> y.representation((byte) 0)
-                            .name(X_POLL_INJECTED)
-                            .value(X_HTTP_CACHE_SYNC));
-
-                    x.item(y -> y.representation((byte) 0)
-                            .name(X_HTTP_CACHE_SYNC)
-                            .value(HttpHeaders.X_HTTP_CACHE_SYNC_ALWAYS));
-                };
-            }
-            else if (requestHeadersFW.anyMatch(h -> HttpHeaders.CACHE_CONTROL.equals(h.name().asString())))
-            {
-                result = x ->
-                {
-                    addRequestHeaders(requestHeadersFW, responseHeadersFW, x);
-
-                    x.item(y -> y.representation((byte) 0)
-                                .name(HttpHeaders.X_POLL_INJECTED)
-                                .value(INJECTED_HEADER_AND_NO_CACHE_VALUE));
-
-                    x.item(y -> y.representation((byte) 0)
-                                .name(HttpHeaders.X_HTTP_CACHE_SYNC)
-                                .value(HttpHeaders.X_HTTP_CACHE_SYNC_ALWAYS));
-                };
-            }
-            else
-            {
-                result = x ->
-                {
-                    addRequestHeaders(requestHeadersFW, responseHeadersFW, x);
-
-                    x.item(y -> y.representation((byte) 0)
-                                .name(HttpHeaders.X_POLL_INJECTED)
-                                .value(INJECTED_HEADER_AND_NO_CACHE_VALUE));
-
-                    x.item(y -> y.representation((byte) 0)
-                            .name(HttpHeaders.CACHE_CONTROL)
-                            .value(CacheDirectives.NO_CACHE));
-
-                    x.item(y -> y.representation((byte) 0)
-                                .name(HttpHeaders.X_HTTP_CACHE_SYNC)
-                                .value(HttpHeaders.X_HTTP_CACHE_SYNC_ALWAYS));
-                };
+                int freshnessExt = getMaxAgeFreshnessExtension(requestHeadersRO, cacheControlParser);
+                result.andThen(
+                        builder -> builder.item(header -> header.name("prefer").value("wait=5")));
             }
             return result;
         }
@@ -817,7 +759,7 @@ public class ProxyStreamFactory implements StreamFactory
         private void addRequestHeaders(
                 ListFW<HttpHeaderFW> requestHeadersFW,
                 ListFW<HttpHeaderFW> responseHeadersFW,
-                Builder<HttpHeaderFW.Builder, HttpHeaderFW> x)
+                Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder)
         {
             requestHeadersFW
                .forEach(h ->
@@ -832,41 +774,36 @@ public class ProxyStreamFactory implements StreamFactory
                        case HttpHeaders.CACHE_CONTROL:
                            if (value.contains(CacheDirectives.NO_CACHE))
                            {
-                               x.item(y -> y.representation((byte) 0)
-                                                .name(nameFW)
-                                                .value(valueFW));
+                               builder.item(header -> header.name(nameFW)
+                                                            .value(valueFW));
                            }
                            else
                            {
-                               x.item(y -> y.representation((byte) 0)
-                                                .name(nameFW)
-                                                .value(value + ", no-cache"));
+                               builder.item(header -> header.name(nameFW)
+                                                            .value(value + ", no-cache"));
                            }
                            break;
                         case HttpHeaders.IF_MODIFIED_SINCE:
                            if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
                            {
                                final String newValue = getHeader(responseHeadersFW, "last-modified");
-                               x.item(y -> y.representation((byte) 0)
-                                            .name(nameFW)
-                                            .value(newValue));
+                               builder.item(header -> header.name(nameFW)
+                                                            .value(newValue));
                            }
                            break;
                         case HttpHeaders.IF_NONE_MATCH:
                            if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
                            {
                                final String newValue = getHeader(responseHeadersFW, "etag");
-                               x.item(y -> y.representation((byte) 0)
-                                            .name(nameFW)
-                                            .value(newValue));
+                               builder.item(header -> header.name(nameFW)
+                                                            .value(newValue));
                            }
                            break;
                         case HttpHeaders.IF_MATCH:
-                        case IF_UNMODIFIED_SINCE:
+                        case HttpHeaders.IF_UNMODIFIED_SINCE:
                             break;
-                       default: x.item(y -> y.representation((byte) 0)
-                                            .name(nameFW)
-                                            .value(valueFW));
+                       default: builder.item(header -> header.name(nameFW)
+                                                             .value(valueFW));
                    }
                });
         }
@@ -1183,7 +1120,7 @@ public class ProxyStreamFactory implements StreamFactory
                     final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
                     final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
                     final ListFW<HttpHeaderFW> requestHeaders = streamCorrelation.requestHeaders(pendingRequestHeadersRO);
-                    if (requestHeaders.anyMatch(h -> X_POLL_INJECTED.equals(h.name().asString())) &&
+                    if (requestHeaders.anyMatch(PREFER_RESPONSE_WHEN_MODIFIED) &&
                         responseHeaders.anyMatch(h -> STATUS.equals(h.name().asString())
                                             && "304".equals(h.value().asString())))
                     {
@@ -1223,10 +1160,10 @@ public class ProxyStreamFactory implements StreamFactory
             final long newConnectStreamId = supplyStreamId.getAsLong();
             final long newConnectCorrelationId = supplyCorrelationId.getAsLong();
 
-            String pollTime = getHeader(requestHeaders, "x-retry-after");
-            if (pollTime != null)
+            String waitTime = PreferHeader.getWait(requestHeaders, cacheControlParser);
+            if (waitTime != null)
             {
-                scheduler.accept(currentTimeMillis() + parseInt(pollTime) * 1000, () ->
+                scheduler.accept(currentTimeMillis() + parseInt(waitTime) * 1000, () ->
                     sendRequest(newConnect,
                                 newConnectStreamId,
                                 connectRef,
@@ -1722,50 +1659,22 @@ public class ProxyStreamFactory implements StreamFactory
             final long connectCorrelationId,
             final ListFW<HttpHeaderFW> requestHeaders)
     {
-        boolean stripNoCacheValue = false;
-
-        Predicate<HttpHeaderFW> isInjected = h -> X_POLL_INJECTED.equals(h.name().asString())
-                || "x-http-cache-sync".equals(h.name().asString());
-        if (requestHeaders.anyMatch(INJECTED_HEADER_AND_NO_CACHE) && requestHeaders.anyMatch(NO_CACHE_CACHE_CONTROL))
-            {
-                isInjected = isInjected.or(h -> HttpHeaders.CACHE_CONTROL.equals(h.name().asString()));
-                if (requestHeaders.anyMatch(h -> HttpHeaders.CACHE_CONTROL.equals(h.name().asString())))
-                {
-                    stripNoCacheValue = true;
-                }
-        }
-        final Predicate<HttpHeaderFW> forwardHeader = isInjected.negate();
-        final boolean stripNoCacheValue2 = stripNoCacheValue;
 
         writer.doHttpBegin2(
             connect,
             connectStreamId,
             connectRef,
             connectCorrelationId,
-            hs -> requestHeaders.forEach(h ->
+            builder -> requestHeaders.forEach(requestHeader ->
             {
-                final StringFW nameRO = h.name();
-                final String name = nameRO.asString();
-                final String16FW valueRO = h.value();
-                final String value = valueRO.asString();
-                if (forwardHeader.test(h))
-                {
-                    hs.item(b ->
-                        b.representation((byte) 0).name(nameRO).value(valueRO)
-                    );
-                }
-                else if (stripNoCacheValue2 && HttpHeaders.CACHE_CONTROL.equals(name) && !"no-cache".equals(value))
-                {
-                    hs.item(b ->
+                    builder.item(item ->
                         {
-                            String replaceFirst = value.replaceFirst(",?\\s*no-cache", "");
-                            b.representation((byte) 0)
-                                    .name(nameRO)
-                                    .value(replaceFirst);
+                            final StringFW name = requestHeader.name();
+                            final String16FW value = requestHeader.value();
+                            item.name(name).value(value);
                         }
                     );
-                }
-        }));
+            }));
         writer.doHttpEnd(connect, connectStreamId);
     }
 

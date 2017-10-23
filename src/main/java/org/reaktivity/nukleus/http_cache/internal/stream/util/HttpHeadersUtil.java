@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_HTTP_CACHE_SYNC;
-
 import java.util.function.Predicate;
 
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -24,26 +22,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class HttpHeadersUtil
 {
-    public static final String INJECTED_HEADER_AND_NO_CACHE_VALUE = X_HTTP_CACHE_SYNC + ", no-cache";
-
-    public static final Predicate<HttpHeaderFW> SHOULD_POLL =
-                    h -> HttpHeaders.X_RETRY_AFTER.equals(h.name().asString());
-
-
-    public static final Predicate<? super HttpHeaderFW> INJECTED_DEFAULT_HEADER = h ->
-    {
-        String name = h.name().asString();
-        String value = h.value().asString();
-        return HttpHeaders.X_POLL_INJECTED.equals(name) && X_HTTP_CACHE_SYNC.equals(value);
-    };
-
-    public static final Predicate<? super HttpHeaderFW> INJECTED_HEADER_AND_NO_CACHE = h ->
-    {
-        String name = h.name().asString();
-        String value = h.value().asString();
-        return HttpHeaders.X_POLL_INJECTED.equals(name) && INJECTED_HEADER_AND_NO_CACHE_VALUE.equals(value);
-    };
-
     public static final Predicate<? super HttpHeaderFW> NO_CACHE_CACHE_CONTROL = h ->
     {
         String name = h.name().asString();
