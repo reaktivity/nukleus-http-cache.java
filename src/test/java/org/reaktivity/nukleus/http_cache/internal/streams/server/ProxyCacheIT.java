@@ -481,4 +481,28 @@ public class ProxyCacheIT
     {
         k3po.finish();
     }
+
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.cache.when.authorization.is.provided/accept/client",
+        "${streams}/not.cache.when.authorization.is.provided/connect/server",
+    })
+    public void shouldNotCacheWithRequestAuthorizationHeader() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/explicitly.smaxage.and.authorization/accept/client",
+        "${streams}/explicitly.smaxage.and.authorization/connect/server",
+    })
+    public void shouldCacheWithRequestAuthorizationHeaderAndSmaxage() throws Exception
+    {
+        k3po.finish();
+    }
+
 }
