@@ -57,7 +57,7 @@
     <nukleus.version>0.12</nukleus.version>
 
     <nukleus.http.cache.spec.version>0.21</nukleus.http.cache.spec.version>
-    <reaktor.version>develop-SNAPSHOT</reaktor.version>
+    <reaktor.version>0.31</reaktor.version>
   </properties>
 
   <dependencies>
