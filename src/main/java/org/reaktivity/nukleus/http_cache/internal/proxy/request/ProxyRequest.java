@@ -1,6 +1,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.route.RouteManager;
 
 public class ProxyRequest extends Request
 {
@@ -9,9 +10,10 @@ public class ProxyRequest extends Request
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
-        long acceptCorrelationId)
+        long acceptCorrelationId,
+        RouteManager router)
     {
-        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId);
+        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
     }
 
     @Override

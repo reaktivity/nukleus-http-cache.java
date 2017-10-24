@@ -135,13 +135,12 @@ final class ProxyConnectReplyStream
     ///////////// PROXY
     private void doProxyBegin(ListFW<HttpHeaderFW> responseHeaders)
     {
-        final String acceptName = streamCorrelation.acceptName();
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
         final long acceptReplyRef = streamCorrelation.acceptRef();
         final long correlationId = streamCorrelation.acceptCorrelationId();
 
-        streamFactory.router.setThrottle(acceptName, acceptReplyStreamId, this::handleProxyThrottle);
+        streamCorrelation.setThrottle(this::handleProxyThrottle);
         streamFactory.writer.doHttpBegin(
                 acceptReply,
                 acceptReplyStreamId,

@@ -1,6 +1,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class Request
 {
@@ -13,17 +14,20 @@ public abstract class Request
     private final MessageConsumer acceptReply;
     private final long acceptReplyStreamId;
     private final long acceptCorrelationId;
+    private final RouteManager router;
 
     public Request(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
-        long acceptCorrelationId)
+        long acceptCorrelationId,
+        RouteManager router)
     {
         this.acceptName = acceptName;
         this.acceptReply = acceptReply;
         this.acceptReplyStreamId = acceptReplyStreamId;
         this.acceptCorrelationId = acceptCorrelationId;
+        this.router = router;
     }
 
     public abstract Type getType();
@@ -51,6 +55,11 @@ public abstract class Request
     public long acceptCorrelationId()
     {
         return acceptCorrelationId;
+    }
+
+    public void setThrottle(MessageConsumer throttle)
+    {
+        this.router.setThrottle(acceptName, acceptReplyStreamId, throttle);
     }
 
     public abstract void abort();

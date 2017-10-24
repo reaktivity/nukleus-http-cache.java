@@ -113,7 +113,7 @@ public final class CacheEntry
                 responseHeaderSize,
                 responseSize,
                 this::handleEndOfStream);
-        request.handleThrottle(serveFromCacheStream);
+        request.setThrottle(serveFromCacheStream);
 
 
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders

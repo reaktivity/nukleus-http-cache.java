@@ -205,7 +205,8 @@ final class ProxyAcceptStream
                 acceptName,
                 acceptReply,
                 acceptReplyStreamId,
-                acceptCorrelationId);
+                acceptCorrelationId,
+                streamFactory.router);
 
         sendBeginToConnect(requestHeaders);
 

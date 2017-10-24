@@ -17,7 +17,6 @@ public class CacheableRequest extends Request
     private final BufferPool bufferPool;
     private final int requestSlot;
     private final int requestSize;
-    private final RouteManager router;
     private int responseSlot;
     private int responseHeadersSize;
     private int responseSize;
@@ -32,22 +31,16 @@ public class CacheableRequest extends Request
         int requestSize,
         RouteManager router)
     {
-        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId);
+        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
         this.bufferPool = bufferPool;
         this.requestSlot = requestSlot;
         this.requestSize = requestSize;
-        this.router = router;
     }
 
     @Override
     public Type getType()
     {
         return Type.CACHEABLE;
-    }
-
-    public void handleThrottle(MessageConsumer throttle)
-    {
-        router.setThrottle(acceptName(), acceptReplyStreamId(), throttle);
     }
 
     public ListFW<HttpHeaderFW> getRequestHeaders()
