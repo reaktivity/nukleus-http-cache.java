@@ -13,15 +13,15 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.stream.util;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_AGE;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MAX_STALE;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.MIN_FRESH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.CacheDirectives.S_MAXAGE;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheUtils.sameAuthorizationScope;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -34,7 +34,8 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.Correlation;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -58,8 +59,11 @@ public final class CacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
+    private CacheControl cacheControlFW;
+
     CacheEntry(
-        Cache cache, int requestSlot,
+        Cache cache,
+        int requestSlot,
         int requestSize,
         int responseSlot,
         int responseHeaderSize,
@@ -83,38 +87,34 @@ public final class CacheEntry
     }
 
     // forwards response to client once cached (No need to inject warnings)
-    public void forwardToClient(Correlation streamCorrelation)
+    public void forwardToClient(CacheableRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, false);
     }
 
     // serves client from cache (need to inject warnings
     public void serveClient(
-            Correlation streamCorrelation)
+            CacheableRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, true);
     }
 
     private void sendResponseToClient(
-        Correlation streamCorrelation,
+        CacheableRequest request,
         boolean injectWarnings)
     {
         addClient();
         MutableDirectBuffer buffer = this.cache.requestBufferPool.buffer(responseSlot);
         ListFW<HttpHeaderFW> responseHeaders = this.cache.responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
 
-        CacheEntry cacheEntry = this.cache.requestURLToResponse.get(streamCorrelation.requestURLHash());
-        final long correlation = this.cache.supplyCorrelationId.getAsLong();
-        final MessageConsumer messageConsumer = streamCorrelation.consumer();
-        final long streamId = this.cache.streamSupplier.getAsLong();
-        streamCorrelation.setConnectReplyThrottle(
-                new ServeFromCacheStream(
-                        messageConsumer,
-                        streamId,
-                        responseSlot,
-                        responseHeaderSize,
-                        responseSize,
-                        this::handleEndOfStream));
+        ServeFromCacheStream serveFromCacheStream = new ServeFromCacheStream(
+                request,
+                responseSlot,
+                responseHeaderSize,
+                responseSize,
+                this::handleEndOfStream);
+        request.handleThrottle(serveFromCacheStream);
+
 
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
                 .forEach(h ->
@@ -122,13 +122,23 @@ public final class CacheEntry
                                 .name(h.name())
                                 .value(h.value())));
 
-        if (injectWarnings && cacheEntry.isStale())
+        if (injectWarnings && isStale())
         {
             headers = headers.andThen(
                     x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
             );
         }
-        this.cache.writer.doHttpBegin(messageConsumer, streamId, 0L, correlation, headers);
+        final MessageConsumer acceptReply = request.acceptReply();
+        long acceptReplyStreamId = request.acceptReplyStreamId();
+        long acceptReplyRef = request.acceptRef();
+        long acceptCorrelationId = request.acceptCorrelationId();
+        this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
+        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders();
+        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders, cacheControlFW);
+        if (freshnessExtension > 0)
+        {
+            this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, freshnessExtension);
+        }
     }
 
     public void cleanUp()
@@ -143,9 +153,7 @@ public final class CacheEntry
 
     class ServeFromCacheStream implements MessageConsumer
     {
-        private final  MessageConsumer messageConsumer;
-        private final long streamId;
-
+        private final Request request;
         private int payloadWritten;
         private int responseSlot;
         private int responseHeaderSize;
@@ -153,16 +161,14 @@ public final class CacheEntry
         private MessageConsumer onEnd;
 
          ServeFromCacheStream(
-            MessageConsumer messageConsumer,
-            long streamId,
+            Request request,
             int responseSlot,
             int responseHeaderSize,
             int responseSize,
             MessageConsumer onEnd)
         {
             this.payloadWritten = 0;
-            this.messageConsumer = messageConsumer;
-            this.streamId = streamId;
+            this.request = request;
             this.responseSlot = responseSlot;
             this.responseHeaderSize = responseHeaderSize;
             this.responseSize = responseSize - responseHeaderSize;
@@ -195,11 +201,14 @@ public final class CacheEntry
             final int toWrite = Math.min(update, responseSize - payloadWritten);
             final int offset = responseHeaderSize + payloadWritten;
             MutableDirectBuffer buffer = CacheEntry.this.cache.responseBufferPool.buffer(responseSlot);
-            CacheEntry.this.cache.writer.doHttpData(messageConsumer, streamId, buffer, offset, toWrite);
+
+            final MessageConsumer acceptReply = request.acceptReply();
+            final long acceptReplyStreamId = request.acceptReplyStreamId();
+
+            CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
             payloadWritten += toWrite;
             if (payloadWritten == responseSize)
             {
-                CacheEntry.this.cache.writer.doHttpEnd(messageConsumer, streamId);
                 this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
             }
         }
@@ -250,7 +259,7 @@ public final class CacheEntry
     {
         final ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders();
         final ListFW<HttpHeaderFW> cachedRequest = getRequest();
-        return HttpCacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
+        return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
 

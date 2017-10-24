@@ -1,4 +1,4 @@
-package org.reaktivity.nukleus.http_cache.internal.stream.util;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;

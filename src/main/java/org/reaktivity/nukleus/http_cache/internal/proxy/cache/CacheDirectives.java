@@ -13,7 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.stream.util;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.ONLY_IF_CACHED;
+
+import java.util.function.Predicate;
+
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 
 public final class CacheDirectives
 {
@@ -32,4 +39,11 @@ public final class CacheDirectives
     {
         // Utility class
     }
+
+    public static final Predicate<? super HttpHeaderFW> IS_ONLY_IF_CACHED = h ->
+    {
+        String name = h.name().asString();
+        String value = h.value().asString();
+        return name.equals(HttpHeaders.CACHE_CONTROL) && value.contains(ONLY_IF_CACHED);
+    };
 }

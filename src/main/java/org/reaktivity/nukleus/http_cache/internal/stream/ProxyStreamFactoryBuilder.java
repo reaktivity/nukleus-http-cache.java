@@ -21,9 +21,9 @@ import java.util.function.Supplier;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.Correlation;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -35,7 +35,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     private final HttpCacheConfiguration config;
     private final LongObjectBiConsumer<Runnable> scheduler;
-    private final Long2ObjectHashMap<Correlation> correlations;
+    private final Long2ObjectHashMap<Request> correlations;
 
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
@@ -106,7 +106,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     writeBuffer,
                     supplyStreamId,
                     supplyCorrelationId,
-                    bufferPool);
+                    bufferPool,
+                    correlations);
         }
         return new ProxyStreamFactory(
                 router,

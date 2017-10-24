@@ -13,13 +13,18 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+
+import java.util.Optional;
 import java.util.function.LongSupplier;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnModification;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
@@ -46,7 +51,8 @@ public class Cache
             MutableDirectBuffer writeBuffer,
             LongSupplier streamSupplier,
             LongSupplier supplyCorrelationId,
-            BufferPool bufferPool)
+            BufferPool bufferPool,
+            Long2ObjectHashMap<Request> correlations)
     {
         this.streamSupplier = streamSupplier;
         this.supplyCorrelationId = supplyCorrelationId;
@@ -65,7 +71,8 @@ public class Cache
         int responseSize)
     {
         CacheEntry responseServer = new CacheEntry(
-                this, requestSlot,
+                this,
+                requestSlot,
                 requestSize,
                 responseSlot,
                 responseHeaderSize,
@@ -78,27 +85,29 @@ public class Cache
         }
     }
 
-    public CacheEntry get(int requestURLHash)
-    {
-        return requestURLToResponse.get(requestURLHash);
-    }
-
-    public CacheEntry getCachedResponseThatSatisfies(
+    public Optional<CacheEntry> getResponseThatSatisfies(
             int requestURLHash,
-            ListFW<HttpHeaderFW> request,
-            boolean isRevalidating)
+            ListFW<HttpHeaderFW> request
+            )
     {
+        // DPW TODO lookup if revalidating
+        boolean isRevalidating = false;
         // Will be stream of responses in near future, so coding it as now.
         final CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
 
         if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, isRevalidating))
         {
-            return cacheEntry;
+            return Optional.of(cacheEntry);
         }
         else
         {
-            return null;
+            return Optional.empty();
         }
+    }
+
+    public void onUpdate(OnModification onModificationRequest)
+    {
+        throw new RuntimeException("DPW to implement");
     }
 
 }
