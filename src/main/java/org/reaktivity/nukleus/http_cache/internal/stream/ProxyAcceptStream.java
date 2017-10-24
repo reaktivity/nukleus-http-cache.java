@@ -193,6 +193,7 @@ final class ProxyAcceptStream
                     streamFactory.router);
 
             sendBeginToConnect(requestHeaders);
+            streamFactory.writer.doHttpEnd(connect, connectStreamId);
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
@@ -220,8 +221,6 @@ final class ProxyAcceptStream
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
             )
         );
-
-        streamFactory.writer.doHttpEnd(connect, connectStreamId);
 
         streamFactory.router.setThrottle(connectName, connectStreamId, this::handleConnectThrottle);
     }

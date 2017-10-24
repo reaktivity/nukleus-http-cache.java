@@ -141,6 +141,7 @@ final class ProxyConnectReplyStream
         final long acceptReplyRef = streamCorrelation.acceptRef();
         final long correlationId = streamCorrelation.acceptCorrelationId();
 
+        streamFactory.router.setThrottle(acceptName, acceptReplyStreamId, this::handleProxyThrottle);
         streamFactory.writer.doHttpBegin(
                 acceptReply,
                 acceptReplyStreamId,
@@ -149,7 +150,6 @@ final class ProxyConnectReplyStream
                 builder -> responseHeaders.forEach(
                         h -> builder.item(item -> item.name(h.name()).value(h.value()))
             ));
-        streamFactory.router.setThrottle(acceptName, acceptReplyStreamId, this::handleProxyThrottle);
 
         this.streamState = this::handleFramesWhenProxying;
     }

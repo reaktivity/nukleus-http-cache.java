@@ -869,20 +869,20 @@ private void handleAcceptReplyReset(
 //
 //        private boolean cache(DataFW data)
 //        {
-            OctetsFW payload = data.payload();
-            int sizeof = payload.sizeof();
-            if (cacheResponseSize + sizeof + 4 > this.proxyStreamFactory.cacheBufferPool.slotCapacity())
-            {
-                this.proxyStreamFactory.cacheBufferPool.release(this.cacheResponseSlot);
-                return false;
-            }
-            else
-            {
-                MutableDirectBuffer buffer = this.proxyStreamFactory.cacheBufferPool.buffer(this.cacheResponseSlot);
-                buffer.putBytes(cacheResponseSize, payload.buffer(), payload.offset(), sizeof);
-                cacheResponseSize += sizeof;
-                return true;
-            }
+//            OctetsFW payload = data.payload();
+//            int sizeof = payload.sizeof();
+//            if (cacheResponseSize + sizeof + 4 > this.proxyStreamFactory.cacheBufferPool.slotCapacity())
+//            {
+//                this.proxyStreamFactory.cacheBufferPool.release(this.cacheResponseSlot);
+//                return false;
+//            }
+//            else
+//            {
+//                MutableDirectBuffer buffer = this.proxyStreamFactory.cacheBufferPool.buffer(this.cacheResponseSlot);
+//                buffer.putBytes(cacheResponseSize, payload.buffer(), payload.offset(), sizeof);
+//                cacheResponseSize += sizeof;
+//                return true;
+//            }
 //        }
 //
 //        private boolean cache(EndFW end)

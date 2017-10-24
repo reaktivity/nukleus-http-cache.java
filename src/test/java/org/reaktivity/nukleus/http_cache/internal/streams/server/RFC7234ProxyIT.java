@@ -49,6 +49,7 @@ public class RFC7234ProxyIT
     public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.get.request/accept/client",
@@ -71,6 +72,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.get.request.with.transfer.encoding/accept/client",
@@ -94,6 +96,7 @@ public class RFC7234ProxyIT
 
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.request.and.304/accept/client",
@@ -105,6 +108,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.max-age/accept/client",
@@ -116,6 +120,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.greater.max-age/accept/client",
@@ -131,6 +136,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.lesser.max-age/accept/client",
@@ -146,6 +152,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.max-stale.with.value/accept/client",
@@ -161,6 +168,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.min-fresh/accept/client",
@@ -176,6 +184,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.max-stale.no.value/accept/client",
@@ -191,6 +200,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.max-stale.with.max-age/accept/client",
@@ -206,6 +216,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/expire.max-stale/accept/client",
@@ -221,6 +232,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/expire.min-fresh/accept/client",
@@ -232,6 +244,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.cache.max-age=0/accept/client",
@@ -243,6 +256,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.cache.max-age=0.and.304/accept/client",
@@ -254,6 +268,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.get.request.with.no-store/accept/client",
@@ -265,6 +280,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
@@ -276,6 +292,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/expire.max-age/accept/client",
@@ -291,6 +308,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.no-cache/accept/client",
@@ -302,6 +320,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.only-if-cached/accept/client",
@@ -324,6 +343,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/request.expire.only-if-cached/accept/client",
@@ -339,6 +359,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/should.bypass.cache.on.no.cache/accept/client",
@@ -350,6 +371,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.s-maxage/accept/client",
@@ -361,6 +383,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/expire.s-maxage/accept/client",
@@ -376,6 +399,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/expire.cache.by.default.for.0.seconds/accept/client",
@@ -391,6 +415,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.by.default.for.10.percent.of.last-modified/accept/client",
@@ -402,6 +427,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/expire.cache.by.default.for.10.percent.of.last-modified/accept/client",
@@ -417,6 +443,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/private.cache/accept/client",
@@ -428,6 +455,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/implied.private.cache/accept/client",
@@ -439,6 +467,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/explicitly.public.cache/accept/client",
@@ -450,6 +479,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/not.use.cache.that.varys/accept/client",
@@ -461,6 +491,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.that.varys.but.matches/accept/client",
@@ -472,6 +503,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.response.too.large.to.cache/accept/client",
