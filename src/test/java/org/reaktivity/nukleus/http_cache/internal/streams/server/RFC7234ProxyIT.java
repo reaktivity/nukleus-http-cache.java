@@ -71,7 +71,6 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.get.request.with.transfer.encoding/accept/client",
