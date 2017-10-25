@@ -72,10 +72,10 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/serve.from.cache.when.freshness.extension.is.valid.and.x-protected/accept/client",
-        "${streams}/serve.from.cache.when.freshness.extension.is.valid.and.x-protected/connect/server",
+        "${streams}/serve.from.cache.when.freshness.extension.is.valid/accept/client",
+        "${streams}/serve.from.cache.when.freshness.extension.is.valid/connect/server",
     })
-    public void serveFromCacheWhenFreshnessExtensionIsValidAndXProtected() throws Exception
+    public void serveFromCacheWhenFreshnessExtensionIsValid() throws Exception
     {
         k3po.finish();
     }
@@ -118,7 +118,17 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Ignore
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/share.with.x-protected.scope/accept/client",
+        "${streams}/share.with.x-protected.scope/connect/server",
+    })
+    public void shareWithXProtectedScope() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
     @Specification({
         "${route}/proxy/controller",
         "${streams}/does.not.share.with.different.protected.scope/accept/client",
@@ -154,7 +164,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/share.debounce.when.explicitly.public/accept/client",

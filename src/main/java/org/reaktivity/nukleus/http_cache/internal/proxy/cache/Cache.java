@@ -68,7 +68,8 @@ public class Cache
         int requestSize,
         int responseSlot,
         int responseHeaderSize,
-        int responseSize)
+        int responseSize,
+        short authScope)
     {
         CacheEntry responseServer = new CacheEntry(
                 this,
@@ -76,7 +77,8 @@ public class Cache
                 requestSize,
                 responseSlot,
                 responseHeaderSize,
-                responseSize);
+                responseSize,
+                authScope);
 
         CacheEntry oldCacheEntry = requestURLToResponse.put(requestURLHash, responseServer);
         if (oldCacheEntry != null)
@@ -87,15 +89,15 @@ public class Cache
 
     public Optional<CacheEntry> getResponseThatSatisfies(
             int requestURLHash,
-            ListFW<HttpHeaderFW> request
-            )
+            ListFW<HttpHeaderFW> request,
+            short authScope)
     {
         // DPW TODO lookup if revalidating
         boolean isRevalidating = false;
         // Will be stream of responses in near future, so coding it as now.
         final CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
 
-        if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, isRevalidating))
+        if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, isRevalidating, authScope))
         {
             return Optional.of(cacheEntry);
         }

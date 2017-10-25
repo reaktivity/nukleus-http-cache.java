@@ -54,6 +54,7 @@ public final class CacheEntry
     private final int responseSize;
     private int clientCount = 0;
     private boolean cleanUp = false;
+    private final short authScope;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -66,7 +67,8 @@ public final class CacheEntry
         int requestSize,
         int responseSlot,
         int responseHeaderSize,
-        int responseSize)
+        int responseSize,
+        short authScope)
     {
         this.cache = cache;
         this.requestSlot = requestSlot;
@@ -74,6 +76,7 @@ public final class CacheEntry
         this.responseSlot = responseSlot;
         this.responseHeaderSize = responseHeaderSize;
         this.responseSize = responseSize;
+        this.authScope = authScope;
     }
 
     private void handleEndOfStream(
@@ -263,8 +266,15 @@ public final class CacheEntry
     }
 
     private boolean canBeServedToAuthorized(
-        ListFW<HttpHeaderFW> request)
+        ListFW<HttpHeaderFW> request,
+        short requestAuthScope)
     {
+
+        if (SurrogateControl.isXProtected(this.getResponseHeaders()))
+        {
+            return requestAuthScope == authScope;
+        }
+
         final CacheControl responseCacheControl = responseCacheControl();
         final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getRequest();
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
@@ -390,11 +400,12 @@ public final class CacheEntry
     public boolean canServeRequest(
         int requestURLHash,
         ListFW<HttpHeaderFW> request,
-        boolean isRevalidating)
+        boolean isRevalidating,
+        short authScope)
     {
         Instant now = Instant.now();
 
-        final boolean canBeServedToAuthorized = canBeServedToAuthorized(request);
+        final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now) || isRevalidating;

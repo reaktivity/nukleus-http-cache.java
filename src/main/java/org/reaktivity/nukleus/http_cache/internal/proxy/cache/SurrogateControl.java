@@ -29,6 +29,7 @@ public final class SurrogateControl
     public static final String MAX_AGE = "max-age";
     private static final Pattern CACHE_PATTERN = Pattern
             .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")?\\s*");
+    private static final String X_PROTECTED = "x-protected";
 
     public static int getMaxAgeFreshnessExtension(
             ListFW<HttpHeaderFW> responseHeadersRO)
@@ -84,5 +85,22 @@ public final class SurrogateControl
             }
         }
         return -1;
+    }
+
+    public static boolean isXProtected(ListFW<HttpHeaderFW> response)
+    {
+        String surrogateControl = getHeader(response, SURROGATE_CONTROL);
+        if (surrogateControl != null)
+        {
+            Matcher matcher = CACHE_PATTERN.matcher(surrogateControl);
+            while (matcher.find())
+            {
+                if (X_PROTECTED.equals(matcher.group(1)))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

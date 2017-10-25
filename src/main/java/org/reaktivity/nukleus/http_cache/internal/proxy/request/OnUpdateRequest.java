@@ -32,7 +32,8 @@ public class OnUpdateRequest extends CacheableRequest
         int requestSlot,
         int requestSize,
         RouteManager router,
-        int requestURLHash)
+        int requestURLHash,
+        short authScope)
     {
         super(
             acceptName,
@@ -42,7 +43,10 @@ public class OnUpdateRequest extends CacheableRequest
             requestURLHash,
             responseBufferPool,
             requestBufferPool,
-            requestSlot, requestSize, router);
+            requestSlot,
+            requestSize,
+            router,
+            authScope);
     }
 
     @Override

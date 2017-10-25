@@ -108,7 +108,9 @@ final class ProxyAcceptStream
     private void handleBegin(BeginFW begin)
     {
         long acceptRef = streamFactory.beginRO.sourceRef();
-        final RouteFW connectRoute = streamFactory.resolveTarget(acceptRef, begin.authorization(), acceptName);
+        final long authorization = begin.authorization();
+        final short authorizationScope = authorizationScope(authorization);
+        final RouteFW connectRoute = streamFactory.resolveTarget(acceptRef, authorization, acceptName);
 
         if (connectRoute == null)
         {
@@ -140,12 +142,12 @@ final class ProxyAcceptStream
             if (requestHeaders.anyMatch(PREFER_RESPONSE_WHEN_UPDATED))
             {
                 storeRequest(requestHeaders);
-                handleRequestForWhenUpdated();
+                handleRequestForWhenUpdated(authorizationScope);
             }
             else if (canBeServedByCache(requestHeaders))
             {
                 storeRequest(requestHeaders);
-                handleCacheableRequest(requestHeaders, requestURL);
+                handleCacheableRequest(requestHeaders, requestURL, authorizationScope);
             }
             else
             {
@@ -154,7 +156,12 @@ final class ProxyAcceptStream
         }
     }
 
-    private void handleRequestForWhenUpdated()
+    private short authorizationScope(long authorization)
+    {
+        return (short) (authorization >>> 48);
+    }
+
+    private void handleRequestForWhenUpdated(short authScope)
     {
         OnUpdateRequest onUpdateRequest;
         this.request = onUpdateRequest = new OnUpdateRequest(
@@ -167,17 +174,20 @@ final class ProxyAcceptStream
             requestSlot,
             requestSize,
             streamFactory.router,
-            requestURLHash);
+            requestURLHash,
+            authScope);
         streamFactory.cache.onUpdate(onUpdateRequest);
     }
 
     private void handleCacheableRequest(
         final ListFW<HttpHeaderFW> requestHeaders,
-        final String requestURL)
+        final String requestURL,
+        short authScope)
     {
         Optional<CacheEntry> cachedResponse = streamFactory.cache.getResponseThatSatisfies(
                 requestURLHash,
-                requestHeaders);
+                requestHeaders,
+                authScope);
 
         if (cachedResponse.isPresent())
         {
@@ -192,7 +202,8 @@ final class ProxyAcceptStream
                     streamFactory.correlationRequestBufferPool,
                     requestSlot,
                     requestSize,
-                    streamFactory.router);
+                    streamFactory.router,
+                    authScope);
             cachedResponse.get().serveClient(cacheableRequest);
         }
         else if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
@@ -209,7 +220,10 @@ final class ProxyAcceptStream
                     requestURLHash,
                     streamFactory.correlationResponseBufferPool,
                     streamFactory.correlationRequestBufferPool,
-                    requestSlot, requestSize, streamFactory.router);
+                    requestSlot,
+                    requestSize,
+                    streamFactory.router,
+                    authScope);
 
             sendBeginToConnect(requestHeaders);
             streamFactory.writer.doHttpEnd(connect, connectStreamId);

@@ -38,6 +38,7 @@ public class CacheableRequest extends Request
     private int responseHeadersSize;
     private int responseSize;
     private boolean cachingResponse;    // TODO, move to state
+    public final short authScope;
 
     public CacheableRequest(
         String acceptName,
@@ -49,7 +50,8 @@ public class CacheableRequest extends Request
         BufferPool requestBufferPool,
         int requestSlot,
         int requestSize,
-        RouteManager router)
+        RouteManager router,
+        short authScope)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
         this.requestBufferPool = requestBufferPool;
@@ -58,6 +60,7 @@ public class CacheableRequest extends Request
         this.requestSize = requestSize;
         this.requestUrlHash = requestURLHash;
         this.cachingResponse = true;
+        this.authScope = authScope;
     }
 
     @Override
@@ -101,7 +104,13 @@ public class CacheableRequest extends Request
 
     public void cache(EndFW end, Cache cache)
     {
-        cache.put(requestUrlHash(), requestSlot, requestSize, responseSlot, responseHeadersSize, responseSize);
+        cache.put(requestUrlHash(),
+                requestSlot,
+                requestSize,
+                responseSlot,
+                responseHeadersSize,
+                responseSize,
+                authScope);
     }
 
     private int requestUrlHash()
@@ -124,5 +133,10 @@ public class CacheableRequest extends Request
             requestBufferPool.release(requestSlot);
             responseBufferPool.release(responseSlot);
         }
+    }
+
+    public Object authScope()
+    {
+        return authScope();
     }
 }
