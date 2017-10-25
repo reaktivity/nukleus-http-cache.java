@@ -159,6 +159,7 @@ public final class CacheEntry
         private int responseHeaderSize;
         private int responseSize;
         private MessageConsumer onEnd;
+        private int budget;
 
          ServeFromCacheStream(
             Request request,
@@ -186,8 +187,7 @@ public final class CacheEntry
             {
                 case WindowFW.TYPE_ID:
                     final WindowFW window = CacheEntry.this.cache.windowRO.wrap(buffer, index, index + length);
-                    int update = window.update();
-                    writePayload(update);
+                    writePayload(window.credit(), window.padding());
                     break;
                 case ResetFW.TYPE_ID:
                 default:
@@ -196,17 +196,16 @@ public final class CacheEntry
             }
         }
 
-        private void writePayload(int update)
+        private void writePayload(int credit, int padding)
         {
-            final int toWrite = Math.min(update, responseSize - payloadWritten);
-            if (toWrite > 0)
+            budget += credit;
+            if (budget > padding)
             {
+                final int toWrite = Math.min(budget - padding, responseSize - payloadWritten);
                 final int offset = responseHeaderSize + payloadWritten;
                 MutableDirectBuffer buffer = CacheEntry.this.cache.responseBufferPool.buffer(responseSlot);
-
                 final MessageConsumer acceptReply = request.acceptReply();
                 final long acceptReplyStreamId = request.acceptReplyStreamId();
-
                 CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
                 payloadWritten += toWrite;
                 if (payloadWritten == responseSize)

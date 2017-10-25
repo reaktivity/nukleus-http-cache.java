@@ -108,7 +108,7 @@ final class ProxyAcceptStream
     private void handleBegin(BeginFW begin)
     {
         long acceptRef = streamFactory.beginRO.sourceRef();
-        final RouteFW connectRoute = streamFactory.resolveTarget(acceptRef, acceptName);
+        final RouteFW connectRoute = streamFactory.resolveTarget(acceptRef, begin.authorization(), acceptName);
 
         if (connectRoute == null)
         {
@@ -329,9 +329,9 @@ final class ProxyAcceptStream
         {
             case WindowFW.TYPE_ID:
                 final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
-                final int bytes = window.update();
-                final int frames = window.frames();
-                streamFactory.writer.doWindow(acceptThrottle, acceptStreamId, bytes, frames);
+                final int credit = window.credit();
+                final int padding = window.padding();
+                streamFactory.writer.doWindow(acceptThrottle, acceptStreamId, credit, padding);
                 break;
             case ResetFW.TYPE_ID:
                 streamFactory.writer.doReset(acceptThrottle, acceptStreamId);

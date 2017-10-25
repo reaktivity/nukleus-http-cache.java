@@ -222,9 +222,9 @@ final class ProxyConnectReplyStream
         {
             case WindowFW.TYPE_ID:
                 final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
-                final int bytes = window.update();
-                final int frames = window.frames();
-                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, bytes, frames);
+                final int credit = window.credit();
+                final int padding = window.padding();
+                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, credit, padding);
                 break;
             case ResetFW.TYPE_ID:
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
