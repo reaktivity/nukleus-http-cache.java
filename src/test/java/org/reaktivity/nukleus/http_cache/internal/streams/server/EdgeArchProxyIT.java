@@ -28,7 +28,6 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-@Ignore
 public class EdgeArchProxyIT
 {
     private final K3poRule k3po = new K3poRule()
@@ -47,7 +46,6 @@ public class EdgeArchProxyIT
 
     @Rule
     public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
-
 
     @Test
     @Specification({
@@ -72,6 +70,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/serve.from.cache.when.freshness.extension.is.valid.and.x-protected/accept/client",
@@ -83,6 +82,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/does.not.share.debounce.when.explicitly.private.cache/accept/client",
@@ -94,6 +94,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/does.not.share.debounce.when.implied.private.cache/accept/client",
@@ -105,6 +106,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/does.not.share.debounce.when.varies/accept/client",
@@ -117,6 +119,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/does.not.share.with.different.protected.scope/accept/client",
@@ -129,6 +132,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/freshness-extension.inject.individualized.push.promises/accept/client",
@@ -140,6 +144,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/inject.stale-while-revalidate.push-promise.no-cache/accept/client",
@@ -151,6 +156,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/share.debounce.when.explicitly.public/accept/client",
@@ -163,6 +169,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/share.debounce.when.x-protected.and.same.scope/accept/client",

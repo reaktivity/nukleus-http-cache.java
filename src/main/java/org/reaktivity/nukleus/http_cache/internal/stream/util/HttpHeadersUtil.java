@@ -22,12 +22,10 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class HttpHeadersUtil
 {
-    public static final Predicate<? super HttpHeaderFW> NO_CACHE_CACHE_CONTROL = h ->
+    public static final Predicate<? super HttpHeaderFW> HAS_CACHE_CONTROL = h ->
     {
         String name = h.name().asString();
-        String value = h.value().asString();
-        // TODO proper parsing of value
-        return "cache-control".equals(name) && value.contains("no-cache");
+        return "cache-control".equals(name);
     };
 
     public static String getRequestURL(ListFW<HttpHeaderFW> headers)

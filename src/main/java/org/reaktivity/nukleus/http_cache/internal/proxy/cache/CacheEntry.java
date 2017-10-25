@@ -133,10 +133,11 @@ public final class CacheEntry
         this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
 
         final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
-        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders, cacheControlFW);
+        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders);
         if (freshnessExtension > 0)
         {
-            this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, freshnessExtension);
+            int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
+            this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge);
         }
     }
 

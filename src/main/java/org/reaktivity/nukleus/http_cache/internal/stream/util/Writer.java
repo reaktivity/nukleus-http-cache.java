@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Consumer;
@@ -25,6 +26,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -193,7 +195,7 @@ public class Writer
         CacheableRequest request,
         ListFW<HttpHeaderFW> requestHeaders,
         ListFW<HttpHeaderFW> responseHeaders,
-        int freshnessExtension)
+        int surrogateAge)
     {
         final MessageConsumer acceptReply = request.acceptReply();
         final long acceptReplyStreamId = request.acceptReplyStreamId();
@@ -201,26 +203,25 @@ public class Writer
         doH2PushPromise(
             acceptReply,
             acceptReplyStreamId,
-            setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension));
+            setPushPromiseHeaders(requestHeaders, responseHeaders, surrogateAge));
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
             ListFW<HttpHeaderFW> requestHeadersRO,
             ListFW<HttpHeaderFW> responseHeadersRO,
-            int freshnessExt)
+            int surrogateAge)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
-                x -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, x);
+                x -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, x, surrogateAge);
 
-        result.andThen(
-                builder -> builder.item(header -> header.name("prefer").value("wait=" + freshnessExt)));
         return result;
     }
 
     private void updateRequestHeaders(
             ListFW<HttpHeaderFW> requestHeadersFW,
             ListFW<HttpHeaderFW> responseHeadersFW,
-            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder)
+            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+            int surrogateAge)
     {
         requestHeadersFW
            .forEach(h ->
@@ -263,10 +264,19 @@ public class Writer
                     case HttpHeaders.IF_MATCH:
                     case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
+                    // DPW TODO x-on-update modified wait
                    default: builder.item(header -> header.name(nameFW)
                                                          .value(valueFW));
                }
            });
+           if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
+           {
+               builder.item(header -> header.name("cache-control").value("no-cache"));
+           }
+           if (!requestHeadersFW.anyMatch(PreferHeader.HAS_HEADER))
+           {
+               builder.item(header -> header.name("prefer").value("x-on-update, wait=ff" + surrogateAge));
+           }
     }
 
     private void doH2PushPromise(
@@ -276,6 +286,7 @@ public class Writer
         {
             DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(targetId)
+                .payload(e -> {})
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
