@@ -191,7 +191,6 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.max-stale.with.max-age/accept/client",
@@ -266,7 +265,8 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
+    @Ignore("no-store is not implemented, need fix in ProxyAcceptStreamHandle begin" +
+            "(can be served by cache but is not CacheableRequest)")
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
@@ -441,7 +441,6 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/explicitly.public.cache/accept/client",
@@ -475,7 +474,7 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
+    @Ignore("To implement such that size is not an issue")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.response.too.large.to.cache/accept/client",
