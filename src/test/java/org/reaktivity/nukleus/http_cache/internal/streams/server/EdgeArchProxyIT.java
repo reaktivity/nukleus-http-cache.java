@@ -70,7 +70,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/serve.from.cache.when.freshness.extension.is.valid.and.x-protected/accept/client",

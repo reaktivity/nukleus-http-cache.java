@@ -115,29 +115,40 @@ public final class CacheEntry
         request.setThrottle(serveFromCacheStream);
 
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-                .forEach(h ->
-                        x.item(y -> y.representation((byte) 0)
-                                .name(h.name())
-                                .value(h.value())));
+                .forEach(h -> x.item(y -> y.representation((byte) 0).name(h.name()).value(h.value())));
 
-        if (injectWarnings && isStale())
-        {
-            headers = headers.andThen(
-                    x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
-            );
-        }
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptReplyStreamId = request.acceptReplyStreamId();
         long acceptReplyRef = request.acceptRef();
         long acceptCorrelationId = request.acceptCorrelationId();
-        this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
 
-        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
+        // TODO should reduce freshness extension by how long it has aged
         int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders);
         if (freshnessExtension > 0)
         {
+            this.cache.writer.doHttpResponseWithUpdatedCacheControl(
+                    acceptReply,
+                    acceptReplyStreamId,
+                    acceptReplyRef,
+                    acceptCorrelationId,
+                    cacheControlFW,
+                    responseHeaders,
+                    freshnessExtension);
+
+            final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
             int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
             this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge);
+        }
+        else
+        {
+            // TODO inject stale on above if (freshnessExtension > 0)?
+            if (injectWarnings && isStale())
+            {
+                headers = headers.andThen(
+                        x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
+                );
+            }
+            this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
         }
     }
 
@@ -340,6 +351,9 @@ public final class CacheEntry
             int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
+
+                int surrogateAge = SurrogateControl.getMaxAgeFreshnessExtension(this.getResponseHeaders());
+                staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
         return lazyInitiatedResponseStaleAt;
@@ -380,11 +394,16 @@ public final class CacheEntry
     {
         Instant now = Instant.now();
 
-        return canBeServedToAuthorized(request)
-               && doesNotVaryBy(request)
-               && satisfiesFreshnessRequirementsOf(request, now)
-               && (satisfiesStalenessRequirementsOf(request, now) || isRevalidating)
-               && satisfiesAgeRequirementsOf(request, now);
+        final boolean canBeServedToAuthorized = canBeServedToAuthorized(request);
+        final boolean doesNotVaryBy = doesNotVaryBy(request);
+        final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now) || isRevalidating;
+        final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
+        return canBeServedToAuthorized &&
+                doesNotVaryBy &&
+                satisfiesFreshnessRequirements &&
+                satisfiesStalenessRequirements &&
+                satisfiesAgeRequirements;
     }
 
     private boolean isStale()
