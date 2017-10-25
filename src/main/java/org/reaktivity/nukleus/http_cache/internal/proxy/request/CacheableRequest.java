@@ -47,11 +47,10 @@ public class CacheableRequest extends Request
         return Type.CACHEABLE;
     }
 
-    public ListFW<HttpHeaderFW> getRequestHeaders()
+    public ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeadersRO)
     {
-        // TODO Auto-generated method stub
-//        return null;
-        throw new RuntimeException("DPW not implemented");
+        final MutableDirectBuffer buffer = bufferPool.buffer(requestSlot);
+        return requestHeadersRO.wrap(buffer, 0, requestSize);
     }
 
     public void cache(ListFW<HttpHeaderFW> responseHeaders)

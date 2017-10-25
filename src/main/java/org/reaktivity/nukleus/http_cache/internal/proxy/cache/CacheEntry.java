@@ -38,7 +38,6 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
@@ -133,7 +132,7 @@ public final class CacheEntry
         long acceptReplyRef = request.acceptRef();
         long acceptCorrelationId = request.acceptCorrelationId();
         this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
-        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders();
+        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
         int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders, cacheControlFW);
         if (freshnessExtension > 0)
         {
@@ -199,17 +198,21 @@ public final class CacheEntry
         private void writePayload(int update)
         {
             final int toWrite = Math.min(update, responseSize - payloadWritten);
-            final int offset = responseHeaderSize + payloadWritten;
-            MutableDirectBuffer buffer = CacheEntry.this.cache.responseBufferPool.buffer(responseSlot);
-
-            final MessageConsumer acceptReply = request.acceptReply();
-            final long acceptReplyStreamId = request.acceptReplyStreamId();
-
-            CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
-            payloadWritten += toWrite;
-            if (payloadWritten == responseSize)
+            if (toWrite > 0)
             {
-                this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
+                final int offset = responseHeaderSize + payloadWritten;
+                MutableDirectBuffer buffer = CacheEntry.this.cache.responseBufferPool.buffer(responseSlot);
+
+                final MessageConsumer acceptReply = request.acceptReply();
+                final long acceptReplyStreamId = request.acceptReplyStreamId();
+
+                CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
+                payloadWritten += toWrite;
+                if (payloadWritten == responseSize)
+                {
+                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+                    this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
+                }
             }
         }
     }
@@ -226,11 +229,12 @@ public final class CacheEntry
         return this.cache.responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
     }
 
-    public OctetsFW getResponse(OctetsFW octetsFW)
-    {
-        DirectBuffer buffer = this.cache.responseBufferPool.buffer(responseSlot);
-        return octetsFW.wrap(buffer, responseHeaderSize, responseSize);
-    }
+//  TODO remove
+//    public OctetsFW getResponse(OctetsFW octetsFW)
+//    {
+//        DirectBuffer buffer = this.cache.responseBufferPool.buffer(responseSlot);
+//        return octetsFW.wrap(buffer, responseHeaderSize, responseSize);
+//    }
 
     public void addClient()
     {

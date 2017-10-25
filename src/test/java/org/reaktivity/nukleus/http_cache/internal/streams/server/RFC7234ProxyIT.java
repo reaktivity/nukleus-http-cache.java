@@ -105,7 +105,6 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.max-age/accept/client",
