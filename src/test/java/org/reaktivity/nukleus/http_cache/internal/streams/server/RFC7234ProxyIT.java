@@ -94,7 +94,6 @@ public class RFC7234ProxyIT
 
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.request.and.304/accept/client",
