@@ -49,7 +49,6 @@ public class RFC7234ProxyIT
     public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.get.request/accept/client",

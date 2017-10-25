@@ -17,24 +17,28 @@ public class CacheableRequest extends Request
     private final BufferPool bufferPool;
     private final int requestSlot;
     private final int requestSize;
+    private final int requestUrlHash;
     private int responseSlot;
     private int responseHeadersSize;
     private int responseSize;
+    private boolean cachingResponse;    // TODO, move to state
 
     public CacheableRequest(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
         long acceptCorrelationId,
+        int requestURLHash,
         BufferPool bufferPool,
         int requestSlot,
-        int requestSize,
-        RouteManager router)
+        int requestSize, RouteManager router)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
         this.bufferPool = bufferPool;
         this.requestSlot = requestSlot;
         this.requestSize = requestSize;
+        this.requestUrlHash = requestURLHash;
+        this.cachingResponse = true;
     }
 
     @Override
@@ -84,22 +88,23 @@ public class CacheableRequest extends Request
 
     private int requestUrlHash()
     {
-        throw new RuntimeException("DPW not implemented");
-        // TODO Auto-generated method stub
-//        return 0;
+        return this.requestUrlHash;
     }
 
     @Override
     public void abort()
     {
-        throw new RuntimeException("DPW not implemented");
-        // TODO Auto-generated method stub
+        bufferPool.release(requestSlot);
+        bufferPool.release(responseSlot);
     }
 
     @Override
     public void complete()
     {
-        // TODO Auto-generated method stub
-        throw new RuntimeException("DPW not implemented");
+        if (!cachingResponse)
+        {
+            bufferPool.release(requestSlot);
+            bufferPool.release(responseSlot);
+        }
     }
 }

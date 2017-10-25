@@ -15,17 +15,18 @@ public class OnModification extends CacheableRequest
         BufferPool bufferPool,
         int requestSlot,
         int requestSize,
-        RouteManager router)
+        RouteManager router,
+        int requestURLHash)
     {
         super(
             acceptName,
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
+            requestURLHash,
             bufferPool,
             requestSlot,
-            requestSize,
-            router);
+            requestSize, router);
     }
 
     @Override
