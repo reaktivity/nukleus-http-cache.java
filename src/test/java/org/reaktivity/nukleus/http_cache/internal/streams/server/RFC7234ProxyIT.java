@@ -146,7 +146,6 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
             "${route}/proxy/controller",
             "${streams}/cache.max-stale.with.value/accept/client",

@@ -114,7 +114,6 @@ public final class CacheEntry
                 this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
 
-
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
                 .forEach(h ->
                         x.item(y -> y.representation((byte) 0)
@@ -132,6 +131,7 @@ public final class CacheEntry
         long acceptReplyRef = request.acceptRef();
         long acceptCorrelationId = request.acceptCorrelationId();
         this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
+
         final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
         int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders, cacheControlFW);
         if (freshnessExtension > 0)

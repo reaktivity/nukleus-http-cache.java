@@ -147,7 +147,8 @@ final class ProxyAcceptStream
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
-            streamFactory.streamBufferPool,
+            streamFactory.correlationResponseBufferPool,
+            streamFactory.correlationRequestBufferPool,
             requestSlot,
             requestSize,
             streamFactory.router,
@@ -172,9 +173,11 @@ final class ProxyAcceptStream
                     acceptReplyStreamId,
                     acceptCorrelationId,
                     requestURLHash,
-                    streamFactory.streamBufferPool,
+                    streamFactory.correlationResponseBufferPool,
+                    streamFactory.correlationRequestBufferPool,
                     requestSlot,
-                    requestSize, streamFactory.router);
+                    requestSize,
+                    streamFactory.router);
             cachedResponse.get().serveClient(cacheableRequest);
         }
         else if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
@@ -189,9 +192,9 @@ final class ProxyAcceptStream
                     acceptReplyStreamId,
                     acceptCorrelationId,
                     requestURLHash,
-                    streamFactory.streamBufferPool,
-                    requestSlot,
-                    requestSize, streamFactory.router);
+                    streamFactory.correlationResponseBufferPool,
+                    streamFactory.correlationRequestBufferPool,
+                    requestSlot, requestSize, streamFactory.router);
 
             sendBeginToConnect(requestHeaders);
             streamFactory.writer.doHttpEnd(connect, connectStreamId);

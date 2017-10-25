@@ -12,7 +12,8 @@ public class OnModification extends CacheableRequest
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
         long acceptCorrelationId,
-        BufferPool bufferPool,
+        BufferPool responseBufferPool,
+        BufferPool requestBufferPool,
         int requestSlot,
         int requestSize,
         RouteManager router,
@@ -24,9 +25,9 @@ public class OnModification extends CacheableRequest
             acceptReplyStreamId,
             acceptCorrelationId,
             requestURLHash,
-            bufferPool,
-            requestSlot,
-            requestSize, router);
+            responseBufferPool,
+            requestBufferPool,
+            requestSlot, requestSize, router);
     }
 
     @Override

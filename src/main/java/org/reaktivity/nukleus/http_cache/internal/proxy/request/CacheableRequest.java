@@ -14,7 +14,8 @@ import org.reaktivity.nukleus.route.RouteManager;
 public class CacheableRequest extends Request
 {
 
-    private final BufferPool bufferPool;
+    private final BufferPool requestBufferPool;
+    private final BufferPool responseBufferPool;
     private final int requestSlot;
     private final int requestSize;
     private final int requestUrlHash;
@@ -29,12 +30,15 @@ public class CacheableRequest extends Request
         long acceptReplyStreamId,
         long acceptCorrelationId,
         int requestURLHash,
-        BufferPool bufferPool,
+        BufferPool responseBufferPool,
+        BufferPool requestBufferPool,
         int requestSlot,
-        int requestSize, RouteManager router)
+        int requestSize,
+        RouteManager router)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
-        this.bufferPool = bufferPool;
+        this.requestBufferPool = requestBufferPool;
+        this.responseBufferPool = responseBufferPool;
         this.requestSlot = requestSlot;
         this.requestSize = requestSize;
         this.requestUrlHash = requestURLHash;
@@ -49,7 +53,7 @@ public class CacheableRequest extends Request
 
     public ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeadersRO)
     {
-        final MutableDirectBuffer buffer = bufferPool.buffer(requestSlot);
+        final MutableDirectBuffer buffer = requestBufferPool.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, requestSize);
     }
 
@@ -57,7 +61,7 @@ public class CacheableRequest extends Request
     {
         // DPW TODO abort if not cacheable
         setupResponseBuffer();
-        MutableDirectBuffer buffer = bufferPool.buffer(responseSlot);
+        MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
         final int headersSize = responseHeaders.sizeof();
         buffer.putBytes(responseSize, responseHeaders.buffer(), responseHeaders.offset(), headersSize);
         responseSize += headersSize;
@@ -66,7 +70,7 @@ public class CacheableRequest extends Request
 
     private void setupResponseBuffer()
     {
-        this.responseSlot = bufferPool.acquire(acceptReplyStreamId());
+        this.responseSlot = responseBufferPool.acquire(acceptReplyStreamId());
         this.responseHeadersSize = 0;
         this.responseSize = 0;
     }
@@ -75,7 +79,7 @@ public class CacheableRequest extends Request
     {
         OctetsFW payload = data.payload();
         int sizeof = payload.sizeof();
-        MutableDirectBuffer buffer = bufferPool.buffer(responseSlot);
+        MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
         buffer.putBytes(responseSize, payload.buffer(), payload.offset(), sizeof);
         responseSize += sizeof;
     }
@@ -93,8 +97,8 @@ public class CacheableRequest extends Request
     @Override
     public void abort()
     {
-        bufferPool.release(requestSlot);
-        bufferPool.release(responseSlot);
+        requestBufferPool.release(requestSlot);
+        responseBufferPool.release(responseSlot);
     }
 
     @Override
@@ -102,8 +106,8 @@ public class CacheableRequest extends Request
     {
         if (!cachingResponse)
         {
-            bufferPool.release(requestSlot);
-            bufferPool.release(responseSlot);
+            requestBufferPool.release(requestSlot);
+            responseBufferPool.release(responseSlot);
         }
     }
 }

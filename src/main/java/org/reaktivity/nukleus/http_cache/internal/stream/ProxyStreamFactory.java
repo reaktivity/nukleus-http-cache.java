@@ -71,7 +71,8 @@ public class ProxyStreamFactory implements StreamFactory
 
     final LongSupplier supplyStreamId;
     final BufferPool streamBufferPool;
-    final BufferPool correlationBufferPool;
+    final BufferPool correlationRequestBufferPool;
+    final BufferPool correlationResponseBufferPool;
     final BufferPool cacheBufferPool;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyCorrelationId;
@@ -96,7 +97,8 @@ public class ProxyStreamFactory implements StreamFactory
         this.router = requireNonNull(router);
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.streamBufferPool = requireNonNull(bufferPool);
-        this.correlationBufferPool = bufferPool.duplicate();
+        this.correlationRequestBufferPool = bufferPool.duplicate();
+        this.correlationResponseBufferPool = bufferPool.duplicate();
         this.cacheBufferPool = bufferPool.duplicate();
         this.correlations = requireNonNull(correlations);
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
