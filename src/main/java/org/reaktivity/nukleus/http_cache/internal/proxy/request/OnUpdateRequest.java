@@ -19,10 +19,10 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class OnModification extends CacheableRequest
+public class OnUpdateRequest extends CacheableRequest
 {
 
-    public OnModification(
+    public OnUpdateRequest(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,

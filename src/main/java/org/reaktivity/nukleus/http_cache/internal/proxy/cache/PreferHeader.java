@@ -41,13 +41,13 @@ public final class PreferHeader
         return null;
     }
 
-    public static final String ONLY_WHEN_MODIFIED = "only-when-modified";
+    public static final String X_ON_UPDATE = "x-on-update";
 
-    public static final Predicate<? super HttpHeaderFW> PREFER_RESPONSE_WHEN_MODIFIED = h ->
+    public static final Predicate<? super HttpHeaderFW> PREFER_RESPONSE_WHEN_UPDATED = h ->
     {
         final String name = h.name().asString();
         final String value = h.name().asString();
-        return PREFER.equals(name) && value.contains(ONLY_WHEN_MODIFIED);
+        return PREFER.equals(name) && value.contains(X_ON_UPDATE);
     };
 
     public static final Predicate<? super HttpHeaderFW> HAS_HEADER = h ->

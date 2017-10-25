@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.PREFER_RESPONSE_WHEN_MODIFIED;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.PREFER_RESPONSE_WHEN_UPDATED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -29,7 +29,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnModification;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -137,10 +137,10 @@ final class ProxyAcceptStream
 
             this.requestURLHash = requestURL.hashCode();
 
-            if (requestHeaders.anyMatch(PREFER_RESPONSE_WHEN_MODIFIED))
+            if (requestHeaders.anyMatch(PREFER_RESPONSE_WHEN_UPDATED))
             {
                 storeRequest(requestHeaders);
-                handleRequestForWhenModified();
+                handleRequestForWhenUpdated();
             }
             else if (canBeServedByCache(requestHeaders))
             {
@@ -154,10 +154,10 @@ final class ProxyAcceptStream
         }
     }
 
-    private void handleRequestForWhenModified()
+    private void handleRequestForWhenUpdated()
     {
-        OnModification onModificationRequest;
-        this.request = onModificationRequest = new OnModification(
+        OnUpdateRequest onUpdateRequest;
+        this.request = onUpdateRequest = new OnUpdateRequest(
             acceptName,
             acceptReply,
             acceptReplyStreamId,
@@ -168,7 +168,7 @@ final class ProxyAcceptStream
             requestSize,
             streamFactory.router,
             requestURLHash);
-        streamFactory.cache.onUpdate(onModificationRequest);
+        streamFactory.cache.onUpdate(onUpdateRequest);
     }
 
     private void handleCacheableRequest(

@@ -22,7 +22,7 @@ import java.util.function.LongSupplier;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnModification;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -105,7 +105,7 @@ public class Cache
         }
     }
 
-    public void onUpdate(OnModification onModificationRequest)
+    public void onUpdate(OnUpdateRequest onModificationRequest)
     {
         throw new RuntimeException("DPW to implement");
     }
