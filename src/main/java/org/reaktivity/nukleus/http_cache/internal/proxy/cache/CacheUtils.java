@@ -74,6 +74,29 @@ public final class CacheUtils
         });
     }
 
+    public static boolean hasStaleWhileRevalidate(
+            ListFW<HttpHeaderFW> headers)
+    {
+        return !headers.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            switch (name)
+            {
+            case CACHE_CONTROL:
+                return value.contains("no-cache");
+            case METHOD:
+                return !"GET".equalsIgnoreCase(value);
+            case CONTENT_LENGTH:
+                return true;
+            case TRANSFER_ENCODING:
+                return true;
+            default:
+                return false;
+            }
+        });
+    }
+
     public static boolean canInjectPushPromise(
             ListFW<HttpHeaderFW> headers)
     {
@@ -100,7 +123,7 @@ public final class CacheUtils
         return HttpHeaders.CACHE_CONTROL.equals(name) && value.contains(NO_STORE);
     }
 
-    public static boolean isCacheable(ListFW<HttpHeaderFW> response)
+    public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)
     {
         if (response.anyMatch(h ->
                 CACHE_CONTROL.equals(h.name().asString())

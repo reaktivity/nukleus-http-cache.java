@@ -144,7 +144,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/inject.stale-while-revalidate.push-promise.no-cache/accept/client",

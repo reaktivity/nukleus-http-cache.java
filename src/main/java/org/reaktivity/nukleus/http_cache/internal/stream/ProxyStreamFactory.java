@@ -33,8 +33,6 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
-import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -202,21 +200,14 @@ public class ProxyStreamFactory implements StreamFactory
             final ListFW<HttpHeaderFW> requestHeaders)
     {
 
-        writer.doHttpBegin2(
+        writer.doHttpBegin(
             connect,
             connectStreamId,
             connectRef,
             connectCorrelationId,
             builder -> requestHeaders.forEach(requestHeader ->
-            {
-                    builder.item(item ->
-                        {
-                            final StringFW name = requestHeader.name();
-                            final String16FW value = requestHeader.value();
-                            item.name(name).value(value);
-                        }
-                    );
-            }));
+                    builder.item(item -> item.name(requestHeader.name()).value(requestHeader.value()))
+            ));
         writer.doHttpEnd(connect, connectStreamId);
     }
 

@@ -15,9 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -101,7 +102,7 @@ final class ProxyConnectReplyStream
                     doProxyBegin(responseHeaders);
                     break;
                 case CACHEABLE:
-                    handleCacheableResponse(responseHeaders);
+                    handleCacheableRequest(responseHeaders);
                     break;
                 case ON_MODIFIED:
                 default:
@@ -115,20 +116,59 @@ final class ProxyConnectReplyStream
     }
 
     ///////////// CACHEABLE REQUEST
+    private void handleCacheableRequest(ListFW<HttpHeaderFW> responseHeaders)
+    {
+        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders);
+        final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
+
+        if (freshnessExtension > 0 && isCacheableResponse)
+        {
+            handleEdgeArchSync(responseHeaders, freshnessExtension);
+        }
+        else if(isCacheableResponse)
+        {
+            handleCacheableResponse(responseHeaders);
+        }
+        else
+        {
+            doProxyBegin(responseHeaders);
+        }
+    }
+
+    private void handleEdgeArchSync(
+        ListFW<HttpHeaderFW> responseHeaders,
+        int freshnessExtension)
+    {
+        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        request.cache(responseHeaders);
+        int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
+
+        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+        final long acceptReplyRef = streamCorrelation.acceptRef();
+        final long correlationId = streamCorrelation.acceptCorrelationId();
+
+        streamCorrelation.setThrottle(this::handleProxyThrottle);
+        streamFactory.writer.doHttpResponseWithUpdatedCacheControl(
+                acceptReply,
+                acceptReplyStreamId,
+                acceptReplyRef,
+                correlationId,
+                streamFactory.cacheControlParser,
+                responseHeaders,
+                freshnessExtension
+            );
+
+        streamFactory.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge);
+        this.streamState = this::handleCacheableRequestResponse;
+    }
+
     private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         request.cache(responseHeaders);
-
         doProxyBegin(responseHeaders);
-
-        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders);
-        if (freshnessExtension > 0 && CacheUtils.isCacheable(responseHeaders))
-        {
-            int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
-            ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
-            streamFactory.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge);
-        }
         this.streamState = this::handleCacheableRequestResponse;
     }
 
