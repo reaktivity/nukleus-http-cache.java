@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.ONLY_IF_CACHED;
-
 import java.util.function.Predicate;
 
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;

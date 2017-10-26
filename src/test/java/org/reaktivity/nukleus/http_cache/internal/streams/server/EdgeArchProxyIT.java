@@ -141,7 +141,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/freshness-extension.inject.individualized.push.promises/accept/client",
@@ -164,6 +163,7 @@ public class EdgeArchProxyIT
     }
 
     @Test
+    @Ignore
     @Specification({
         "${route}/proxy/controller",
         "${streams}/share.debounce.when.explicitly.public/accept/client",
@@ -183,6 +183,17 @@ public class EdgeArchProxyIT
         "${streams}/share.debounce.when.x-protected.and.same.scope/connect/server",
     })
     public void shouldShareDebounceWhenXProtectedAndSameScope() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/accept/client",
+        "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/connect/server",
+    })
+    public void shouldCacheAndPollOnSurrogateMaxAgeWhenFreshExt() throws Exception
     {
         k3po.finish();
     }

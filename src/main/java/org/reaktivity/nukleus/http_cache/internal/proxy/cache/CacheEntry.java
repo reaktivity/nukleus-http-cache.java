@@ -36,6 +36,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -420,6 +421,26 @@ public final class CacheEntry
     private boolean isStale()
     {
         return Instant.now().isAfter(staleAt());
+    }
+
+    public boolean isIntendedForSingleUser()
+    {
+        ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
+        if (SurrogateControl.isXProtected(responseHeaders))
+        {
+            return false;
+        }
+        else
+        {
+            // TODO pull out as utility of CacheUtils
+            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
+            if (cacheControl == null)
+            {
+                return false;
+            }
+            final CacheControl parsedCacheControl = cache.responseCacheControlParser.parse(cacheControl);
+            return parsedCacheControl.contains("private");
+        }
     }
 
 }

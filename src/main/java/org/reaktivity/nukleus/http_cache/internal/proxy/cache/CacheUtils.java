@@ -136,6 +136,7 @@ public final class CacheUtils
 
     public static boolean isPrivatelyCacheable(ListFW<HttpHeaderFW> response)
     {
+        // TODO force passing of CacheControl as FW
         String cacheControl = getHeader(response, "cache-control");
         if (cacheControl != null)
         {

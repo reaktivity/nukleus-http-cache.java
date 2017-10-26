@@ -34,7 +34,7 @@ public class Cache
 {
 
     final Writer writer;
-    final Long2ObjectHashMap<CacheEntry> requestURLToResponse;
+    final Long2ObjectHashMap<CacheEntry> cachedEntries;
     final BufferPool requestBufferPool;
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     final BufferPool responseBufferPool;
@@ -59,7 +59,7 @@ public class Cache
         this.writer = new Writer(writeBuffer);
         this.requestBufferPool = bufferPool;
         this.responseBufferPool = bufferPool.duplicate();
-        this.requestURLToResponse = new Long2ObjectHashMap<>();
+        this.cachedEntries = new Long2ObjectHashMap<>();
     }
 
     public void put(
@@ -71,7 +71,7 @@ public class Cache
         int responseSize,
         short authScope)
     {
-        CacheEntry responseServer = new CacheEntry(
+        CacheEntry cacheEntry = new CacheEntry(
                 this,
                 requestSlot,
                 requestSize,
@@ -80,10 +80,17 @@ public class Cache
                 responseSize,
                 authScope);
 
-        CacheEntry oldCacheEntry = requestURLToResponse.put(requestURLHash, responseServer);
-        if (oldCacheEntry != null)
+        if (cacheEntry.isIntendedForSingleUser())
         {
-            oldCacheEntry.cleanUp();
+            cacheEntry.cleanUp();
+        }
+        else
+        {
+            CacheEntry oldCacheEntry = cachedEntries.put(requestURLHash, cacheEntry);
+            if (oldCacheEntry != null)
+            {
+                oldCacheEntry.cleanUp();
+            }
         }
     }
 
@@ -95,7 +102,7 @@ public class Cache
         // DPW TODO lookup if revalidating
         boolean isRevalidating = false;
         // Will be stream of responses in near future, so coding it as now.
-        final CacheEntry cacheEntry = requestURLToResponse.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
 
         if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, isRevalidating, authScope))
         {

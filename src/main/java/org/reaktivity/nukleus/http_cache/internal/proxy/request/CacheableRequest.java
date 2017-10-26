@@ -132,7 +132,7 @@ public class CacheableRequest extends Request
         {
             requestBufferPool.release(requestSlot);
             responseBufferPool.release(responseSlot);
-        }
+        }// else cache's responsibility to clear, TODO clean up this abstraction
     }
 
     public Object authScope()
