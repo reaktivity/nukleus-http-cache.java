@@ -198,4 +198,15 @@ public class EdgeArchProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.updates.cache/accept/client",
+        "${streams}/polling.updates.cache/connect/server",
+    })
+    public void shouldUpdateCacheOnPoll() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

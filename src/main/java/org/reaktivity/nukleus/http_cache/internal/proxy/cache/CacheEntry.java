@@ -415,7 +415,6 @@ public final class CacheEntry
     public boolean canServeRequest(
         int requestURLHash,
         ListFW<HttpHeaderFW> request,
-        boolean isRevalidating,
         short authScope)
     {
         Instant now = Instant.now();
@@ -423,7 +422,7 @@ public final class CacheEntry
         final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now) || isRevalidating;
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now); // || isRevalidating;
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
                 doesNotVaryBy &&

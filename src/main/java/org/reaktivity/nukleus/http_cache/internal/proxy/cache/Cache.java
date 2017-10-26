@@ -71,6 +71,7 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
+        System.out.println("Cache Updated");
         CacheEntry cacheEntry = new CacheEntry(
                 this,
                 request);
@@ -94,13 +95,12 @@ public class Cache
             ListFW<HttpHeaderFW> request,
             short authScope)
     {
-        // DPW TODO lookup if revalidating
-        boolean isRevalidating = false;
-        // Will be stream of responses in near future, so coding it as now.
+        System.out.println("Searching Cache");
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
 
-        if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, isRevalidating, authScope))
+        if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, authScope))
         {
+            System.out.println("Cache found");
             return Optional.of(cacheEntry);
         }
         else
