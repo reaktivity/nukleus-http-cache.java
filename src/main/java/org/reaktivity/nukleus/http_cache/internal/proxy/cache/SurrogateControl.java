@@ -31,7 +31,7 @@ public final class SurrogateControl
             .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")?\\s*");
     private static final String X_PROTECTED = "x-protected";
 
-    public static int getMaxAgeFreshnessExtension(
+    public static int getSurrogateFreshnessExtension(
             ListFW<HttpHeaderFW> responseHeadersRO)
     {
         String surrogateControl = getHeader(responseHeadersRO, SURROGATE_CONTROL);

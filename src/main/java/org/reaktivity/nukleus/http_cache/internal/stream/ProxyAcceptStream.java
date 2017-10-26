@@ -141,8 +141,9 @@ final class ProxyAcceptStream
 
             if (requestHeaders.anyMatch(PREFER_RESPONSE_WHEN_UPDATED))
             {
-                storeRequest(requestHeaders);
-                handleRequestForWhenUpdated(authorizationScope);
+                handleRequestForWhenUpdated(
+                        authorizationScope,
+                        requestHeaders);
             }
             else if (canBeServedByCache(requestHeaders))
             {
@@ -161,7 +162,9 @@ final class ProxyAcceptStream
         return (short) (authorization >>> 48);
     }
 
-    private void handleRequestForWhenUpdated(short authScope)
+    private void handleRequestForWhenUpdated(
+        short authScope,
+        ListFW<HttpHeaderFW> requestHeaders)
     {
         OnUpdateRequest onUpdateRequest;
         this.request = onUpdateRequest = new OnUpdateRequest(
@@ -199,8 +202,9 @@ final class ProxyAcceptStream
                     acceptCorrelationId,
                     // DPW TODO - Move next 4 into cache constructor, back
                     // making cache tied to ProxyAcceptStreamFactory
-                    this.connectName,
-                    this.connectRef,
+                    connect,
+                    connectName,
+                    connectRef,
                     streamFactory.supplyCorrelationId,
                     streamFactory.supplyStreamId,
                     //
@@ -226,8 +230,9 @@ final class ProxyAcceptStream
                     acceptCorrelationId,
                     // DPW TODO - Move next 4 into cache constructor, back
                     // making cache tied to ProxyAcceptStreamFactory
-                    this.connectName,
-                    this.connectRef,
+                    connect,
+                    connectName,
+                    connectRef,
                     streamFactory.supplyCorrelationId,
                     streamFactory.supplyStreamId,
                     //

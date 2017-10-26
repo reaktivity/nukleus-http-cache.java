@@ -22,14 +22,14 @@ public abstract class Request
 {
     public enum Type
     {
-        ON_MODIFIED, PROXY, CACHEABLE
+        ON_MODIFIED, PROXY, CACHEABLE, CACHE_REFRESH
     }
 
-    private final String acceptName;
-    private final MessageConsumer acceptReply;
-    private final long acceptReplyStreamId;
-    private final long acceptCorrelationId;
-    private final RouteManager router;
+    final String acceptName;
+    final MessageConsumer acceptReply;
+    final long acceptReplyStreamId;
+    final long acceptCorrelationId;
+    final RouteManager router;
 
     public Request(
         String acceptName,

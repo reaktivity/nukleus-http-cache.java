@@ -17,11 +17,14 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateFreshnessExtension;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -34,6 +37,7 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -63,6 +67,43 @@ public final class CacheEntry
     {
         this.cache = cache;
         this.cachedRequest = request;
+
+        final int freshnessExtension = getSurrogateFreshnessExtension(getResponseHeaders());
+        if (freshnessExtension > 0)
+        {
+            int surrogateMaxAge = getSurrogateAge(getResponseHeaders());
+            long scheduleAt = this.responseReceivedAt()
+                                  .plusSeconds(surrogateMaxAge)
+                                  .toEpochMilli();
+            cache.scheduler.accept(scheduleAt, this::updateCache);
+        }
+    }
+
+    public void updateCache()
+    {
+        if (!cleanUp)
+        {
+            MessageConsumer connect = cachedRequest.connect();
+            long connectStreamId = cachedRequest.supplyStreamId().getAsLong();
+            long connectRef = cachedRequest.connectRef();
+            long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
+            ListFW<HttpHeaderFW> requestHeaders = getRequest();
+            cache.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,
+                    builder -> requestHeaders.forEach(
+                            h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
+            cache.writer.doHttpEnd(connect, connectStreamId);
+
+            // duplicate request into new slot (TODO optimize to single request)
+            int newSlot = cache.newRequestBufferPool.acquire(connectStreamId);
+            if (newSlot == NO_SLOT)
+            {
+                throw new RuntimeException("Cache out of space, please reconfigure");  // DPW TODO reconsider hard fail??
+            }
+            MutableDirectBuffer newBuffer = cache.newRequestBufferPool.buffer(newSlot);
+            this.cachedRequest.copyRequestTo(newBuffer);
+
+            cache.correlations.put(connectCorrelationId, new CacheRefreshRequest(cachedRequest, newSlot));
+        }
     }
 
     private void handleEndOfStream(
@@ -111,7 +152,7 @@ public final class CacheEntry
         long acceptCorrelationId = request.acceptCorrelationId();
 
         // TODO should reduce freshness extension by how long it has aged
-        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders);
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         if (freshnessExtension > 0)
         {
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
@@ -246,7 +287,7 @@ public final class CacheEntry
 
         if (SurrogateControl.isXProtected(this.getResponseHeaders()))
         {
-            return requestAuthScope == cachedRequest.authScope;
+            return requestAuthScope == cachedRequest.authScope();
         }
 
         final CacheControl responseCacheControl = responseCacheControl();
@@ -267,7 +308,7 @@ public final class CacheEntry
             Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeaderValue);
+        final CacheControl requestCacheControl = cache.requestCacheControlFW.parse(requestCacheControlHeaderValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MIN_FRESH))
@@ -286,7 +327,7 @@ public final class CacheEntry
             Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeacerValue);
+        final CacheControl requestCacheControl = cache.requestCacheControlFW.parse(requestCacheControlHeacerValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MAX_STALE))
@@ -312,7 +353,7 @@ public final class CacheEntry
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.requestCacheControlParser.parse(requestCacheControlHeaderValue);
+        final CacheControl requestCacheControl = cache.requestCacheControlFW.parse(requestCacheControlHeaderValue);
         Instant receivedAt = responseReceivedAt();
 
         if (requestCacheControl.contains(MAX_AGE))
@@ -336,7 +377,7 @@ public final class CacheEntry
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
 
-                int surrogateAge = SurrogateControl.getMaxAgeFreshnessExtension(this.getResponseHeaders());
+                int surrogateAge = SurrogateControl.getSurrogateFreshnessExtension(this.getResponseHeaders());
                 staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
@@ -368,7 +409,7 @@ public final class CacheEntry
     {
         ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
         String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
-        return cache.responseCacheControlParser.parse(cacheControl);
+        return cache.responseCacheControlFW.parse(cacheControl);
     }
 
     public boolean canServeRequest(
@@ -411,7 +452,7 @@ public final class CacheEntry
             {
                 return false;
             }
-            final CacheControl parsedCacheControl = cache.responseCacheControlParser.parse(cacheControl);
+            final CacheControl parsedCacheControl = cache.responseCacheControlFW.parse(cacheControl);
             return parsedCacheControl.contains("private");
         }
     }

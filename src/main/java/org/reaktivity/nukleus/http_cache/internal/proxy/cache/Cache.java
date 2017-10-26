@@ -17,7 +17,6 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.Optional;
-import java.util.function.LongSupplier;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -25,6 +24,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -37,30 +37,32 @@ public class Cache
 
     final Writer writer;
     final Long2ObjectHashMap<CacheEntry> cachedEntries;
-    final BufferPool requestBufferPool;
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final BufferPool cachedRequestBufferPool;
     final BufferPool responseBufferPool;
+    final BufferPool newRequestBufferPool;
+    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
-    final LongSupplier streamSupplier;
-    final LongSupplier supplyCorrelationId;
     final WindowFW windowRO = new WindowFW();
+
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
-    final CacheControl responseCacheControlParser = new CacheControl();
-    final CacheControl requestCacheControlParser = new CacheControl();
+    final CacheControl responseCacheControlFW = new CacheControl();
+    final CacheControl requestCacheControlFW = new CacheControl();
+    final LongObjectBiConsumer<Runnable> scheduler;
+    final Long2ObjectHashMap<Request> correlations;
 
     public Cache(
+            LongObjectBiConsumer<Runnable> scheduler,
             MutableDirectBuffer writeBuffer,
-            LongSupplier streamSupplier,
-            LongSupplier supplyCorrelationId,
             BufferPool bufferPool,
             Long2ObjectHashMap<Request> correlations,
             RouteManager router)
     {
-        this.streamSupplier = streamSupplier;
-        this.supplyCorrelationId = supplyCorrelationId;
+        this.scheduler = scheduler;
+        this.correlations = correlations;
         this.writer = new Writer(writeBuffer);
-        this.requestBufferPool = bufferPool;
+        this.cachedRequestBufferPool = bufferPool;
+        this.newRequestBufferPool = bufferPool;
         this.responseBufferPool = bufferPool.duplicate();
         this.cachedEntries = new Long2ObjectHashMap<>();
     }

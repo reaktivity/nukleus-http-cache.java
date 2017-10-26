@@ -20,6 +20,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -104,6 +105,9 @@ final class ProxyConnectReplyStream
                 case CACHEABLE:
                     handleCacheableRequest(responseHeaders);
                     break;
+                case CACHE_REFRESH:
+                    handleCacheRefresh(responseHeaders);
+                    break;
                 case ON_MODIFIED:
                 default:
                     throw new RuntimeException("Not implemented");
@@ -115,10 +119,47 @@ final class ProxyConnectReplyStream
         }
     }
 
-    ///////////// CACHEABLE REQUEST
-    private void handleCacheableRequest(ListFW<HttpHeaderFW> responseHeaders)
+    ///////////// CACHE REFRESH
+    private void handleCacheRefresh(
+            ListFW<HttpHeaderFW> responseHeaders)
     {
-        int freshnessExtension = SurrogateControl.getMaxAgeFreshnessExtension(responseHeaders);
+        CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
+        request.cache(responseHeaders);
+        this.streamState = this::handleCacheRefresh;
+        streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 65200, 0);
+    }
+
+    private void handleCacheRefresh(
+            int msgTypeId,
+            DirectBuffer buffer,
+            int index,
+            int length)
+    {
+        CacheableRequest request = (CacheableRequest) streamCorrelation;
+
+        switch (msgTypeId)
+        {
+            case DataFW.TYPE_ID:
+                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
+                request.cache(data);
+                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 65200, 0);
+                break;
+            case EndFW.TYPE_ID:
+                final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+                request.cache(end, streamFactory.cache);
+                break;
+            case AbortFW.TYPE_ID:
+            default:
+                request.abort();
+                break;
+        }
+    }
+
+    ///////////// CACHEABLE REQUEST
+    private void handleCacheableRequest(
+            ListFW<HttpHeaderFW> responseHeaders)
+    {
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
         if (freshnessExtension > 0 && isCacheableResponse)

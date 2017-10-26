@@ -31,26 +31,28 @@ import org.reaktivity.nukleus.route.RouteManager;
 public class CacheableRequest extends Request
 {
 
-    private final BufferPool requestBufferPool;
-    private final BufferPool responseBufferPool;
-    private final int requestSlot;
-    private final int requestSize;
-    private final int requestUrlHash;
-    private int responseSlot;
-    private int responseHeadersSize;
-    private int responseSize;
-    private boolean cachingResponse;    // TODO, consider using state management via method references
-    public final short authScope;
-    private final String connectName;
-    private final long connectRef;
-    private final LongSupplier supplyCorrelationId;
-    private final LongSupplier supplyStreamId;
+    final BufferPool requestBufferPool;
+    final BufferPool responseBufferPool;
+    final int requestSlot;
+    final int requestSize;
+    final int requestURLHash;
+    int responseSlot;
+    int responseHeadersSize;
+    int responseSize;
+    boolean cachingResponse;    // TODO, consider using state management via method references
+    final short authScope;
+    final MessageConsumer connect;
+    final String connectName;
+    final long connectRef;
+    final LongSupplier supplyCorrelationId;
+    final LongSupplier supplyStreamId;
 
     public CacheableRequest(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
         long acceptCorrelationId,
+        MessageConsumer connect,
         String connectName,
         long connectRef,
         LongSupplier supplyCorrelationId,
@@ -68,12 +70,13 @@ public class CacheableRequest extends Request
         this.responseBufferPool = responseBufferPool;
         this.requestSlot = requestSlot;
         this.requestSize = requestSize;
-        this.requestUrlHash = requestURLHash;
+        this.requestURLHash = requestURLHash;
         this.cachingResponse = true;
         this.authScope = authScope;
         this.supplyCorrelationId = supplyCorrelationId;
         this.supplyStreamId = supplyStreamId;
 
+        this.connect = connect;
         this.connectName = connectName;
         this.connectRef = connectRef;
     }
@@ -88,6 +91,13 @@ public class CacheableRequest extends Request
     {
         final MutableDirectBuffer buffer = requestBufferPool.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, requestSize);
+    }
+
+    // TODO remove need for
+    public void copyRequestTo(MutableDirectBuffer buffer)
+    {
+        MutableDirectBuffer requestBuffer = requestBufferPool.buffer(requestSlot);
+        requestBuffer.getBytes(0, buffer, 0, requestSize);
     }
 
     public void cache(ListFW<HttpHeaderFW> responseHeaders)
@@ -119,12 +129,12 @@ public class CacheableRequest extends Request
 
     public void cache(EndFW end, Cache cache)
     {
-        cache.put(requestUrlHash(), this);
+        cache.put(requestURLHash(), this);
     }
 
-    private int requestUrlHash()
+    private int requestURLHash()
     {
-        return this.requestUrlHash;
+        return this.requestURLHash;
     }
 
     @Override
@@ -144,9 +154,9 @@ public class CacheableRequest extends Request
         }// else cache's responsibility to clear, TODO clean up this abstraction
     }
 
-    public Object authScope()
+    public short authScope()
     {
-        return authScope();
+        return authScope;
     }
 
     public String connectName()
@@ -192,5 +202,10 @@ public class CacheableRequest extends Request
     {
         MutableDirectBuffer responseBuffer = responseBufferPool.buffer(responseSlot);
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
+    }
+
+    public MessageConsumer connect()
+    {
+        return connect;
     }
 }
