@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
 
 import java.util.function.LongSupplier;
 
@@ -23,7 +24,6 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -109,11 +109,10 @@ public class CacheableRequest extends Request
 
     public void cache(ListFW<HttpHeaderFW> responseHeaders)
     {
-        // Update etag if exists
-        this.etag = HttpHeadersUtil.getHeaderOrDefault(responseHeaders, ETAG, etag);
-        // DPW TODO abort if not cacheable
+        this.etag = getHeaderOrDefault(responseHeaders, ETAG, etag);
+
         setupResponseBuffer();
-        MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
+        MutableDirectBuffer buffer = responseBuffer();
         final int headersSize = responseHeaders.sizeof();
         buffer.putBytes(responseSize, responseHeaders.buffer(), responseHeaders.offset(), headersSize);
         responseSize += headersSize;
@@ -131,7 +130,7 @@ public class CacheableRequest extends Request
     {
         OctetsFW payload = data.payload();
         int sizeof = payload.sizeof();
-        MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
+        MutableDirectBuffer buffer = responseBuffer();
         buffer.putBytes(responseSize, payload.buffer(), payload.offset(), sizeof);
         responseSize += sizeof;
     }
@@ -212,7 +211,7 @@ public class CacheableRequest extends Request
     public ListFW<HttpHeaderFW> getResponseHeaders(
         ListFW<HttpHeaderFW> responseHeadersRO)
     {
-        MutableDirectBuffer responseBuffer = responseBufferPool.buffer(responseSlot);
+        MutableDirectBuffer responseBuffer = responseBuffer();
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
     }
 
@@ -224,5 +223,10 @@ public class CacheableRequest extends Request
     public String etag()
     {
         return etag;
+    }
+
+    private MutableDirectBuffer responseBuffer()
+    {
+        return responseBufferPool.buffer(responseSlot);
     }
 }

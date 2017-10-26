@@ -325,7 +325,7 @@ public class Writer
                     case HttpHeaders.IF_MATCH:
                     case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
-                    // DPW TODO x-on-update modified wait
+                    // TODO x-on-update modified wait
                    default: builder.item(header -> header.name(nameFW)
                                                          .value(valueFW));
                }

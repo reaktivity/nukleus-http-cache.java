@@ -103,7 +103,7 @@ public final class CacheEntry
             int newSlot = cache.newRequestBufferPool.acquire(connectStreamId);
             if (newSlot == NO_SLOT)
             {
-                throw new RuntimeException("Cache out of space, please reconfigure");  // DPW TODO reconsider hard fail??
+                throw new RuntimeException("Cache out of space, please reconfigure");  // TODO reconsider hard fail??
             }
             MutableDirectBuffer newBuffer = cache.newRequestBufferPool.buffer(newSlot);
             this.cachedRequest.copyRequestTo(newBuffer);
