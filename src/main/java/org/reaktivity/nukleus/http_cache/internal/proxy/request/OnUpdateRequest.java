@@ -19,7 +19,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class OnUpdateRequest extends InitialCacheableRequest
+public class OnUpdateRequest extends CacheableRequest
 {
 
     public OnUpdateRequest(

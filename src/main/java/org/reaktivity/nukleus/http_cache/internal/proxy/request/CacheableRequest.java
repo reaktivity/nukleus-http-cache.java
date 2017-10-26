@@ -28,7 +28,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class InitialCacheableRequest extends Request
+public class CacheableRequest extends Request
 {
 
     private final BufferPool requestBufferPool;
@@ -46,7 +46,7 @@ public class InitialCacheableRequest extends Request
     private final LongSupplier supplyCorrelationId;
     private final LongSupplier supplyStreamId;
 
-    public InitialCacheableRequest(
+    public CacheableRequest(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
@@ -119,13 +119,7 @@ public class InitialCacheableRequest extends Request
 
     public void cache(EndFW end, Cache cache)
     {
-        cache.put(requestUrlHash(),
-                requestSlot,
-                requestSize,
-                responseSlot,
-                responseHeadersSize,
-                responseSize,
-                authScope);
+        cache.put(requestUrlHash(), this);
     }
 
     private int requestUrlHash()
@@ -173,5 +167,30 @@ public class InitialCacheableRequest extends Request
     public LongSupplier supplyStreamId()
     {
         return supplyStreamId;
+    }
+
+    // TODO hide abstraction
+    public int responseSlot()
+    {
+        return responseSlot;
+    }
+
+    // TODO hide abstraction
+    public int responseHeadersSize()
+    {
+        return responseHeadersSize;
+    }
+
+    // TODO hide abstraction
+    public int responseSize()
+    {
+        return responseSize;
+    }
+
+    public ListFW<HttpHeaderFW> getResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeadersRO)
+    {
+        MutableDirectBuffer responseBuffer = responseBufferPool.buffer(responseSlot);
+        return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
     }
 }

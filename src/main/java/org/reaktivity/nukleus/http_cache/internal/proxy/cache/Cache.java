@@ -22,6 +22,7 @@ import java.util.function.LongSupplier;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
@@ -65,22 +66,12 @@ public class Cache
     }
 
     public void put(
-        int requestURLHash,
-        int requestSlot,
-        int requestSize,
-        int responseSlot,
-        int responseHeaderSize,
-        int responseSize,
-        short authScope)
+        int requestUrlHash,
+        CacheableRequest request)
     {
         CacheEntry cacheEntry = new CacheEntry(
                 this,
-                requestSlot,
-                requestSize,
-                responseSlot,
-                responseHeaderSize,
-                responseSize,
-                authScope);
+                request);
 
         if (cacheEntry.isIntendedForSingleUser())
         {
@@ -88,7 +79,7 @@ public class Cache
         }
         else
         {
-            CacheEntry oldCacheEntry = cachedEntries.put(requestURLHash, cacheEntry);
+            CacheEntry oldCacheEntry = cachedEntries.put(requestUrlHash, cacheEntry);
             if (oldCacheEntry != null)
             {
                 oldCacheEntry.cleanUp();

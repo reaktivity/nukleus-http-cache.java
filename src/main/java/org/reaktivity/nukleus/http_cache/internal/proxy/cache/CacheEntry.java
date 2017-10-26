@@ -34,7 +34,7 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialCacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -48,36 +48,21 @@ public final class CacheEntry
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     private final Cache cache;
-    private final int requestSlot;
-    private final int requestSize;
-    private final int responseSlot;
-    private final int responseHeaderSize;
-    private final int responseSize;
     private int clientCount = 0;
     private boolean cleanUp = false;
-    private final short authScope;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
     private CacheControl cacheControlFW;
 
-    CacheEntry(
-        Cache cache,
-        int requestSlot,
-        int requestSize,
-        int responseSlot,
-        int responseHeaderSize,
-        int responseSize,
-        short authScope)
+    private final CacheableRequest cachedRequest;
+
+    public CacheEntry(Cache cache,
+            CacheableRequest request)
     {
         this.cache = cache;
-        this.requestSlot = requestSlot;
-        this.requestSize = requestSize;
-        this.responseSlot = responseSlot;
-        this.responseHeaderSize = responseHeaderSize;
-        this.responseSize = responseSize;
-        this.authScope = authScope;
+        this.cachedRequest = request;
     }
 
     private void handleEndOfStream(
@@ -90,31 +75,30 @@ public final class CacheEntry
     }
 
     // forwards response to client once cached (No need to inject warnings)
-    public void forwardToClient(InitialCacheableRequest streamCorrelation)
+    public void forwardToClient(CacheableRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, false);
     }
 
-    // serves client from cache (need to inject warnings
+    // serves client from cache (need to inject warnings)
     public void serveClient(
-            InitialCacheableRequest streamCorrelation)
+            CacheableRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, true);
     }
 
     private void sendResponseToClient(
-        InitialCacheableRequest request,
+        CacheableRequest request,
         boolean injectWarnings)
     {
         addClient();
-        MutableDirectBuffer buffer = this.cache.requestBufferPool.buffer(responseSlot);
-        ListFW<HttpHeaderFW> responseHeaders = this.cache.responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
+        ListFW<HttpHeaderFW> responseHeaders = getResponseHeaders();
 
         ServeFromCacheStream serveFromCacheStream = new ServeFromCacheStream(
                 request,
-                responseSlot,
-                responseHeaderSize,
-                responseSize,
+                cachedRequest.responseSlot(),   // TODO hide abstraction
+                cachedRequest.responseHeadersSize(),
+                cachedRequest.responseSize(),
                 this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
 
@@ -161,8 +145,7 @@ public final class CacheEntry
         cleanUp = true;
         if (clientCount == 0)
         {
-            this.cache.responseBufferPool.release(responseSlot);
-            this.cache.requestBufferPool.release(requestSlot);
+            cachedRequest.abort();
         }
     }
 
@@ -234,22 +217,13 @@ public final class CacheEntry
 
     private ListFW<HttpHeaderFW> getRequest()
     {
-        DirectBuffer buffer = this.cache.requestBufferPool.buffer(requestSlot);
-        return this.cache.requestHeadersRO.wrap(buffer, 0, requestSize);
+        return cachedRequest.getRequestHeaders(cache.requestHeadersRO);
     }
 
     public ListFW<HttpHeaderFW> getResponseHeaders()
     {
-        DirectBuffer buffer = this.cache.responseBufferPool.buffer(responseSlot);
-        return this.cache.responseHeadersRO.wrap(buffer, 0, responseHeaderSize);
+        return cachedRequest.getResponseHeaders(cache.responseHeadersRO);
     }
-
-//  TODO remove
-//    public OctetsFW getResponse(OctetsFW octetsFW)
-//    {
-//        DirectBuffer buffer = this.cache.responseBufferPool.buffer(responseSlot);
-//        return octetsFW.wrap(buffer, responseHeaderSize, responseSize);
-//    }
 
     public void addClient()
     {
@@ -261,8 +235,7 @@ public final class CacheEntry
         clientCount--;
         if (clientCount == 0 && cleanUp)
         {
-            this.cache.responseBufferPool.release(responseSlot);
-            this.cache.requestBufferPool.release(requestSlot);
+            cachedRequest.abort(); // Force hard clean up
         }
     }
 
@@ -273,7 +246,7 @@ public final class CacheEntry
 
         if (SurrogateControl.isXProtected(this.getResponseHeaders()))
         {
-            return requestAuthScope == authScope;
+            return requestAuthScope == cachedRequest.authScope;
         }
 
         final CacheControl responseCacheControl = responseCacheControl();
