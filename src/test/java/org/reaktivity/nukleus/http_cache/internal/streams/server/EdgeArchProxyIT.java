@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -81,43 +80,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Ignore
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/does.not.share.debounce.when.explicitly.private.cache/accept/client",
-        "${streams}/does.not.share.debounce.when.explicitly.private.cache/connect/server",
-    })
-    public void doesNotShareDebounceWhenExplicitlyPrivate() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Ignore
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/does.not.share.debounce.when.implied.private.cache/accept/client",
-        "${streams}/does.not.share.debounce.when.implied.private.cache/connect/server",
-    })
-    public void shouldNotShareDebounceWhenImpliedPrivate() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Ignore
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/does.not.share.debounce.when.varies/accept/client",
-        "${streams}/does.not.share.debounce.when.varies/connect/server",
-    })
-
-    public void shouldNotShareDebounceWhenVaries() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
     @Specification({
         "${route}/proxy/controller",
         "${streams}/share.with.x-protected.scope/accept/client",
@@ -158,31 +120,6 @@ public class EdgeArchProxyIT
         "${streams}/inject.stale-while-revalidate.push-promise.no-cache/connect/server",
     })
     public void shouldInjectValuesOnFreshnessExtension() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Ignore
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/share.debounce.when.explicitly.public/accept/client",
-        "${streams}/share.debounce.when.explicitly.public/connect/server",
-    })
-
-    public void shouldShareDebounceWhenExplicitlyPublic() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Ignore
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/share.debounce.when.x-protected.and.same.scope/accept/client",
-        "${streams}/share.debounce.when.x-protected.and.same.scope/connect/server",
-    })
-    public void shouldShareDebounceWhenXProtectedAndSameScope() throws Exception
     {
         k3po.finish();
     }
