@@ -79,7 +79,6 @@ public class ProxyStreamFactory implements StreamFactory
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
 
-
     final Cache cache;
 
     public ProxyStreamFactory(

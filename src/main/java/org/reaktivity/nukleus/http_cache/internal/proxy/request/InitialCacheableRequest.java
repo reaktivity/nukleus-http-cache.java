@@ -15,6 +15,8 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import java.util.function.LongSupplier;
+
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -26,7 +28,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class CacheableRequest extends Request
+public class InitialCacheableRequest extends Request
 {
 
     private final BufferPool requestBufferPool;
@@ -37,14 +39,22 @@ public class CacheableRequest extends Request
     private int responseSlot;
     private int responseHeadersSize;
     private int responseSize;
-    private boolean cachingResponse;    // TODO, move to state
+    private boolean cachingResponse;    // TODO, consider using state management via method references
     public final short authScope;
+    private final String connectName;
+    private final long connectRef;
+    private final LongSupplier supplyCorrelationId;
+    private final LongSupplier supplyStreamId;
 
-    public CacheableRequest(
+    public InitialCacheableRequest(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
         long acceptCorrelationId,
+        String connectName,
+        long connectRef,
+        LongSupplier supplyCorrelationId,
+        LongSupplier supplyStreamId,
         int requestURLHash,
         BufferPool responseBufferPool,
         BufferPool requestBufferPool,
@@ -61,6 +71,11 @@ public class CacheableRequest extends Request
         this.requestUrlHash = requestURLHash;
         this.cachingResponse = true;
         this.authScope = authScope;
+        this.supplyCorrelationId = supplyCorrelationId;
+        this.supplyStreamId = supplyStreamId;
+
+        this.connectName = connectName;
+        this.connectRef = connectRef;
     }
 
     @Override
@@ -138,5 +153,25 @@ public class CacheableRequest extends Request
     public Object authScope()
     {
         return authScope();
+    }
+
+    public String connectName()
+    {
+        return connectName;
+    }
+
+    public long connectRef()
+    {
+        return connectRef;
+    }
+
+    public LongSupplier supplyCorrelationId()
+    {
+        return supplyCorrelationId;
+    }
+
+    public LongSupplier supplyStreamId()
+    {
+        return supplyStreamId;
     }
 }

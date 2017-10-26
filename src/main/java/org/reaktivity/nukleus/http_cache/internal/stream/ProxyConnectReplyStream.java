@@ -20,7 +20,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -139,7 +139,7 @@ final class ProxyConnectReplyStream
         ListFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        InitialCacheableRequest request = (InitialCacheableRequest) streamCorrelation;
         request.cache(responseHeaders);
         int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
@@ -166,7 +166,7 @@ final class ProxyConnectReplyStream
 
     private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        InitialCacheableRequest request = (InitialCacheableRequest) streamCorrelation;
         request.cache(responseHeaders);
         doProxyBegin(responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
@@ -178,7 +178,7 @@ final class ProxyConnectReplyStream
             int index,
             int length)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        InitialCacheableRequest request = (InitialCacheableRequest) streamCorrelation;
 
         switch (msgTypeId)
         {

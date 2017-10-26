@@ -19,7 +19,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class OnUpdateRequest extends CacheableRequest
+public class OnUpdateRequest extends InitialCacheableRequest
 {
 
     public OnUpdateRequest(
@@ -40,6 +40,10 @@ public class OnUpdateRequest extends CacheableRequest
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
+            null,   // DPW TO Remove (class hierarchy needs to be reversed)
+            0,      // DPW TO Remove
+            null,   // DPW TO Remove
+            null,   // DPW TO Remove
             requestURLHash,
             responseBufferPool,
             requestBufferPool,

@@ -107,7 +107,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     supplyStreamId,
                     supplyCorrelationId,
                     bufferPool,
-                    correlations);
+                    correlations,
+                    router);
         }
         return new ProxyStreamFactory(
                 router,

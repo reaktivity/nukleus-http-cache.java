@@ -28,7 +28,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -191,12 +191,19 @@ final class ProxyAcceptStream
 
         if (cachedResponse.isPresent())
         {
-            CacheableRequest cacheableRequest;
-            this.request = cacheableRequest = new CacheableRequest(
+            InitialCacheableRequest cacheableRequest;
+            this.request = cacheableRequest = new InitialCacheableRequest(
                     acceptName,
                     acceptReply,
                     acceptReplyStreamId,
                     acceptCorrelationId,
+                    // DPW TODO - Move next 4 into cache constructor, back
+                    // making cache tied to ProxyAcceptStreamFactory
+                    this.connectName,
+                    this.connectRef,
+                    streamFactory.supplyCorrelationId,
+                    streamFactory.supplyStreamId,
+                    //
                     requestURLHash,
                     streamFactory.correlationResponseBufferPool,
                     streamFactory.correlationRequestBufferPool,
@@ -212,11 +219,18 @@ final class ProxyAcceptStream
         }
         else
         {
-            this.request = new CacheableRequest(
+            this.request = new InitialCacheableRequest(
                     acceptName,
                     acceptReply,
                     acceptReplyStreamId,
                     acceptCorrelationId,
+                    // DPW TODO - Move next 4 into cache constructor, back
+                    // making cache tied to ProxyAcceptStreamFactory
+                    this.connectName,
+                    this.connectRef,
+                    streamFactory.supplyCorrelationId,
+                    streamFactory.supplyStreamId,
+                    //
                     requestURLHash,
                     streamFactory.correlationResponseBufferPool,
                     streamFactory.correlationRequestBufferPool,

@@ -34,7 +34,7 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -90,20 +90,20 @@ public final class CacheEntry
     }
 
     // forwards response to client once cached (No need to inject warnings)
-    public void forwardToClient(CacheableRequest streamCorrelation)
+    public void forwardToClient(InitialCacheableRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, false);
     }
 
     // serves client from cache (need to inject warnings
     public void serveClient(
-            CacheableRequest streamCorrelation)
+            InitialCacheableRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, true);
     }
 
     private void sendResponseToClient(
-        CacheableRequest request,
+        InitialCacheableRequest request,
         boolean injectWarnings)
     {
         addClient();

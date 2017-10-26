@@ -28,7 +28,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -237,7 +237,7 @@ public class Writer
     }
 
     public void doHttpPushPromise(
-        CacheableRequest request,
+        InitialCacheableRequest request,
         ListFW<HttpHeaderFW> requestHeaders,
         ListFW<HttpHeaderFW> responseHeaders,
         int surrogateAge)
