@@ -16,6 +16,8 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -89,10 +91,11 @@ public class Writer
             long correlationId,
             CacheControl cacheControlFW,
             ListFW<HttpHeaderFW> responseHeaders,
-            int staleWhileRevalidate)
+            int staleWhileRevalidate,
+            String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate);
+                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate, etag);
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(targetStreamId)
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
@@ -107,7 +110,8 @@ public class Writer
             Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
             CacheControl cacheControlFW,
             ListFW<HttpHeaderFW> responseHeadersRO,
-            int staleWhileRevalidate)
+            int staleWhileRevalidate,
+            String etag)
     {
         responseHeadersRO.forEach(h ->
         {
@@ -159,6 +163,10 @@ public class Writer
         if (!responseHeadersRO.anyMatch(HAS_CACHE_CONTROL))
         {
             builder.item(header -> header.name("cache-control").value("stale-while-revalidate=" + staleWhileRevalidate));
+        }
+        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
+        {
+            builder.item(header -> header.name(ETAG).value(etag));
         }
     }
 
@@ -240,7 +248,8 @@ public class Writer
         CacheableRequest request,
         ListFW<HttpHeaderFW> requestHeaders,
         ListFW<HttpHeaderFW> responseHeaders,
-        int surrogateAge)
+        int surrogateAge,
+        String etag)
     {
         final MessageConsumer acceptReply = request.acceptReply();
         final long acceptReplyStreamId = request.acceptReplyStreamId();
@@ -248,16 +257,17 @@ public class Writer
         doH2PushPromise(
             acceptReply,
             acceptReplyStreamId,
-            setPushPromiseHeaders(requestHeaders, responseHeaders, surrogateAge));
+            setPushPromiseHeaders(requestHeaders, responseHeaders, surrogateAge, etag));
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
             ListFW<HttpHeaderFW> requestHeadersRO,
             ListFW<HttpHeaderFW> responseHeadersRO,
-            int surrogateAge)
+            int surrogateAge,
+            String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
-                builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, surrogateAge);
+                builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, surrogateAge, etag);
 
         return result;
     }
@@ -266,7 +276,8 @@ public class Writer
             ListFW<HttpHeaderFW> requestHeadersFW,
             ListFW<HttpHeaderFW> responseHeadersFW,
             Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-            int surrogateAge)
+            int surrogateAge,
+            String etag)
     {
         requestHeadersFW
            .forEach(h ->
@@ -299,12 +310,17 @@ public class Writer
                        }
                        break;
                     case HttpHeaders.IF_NONE_MATCH:
+                       String etagValue = etag;
                        if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
                        {
-                           final String newValue = getHeader(responseHeadersFW, "etag");
-                           builder.item(header -> header.name(nameFW)
-                                                        .value(newValue));
+                           if (!etag.contains(etagValue))  // TODO, fix logic to handle multiple values and fuzzy match
+                           {
+                               etagValue += ", " + getHeader(responseHeadersFW, "etag");
+                           }
                        }
+                       final String finalEtag = etagValue;
+                       builder.item(header -> header.name(nameFW)
+                               .value(finalEtag));
                        break;
                     case HttpHeaders.IF_MATCH:
                     case HttpHeaders.IF_UNMODIFIED_SINCE:
@@ -321,6 +337,10 @@ public class Writer
            if (!requestHeadersFW.anyMatch(PreferHeader.HAS_HEADER))
            {
                builder.item(header -> header.name("prefer").value("x-on-update, wait=" + surrogateAge));
+           }
+           if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h)))
+           {
+               builder.item(header -> header.name(IF_NONE_MATCH).value(etag));
            }
     }
 

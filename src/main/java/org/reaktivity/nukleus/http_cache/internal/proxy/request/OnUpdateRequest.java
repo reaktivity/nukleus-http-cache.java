@@ -33,7 +33,8 @@ public class OnUpdateRequest extends CacheableRequest
         int requestSize,
         RouteManager router,
         int requestURLHash,
-        short authScope)
+        short authScope,
+        String etag)
     {
         super(
             acceptName,
@@ -51,7 +52,8 @@ public class OnUpdateRequest extends CacheableRequest
             requestSlot,
             requestSize,
             router,
-            authScope);
+            authScope,
+            etag);
     }
 
     @Override

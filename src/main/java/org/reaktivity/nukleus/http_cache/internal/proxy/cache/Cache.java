@@ -16,6 +16,8 @@
 
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import java.util.function.Supplier;
+
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -48,13 +50,15 @@ public class Cache
     final CacheControl requestCacheControlFW = new CacheControl();
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
+    final Supplier<String> etagSupplier;
 
     public Cache(
             LongObjectBiConsumer<Runnable> scheduler,
             MutableDirectBuffer writeBuffer,
             BufferPool bufferPool,
             Long2ObjectHashMap<Request> correlations,
-            RouteManager router)
+            RouteManager router,
+            Supplier<String> etagSupplier)
     {
         this.scheduler = scheduler;
         this.correlations = correlations;
@@ -63,13 +67,13 @@ public class Cache
         this.newRequestBufferPool = bufferPool;
         this.responseBufferPool = bufferPool.duplicate();
         this.cachedEntries = new Long2ObjectHashMap<>();
+        this.etagSupplier = etagSupplier;
     }
 
     public void put(
         int requestUrlHash,
         CacheableRequest request)
     {
-        System.out.println("Cache Updated");
         CacheEntry cacheEntry = new CacheEntry(
                 this,
                 request);

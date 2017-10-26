@@ -30,13 +30,8 @@ public final class HttpHeaders
     public static final String METHOD = ":method";
     public static final String WARNING = "warning";
     public static final String SURROGATE_CONTROL = "surrogate-control";
-    public static final String PREFER = "surroate-control";
+    public static final String PREFER = "prefer";
     public static final String IF_UNMODIFIED_SINCE = "if-unmodified-since";
     public static final String ETAG = "etag";
-
-    private HttpHeaders()
-    {
-        // utility class
-    }
 
 }

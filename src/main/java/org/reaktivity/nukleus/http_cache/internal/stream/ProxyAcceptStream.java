@@ -163,6 +163,7 @@ final class ProxyAcceptStream
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
+        storeRequest(requestHeaders);
         OnUpdateRequest onUpdateRequest;
         this.request = onUpdateRequest = new OnUpdateRequest(
             acceptName,
@@ -175,7 +176,8 @@ final class ProxyAcceptStream
             requestSize,
             streamFactory.router,
             requestURLHash,
-            authScope);
+            authScope,
+            streamFactory.etagSupplier.get());
 
         if (!streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
         {
@@ -215,7 +217,8 @@ final class ProxyAcceptStream
                 requestSlot,
                 requestSize,
                 streamFactory.router,
-                authScope);
+                authScope,
+                streamFactory.etagSupplier.get());
 
         if (!streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {

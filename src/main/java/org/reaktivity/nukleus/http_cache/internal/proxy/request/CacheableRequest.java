@@ -15,12 +15,15 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+
 import java.util.function.LongSupplier;
 
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -47,6 +50,7 @@ public class CacheableRequest extends Request
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
+    private String etag;
 
     public CacheableRequest(
         String acceptName,
@@ -64,7 +68,8 @@ public class CacheableRequest extends Request
         int requestSlot,
         int requestSize,
         RouteManager router,
-        short authScope)
+        short authScope,
+        String etag)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
         this.requestBufferPool = requestBufferPool;
@@ -72,6 +77,7 @@ public class CacheableRequest extends Request
         this.requestSlot = requestSlot;
         this.requestSize = requestSize;
         this.requestURLHash = requestURLHash;
+        this.etag = etag;
         this.cachingResponse = true;
         this.authScope = authScope;
         this.supplyCorrelationId = supplyCorrelationId;
@@ -103,6 +109,8 @@ public class CacheableRequest extends Request
 
     public void cache(ListFW<HttpHeaderFW> responseHeaders)
     {
+        // Update etag if exists
+        this.etag = HttpHeadersUtil.getHeaderOrDefault(responseHeaders, ETAG, etag);
         // DPW TODO abort if not cacheable
         setupResponseBuffer();
         MutableDirectBuffer buffer = responseBufferPool.buffer(responseSlot);
@@ -211,5 +219,10 @@ public class CacheableRequest extends Request
     public MessageConsumer connect()
     {
         return connect;
+    }
+
+    public String etag()
+    {
+        return etag;
     }
 }

@@ -228,7 +228,7 @@ public final class CacheUtils
             return false;
         }
 
-        String ifMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_MATCH);
+        String ifMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         if (ifMatch == null)
         {
             return false;

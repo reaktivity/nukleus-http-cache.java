@@ -17,7 +17,9 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Random;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -51,6 +53,13 @@ public class ProxyStreamFactory implements StreamFactory
 
     // TODO, remove need for RW in simplification of inject headers
     final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
+
+    private int etagCnt = 0;
+    private final int etagPrefix = new Random().nextInt(99999);
+    final Supplier<String> etagSupplier = () ->
+    {
+        return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
+    };
 
     final BeginFW beginRO = new BeginFW();
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
@@ -191,36 +200,4 @@ public class ProxyStreamFactory implements StreamFactory
         return routeRO.wrap(buffer, index, index + length);
     }
 
-    void sendRequest(
-            final MessageConsumer connect,
-            final long connectStreamId,
-            final long connectRef,
-            final long connectCorrelationId,
-            final ListFW<HttpHeaderFW> requestHeaders)
-    {
-
-        writer.doHttpBegin(
-            connect,
-            connectStreamId,
-            connectRef,
-            connectCorrelationId,
-            builder -> requestHeaders.forEach(requestHeader ->
-                    builder.item(item -> item.name(requestHeader.name()).value(requestHeader.value()))
-            ));
-        writer.doHttpEnd(connect, connectStreamId);
-    }
-
-    // TODO add to Long2ObjectHashMap#putIfAbsent.putIfAbsent without Boxing
-    public static <T> T long2ObjectPutIfAbsent(
-            Long2ObjectHashMap<T> map,
-            int key,
-            T value)
-    {
-        T old = map.get(key);
-        if (old == null)
-        {
-            map.put(key, value);
-        }
-        return old;
-    }
 }

@@ -93,7 +93,7 @@ public final class CacheEntry
             long connectStreamId = cachedRequest.supplyStreamId().getAsLong();
             long connectRef = cachedRequest.connectRef();
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
-            ListFW<HttpHeaderFW> requestHeaders = getRequest();
+            ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             cache.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,
                     builder -> requestHeaders.forEach(
                             h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
@@ -108,7 +108,8 @@ public final class CacheEntry
             MutableDirectBuffer newBuffer = cache.newRequestBufferPool.buffer(newSlot);
             this.cachedRequest.copyRequestTo(newBuffer);
 
-            cache.correlations.put(connectCorrelationId, new CacheRefreshRequest(cachedRequest, newSlot));
+            final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(cachedRequest, newSlot, cache.etagSupplier.get());
+            cache.correlations.put(connectCorrelationId, refreshRequest);
         }
     }
 
@@ -168,11 +169,12 @@ public final class CacheEntry
                     acceptCorrelationId,
                     cacheControlFW,
                     responseHeaders,
-                    freshnessExtension);
+                    freshnessExtension,
+                    cachedRequest.etag());
 
             final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
             int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
-            this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge);
+            this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge, cachedRequest.etag());
         }
         else
         {
@@ -262,7 +264,7 @@ public final class CacheEntry
         }
     }
 
-    private ListFW<HttpHeaderFW> getRequest()
+    private ListFW<HttpHeaderFW> getCachedRequest()
     {
         return cachedRequest.getRequestHeaders(cache.requestHeadersRO);
     }
@@ -297,14 +299,14 @@ public final class CacheEntry
         }
 
         final CacheControl responseCacheControl = responseCacheControl();
-        final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getRequest();
+        final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getCachedRequest();
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
     }
 
     private boolean doesNotVaryBy(ListFW<HttpHeaderFW> request)
     {
         final ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders();
-        final ListFW<HttpHeaderFW> cachedRequest = getRequest();
+        final ListFW<HttpHeaderFW> cachedRequest = getCachedRequest();
         return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 

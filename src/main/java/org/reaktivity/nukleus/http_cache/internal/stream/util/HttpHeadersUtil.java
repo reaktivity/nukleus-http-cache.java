@@ -70,8 +70,12 @@ public final class HttpHeadersUtil
         return header.length() == 0 ? null : header.toString();
     }
 
-    private HttpHeadersUtil()
+    public static String getHeaderOrDefault(
+            ListFW<HttpHeaderFW> responseHeaders,
+            String headerName,
+            String defaulted)
     {
-        // utility class
+        final String result = getHeader(responseHeaders, headerName);
+        return result == null ? defaulted : result;
     }
 }

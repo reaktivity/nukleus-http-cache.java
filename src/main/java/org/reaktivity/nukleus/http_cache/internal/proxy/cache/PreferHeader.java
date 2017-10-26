@@ -46,7 +46,7 @@ public final class PreferHeader
     public static final Predicate<? super HttpHeaderFW> PREFER_RESPONSE_WHEN_UPDATED = h ->
     {
         final String name = h.name().asString();
-        final String value = h.name().asString();
+        final String value = h.value().asString();
         return PREFER.equals(name) && value.contains(X_ON_UPDATE);
     };
 

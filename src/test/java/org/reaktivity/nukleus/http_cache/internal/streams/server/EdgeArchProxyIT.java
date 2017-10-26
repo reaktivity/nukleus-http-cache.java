@@ -212,8 +212,8 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/polling.updates.on-update/accept/client",
-        "${streams}/polling.updates.on-update/connect/server",
+        "${streams}/polling.updates.pending.on-update.requests/accept/client",
+        "${streams}/polling.updates.pending.on-update.requests/connect/server",
     })
     public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
     {
