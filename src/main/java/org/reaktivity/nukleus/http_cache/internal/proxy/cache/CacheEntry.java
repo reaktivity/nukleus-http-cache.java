@@ -31,14 +31,18 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -61,6 +65,8 @@ public final class CacheEntry
     private CacheControl cacheControlFW;
 
     private final CacheableRequest cachedRequest;
+
+    private List<OnUpdateRequest> subscribeToUpdates = new ArrayList<OnUpdateRequest>(); // TODO, lazy init
 
     public CacheEntry(Cache cache,
             CacheableRequest request)
@@ -413,7 +419,6 @@ public final class CacheEntry
     }
 
     public boolean canServeRequest(
-        int requestURLHash,
         ListFW<HttpHeaderFW> request,
         short authScope)
     {
@@ -456,4 +461,20 @@ public final class CacheEntry
         }
     }
 
+    public boolean isMatch(ListFW<HttpHeaderFW> requestHeaders)
+    {
+        return CacheUtils.isMatchByEtag(requestHeaders, getResponseHeaders());
+    }
+
+    public void subscribeToUpdate(OnUpdateRequest onModificationRequest)
+    {
+        this.subscribeToUpdates.add(onModificationRequest);
+    }
+
+    public Stream<OnUpdateRequest> subscribersOnUpdate()
+    {
+        return subscribeToUpdates.stream();
+    }
+
 }
+

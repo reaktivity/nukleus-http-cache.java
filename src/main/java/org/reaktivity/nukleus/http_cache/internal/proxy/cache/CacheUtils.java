@@ -30,11 +30,13 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -214,6 +216,26 @@ public final class CacheUtils
             String myHeaderValue = getHeader(cachedRequest, v);
             return !Objects.equals(pendingHeaderValue, myHeaderValue);
         });
+    }
+
+    public static boolean isMatchByEtag(
+        ListFW<HttpHeaderFW> requestHeaders,
+        ListFW<HttpHeaderFW> responseHeaders)
+    {
+        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+        if (etag == null)
+        {
+            return false;
+        }
+
+        String ifMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_MATCH);
+        if (ifMatch == null)
+        {
+            return false;
+        }
+
+        // TODO, use Java Pattern for less GC
+        return Arrays.stream(ifMatch.split(",")).anyMatch(t -> etag.equals(t.trim()));
     }
 
 }

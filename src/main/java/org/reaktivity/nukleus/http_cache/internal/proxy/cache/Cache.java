@@ -16,8 +16,6 @@
 
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import java.util.Optional;
-
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -86,32 +84,74 @@ public class Cache
             if (oldCacheEntry != null)
             {
                 oldCacheEntry.cleanUp();
+                oldCacheEntry.subscribersOnUpdate().forEach(r ->
+                {
+                    if (!this.serveRequest(
+                            cacheEntry,
+                            r.getRequestHeaders(requestHeadersRO),
+                            r.authScope(),
+                            r))
+                    {
+                        throw new RuntimeException("Not implemented, probably better" +
+                                " to cancel push promise, but maybe should forward request?");
+                    }
+                });
             }
         }
     }
 
-    public Optional<CacheEntry> getResponseThatSatisfies(
+    public boolean handleInitialRequest(
             int requestURLHash,
             ListFW<HttpHeaderFW> request,
-            short authScope)
+            short authScope,
+            CacheableRequest cacheableRequest)
     {
-        System.out.println("Searching Cache");
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-
-        if (cacheEntry != null && cacheEntry.canServeRequest(requestURLHash, request, authScope))
+        if (cacheEntry != null)
         {
-            System.out.println("Cache found");
-            return Optional.of(cacheEntry);
+            return serveRequest(cacheEntry, request, authScope, cacheableRequest);
         }
         else
         {
-            return Optional.empty();
+            return false;
         }
     }
 
-    public void onUpdate(OnUpdateRequest onModificationRequest)
+    public boolean handleOnUpdateRequest(
+            int requestURLHash,
+            OnUpdateRequest onModificationRequest,
+            ListFW<HttpHeaderFW> requestHeaders,
+            short authScope)
     {
-        throw new RuntimeException("DPW to implement");
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        if (cacheEntry == null)
+        {
+            return false;
+        }
+        else if (cacheEntry.isMatch(requestHeaders))
+        {
+            cacheEntry.subscribeToUpdate(onModificationRequest);
+            return true;
+        }
+        else
+        {
+            cacheEntry.serveClient(onModificationRequest);
+            return true;
+        }
+    }
+
+    private boolean serveRequest(
+            CacheEntry entry,
+            ListFW<HttpHeaderFW> request,
+            short authScope,
+            CacheableRequest cacheableRequest)
+    {
+        if (entry.canServeRequest(request, authScope))
+        {
+            entry.serveClient(cacheableRequest);
+            return true;
+        }
+        return false;
     }
 
 }

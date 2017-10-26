@@ -103,12 +103,12 @@ final class ProxyConnectReplyStream
                     doProxyBegin(responseHeaders);
                     break;
                 case CACHEABLE:
+                case ON_MODIFIED:
                     handleCacheableRequest(responseHeaders);
                     break;
                 case CACHE_REFRESH:
                     handleCacheRefresh(responseHeaders);
                     break;
-                case ON_MODIFIED:
                 default:
                     throw new RuntimeException("Not implemented");
             }

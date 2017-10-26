@@ -21,6 +21,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -36,7 +37,7 @@ public class CacheableRequest extends Request
     final int requestSlot;
     final int requestSize;
     final int requestURLHash;
-    int responseSlot;
+    int responseSlot = Slab.NO_SLOT;
     int responseHeadersSize;
     int responseSize;
     boolean cachingResponse;    // TODO, consider using state management via method references
@@ -141,7 +142,10 @@ public class CacheableRequest extends Request
     public void abort()
     {
         requestBufferPool.release(requestSlot);
-        responseBufferPool.release(responseSlot);
+        if (responseSlot != Slab.NO_SLOT)
+        {
+            responseBufferPool.release(responseSlot);
+        }
     }
 
     @Override

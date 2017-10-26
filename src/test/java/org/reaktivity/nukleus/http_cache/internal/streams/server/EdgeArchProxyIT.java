@@ -209,4 +209,15 @@ public class EdgeArchProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.updates.on-update/accept/client",
+        "${streams}/polling.updates.on-update/connect/server",
+    })
+    public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

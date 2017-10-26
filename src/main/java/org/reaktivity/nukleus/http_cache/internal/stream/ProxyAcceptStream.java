@@ -21,13 +21,10 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
-import java.util.Optional;
-
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
@@ -179,7 +176,18 @@ final class ProxyAcceptStream
             streamFactory.router,
             requestURLHash,
             authScope);
-        streamFactory.cache.onUpdate(onUpdateRequest);
+
+        if (!streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
+        {
+            sendBeginToConnect(requestHeaders);
+        }
+        else
+        {
+            sendBeginToConnect(requestHeaders);
+            streamFactory.writer.doHttpEnd(connect, connectStreamId);
+            this.streamState = this::handleAllFramesByIgnoring;
+        }
+        this.streamState = this::handleAllFramesByIgnoring;
     }
 
     private void handleCacheableRequest(
@@ -187,65 +195,41 @@ final class ProxyAcceptStream
         final String requestURL,
         short authScope)
     {
-        Optional<CacheEntry> cachedResponse = streamFactory.cache.getResponseThatSatisfies(
+        CacheableRequest cacheableRequest;
+        this.request = cacheableRequest = new CacheableRequest(
+                acceptName,
+                acceptReply,
+                acceptReplyStreamId,
+                acceptCorrelationId,
+                // DPW TODO - Move next 4 into cache constructor, back
+                // making cache tied to ProxyAcceptStreamFactory
+                connect,
+                connectName,
+                connectRef,
+                streamFactory.supplyCorrelationId,
+                streamFactory.supplyStreamId,
+                //
                 requestURLHash,
-                requestHeaders,
+                streamFactory.correlationResponseBufferPool,
+                streamFactory.correlationRequestBufferPool,
+                requestSlot,
+                requestSize,
+                streamFactory.router,
                 authScope);
 
-        if (cachedResponse.isPresent())
+        if (!streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
-            CacheableRequest cacheableRequest;
-            this.request = cacheableRequest = new CacheableRequest(
-                    acceptName,
-                    acceptReply,
-                    acceptReplyStreamId,
-                    acceptCorrelationId,
-                    // DPW TODO - Move next 4 into cache constructor, back
-                    // making cache tied to ProxyAcceptStreamFactory
-                    connect,
-                    connectName,
-                    connectRef,
-                    streamFactory.supplyCorrelationId,
-                    streamFactory.supplyStreamId,
-                    //
-                    requestURLHash,
-                    streamFactory.correlationResponseBufferPool,
-                    streamFactory.correlationRequestBufferPool,
-                    requestSlot,
-                    requestSize,
-                    streamFactory.router,
-                    authScope);
-            cachedResponse.get().serveClient(cacheableRequest);
-        }
-        else if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
-        {
-            send504();
-        }
-        else
-        {
-            this.request = new CacheableRequest(
-                    acceptName,
-                    acceptReply,
-                    acceptReplyStreamId,
-                    acceptCorrelationId,
-                    // DPW TODO - Move next 4 into cache constructor, back
-                    // making cache tied to ProxyAcceptStreamFactory
-                    connect,
-                    connectName,
-                    connectRef,
-                    streamFactory.supplyCorrelationId,
-                    streamFactory.supplyStreamId,
-                    //
-                    requestURLHash,
-                    streamFactory.correlationResponseBufferPool,
-                    streamFactory.correlationRequestBufferPool,
-                    requestSlot,
-                    requestSize,
-                    streamFactory.router,
-                    authScope);
-
-            sendBeginToConnect(requestHeaders);
-            streamFactory.writer.doHttpEnd(connect, connectStreamId);
+            if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+            {
+                // TODO move this logic and edge case inside of cache
+                send504();
+                this.request.abort();
+            }
+            else
+            {
+                sendBeginToConnect(requestHeaders);
+                streamFactory.writer.doHttpEnd(connect, connectStreamId);
+            }
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
