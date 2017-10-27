@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -345,16 +346,28 @@ public class Writer
     }
 
     private void doH2PushPromise(
-            MessageConsumer target,
-            long targetId,
-            Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
-        {
-            DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetId)
-                .payload(e -> {})
-                .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                .build();
+        MessageConsumer target,
+        long targetId,
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+    {
+        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+            .streamId(targetId)
+            .payload(e -> {})
+            .extension(e -> e.set(visitHttpBeginEx(mutator)))
+            .build();
 
-            target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
-        }
+        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+    }
+
+    public void do503AndReset(
+        MessageConsumer acceptReply,
+        long acceptReplyStreamId,
+        long acceptCorrelationId)
+    {
+        this.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+        e.item(h -> h.representation((byte) 0)
+                .name(STATUS)
+                .value("503")));
+        this.doAbort(acceptReply, acceptReplyStreamId);
+    }
 }

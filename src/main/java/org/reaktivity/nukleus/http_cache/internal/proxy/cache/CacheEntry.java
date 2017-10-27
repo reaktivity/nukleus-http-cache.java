@@ -69,6 +69,8 @@ public final class CacheEntry
 
     private List<OnUpdateRequest> subscribeToUpdates = new ArrayList<OnUpdateRequest>(); // TODO, lazy init
 
+    private boolean polling = false;
+
     public CacheEntry(Cache cache,
             CacheableRequest request)
     {
@@ -83,6 +85,7 @@ public final class CacheEntry
         final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
         if (freshnessExtension > 0)
         {
+            this.polling = true;
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
             long scheduleAt = this.responseReceivedAt()
                                   .plusSeconds(surrogateMaxAge)
@@ -114,7 +117,11 @@ public final class CacheEntry
             MutableDirectBuffer newBuffer = cache.requestBufferPool.buffer(newSlot);
             this.cachedRequest.copyRequestTo(newBuffer);
 
-            final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(cachedRequest, newSlot, cache.etagSupplier.get());
+            final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
+                    cachedRequest,
+                    newSlot,
+                    cache.etagSupplier.get(),
+                    this);
             cache.correlations.put(connectCorrelationId, refreshRequest);
         }
     }
@@ -467,9 +474,13 @@ public final class CacheEntry
         return CacheUtils.isMatchByEtag(requestHeaders, getCachedResponseHeaders());
     }
 
-    public void subscribeToUpdate(OnUpdateRequest onModificationRequest)
+    public boolean subscribeToUpdate(OnUpdateRequest onModificationRequest)
     {
-        this.subscribeToUpdates.add(onModificationRequest);
+        if (polling)
+        {
+            this.subscribeToUpdates.add(onModificationRequest);
+        }
+        return polling;
     }
 
     public Stream<OnUpdateRequest> subscribersOnUpdate()
@@ -479,9 +490,6 @@ public final class CacheEntry
 
     public boolean isUpdateBy(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> cachedRequestHeadersRO = getCachedRequest();
-        ListFW<HttpHeaderFW> requestHeadersRO = request.getRequestHeaders(cache.requestHeadersRO);
-        ListFW<HttpHeaderFW> cachedResponseHeadersRO = getCachedResponseHeaders();
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
         MutableDirectBuffer cachedResponsePayload = getCachedData();
         MutableDirectBuffer responsePayload = request.getData(cache.responseBufferPool);
@@ -520,6 +528,23 @@ public final class CacheEntry
     public void refresh()
     {
         pollBackend();
+    }
+
+    public void pollAborted()
+    {
+        this.polling = false;
+        abortSubscribers();
+    }
+
+    public void abortSubscribers()
+    {
+        subscribersOnUpdate().forEach(s ->
+        {
+            MessageConsumer acceptReply = s.acceptReply();
+            long acceptReplyStreamId = s.acceptReplyStreamId();
+            long acceptCorrelationId = s.acceptCorrelationId();
+            cache.writer.do503AndReset(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+        });
     }
 
 }

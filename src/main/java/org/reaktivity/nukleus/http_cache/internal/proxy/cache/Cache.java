@@ -152,8 +152,7 @@ public class Cache
         }
         else if (cacheEntry.isMatch(requestHeaders))
         {
-            cacheEntry.subscribeToUpdate(onModificationRequest);
-            return true;
+            return cacheEntry.subscribeToUpdate(onModificationRequest);
         }
         else
         {

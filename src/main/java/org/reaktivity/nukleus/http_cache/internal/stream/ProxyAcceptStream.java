@@ -300,11 +300,7 @@ final class ProxyAcceptStream
     private void send503AndReset()
     {
         streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
-        streamFactory.writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
-        e.item(h -> h.representation((byte) 0)
-                .name(STATUS)
-                .value("503")));
-        streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
+        streamFactory.writer.do503AndReset(acceptReply, acceptReplyStreamId, acceptCorrelationId);
     }
 
     private void send504()

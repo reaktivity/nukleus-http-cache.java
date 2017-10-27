@@ -168,4 +168,14 @@ public class EdgeArchProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/failed.polling.aborts.pending.on-update.requests/accept/client",
+        "${streams}/failed.polling.aborts.pending.on-update.requests/connect/server",
+    })
+    public void failedPollingUpdatesAbortPendingOnUpdateRequests() throws Exception
+    {
+        k3po.finish();
+    }
 }
