@@ -145,24 +145,14 @@ public class CacheableRequest extends Request
         return this.requestURLHash;
     }
 
-    @Override
-    public void abort()
+    public void purge()
     {
+        this.cachingResponse = false;
         requestBufferPool.release(requestSlot);
         if (responseSlot != Slab.NO_SLOT)
         {
             responseBufferPool.release(responseSlot);
         }
-    }
-
-    @Override
-    public void complete()
-    {
-        if (!cachingResponse)
-        {
-            requestBufferPool.release(requestSlot);
-            responseBufferPool.release(responseSlot);
-        }// else cache's responsibility to clear, TODO clean up this abstraction
     }
 
     public short authScope()
@@ -228,5 +218,10 @@ public class CacheableRequest extends Request
     private MutableDirectBuffer responseBuffer()
     {
         return responseBufferPool.buffer(responseSlot);
+    }
+
+    public MutableDirectBuffer getData(BufferPool bp)
+    {
+        return bp.buffer(responseSlot);
     }
 }

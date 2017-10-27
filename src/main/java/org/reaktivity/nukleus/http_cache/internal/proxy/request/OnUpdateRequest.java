@@ -41,11 +41,11 @@ public class OnUpdateRequest extends CacheableRequest
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
-            null,   // DPW TO Remove (class hierarchy needs to be reversed)
-            null,   // DPW TO Remove (class hierarchy needs to be reversed)
-            0,      // DPW TO Remove
-            null,   // DPW TO Remove
-            null,   // DPW TO Remove
+            null,   // These connect properties are only used if we forward on failure,
+            null,   // this is an open question
+            0,      // ""   ""
+            null,   // ""   ""
+            null,   // ""   ""
             requestURLHash,
             responseBufferPool,
             requestBufferPool,

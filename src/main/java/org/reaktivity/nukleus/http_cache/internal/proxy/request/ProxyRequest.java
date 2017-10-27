@@ -38,14 +38,9 @@ public class ProxyRequest extends Request
     }
 
     @Override
-    public void abort()
+    public void purge()
     {
-        // NOOP
+        // NOOP, can't purge non cache-able request, TODO clean up interfaces?
     }
 
-    @Override
-    public void complete()
-    {
-        // NOOP
-    }
 }

@@ -46,6 +46,13 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private Slab bufferPool;
     private Cache cache;
 
+    private int etagCnt = 0;
+    private final int etagPrefix = new Random().nextInt(99999);
+    final Supplier<String> supplyEtag = () ->
+    {
+        return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
+    };
+
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
             LongObjectBiConsumer<Runnable> scheduler)
@@ -95,14 +102,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         return this;
     }
 
-    // TODO move into stream factory when it moves
-    private int etagCnt = 0;
-    private final int etagPrefix = new Random().nextInt(99999);
-    final Supplier<String> etagSupplier = () ->
-    {
-        return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
-    };
-
     @Override
     public StreamFactory build()
     {
@@ -118,7 +117,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     bufferPool,
                     correlations,
                     router,
-                    etagSupplier);
+                    supplyEtag);
         }
         return new ProxyStreamFactory(
                 router,
@@ -128,6 +127,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyCorrelationId,
                 correlations,
                 scheduler,
-                cache);
+                cache,
+                supplyEtag);
     }
 }

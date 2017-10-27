@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Random;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -54,13 +53,6 @@ public class ProxyStreamFactory implements StreamFactory
     // TODO, remove need for RW in simplification of inject headers
     final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
 
-    private int etagCnt = 0;
-    private final int etagPrefix = new Random().nextInt(99999);
-    final Supplier<String> etagSupplier = () ->
-    {
-        return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
-    };
-
     final BeginFW beginRO = new BeginFW();
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
@@ -84,6 +76,7 @@ public class ProxyStreamFactory implements StreamFactory
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyCorrelationId;
     final LongObjectBiConsumer<Runnable> scheduler;
+    final Supplier<String> supplyEtag;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -98,8 +91,10 @@ public class ProxyStreamFactory implements StreamFactory
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
         LongObjectBiConsumer<Runnable> scheduler,
-        Cache cache)
+        Cache cache,
+        Supplier<String> supplyEtag)
     {
+        this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.streamBufferPool = requireNonNull(bufferPool);

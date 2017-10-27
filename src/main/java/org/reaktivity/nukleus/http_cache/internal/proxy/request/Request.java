@@ -77,8 +77,6 @@ public abstract class Request
         this.router.setThrottle(acceptName, acceptReplyStreamId, throttle);
     }
 
-    public abstract void abort();
-
-    public abstract void complete();
+    public abstract void purge();
 
 }

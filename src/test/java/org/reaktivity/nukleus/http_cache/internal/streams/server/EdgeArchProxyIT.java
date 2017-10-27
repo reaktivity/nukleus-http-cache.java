@@ -157,4 +157,15 @@ public class EdgeArchProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.updates.pending.on-update.requests.only.when.modified/accept/client",
+        "${streams}/polling.updates.pending.on-update.requests.only.when.modified/connect/server",
+    })
+    public void shouldUpdateOnUpdateRequestsOnlyWhenModified() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

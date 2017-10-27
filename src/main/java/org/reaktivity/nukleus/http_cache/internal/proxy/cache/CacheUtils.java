@@ -20,7 +20,6 @@ import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_CACHE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.PUBLIC;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
@@ -74,55 +73,6 @@ public final class CacheUtils
                     return false;
                 }
         });
-    }
-
-    public static boolean hasStaleWhileRevalidate(
-            ListFW<HttpHeaderFW> headers)
-    {
-        return !headers.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            switch (name)
-            {
-            case CACHE_CONTROL:
-                return value.contains("no-cache");
-            case METHOD:
-                return !"GET".equalsIgnoreCase(value);
-            case CONTENT_LENGTH:
-                return true;
-            case TRANSFER_ENCODING:
-                return true;
-            default:
-                return false;
-            }
-        });
-    }
-
-    public static boolean canInjectPushPromise(
-            ListFW<HttpHeaderFW> headers)
-    {
-        return !headers.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            switch (name)
-            {
-            case METHOD:
-                return !"GET".equalsIgnoreCase(value);
-            case CONTENT_LENGTH:
-                return true;
-            default:
-                return false;
-            }
-        });
-    }
-
-    public static boolean isCacheControlNoStore(HttpHeaderFW header)
-    {
-        final String name = header.name().asString();
-        final String value = header.value().asString();
-        return HttpHeaders.CACHE_CONTROL.equals(name) && value.contains(NO_STORE);
     }
 
     public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)

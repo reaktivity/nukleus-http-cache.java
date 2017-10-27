@@ -150,7 +150,7 @@ final class ProxyConnectReplyStream
                 break;
             case AbortFW.TYPE_ID:
             default:
-                request.abort();
+                request.purge();
                 break;
         }
     }
@@ -172,6 +172,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
+            ((CacheableRequest) streamCorrelation).purge();
             doProxyBegin(responseHeaders);
         }
     }
@@ -235,7 +236,7 @@ final class ProxyConnectReplyStream
                 break;
             case AbortFW.TYPE_ID:
             default:
-                request.abort();
+                request.purge();
                 break;
         }
         this.handleFramesWhenProxying(msgTypeId, buffer, index, length);
@@ -284,7 +285,6 @@ final class ProxyConnectReplyStream
                 break;
             case EndFW.TYPE_ID:
                 streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
-                streamCorrelation.complete();
                 break;
             case AbortFW.TYPE_ID:
                 streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
@@ -311,7 +311,7 @@ final class ProxyConnectReplyStream
                 break;
             case ResetFW.TYPE_ID:
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
-                streamCorrelation.abort();
+                streamCorrelation.purge();
                 break;
             default:
                 // TODO,  ABORT and RESET

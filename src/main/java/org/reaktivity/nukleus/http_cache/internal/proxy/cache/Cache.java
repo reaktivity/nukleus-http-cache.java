@@ -38,15 +38,19 @@ public class Cache
     final Writer writer;
     final Long2ObjectHashMap<CacheEntry> cachedEntries;
     final BufferPool cachedRequestBufferPool;
+    final BufferPool cachedResponseBufferPool;
     final BufferPool responseBufferPool;
-    final BufferPool newRequestBufferPool;
+    final BufferPool requestBufferPool;
+    final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
     final WindowFW windowRO = new WindowFW();
 
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     final CacheControl responseCacheControlFW = new CacheControl();
+    final CacheControl cachedRequestCacheControlFW = new CacheControl();
     final CacheControl requestCacheControlFW = new CacheControl();
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
@@ -64,7 +68,8 @@ public class Cache
         this.correlations = correlations;
         this.writer = new Writer(writeBuffer);
         this.cachedRequestBufferPool = bufferPool;
-        this.newRequestBufferPool = bufferPool;
+        this.requestBufferPool = bufferPool;
+        this.cachedResponseBufferPool = bufferPool.duplicate();
         this.responseBufferPool = bufferPool.duplicate();
         this.cachedEntries = new Long2ObjectHashMap<>();
         this.etagSupplier = etagSupplier;
@@ -81,25 +86,38 @@ public class Cache
         if (cacheEntry.isIntendedForSingleUser())
         {
             cacheEntry.cleanUp();
+            return;
+        }
+
+        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        if (oldCacheEntry == null)
+        {
+            cachedEntries.put(requestUrlHash, cacheEntry);
+            return;
+        }
+        else if (oldCacheEntry.isUpdateBy(request))
+        {
+            cachedEntries.put(requestUrlHash, cacheEntry);
+            oldCacheEntry.subscribersOnUpdate().forEach(r ->
+            {
+                oldCacheEntry.cleanUp();
+                if (!this.serveRequest(
+                        cacheEntry,
+                        r.getRequestHeaders(cachedRequestHeadersRO),
+                        r.authScope(),
+                        r))
+                {
+                    throw new RuntimeException("Not implemented, probably better" +
+                            " to cancel push promise, but maybe should forward request?");
+                }
+            });
         }
         else
         {
-            CacheEntry oldCacheEntry = cachedEntries.put(requestUrlHash, cacheEntry);
-            if (oldCacheEntry != null)
+            cacheEntry.cleanUp();
+            if (request.getType().equals(Request.Type.CACHE_REFRESH))
             {
-                oldCacheEntry.cleanUp();
-                oldCacheEntry.subscribersOnUpdate().forEach(r ->
-                {
-                    if (!this.serveRequest(
-                            cacheEntry,
-                            r.getRequestHeaders(requestHeadersRO),
-                            r.authScope(),
-                            r))
-                    {
-                        throw new RuntimeException("Not implemented, probably better" +
-                                " to cancel push promise, but maybe should forward request?");
-                    }
-                });
+                oldCacheEntry.refresh();
             }
         }
     }

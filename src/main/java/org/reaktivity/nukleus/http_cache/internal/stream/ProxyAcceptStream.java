@@ -44,12 +44,13 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 final class ProxyAcceptStream
 {
     private final ProxyStreamFactory streamFactory;
-    private final MessageConsumer acceptThrottle;
+
     private String acceptName;
     private MessageConsumer acceptReply;
     private long acceptReplyStreamId;
     private final long acceptStreamId;
     private long acceptCorrelationId;
+    private final MessageConsumer acceptThrottle;
 
     private MessageConsumer connect;
     private String connectName;
@@ -164,8 +165,9 @@ final class ProxyAcceptStream
         ListFW<HttpHeaderFW> requestHeaders)
     {
         storeRequest(requestHeaders);
-        OnUpdateRequest onUpdateRequest;
-        this.request = onUpdateRequest = new OnUpdateRequest(
+        final String etag = streamFactory.supplyEtag.get();
+
+        final OnUpdateRequest onUpdateRequest = new OnUpdateRequest(
             acceptName,
             acceptReply,
             acceptReplyStreamId,
@@ -177,17 +179,13 @@ final class ProxyAcceptStream
             streamFactory.router,
             requestURLHash,
             authScope,
-            streamFactory.etagSupplier.get());
+            etag);
+
+        this.request = onUpdateRequest;
 
         if (!streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
         {
             sendBeginToConnect(requestHeaders);
-        }
-        else
-        {
-            sendBeginToConnect(requestHeaders);
-            streamFactory.writer.doHttpEnd(connect, connectStreamId);
-            this.streamState = this::handleAllFramesByIgnoring;
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
@@ -203,14 +201,11 @@ final class ProxyAcceptStream
                 acceptReply,
                 acceptReplyStreamId,
                 acceptCorrelationId,
-                // DPW TODO - Move next 4 into cache constructor, back
-                // making cache tied to ProxyAcceptStreamFactory
                 connect,
                 connectName,
                 connectRef,
                 streamFactory.supplyCorrelationId,
                 streamFactory.supplyStreamId,
-                //
                 requestURLHash,
                 streamFactory.correlationResponseBufferPool,
                 streamFactory.correlationRequestBufferPool,
@@ -218,7 +213,26 @@ final class ProxyAcceptStream
                 requestSize,
                 streamFactory.router,
                 authScope,
-                streamFactory.etagSupplier.get());
+                streamFactory.supplyEtag.get());
+
+        this.request = cacheableRequest = new CacheableRequest(
+                acceptName,
+                acceptReply,
+                acceptReplyStreamId,
+                acceptCorrelationId,
+                connect,
+                connectName,
+                connectRef,
+                streamFactory.supplyCorrelationId,
+                streamFactory.supplyStreamId,
+                requestURLHash,
+                streamFactory.correlationResponseBufferPool,
+                streamFactory.correlationRequestBufferPool,
+                requestSlot,
+                requestSize,
+                streamFactory.router,
+                authScope,
+                streamFactory.supplyEtag.get());
 
         if (!streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
@@ -226,7 +240,7 @@ final class ProxyAcceptStream
             {
                 // TODO move this logic and edge case inside of cache
                 send504();
-                this.request.abort();
+                this.request.purge();
             }
             else
             {
@@ -271,7 +285,7 @@ final class ProxyAcceptStream
         if (requestSlot == NO_SLOT)
         {
             send503AndReset();
-            throw new RuntimeException("Cache out of space, please reconfigure");  // DPW TODO reconsider hard fail??
+            throw new RuntimeException("Cache out of space, please reconfigure");  // TODO reconsider hard fail??
         }
         this.requestSize = 0;
         MutableDirectBuffer requestCacheBuffer = streamFactory.streamBufferPool.buffer(requestSlot);

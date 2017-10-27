@@ -16,30 +16,13 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Predicate;
 
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class PreferHeader
 {
-
-    public static final String WAIT = "wait";
-
-    public static String getWait(
-            ListFW<HttpHeaderFW> requestHeaders,
-            CacheControl cacheControlParserFW)
-    {
-        String surrogateControl = getHeader(requestHeaders, PREFER);
-        if (surrogateControl != null)
-        {
-            CacheControl parsedSurrogateControl = cacheControlParserFW.parse(surrogateControl);
-            return parsedSurrogateControl.getValue(WAIT);
-        }
-        return null;
-    }
 
     public static final String X_ON_UPDATE = "x-on-update";
 
