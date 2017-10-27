@@ -15,12 +15,15 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
 
     private CacheEntry ce;
+    private boolean commited = false;
 
     public CacheRefreshRequest(
             CacheableRequest req,
@@ -59,6 +62,16 @@ public class CacheRefreshRequest extends CacheableRequest
     public void purge()
     {
         super.purge();
-        ce.pollAborted();
+        if (!commited)
+        {
+            ce.pollAborted();
+        }
+    }
+
+    @Override
+    public void cache(EndFW end, Cache cache)
+    {
+        commited = true;
+        super.cache(end, cache);
     }
 }
