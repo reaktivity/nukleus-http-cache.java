@@ -87,9 +87,8 @@ public final class CacheEntry
         {
             this.polling = true;
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
-            long scheduleAt = this.responseReceivedAt()
-                                  .plusSeconds(surrogateMaxAge)
-                                  .toEpochMilli();
+
+            long scheduleAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
             cache.scheduler.accept(scheduleAt, this::updateCache);
         }
     }
