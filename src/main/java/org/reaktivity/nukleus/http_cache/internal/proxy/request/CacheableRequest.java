@@ -46,7 +46,6 @@ public class CacheableRequest extends Request
     boolean cachingResponse;    // TODO, consider using state management via method references
     final short authScope;
     final MessageConsumer connect;
-    final String connectName;
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
@@ -58,7 +57,6 @@ public class CacheableRequest extends Request
         long acceptReplyStreamId,
         long acceptCorrelationId,
         MessageConsumer connect,
-        String connectName,
         long connectRef,
         LongSupplier supplyCorrelationId,
         LongSupplier supplyStreamId,
@@ -84,7 +82,6 @@ public class CacheableRequest extends Request
         this.supplyStreamId = supplyStreamId;
 
         this.connect = connect;
-        this.connectName = connectName;
         this.connectRef = connectRef;
     }
 
@@ -158,11 +155,6 @@ public class CacheableRequest extends Request
     public short authScope()
     {
         return authScope;
-    }
-
-    public String connectName()
-    {
-        return connectName;
     }
 
     public long connectRef()

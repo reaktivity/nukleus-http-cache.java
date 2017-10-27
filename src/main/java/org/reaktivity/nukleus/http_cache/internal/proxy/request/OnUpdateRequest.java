@@ -42,11 +42,10 @@ public class OnUpdateRequest extends CacheableRequest
             acceptReplyStreamId,
             acceptCorrelationId,
             null,   // These connect properties are only used if we forward on failure,
-            null,   // this is an open question
-            0,      // ""   ""
+            0,   // this is an open question
+            null,      // ""   ""
             null,   // ""   ""
-            null,   // ""   ""
-            requestURLHash,
+            requestURLHash,   // ""   ""
             responseBufferPool,
             requestBufferPool,
             requestSlot,

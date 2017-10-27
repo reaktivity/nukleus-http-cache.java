@@ -37,7 +37,6 @@ public class CacheRefreshRequest extends CacheableRequest
               req.acceptReplyStreamId,
               req.acceptCorrelationId,
               req.connect,
-              req.connectName,
               req.connectRef,
               req.supplyCorrelationId,
               req.supplyStreamId,

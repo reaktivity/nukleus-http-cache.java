@@ -311,15 +311,20 @@ public class Writer
                        }
                        break;
                     case HttpHeaders.IF_NONE_MATCH:
-                       String etagValue = etag;
+                       String result = etag;
                        if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
                        {
-                           if (!etag.contains(etagValue))  // TODO, fix logic to handle multiple values and fuzzy match
+                           final String existingIfNoneMatch = getHeader(responseHeadersFW, "etag");
+                           if (!existingIfNoneMatch.contains(etag))
                            {
-                               etagValue += ", " + getHeader(responseHeadersFW, "etag");
+                               result += ", " + existingIfNoneMatch;
+                           }
+                           else
+                           {
+                               result = existingIfNoneMatch;
                            }
                        }
-                       final String finalEtag = etagValue;
+                       final String finalEtag = result;
                        builder.item(header -> header.name(nameFW)
                                .value(finalEtag));
                        break;
@@ -339,7 +344,7 @@ public class Writer
            {
                builder.item(header -> header.name("prefer").value("x-on-update, wait=" + surrogateAge));
            }
-           if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h)))
+           if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
            {
                builder.item(header -> header.name(IF_NONE_MATCH).value(etag));
            }
