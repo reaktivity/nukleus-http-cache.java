@@ -185,7 +185,7 @@ final class ProxyAcceptStream
 
         if (!streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
         {
-            sendBeginToConnect(requestHeaders);
+            streamFactory.writer.do503AndAbort(acceptReply, authScope, authScope);
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
@@ -298,7 +298,7 @@ final class ProxyAcceptStream
     private void send503AndReset()
     {
         streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
-        streamFactory.writer.do503AndReset(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+        streamFactory.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
     }
 
     private void send504()

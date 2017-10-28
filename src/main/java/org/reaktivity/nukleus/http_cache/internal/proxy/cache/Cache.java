@@ -117,7 +117,7 @@ public class Cache
             cacheEntry.cleanUp();
             if (request.getType().equals(Request.Type.CACHE_REFRESH))
             {
-                oldCacheEntry.refresh();
+                oldCacheEntry.refresh(request);
             }
         }
     }

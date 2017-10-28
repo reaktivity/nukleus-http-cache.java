@@ -364,7 +364,7 @@ public class Writer
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
-    public void do503AndReset(
+    public void do503AndAbort(
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
         long acceptCorrelationId)

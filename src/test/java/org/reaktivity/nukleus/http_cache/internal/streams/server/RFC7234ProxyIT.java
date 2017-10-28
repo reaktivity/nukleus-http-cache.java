@@ -474,7 +474,6 @@ public class RFC7234ProxyIT
     }
 
     @Test
-    @Ignore("To implement such that size is not an issue")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/proxy.response.too.large.to.cache/accept/client",

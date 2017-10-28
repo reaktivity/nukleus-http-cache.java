@@ -149,6 +149,17 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/polling.waits.on.surrogate-age/accept/client",
+        "${streams}/polling.waits.on.surrogate-age/connect/server",
+    })
+    public void pollingWaitsOnSurrogateAge() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/polling.updates.pending.on-update.requests/accept/client",
         "${streams}/polling.updates.pending.on-update.requests/connect/server",
     })

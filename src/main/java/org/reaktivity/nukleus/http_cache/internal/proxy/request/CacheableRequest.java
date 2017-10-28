@@ -125,16 +125,29 @@ public class CacheableRequest extends Request
 
     public void cache(DataFW data)
     {
-        OctetsFW payload = data.payload();
-        int sizeof = payload.sizeof();
-        MutableDirectBuffer buffer = responseBuffer();
-        buffer.putBytes(responseSize, payload.buffer(), payload.offset(), sizeof);
-        responseSize += sizeof;
+        if (cachingResponse)
+        {
+            OctetsFW payload = data.payload();
+            int sizeof = payload.sizeof();
+            if (responseSize + sizeof > responseBufferPool.slotCapacity())
+            {
+                this.purge();
+            }
+            else
+            {
+                MutableDirectBuffer buffer = responseBuffer();
+                buffer.putBytes(responseSize, payload.buffer(), payload.offset(), sizeof);
+                responseSize += sizeof;
+            }
+        }
     }
 
     public void cache(EndFW end, Cache cache)
     {
-        cache.put(requestURLHash(), this);
+        if (cachingResponse)
+        {
+            cache.put(requestURLHash(), this);
+        }
     }
 
     private int requestURLHash()
@@ -144,12 +157,15 @@ public class CacheableRequest extends Request
 
     public void purge()
     {
-        this.cachingResponse = false;
-        requestBufferPool.release(requestSlot);
-        if (responseSlot != Slab.NO_SLOT)
-        {
-            responseBufferPool.release(responseSlot);
+        if (cachingResponse)
+            {
+            requestBufferPool.release(requestSlot);
+            if (responseSlot != Slab.NO_SLOT)
+            {
+                responseBufferPool.release(responseSlot);
+            }
         }
+        this.cachingResponse = false;
     }
 
     public short authScope()

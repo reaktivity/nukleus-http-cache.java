@@ -170,14 +170,8 @@ public final class CacheUtils
 
     public static boolean isMatchByEtag(
         ListFW<HttpHeaderFW> requestHeaders,
-        ListFW<HttpHeaderFW> responseHeaders)
+        String etag)
     {
-        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
-        if (etag == null)
-        {
-            return false;
-        }
-
         String ifMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         if (ifMatch == null)
         {

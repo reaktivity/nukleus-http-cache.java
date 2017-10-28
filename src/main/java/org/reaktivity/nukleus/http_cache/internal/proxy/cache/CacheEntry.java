@@ -71,6 +71,8 @@ public final class CacheEntry
 
     private boolean polling = false;
 
+    private CacheRefreshRequest pollingRequest;
+
     public CacheEntry(Cache cache,
             CacheableRequest request)
     {
@@ -121,6 +123,7 @@ public final class CacheEntry
                     newSlot,
                     cache.etagSupplier.get(),
                     this);
+            this.pollingRequest = refreshRequest;
             cache.correlations.put(connectCorrelationId, refreshRequest);
         }
     }
@@ -470,7 +473,7 @@ public final class CacheEntry
 
     public boolean isMatch(ListFW<HttpHeaderFW> requestHeaders)
     {
-        return CacheUtils.isMatchByEtag(requestHeaders, getCachedResponseHeaders());
+        return CacheUtils.isMatchByEtag(requestHeaders, this.cachedRequest.etag());
     }
 
     public boolean subscribeToUpdate(OnUpdateRequest onModificationRequest)
@@ -524,9 +527,12 @@ public final class CacheEntry
         return this.cachedRequest.getData(cache.cachedResponseBufferPool);
     }
 
-    public void refresh()
+    public void refresh(CacheableRequest request)
     {
-        pollBackend();
+        if (request == pollingRequest)
+        {
+            pollBackend();
+        }
     }
 
     public void pollAborted()
@@ -542,7 +548,7 @@ public final class CacheEntry
             MessageConsumer acceptReply = s.acceptReply();
             long acceptReplyStreamId = s.acceptReplyStreamId();
             long acceptCorrelationId = s.acceptCorrelationId();
-            cache.writer.do503AndReset(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
         });
     }
 

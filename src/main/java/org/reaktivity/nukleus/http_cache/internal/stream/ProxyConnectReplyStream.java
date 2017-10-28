@@ -126,7 +126,7 @@ final class ProxyConnectReplyStream
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
         request.cache(responseHeaders);
         this.streamState = this::handleCacheRefresh;
-        streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 65200, 0);
+        streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 32767, 0);
     }
 
     private void handleCacheRefresh(
@@ -142,7 +142,7 @@ final class ProxyConnectReplyStream
             case DataFW.TYPE_ID:
                 final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
                 request.cache(data);
-                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 65200, 0);
+                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, length, 0);
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
