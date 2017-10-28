@@ -41,16 +41,11 @@ public class OnUpdateRequest extends CacheableRequest
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
-            null,   // These connect properties are only used if we forward on failure,
-            0,   // this is an open question
-            null,      // ""   ""
-            null,   // ""   ""
-            requestURLHash,   // ""   ""
-            responseBufferPool,
+            router,
             requestBufferPool,
             requestSlot,
             requestSize,
-            router,
+            requestURLHash,
             authScope,
             etag);
     }
@@ -58,7 +53,7 @@ public class OnUpdateRequest extends CacheableRequest
     @Override
     public Type getType()
     {
-        return Type.ON_MODIFIED;
+        return Type.ON_UPDATE;
     }
 
 }

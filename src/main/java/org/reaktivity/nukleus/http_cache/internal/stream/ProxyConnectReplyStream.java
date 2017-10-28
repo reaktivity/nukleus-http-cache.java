@@ -21,7 +21,7 @@ import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -103,7 +103,7 @@ final class ProxyConnectReplyStream
                     doProxyBegin(responseHeaders);
                     break;
                 case CACHEABLE:
-                case ON_MODIFIED:
+                case ON_UPDATE:
                     handleCacheableRequest(responseHeaders);
                     break;
                 case CACHE_REFRESH:
@@ -124,7 +124,7 @@ final class ProxyConnectReplyStream
             ListFW<HttpHeaderFW> responseHeaders)
     {
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
-        request.cache(responseHeaders);
+        request.cache(responseHeaders, streamFactory.cache);
         this.streamState = this::handleCacheRefresh;
         streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 32767, 0);
     }
@@ -135,7 +135,7 @@ final class ProxyConnectReplyStream
             int index,
             int length)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        InitialRequest request = (InitialRequest) streamCorrelation;
 
         switch (msgTypeId)
         {
@@ -172,7 +172,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            ((CacheableRequest) streamCorrelation).purge();
+            ((InitialRequest) streamCorrelation).purge();
             doProxyBegin(responseHeaders);
         }
     }
@@ -181,9 +181,9 @@ final class ProxyConnectReplyStream
         ListFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        InitialRequest request = (InitialRequest) streamCorrelation;
 
-        request.cache(responseHeaders);
+        request.cache(responseHeaders, streamFactory.cache);
         int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
 
@@ -210,8 +210,8 @@ final class ProxyConnectReplyStream
 
     private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
-        request.cache(responseHeaders);
+        InitialRequest request = (InitialRequest) streamCorrelation;
+        request.cache(responseHeaders, streamFactory.cache);
         doProxyBegin(responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
     }
@@ -222,7 +222,7 @@ final class ProxyConnectReplyStream
             int index,
             int length)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        InitialRequest request = (InitialRequest) streamCorrelation;
 
         switch (msgTypeId)
         {

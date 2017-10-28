@@ -42,6 +42,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -65,7 +66,7 @@ public final class CacheEntry
 
     private CacheControl cacheControlFW;
 
-    private final CacheableRequest cachedRequest;
+    private final InitialRequest cachedRequest;
 
     private List<OnUpdateRequest> subscribeToUpdates = new ArrayList<OnUpdateRequest>(); // TODO, lazy init
 
@@ -74,7 +75,7 @@ public final class CacheEntry
     private CacheRefreshRequest pollingRequest;
 
     public CacheEntry(Cache cache,
-            CacheableRequest request)
+            InitialRequest request)
     {
         this.cache = cache;
         this.cachedRequest = request;
@@ -490,7 +491,7 @@ public final class CacheEntry
         return subscribeToUpdates.stream();
     }
 
-    public boolean isUpdateBy(CacheableRequest request)
+    public boolean isUpdateBy(InitialRequest request)
     {
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
         MutableDirectBuffer cachedResponsePayload = getCachedData();

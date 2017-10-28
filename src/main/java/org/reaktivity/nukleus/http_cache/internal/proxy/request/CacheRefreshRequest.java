@@ -19,14 +19,14 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 
-public class CacheRefreshRequest extends CacheableRequest
+public class CacheRefreshRequest extends InitialRequest
 {
 
     private CacheEntry ce;
     private boolean commited = false;
 
     public CacheRefreshRequest(
-            CacheableRequest req,
+            InitialRequest req,
             int requestSlot,
             String etag,
             CacheEntry ce)
@@ -40,13 +40,13 @@ public class CacheRefreshRequest extends CacheableRequest
               req.connectRef,
               req.supplyCorrelationId,
               req.supplyStreamId,
-              req.requestURLHash,
+              req.requestURLHash(),
               req.responseBufferPool,
-              req.requestBufferPool,
+              req.requestBufferPool(),
               requestSlot,
-              req.requestSize,
+              req.requestSize(),
               req.router,
-              req.authScope,
+              req.authScope(),
               etag);
         this.ce = ce;
     }

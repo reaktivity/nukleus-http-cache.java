@@ -22,6 +22,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
@@ -77,7 +78,7 @@ public class Cache
 
     public void put(
         int requestUrlHash,
-        CacheableRequest request)
+        InitialRequest request)
     {
         CacheEntry cacheEntry = new CacheEntry(
                 this,
@@ -126,7 +127,7 @@ public class Cache
             int requestURLHash,
             ListFW<HttpHeaderFW> request,
             short authScope,
-            CacheableRequest cacheableRequest)
+            InitialRequest cacheableRequest)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
@@ -141,7 +142,7 @@ public class Cache
 
     public boolean handleOnUpdateRequest(
             int requestURLHash,
-            OnUpdateRequest onModificationRequest,
+            OnUpdateRequest onUpdateRequest,
             ListFW<HttpHeaderFW> requestHeaders,
             short authScope)
     {
@@ -152,11 +153,11 @@ public class Cache
         }
         else if (cacheEntry.isMatch(requestHeaders))
         {
-            return cacheEntry.subscribeToUpdate(onModificationRequest);
+            return cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
         else
         {
-            cacheEntry.serveClient(onModificationRequest);
+            cacheEntry.serveClient(onUpdateRequest);
             return true;
         }
     }
