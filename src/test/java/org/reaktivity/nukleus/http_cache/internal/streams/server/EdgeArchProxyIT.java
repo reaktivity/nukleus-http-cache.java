@@ -18,6 +18,8 @@ package org.reaktivity.nukleus.http_cache.internal.streams.server;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
+import java.time.Instant;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -26,6 +28,8 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+
+import org.junit.Assert;
 
 public class EdgeArchProxyIT
 {
@@ -154,7 +158,10 @@ public class EdgeArchProxyIT
     })
     public void pollingWaitsOnSurrogateAge() throws Exception
     {
+        Instant start = Instant.now();
         k3po.finish();
+        Instant finish = Instant.now();
+        Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
     }
 
     @Test
