@@ -25,6 +25,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
@@ -195,7 +196,7 @@ final class ProxyAcceptStream
         final String requestURL,
         short authScope)
     {
-        InitialRequest cacheableRequest;
+        CacheableRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 acceptName,
                 acceptReply,

@@ -15,94 +15,218 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
+
+import java.util.function.LongSupplier;
+
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public abstract class CacheableRequest extends Request
+public abstract class CacheableRequest extends AnswerableByCacheRequest
 {
+    final BufferPool responseBufferPool;
+    int responseSlot = Slab.NO_SLOT;
+    int responseHeadersSize;
+    int responseSize;
+    final MessageConsumer connect;
+    final long connectRef;
+    final LongSupplier supplyCorrelationId;
+    final LongSupplier supplyStreamId;
+    private CacheState state;
+    private CacheEntry cacheEntry;
 
-    private final BufferPool requestBufferPool;
-    private int requestSlot;
-    private final int requestSize;
-    private final int requestURLHash;
-    private final short authScope;
-    private String etag;
+    public enum CacheState
+    {
+        COMMITING, COMMITTED, PURGED
+    }
 
     public CacheableRequest(
-            String acceptName,
-            MessageConsumer acceptReply,
-            long acceptReplyStreamId,
-            long acceptCorrelationId,
-            RouteManager router,
-            BufferPool requestBufferPool,
-            int requestSlot,
-            int requestSize,
-            int requestURLHash,
-            short authScope,
-            String etag)
+        String acceptName,
+        MessageConsumer acceptReply,
+        long acceptReplyStreamId,
+        long acceptCorrelationId,
+        MessageConsumer connect,
+        long connectRef,
+        LongSupplier supplyCorrelationId,
+        LongSupplier supplyStreamId,
+        int requestURLHash,
+        BufferPool responseBufferPool,
+        BufferPool requestBufferPool,
+        int requestSlot,
+        int requestSize,
+        RouteManager router,
+        short authScope,
+        String etag)
     {
-        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
-        this.requestBufferPool = requestBufferPool;
-        this.requestSlot = requestSlot;
-        this.requestSize = requestSize;
-        this.requestURLHash = requestURLHash;
-        this.authScope = authScope;
-        this.etag = etag;
+        super(acceptName,
+              acceptReply,
+              acceptReplyStreamId,
+              acceptCorrelationId,
+              router,
+              requestBufferPool,
+              requestSlot,
+              requestSize,
+              requestURLHash,
+              authScope,
+              etag);
+        this.responseBufferPool = responseBufferPool;
+        this.state = CacheState.COMMITING;
+        this.supplyCorrelationId = supplyCorrelationId;
+        this.supplyStreamId = supplyStreamId;
+
+        this.connect = connect;
+        this.connectRef = connectRef;
     }
 
-    public final ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeadersRO)
+    // TODO remove need for duplication
+    public void copyRequestTo(MutableDirectBuffer buffer)
     {
-        final MutableDirectBuffer buffer = requestBufferPool.buffer(requestSlot);
-        return requestHeadersRO.wrap(buffer, 0, requestSize);
+        MutableDirectBuffer requestBuffer = requestBufferPool().buffer(requestSlot());
+        requestBuffer.getBytes(0, buffer, 0, requestSize());
     }
 
-    public final short authScope()
+    public void cache(
+            ListFW<HttpHeaderFW> responseHeaders,
+            Cache cache)
     {
-        return authScope;
+        etag(getHeaderOrDefault(responseHeaders, ETAG, etag()));
+        cache.notifyUncommitted(this);
+
+        setupResponseBuffer();
+        MutableDirectBuffer buffer = responseBuffer();
+        final int headersSize = responseHeaders.sizeof();
+        buffer.putBytes(responseSize, responseHeaders.buffer(), responseHeaders.offset(), headersSize);
+        responseSize += headersSize;
+        this.responseHeadersSize = headersSize;
     }
 
-    public final String etag()
+    private void setupResponseBuffer()
     {
-        return etag;
+        this.responseSlot = responseBufferPool.acquire(acceptReplyStreamId());
+        this.responseHeadersSize = 0;
+        this.responseSize = 0;
     }
 
-    public final int requestURLHash()
+    public void cache(DataFW data)
     {
-        return requestURLHash;
+        if (state == CacheState.COMMITING)
+        {
+            OctetsFW payload = data.payload();
+            int sizeof = payload.sizeof();
+            if (responseSize + sizeof > responseBufferPool.slotCapacity())
+            {
+                this.purge();
+            }
+            else
+            {
+                MutableDirectBuffer buffer = responseBuffer();
+                buffer.putBytes(responseSize, payload.buffer(), payload.offset(), sizeof);
+                responseSize += sizeof;
+            }
+        }
     }
 
-    public final BufferPool requestBufferPool()
+    public void cache(EndFW end, Cache cache)
     {
-        return requestBufferPool;
-    }
-
-    public final int requestSize()
-    {
-        return requestSize;
-    }
-
-    public final int requestSlot()
-    {
-        return requestSlot;
+        if (state == CacheState.COMMITING)
+        {
+            state = CacheState.COMMITTED;
+            cache.put(requestURLHash(), this);
+        }
     }
 
     public void purge()
     {
-        if (requestSlot != Slab.NO_SLOT)
+        if (state != CacheState.PURGED)
         {
-            requestBufferPool.release(requestSlot);
-            this.requestSlot = Slab.NO_SLOT;
+            super.purge();
+            if (responseSlot != Slab.NO_SLOT)
+            {
+                responseBufferPool.release(responseSlot);
+            }
+            this.responseSlot = Slab.NO_SLOT;
+
+            if (state != CacheState.COMMITTED && (cacheEntry != null))
+            {
+                cacheEntry.abortSubscribers();
+            }
+            this.state = CacheState.PURGED;
         }
     }
 
-    protected void etag(String etag)
+    public long connectRef()
     {
-        this.etag = etag;
+        return connectRef;
     }
 
+    public LongSupplier supplyCorrelationId()
+    {
+        return supplyCorrelationId;
+    }
+
+    public LongSupplier supplyStreamId()
+    {
+        return supplyStreamId;
+    }
+
+    // TODO hide abstraction
+    public int responseSlot()
+    {
+        return responseSlot;
+    }
+
+    // TODO hide abstraction
+    public int responseHeadersSize()
+    {
+        return responseHeadersSize;
+    }
+
+    // TODO hide abstraction
+    public int responseSize()
+    {
+        return responseSize;
+    }
+
+    public ListFW<HttpHeaderFW> getResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeadersRO)
+    {
+        MutableDirectBuffer responseBuffer = responseBuffer();
+        return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
+    }
+
+    public MessageConsumer connect()
+    {
+        return connect;
+    }
+
+    private MutableDirectBuffer responseBuffer()
+    {
+        return responseBufferPool.buffer(responseSlot);
+    }
+
+    public MutableDirectBuffer getData(BufferPool bp)
+    {
+        return bp.buffer(responseSlot);
+    }
+
+    public CacheState state()
+    {
+        return state;
+    }
+
+    public void cacheEntry(CacheEntry cacheEntry)
+    {
+        this.cacheEntry = cacheEntry;
+    }
 }

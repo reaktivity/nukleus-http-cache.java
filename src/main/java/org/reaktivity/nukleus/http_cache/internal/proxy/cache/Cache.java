@@ -19,10 +19,11 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
@@ -37,7 +38,7 @@ public class Cache
 {
 
     final Writer writer;
-    final Long2ObjectHashMap<CacheEntry> cachedEntries;
+    final Int2ObjectHashMap<CacheEntry> cachedEntries;
     final BufferPool cachedRequestBufferPool;
     final BufferPool cachedResponseBufferPool;
     final BufferPool responseBufferPool;
@@ -72,15 +73,15 @@ public class Cache
         this.requestBufferPool = bufferPool;
         this.cachedResponseBufferPool = bufferPool.duplicate();
         this.responseBufferPool = bufferPool.duplicate();
-        this.cachedEntries = new Long2ObjectHashMap<>();
+        this.cachedEntries = new Int2ObjectHashMap<>();
         this.etagSupplier = etagSupplier;
     }
 
     public void put(
         int requestUrlHash,
-        InitialRequest request)
+        CacheableRequest request)
     {
-        CacheEntry cacheEntry = new CacheEntry(
+        DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                 this,
                 request);
 
@@ -99,18 +100,25 @@ public class Cache
         else if (oldCacheEntry.isUpdateBy(request))
         {
             cachedEntries.put(requestUrlHash, cacheEntry);
-            oldCacheEntry.subscribersOnUpdate().forEach(r ->
+            oldCacheEntry.subscribersOnUpdate().forEach(subscriber ->
             {
-                oldCacheEntry.cleanUp();
-                if (!this.serveRequest(
-                        cacheEntry,
-                        r.getRequestHeaders(cachedRequestHeadersRO),
-                        r.authScope(),
-                        r))
+                if (oldCacheEntry instanceof UncommitedCacheEntry)
                 {
-                    throw new RuntimeException("Not implemented, probably better" +
-                            " to cancel push promise, but maybe should forward request?");
+                    cacheEntry.subscribeToUpdate(subscriber);
                 }
+                else
+                {
+                    if (!this.serveRequest(
+                            cacheEntry,
+                            subscriber.getRequestHeaders(cachedRequestHeadersRO),
+                            subscriber.authScope(),
+                            subscriber))
+                    {
+                        throw new RuntimeException("Not implemented yet, probably better" +
+                                " to cancel push promise, but maybe should forward request?");
+                    }
+                }
+                oldCacheEntry.cleanUp();
             });
         }
         else
@@ -127,7 +135,7 @@ public class Cache
             int requestURLHash,
             ListFW<HttpHeaderFW> request,
             short authScope,
-            InitialRequest cacheableRequest)
+            CacheableRequest cacheableRequest)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
@@ -151,7 +159,7 @@ public class Cache
         {
             return false;
         }
-        else if (cacheEntry.isMatch(requestHeaders))
+        else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
             return cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
@@ -166,7 +174,7 @@ public class Cache
             CacheEntry entry,
             ListFW<HttpHeaderFW> request,
             short authScope,
-            CacheableRequest cacheableRequest)
+            AnswerableByCacheRequest cacheableRequest)
     {
         if (entry.canServeRequest(request, authScope))
         {
@@ -174,6 +182,19 @@ public class Cache
             return true;
         }
         return false;
+    }
+
+    public void notifyUncommitted(CacheableRequest request)
+    {
+        CacheEntry entry = this.cachedEntries.get(request.requestURLHash());
+        if (request.getType() == Request.Type.INITIAL_REQUEST && entry == null)
+        {
+            final UncommitedCacheEntry cacheEntry = new UncommitedCacheEntry(this, request);
+            this.cachedEntries.put(
+                    request.requestURLHash(),
+                    cacheEntry);
+            request.cacheEntry(cacheEntry);
+        }
     }
 
 }

@@ -22,7 +22,7 @@ public abstract class Request
 {
     public enum Type
     {
-        ON_UPDATE, PROXY, CACHEABLE, CACHE_REFRESH
+        ON_UPDATE, PROXY, INITIAL_REQUEST, CACHE_REFRESH
     }
 
     final String acceptName;

@@ -15,21 +15,16 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 
-public class CacheRefreshRequest extends InitialRequest
+public class CacheRefreshRequest extends CacheableRequest
 {
 
-    private CacheEntry ce;
-    private boolean commited = false;
-
     public CacheRefreshRequest(
-            InitialRequest req,
+            CacheableRequest req,
             int requestSlot,
             String etag,
-            CacheEntry ce)
+            CacheEntry cacheEntry)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
         super(req.acceptName,
@@ -48,7 +43,7 @@ public class CacheRefreshRequest extends InitialRequest
               req.router,
               req.authScope(),
               etag);
-        this.ce = ce;
+        cacheEntry(cacheEntry);
     }
 
     @Override
@@ -57,20 +52,4 @@ public class CacheRefreshRequest extends InitialRequest
         return Type.CACHE_REFRESH;
     }
 
-    @Override
-    public void purge()
-    {
-        super.purge();
-        if (!commited)
-        {
-            ce.pollAborted();
-        }
-    }
-
-    @Override
-    public void cache(EndFW end, Cache cache)
-    {
-        commited = true;
-        super.cache(end, cache);
-    }
 }
