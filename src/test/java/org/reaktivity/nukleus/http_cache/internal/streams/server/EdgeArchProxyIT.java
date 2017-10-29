@@ -37,7 +37,7 @@ public class EdgeArchProxyIT
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy/edge-arch");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(25, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
             .directory("target/nukleus-itests")
@@ -64,10 +64,10 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/does.not.inject.on.uncacheable.response/accept/client",
-        "${streams}/does.not.inject.on.uncacheable.response/connect/server",
+        "${streams}/does.not.inject.on.non-cacheable.response/accept/client",
+        "${streams}/does.not.inject.on.non-cacheable.response/connect/server",
     })
-    public void shouldNotInjectOnUncacheableResponse() throws Exception
+    public void shouldNotInjectOnNonCacheableResponse() throws Exception
     {
         k3po.finish();
     }

@@ -15,23 +15,23 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 
 import java.util.function.Predicate;
 
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class PreferHeader
 {
 
-    public static final String X_ON_UPDATE = "x-on-update";
-
-    public static final Predicate<? super HttpHeaderFW> PREFER_RESPONSE_WHEN_UPDATED = h ->
+    public static boolean preferResponseWhenModified(ListFW<HttpHeaderFW> headers)
     {
-        final String name = h.name().asString();
-        final String value = h.value().asString();
-        return PREFER.equals(name) && value.contains(X_ON_UPDATE);
-    };
+        return HttpHeadersUtil.getHeader(headers, IF_NONE_MATCH) != null &&
+               headers.anyMatch(HAS_HEADER);
+    }
 
     public static final Predicate<? super HttpHeaderFW> HAS_HEADER = h ->
     {

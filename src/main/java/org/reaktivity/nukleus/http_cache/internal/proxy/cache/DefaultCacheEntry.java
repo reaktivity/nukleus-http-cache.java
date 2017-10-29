@@ -105,9 +105,14 @@ public final class DefaultCacheEntry implements CacheEntry
             long connectRef = cachedRequest.connectRef();
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
+            final String etag = this.cachedRequest.etag();
             cache.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,
-                    builder -> requestHeaders.forEach(
-                            h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
+                    builder ->
+                        {
+                            requestHeaders.forEach(
+                                    h ->  builder.item(item -> item.name(h.name()).value(h.value())));
+                            builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                        });
             cache.writer.doHttpEnd(connect, connectStreamId);
 
             // duplicate request into new slot (TODO optimize to single request)
@@ -183,8 +188,12 @@ public final class DefaultCacheEntry implements CacheEntry
                     cachedRequest.etag());
 
             final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
-            int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
-            this.cache.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge, cachedRequest.etag());
+            this.cache.writer.doHttpPushPromise(
+                    request,
+                    requestHeaders,
+                    responseHeaders,
+                    freshnessExtension,
+                    cachedRequest.etag());
         }
         else
         {

@@ -184,7 +184,6 @@ final class ProxyConnectReplyStream
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
         request.cache(responseHeaders, streamFactory.cache);
-        int surrogateAge = SurrogateControl.getSurrogateAge(responseHeaders);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
 
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
@@ -204,7 +203,7 @@ final class ProxyConnectReplyStream
                 request.etag()
             );
 
-        streamFactory.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, surrogateAge, request.etag());
+        streamFactory.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, freshnessExtension, request.etag());
         this.streamState = this::handleCacheableRequestResponse;
     }
 

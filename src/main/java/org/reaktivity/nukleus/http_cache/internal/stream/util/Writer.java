@@ -249,7 +249,7 @@ public class Writer
         AnswerableByCacheRequest request,
         ListFW<HttpHeaderFW> requestHeaders,
         ListFW<HttpHeaderFW> responseHeaders,
-        int surrogateAge,
+        int freshnessExtension,
         String etag)
     {
         final MessageConsumer acceptReply = request.acceptReply();
@@ -258,17 +258,17 @@ public class Writer
         doH2PushPromise(
             acceptReply,
             acceptReplyStreamId,
-            setPushPromiseHeaders(requestHeaders, responseHeaders, surrogateAge, etag));
+            setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
             ListFW<HttpHeaderFW> requestHeadersRO,
             ListFW<HttpHeaderFW> responseHeadersRO,
-            int surrogateAge,
+            int freshnessExtension,
             String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
-                builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, surrogateAge, etag);
+                builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
 
         return result;
     }
@@ -277,7 +277,7 @@ public class Writer
             ListFW<HttpHeaderFW> requestHeadersFW,
             ListFW<HttpHeaderFW> responseHeadersFW,
             Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-            int surrogateAge,
+            int freshnessExtension,
             String etag)
     {
         requestHeadersFW
@@ -331,7 +331,6 @@ public class Writer
                     case HttpHeaders.IF_MATCH:
                     case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
-                    // TODO x-on-update modified wait
                    default: builder.item(header -> header.name(nameFW)
                                                          .value(valueFW));
                }
@@ -342,7 +341,7 @@ public class Writer
            }
            if (!requestHeadersFW.anyMatch(PreferHeader.HAS_HEADER))
            {
-               builder.item(header -> header.name("prefer").value("x-on-update, wait=" + surrogateAge));
+               builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
            }
            if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
            {
