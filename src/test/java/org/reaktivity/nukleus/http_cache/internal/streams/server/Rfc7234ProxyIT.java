@@ -483,4 +483,15 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/cache.if.server.returns.503.while.validation/accept/client",
+            "${streams}/cache.if.server.returns.503.while.validation/connect/server",
+    })
+    public void shouldCacheIfServerReturns503WhileValidation() throws Exception
+    {
+        k3po.finish();
+    }
 }
