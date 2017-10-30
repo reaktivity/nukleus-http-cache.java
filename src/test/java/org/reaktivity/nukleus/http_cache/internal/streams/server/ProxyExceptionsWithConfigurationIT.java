@@ -29,11 +29,12 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
+@Ignore
 public class ProxyExceptionsWithConfigurationIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy");
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy/behavior");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
 

@@ -16,6 +16,11 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Consumer;
 
@@ -23,9 +28,16 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
+import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
+import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -73,54 +85,90 @@ public class Writer
 
     }
 
-    public void doHttpBegin(
-        MessageConsumer target,
-        long targetId,
-        long targetRef,
-        long correlationId,
-        Flyweight.Builder.Visitor injectHeaders)
+    public void doHttpResponseWithUpdatedCacheControl(
+            MessageConsumer target,
+            long targetStreamId,
+            long targetRef,
+            long correlationId,
+            CacheControl cacheControlFW,
+            ListFW<HttpHeaderFW> responseHeaders,
+            int staleWhileRevalidate,
+            String etag)
     {
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate, etag);
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetId)
+                .streamId(targetStreamId)
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
                 .sourceRef(targetRef)
                 .correlationId(correlationId)
-                .extension(e -> e.set(injectHeaders))
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
-
         target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
-    public void doH2PushPromise(
-        MessageConsumer target,
-        long targetId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+    private void updateResponseHeaders(
+            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+            CacheControl cacheControlFW,
+            ListFW<HttpHeaderFW> responseHeadersRO,
+            int staleWhileRevalidate,
+            String etag)
     {
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .streamId(targetId)
-            .payload(e -> e.reset())
-            .extension(e -> e.set(visitHttpBeginEx(mutator)))
-            .build();
+        responseHeadersRO.forEach(h ->
+        {
+            final StringFW nameFW = h.name();
+            final String name = nameFW.asString();
+            final String16FW valueFW = h.value();
+            final String value = valueFW.asString();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
-    }
-
-    public void doHttpBegin2(
-        MessageConsumer target,
-        long targetStreamId,
-        long targetRef,
-        long correlationId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
-    {
-        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                               .streamId(targetStreamId)
-                               .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                               .sourceRef(targetRef)
-                               .correlationId(correlationId)
-                               .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                               .build();
-
-        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+            switch(name)
+            {
+                case HttpHeaders.CACHE_CONTROL:
+                    cacheControlFW.parse(value);
+                    if (cacheControlFW.contains("stale-while-revalidate"))
+                    {
+                        StringBuilder cacheControlDirectives = new StringBuilder();
+                        cacheControlFW.getValues().entrySet().stream().forEach(e ->
+                        {
+                            String directive = e.getKey(); e.getValue();
+                            String optionalValue = e.getValue();
+                            if (cacheControlDirectives.length() > 0)
+                            {
+                                cacheControlDirectives.append(", ");
+                            }
+                            if ("stale-while-revalidate".equals(directive))
+                            {
+                                cacheControlDirectives.append("stale-while-revalidate=" + staleWhileRevalidate);
+                            }
+                            else
+                            {
+                                if (optionalValue == null)
+                                {
+                                    cacheControlDirectives.append(directive);
+                                }
+                                else
+                                {
+                                    cacheControlDirectives.append(directive + "=" + optionalValue);
+                                }
+                            }
+                        });
+                    }
+                    else
+                    {
+                        builder.item(header -> header.name(nameFW).value(valueFW));
+                    }
+                    break;
+                default: builder.item(header -> header.name(nameFW).value(valueFW));
+            }
+        });
+        if (!responseHeadersRO.anyMatch(HAS_CACHE_CONTROL))
+        {
+            builder.item(header -> header.name("cache-control").value("stale-while-revalidate=" + staleWhileRevalidate));
+        }
+        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
+        {
+            builder.item(header -> header.name(ETAG).value(etag));
+        }
     }
 
     public void doHttpData(
@@ -134,7 +182,6 @@ public class Writer
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                             .streamId(targetStreamId)
                             .payload(p -> p.set(payload, offset, length))
-                            .extension(e -> e.reset())
                             .build();
 
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
@@ -146,7 +193,6 @@ public class Writer
     {
         EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                          .streamId(targetStreamId)
-                         .extension(e -> e.reset())
                          .build();
 
         target.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
@@ -158,7 +204,6 @@ public class Writer
     {
         AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(targetStreamId)
-                .extension(e -> e.reset())
                 .build();
 
         target.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
@@ -200,4 +245,133 @@ public class Writer
                              .sizeof();
     }
 
+    public void doHttpPushPromise(
+        AnswerableByCacheRequest request,
+        ListFW<HttpHeaderFW> requestHeaders,
+        ListFW<HttpHeaderFW> responseHeaders,
+        int freshnessExtension,
+        String etag)
+    {
+        final MessageConsumer acceptReply = request.acceptReply();
+        final long acceptReplyStreamId = request.acceptReplyStreamId();
+
+        doH2PushPromise(
+            acceptReply,
+            acceptReplyStreamId,
+            setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
+    }
+
+    private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
+            ListFW<HttpHeaderFW> requestHeadersRO,
+            ListFW<HttpHeaderFW> responseHeadersRO,
+            int freshnessExtension,
+            String etag)
+    {
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
+                builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
+
+        return result;
+    }
+
+    private void updateRequestHeaders(
+            ListFW<HttpHeaderFW> requestHeadersFW,
+            ListFW<HttpHeaderFW> responseHeadersFW,
+            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+            int freshnessExtension,
+            String etag)
+    {
+        requestHeadersFW
+           .forEach(h ->
+           {
+               final StringFW nameFW = h.name();
+               final String name = nameFW.asString();
+               final String16FW valueFW = h.value();
+               final String value = valueFW.asString();
+
+               switch(name)
+               {
+                   case HttpHeaders.CACHE_CONTROL:
+                       if (value.contains(CacheDirectives.NO_CACHE))
+                       {
+                           builder.item(header -> header.name(nameFW)
+                                                        .value(valueFW));
+                       }
+                       else
+                       {
+                           builder.item(header -> header.name(nameFW)
+                                                        .value(value + ", no-cache"));
+                       }
+                       break;
+                    case HttpHeaders.IF_MODIFIED_SINCE:
+                       if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
+                       {
+                           final String newValue = getHeader(responseHeadersFW, "last-modified");
+                           builder.item(header -> header.name(nameFW)
+                                                        .value(newValue));
+                       }
+                       break;
+                    case HttpHeaders.IF_NONE_MATCH:
+                       String result = etag;
+                       if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
+                       {
+                           final String existingIfNoneMatch = getHeader(responseHeadersFW, "etag");
+                           if (!existingIfNoneMatch.contains(etag))
+                           {
+                               result += ", " + existingIfNoneMatch;
+                           }
+                           else
+                           {
+                               result = existingIfNoneMatch;
+                           }
+                       }
+                       final String finalEtag = result;
+                       builder.item(header -> header.name(nameFW)
+                               .value(finalEtag));
+                       break;
+                    case HttpHeaders.IF_MATCH:
+                    case HttpHeaders.IF_UNMODIFIED_SINCE:
+                        break;
+                   default: builder.item(header -> header.name(nameFW)
+                                                         .value(valueFW));
+               }
+           });
+           if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
+           {
+               builder.item(header -> header.name("cache-control").value("no-cache"));
+           }
+           if (!requestHeadersFW.anyMatch(PreferHeader.HAS_HEADER))
+           {
+               builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
+           }
+           if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
+           {
+               builder.item(header -> header.name(IF_NONE_MATCH).value(etag));
+           }
+    }
+
+    private void doH2PushPromise(
+        MessageConsumer target,
+        long targetId,
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+    {
+        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+            .streamId(targetId)
+            .payload(e -> {})
+            .extension(e -> e.set(visitHttpBeginEx(mutator)))
+            .build();
+
+        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+    }
+
+    public void do503AndAbort(
+        MessageConsumer acceptReply,
+        long acceptReplyStreamId,
+        long acceptCorrelationId)
+    {
+        this.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+        e.item(h -> h.representation((byte) 0)
+                .name(STATUS)
+                .value("503")));
+        this.doAbort(acceptReply, acceptReplyStreamId);
+    }
 }

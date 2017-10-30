@@ -17,9 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 public final class HttpHeaders
 {
-    public static final String X_HTTP_CACHE_SYNC = "x-http-cache-sync";
-    public static final String X_POLL_INJECTED = "x-poll-injected";
-    public static final String X_RETRY_AFTER = "x-retry-after";
     public static final String STATUS = ":status";
     public static final String CACHE_CONTROL = "cache-control";
     public static final String IF_MATCH = "if-match";
@@ -32,13 +29,9 @@ public final class HttpHeaders
     public static final String TRANSFER_ENCODING = "transfer-encoding";
     public static final String METHOD = ":method";
     public static final String WARNING = "warning";
-
-    // values
-    public static final String X_HTTP_CACHE_SYNC_ALWAYS = "always";
-
-    private HttpHeaders()
-    {
-        // utility class
-    }
+    public static final String SURROGATE_CONTROL = "surrogate-control";
+    public static final String PREFER = "prefer";
+    public static final String IF_UNMODIFIED_SINCE = "if-unmodified-since";
+    public static final String ETAG = "etag";
 
 }
