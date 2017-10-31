@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.stream.util;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.HashMap;
 import java.util.Iterator;
