@@ -53,15 +53,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
     };
-//    private LongSupplier proxyRequests;
-//    private LongSupplier proxyResponses;
-//    private LongSupplier initialRequests;
-//    private LongSupplier initialResponses;
-//    private LongSupplier cacheRefreshRequests;
-//    private LongSupplier cacheRefreshResponses;
-//    private LongSupplier onUpdateRequests;
-//    private LongSupplier onUpdateResponses;
-//    private LongSupplier initialCachedResponses;
     private LongSupplier slabAquires;
     private LongSupplier slabReleases;
 
@@ -118,15 +109,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setCounterSupplier(
         Function<String, LongSupplier> supplyCounter)
     {
-//        proxyRequests = supplyCounter.apply("proxy.requests");
-//        proxyResponses = supplyCounter.apply("proxy.responses");
-//        initialRequests = supplyCounter.apply("initial.requests");
-//        initialResponses = supplyCounter.apply("initial.responses");
-//        initialCachedResponses = supplyCounter.apply("initial.responses");
-//        cacheRefreshRequests = supplyCounter.apply("cache.refresh.requests");
-//        cacheRefreshResponses = supplyCounter.apply("cache.refresh.responses");
-//        onUpdateRequests = supplyCounter.apply("on.update.requests");
-//        onUpdateResponses = supplyCounter.apply("on.update.responses");
         slabAquires = supplyCounter.apply("slab.aquires");
         slabReleases = supplyCounter.apply("slab.releases");
         return this;
