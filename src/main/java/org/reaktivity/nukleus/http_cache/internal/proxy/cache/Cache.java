@@ -116,8 +116,8 @@ public class Cache
                                 " to cancel push promise, but maybe should forward request?");
                     }
                 }
-                oldCacheEntry.cleanUp();
             });
+            oldCacheEntry.cleanUp();
         }
         else
         {

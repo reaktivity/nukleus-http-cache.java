@@ -47,11 +47,6 @@ public abstract class Request
 
     public abstract Type getType();
 
-    public String acceptName()
-    {
-        return acceptName;
-    }
-
     public MessageConsumer acceptReply()
     {
         return acceptReply;

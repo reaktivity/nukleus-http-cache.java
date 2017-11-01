@@ -13,13 +13,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.streams.server;
+package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -29,8 +27,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
-@Ignore
-public class ProxyExceptionsWithConfigurationIT
+public class ProxyExceptionsIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
@@ -44,19 +41,72 @@ public class ProxyExceptionsWithConfigurationIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(1024)
             .nukleus("http-cache"::equals)
-            .configure(BUFFER_SLOT_CAPACITY_PROPERTY, 0)
             .clean();
 
     @Rule
     public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
-    @Ignore("ABORT vs RESET read order not yet guaranteed to match write order")
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/reaktor.overloaded/accept/client",
+        "${streams}/accept.sent.abort/accept/client",
+        "${streams}/accept.sent.abort/connect/server",
     })
-    public void resetIfOOM() throws Exception
+    public void shouldAcceptSentAbort() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/accept.sent.abort.cacheable.request/accept/client",
+        "${streams}/accept.sent.abort.cacheable.request/connect/server",
+    })
+    public void shouldHandleAbortSentOnCacheableRequest() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/connect.reply.sent.abort/accept/client",
+        "${streams}/connect.reply.sent.abort/connect/server",
+    })
+    public void shouldConnectReplySentAbort() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/connect.sent.reset/accept/client",
+        "${streams}/connect.sent.reset/connect/server",
+    })
+    public void shouldConnectSentReset() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/accept.reply.sent.reset/accept/client",
+        "${streams}/accept.reply.sent.reset/connect/server",
+    })
+    public void shouldAcceptReplySentReset() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/client.sent.abort.on.scheduled.poll/accept/client"
+    })
+    public void shouldClientSentAbortOnScheduledPoll() throws Exception
     {
         k3po.finish();
     }
