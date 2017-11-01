@@ -62,7 +62,7 @@ public class ProxyExceptionsIT
     public void shouldAcceptSentAbort() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -87,7 +87,7 @@ public class ProxyExceptionsIT
     public void shouldConnectReplySentAbort() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -99,7 +99,7 @@ public class ProxyExceptionsIT
     public void shouldConnectSentReset() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -111,7 +111,7 @@ public class ProxyExceptionsIT
     public void shouldAcceptReplySentReset() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -122,7 +122,7 @@ public class ProxyExceptionsIT
     public void shouldClientSentAbortOnScheduledPoll() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
 }

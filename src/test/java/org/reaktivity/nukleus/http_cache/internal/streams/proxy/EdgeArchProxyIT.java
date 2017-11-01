@@ -65,7 +65,7 @@ public class EdgeArchProxyIT
     public void shouldNotInjectOnPost() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -77,7 +77,7 @@ public class EdgeArchProxyIT
     public void shouldNotInjectOnNonCacheableResponse() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(0);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -89,7 +89,7 @@ public class EdgeArchProxyIT
     public void serveFromCacheWhenFreshnessExtensionIsValid() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -101,7 +101,7 @@ public class EdgeArchProxyIT
     public void shareWithXProtectedScope() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -114,7 +114,7 @@ public class EdgeArchProxyIT
     public void doesNotShareWithDifferentProtectedScope() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -126,7 +126,7 @@ public class EdgeArchProxyIT
     public void shouldInjectIndividualizedPushPromisesOnSharedFreshnessExtension() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1, 1, 1);
+        counters.assertExpectedCacheEntries(1, 1, 1);
     }
 
     @Test
@@ -138,7 +138,7 @@ public class EdgeArchProxyIT
     public void shouldInjectValuesOnFreshnessExtension() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -150,8 +150,7 @@ public class EdgeArchProxyIT
     public void shouldCacheAndPollOnSurrogateMaxAgeWhenFreshExt() throws Exception
     {
         k3po.finish();
-        Thread.sleep(10);
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1, 1);
     }
 
     @Test
@@ -163,7 +162,7 @@ public class EdgeArchProxyIT
     public void shouldUpdateCacheOnPoll() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1, 1);
+        counters.assertExpectedCacheEntries(1, 1);
     }
 
     @Test
@@ -178,7 +177,7 @@ public class EdgeArchProxyIT
         k3po.finish();
         Instant finish = Instant.now();
         Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertNumOfCacheResponsesEquals(1, 0, 1);
+        counters.assertExpectedCacheEntries(1, 0, 1);
     }
 
     @Test
@@ -190,7 +189,7 @@ public class EdgeArchProxyIT
     public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1, 1);
+        counters.assertExpectedCacheEntries(1, 1);
     }
 
     @Test
@@ -202,7 +201,7 @@ public class EdgeArchProxyIT
     public void shouldAttachToNextCacheEntryIfPushPromiseArrivesBeforeResponseCompletes() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1, 1);
+        counters.assertExpectedCacheEntries(1, 1);
     }
 
     @Test
@@ -214,7 +213,7 @@ public class EdgeArchProxyIT
     public void shouldUpdateOnUpdateRequestsOnlyWhenModified() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -223,9 +222,21 @@ public class EdgeArchProxyIT
         "${streams}/failed.polling.aborts.pending.on-update.requests/accept/client",
         "${streams}/failed.polling.aborts.pending.on-update.requests/connect/server",
     })
-    public void failedPollingUpdatesAbortPendingOnUpdateRequests() throws Exception
+    public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdates() throws Exception
     {
         k3po.finish();
-        counters.assertNumOfCacheResponsesEquals(1);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.403.response.cancels.pending.on-update.requests/accept/client",
+        "${streams}/polling.403.response.cancels.pending.on-update.requests/connect/server",
+    })
+    public void shouldCancelPushPromisesOn403() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
     }
 }

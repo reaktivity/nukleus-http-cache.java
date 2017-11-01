@@ -56,12 +56,12 @@ public class HttpCacheCountersRule implements TestRule
 
     public long slabAquires()
     {
-        return controller().count("slab.aquires");
+        return controller().count("entry.acquires");
     }
 
     public long slabReleases()
     {
-        return controller().count("slab.releases");
+        return controller().count("entry.releases");
     }
 
     private HttpCacheController controller()
@@ -69,26 +69,26 @@ public class HttpCacheCountersRule implements TestRule
         return reaktor.controller(HttpCacheController.class);
     }
 
-    public void assertNumOfCacheResponsesEquals(
+    public void assertExpectedCacheEntries(
             int numberOfResponses)
     {
         assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses, slabAquires() - slabReleases());
     }
 
-    public void assertNumOfCacheResponsesEquals(
+    public void assertExpectedCacheEntries(
             int numberOfResponses,
-            int cacheInitiatedRefresh)
+            int cacheInitiatedRefreshes)
     {
-        assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses + cacheInitiatedRefresh, slabAquires() - slabReleases());
+        assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses + cacheInitiatedRefreshes, slabAquires() - slabReleases());
     }
 
-    public void assertNumOfCacheResponsesEquals(
+    public void assertExpectedCacheEntries(
             int numberOfResponses,
-            int cacheInitiatedRefresh,
+            int cacheInitiatedRefreshes,
             int requestPendingCacheUpdate)
     {
         assertEquals(
-            NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses + cacheInitiatedRefresh + requestPendingCacheUpdate,
+            NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses + cacheInitiatedRefreshes + requestPendingCacheUpdate,
             slabAquires() - slabReleases());
     }
 }

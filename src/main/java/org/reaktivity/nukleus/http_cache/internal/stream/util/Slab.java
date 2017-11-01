@@ -45,10 +45,10 @@ public class Slab implements BufferPool
     private final BitSet used;
     private final int[] availableSlots;
 
-    private LongSupplier slabAquires;
-    private LongSupplier slabReleases;
+    private LongSupplier acquires;
+    private LongSupplier releases;
 
-    public Slab(int totalCapacity, int slotCapacity, LongSupplier slabAquires, LongSupplier slabReleases)
+    public Slab(int totalCapacity, int slotCapacity, LongSupplier acquires, LongSupplier releases)
     {
         if (!isZeroOrPowerOfTwo(totalCapacity))
         {
@@ -70,8 +70,8 @@ public class Slab implements BufferPool
         this.slotByteBuffer = slabBuffer.byteBuffer().duplicate();
         this.used = new BitSet(totalSlots);
         this.availableSlots = new int[] { totalSlots };
-        this.slabAquires = slabAquires;
-        this.slabReleases = slabReleases;
+        this.acquires = acquires;
+        this.releases = releases;
     }
 
     public int acquiredSlots()
@@ -100,7 +100,7 @@ public class Slab implements BufferPool
         used.set(slot);
         availableSlots[0]--;
 
-        this.slabAquires.getAsLong();
+        this.acquires.getAsLong();
         return slot;
     }
 
@@ -142,7 +142,7 @@ public class Slab implements BufferPool
     {
         assert used.get(slot);
         used.clear(slot);
-        this.slabReleases.getAsLong();
+        this.releases.getAsLong();
         availableSlots[0]++;
     }
 
@@ -162,8 +162,8 @@ public class Slab implements BufferPool
         this.slotCapacity = that.slotCapacity;
         this.used = that.used;
         this.slotByteBuffer = that.slotByteBuffer.duplicate();
-        this.slabAquires = that.slabAquires;
-        this.slabReleases = that.slabReleases;
+        this.acquires = that.acquires;
+        this.releases = that.releases;
     }
 
     private static boolean isZeroOrPowerOfTwo(int value)

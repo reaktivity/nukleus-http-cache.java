@@ -109,8 +109,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setCounterSupplier(
         Function<String, LongSupplier> supplyCounter)
     {
-        slabAquires = supplyCounter.apply("slab.aquires");
-        slabReleases = supplyCounter.apply("slab.releases");
+        slabAquires = supplyCounter.apply("entry.acquires");
+        slabReleases = supplyCounter.apply("entry.releases");
         return this;
     }
 
