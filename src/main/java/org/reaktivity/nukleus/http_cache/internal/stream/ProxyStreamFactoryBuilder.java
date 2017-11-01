@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import java.util.Random;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -103,6 +104,13 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setCounterSupplier(
+        Function<String, LongSupplier> supplyCounter)
+    {
+        return this;
+    }
+
+    @Override
     public StreamFactory build()
     {
         if (cache == null)
@@ -116,7 +124,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     writeBuffer,
                     bufferPool,
                     correlations,
-                    router,
                     supplyEtag);
         }
         return new ProxyStreamFactory(

@@ -32,7 +32,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.route.RouteManager;
 
 public class Cache
 {
@@ -63,7 +62,6 @@ public class Cache
             MutableDirectBuffer writeBuffer,
             BufferPool bufferPool,
             Long2ObjectHashMap<Request> correlations,
-            RouteManager router,
             Supplier<String> etagSupplier)
     {
         this.scheduler = scheduler;

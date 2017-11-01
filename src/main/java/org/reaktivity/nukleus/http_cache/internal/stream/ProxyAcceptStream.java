@@ -215,24 +215,6 @@ final class ProxyAcceptStream
                 authScope,
                 streamFactory.supplyEtag.get());
 
-        this.request = cacheableRequest = new InitialRequest(
-                acceptName,
-                acceptReply,
-                acceptReplyStreamId,
-                acceptCorrelationId,
-                connect,
-                connectRef,
-                streamFactory.supplyCorrelationId,
-                streamFactory.supplyStreamId,
-                requestURLHash,
-                streamFactory.correlationResponseBufferPool,
-                streamFactory.correlationRequestBufferPool,
-                requestSlot,
-                requestSize,
-                streamFactory.router,
-                authScope,
-                streamFactory.supplyEtag.get());
-
         if (!streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
             if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
@@ -246,6 +228,10 @@ final class ProxyAcceptStream
                 sendBeginToConnect(requestHeaders);
                 streamFactory.writer.doHttpEnd(connect, connectStreamId);
             }
+        }
+        else
+        {
+            this.request.purge();
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
