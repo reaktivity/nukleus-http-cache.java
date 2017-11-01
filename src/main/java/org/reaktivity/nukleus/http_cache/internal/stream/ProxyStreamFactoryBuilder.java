@@ -53,8 +53,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
     };
-    private LongSupplier slabAquires;
-    private LongSupplier slabReleases;
+    private LongSupplier entryAcquires;
+    private LongSupplier entryReleases;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -109,8 +109,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setCounterSupplier(
         Function<String, LongSupplier> supplyCounter)
     {
-        slabAquires = supplyCounter.apply("entry.acquires");
-        slabReleases = supplyCounter.apply("entry.releases");
+        entryAcquires = supplyCounter.apply("entry.acquires");
+        entryReleases = supplyCounter.apply("entry.releases");
         return this;
     }
 
@@ -121,7 +121,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         {
             final int slotCapacity = supplyBufferPool.get().slotCapacity();
             final int httpCacheCapacity = config.httpCacheCapacity();
-            this.bufferPool = new Slab(httpCacheCapacity, slotCapacity, slabAquires, slabReleases);
+            this.bufferPool = new Slab(httpCacheCapacity, slotCapacity, entryAcquires, entryReleases);
 
             this.cache = new Cache(
                     scheduler,
