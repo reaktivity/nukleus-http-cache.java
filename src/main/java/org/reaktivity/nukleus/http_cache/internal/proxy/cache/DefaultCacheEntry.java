@@ -74,9 +74,6 @@ public final class DefaultCacheEntry implements CacheEntry
 
     private CacheRefreshRequest pollingRequest;
 
-    private boolean expectOnUpdateRequest = false;
-    private boolean isRevalidating = false;
-
     public DefaultCacheEntry(Cache cache,
             CacheableRequest request)
     {
@@ -95,7 +92,6 @@ public final class DefaultCacheEntry implements CacheEntry
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
 
             long scheduleAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
-            this.isRevalidating = true;
             cache.scheduler.accept(scheduleAt, this::updateCache);
         }
     }
@@ -151,7 +147,6 @@ public final class DefaultCacheEntry implements CacheEntry
     public void serveClient(
             AnswerableByCacheRequest streamCorrelation)
     {
-        this.expectOnUpdateRequest = true;
         sendResponseToClient(streamCorrelation, true);
     }
 
@@ -203,7 +198,7 @@ public final class DefaultCacheEntry implements CacheEntry
         else
         {
             // TODO inject stale on above if (freshnessExtension > 0)?
-            if (injectWarnings && isStale() && !isRevalidating)
+            if (injectWarnings && isStale())
             {
                 headers = headers.andThen(
                         x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
@@ -359,8 +354,8 @@ public final class DefaultCacheEntry implements CacheEntry
             ListFW<HttpHeaderFW> request,
             Instant now)
     {
-        final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeaderValue);
+        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeacerValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MAX_STALE))
@@ -410,7 +405,7 @@ public final class DefaultCacheEntry implements CacheEntry
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
 
-                int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
+                int surrogateAge = SurrogateControl.getSurrogateFreshnessExtension(this.getCachedResponseHeaders());
                 staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
@@ -452,11 +447,16 @@ public final class DefaultCacheEntry implements CacheEntry
     {
         Instant now = Instant.now();
 
-        return canBeServedToAuthorized(request, authScope) &&
-                doesNotVaryBy(request) &&
-                (isRevalidating || satisfiesFreshnessRequirementsOf(request, now)) &&
-                satisfiesStalenessRequirementsOf(request, now) &&
-                satisfiesAgeRequirementsOf(request, now);
+        final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
+        final boolean doesNotVaryBy = doesNotVaryBy(request);
+        final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now); // || isRevalidating;
+        final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
+        return canBeServedToAuthorized &&
+                doesNotVaryBy &&
+                satisfiesFreshnessRequirements &&
+                satisfiesStalenessRequirements &&
+                satisfiesAgeRequirements;
     }
 
     private boolean isStale()
@@ -548,15 +548,7 @@ public final class DefaultCacheEntry implements CacheEntry
     {
         if (request == pollingRequest)
         {
-            if (subscribersOnUpdate().count() > 0 || expectOnUpdateRequest)
-            {
-                expectOnUpdateRequest = false;
-                pollBackend();
-            }
-            else
-            {
-                isRevalidating = false;
-            }
+            pollBackend();
         }
     }
 
