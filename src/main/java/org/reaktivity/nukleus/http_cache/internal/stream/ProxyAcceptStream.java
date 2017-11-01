@@ -221,7 +221,6 @@ final class ProxyAcceptStream
             {
                 // TODO move this logic and edge case inside of cache
                 send504();
-                this.request.purge();
             }
             else
             {
@@ -286,6 +285,7 @@ final class ProxyAcceptStream
     {
         streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
         streamFactory.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+        request.purge();
     }
 
     private void send504()
@@ -295,6 +295,7 @@ final class ProxyAcceptStream
                         .name(STATUS)
                         .value("504")));
         streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
+        request.purge();
     }
 
     private void handleAllFramesByIgnoring(
@@ -327,6 +328,7 @@ final class ProxyAcceptStream
             break;
         case AbortFW.TYPE_ID:
             streamFactory.writer.doAbort(connect, connectStreamId);
+            request.purge();
             break;
         default:
             streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
