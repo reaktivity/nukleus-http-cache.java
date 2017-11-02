@@ -148,6 +148,7 @@ public final class DefaultCacheEntry implements CacheEntry
             AnswerableByCacheRequest streamCorrelation)
     {
         sendResponseToClient(streamCorrelation, true);
+        streamCorrelation.purge();
     }
 
     private void sendResponseToClient(
@@ -561,6 +562,7 @@ public final class DefaultCacheEntry implements CacheEntry
             long acceptReplyStreamId = s.acceptReplyStreamId();
             long acceptCorrelationId = s.acceptCorrelationId();
             cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            s.purge();
         });
     }
 }

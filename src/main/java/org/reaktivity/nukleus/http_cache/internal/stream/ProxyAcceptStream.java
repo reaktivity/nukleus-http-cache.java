@@ -215,37 +215,22 @@ final class ProxyAcceptStream
                 authScope,
                 streamFactory.supplyEtag.get());
 
-        this.request = cacheableRequest = new InitialRequest(
-                acceptName,
-                acceptReply,
-                acceptReplyStreamId,
-                acceptCorrelationId,
-                connect,
-                connectRef,
-                streamFactory.supplyCorrelationId,
-                streamFactory.supplyStreamId,
-                requestURLHash,
-                streamFactory.correlationResponseBufferPool,
-                streamFactory.correlationRequestBufferPool,
-                requestSlot,
-                requestSize,
-                streamFactory.router,
-                authScope,
-                streamFactory.supplyEtag.get());
-
         if (!streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
             if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
             {
                 // TODO move this logic and edge case inside of cache
                 send504();
-                this.request.purge();
             }
             else
             {
                 sendBeginToConnect(requestHeaders);
                 streamFactory.writer.doHttpEnd(connect, connectStreamId);
             }
+        }
+        else
+        {
+            this.request.purge();
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
@@ -300,6 +285,7 @@ final class ProxyAcceptStream
     {
         streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
         streamFactory.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+        request.purge();
     }
 
     private void send504()
@@ -309,6 +295,7 @@ final class ProxyAcceptStream
                         .name(STATUS)
                         .value("504")));
         streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
+        request.purge();
     }
 
     private void handleAllFramesByIgnoring(
@@ -341,6 +328,7 @@ final class ProxyAcceptStream
             break;
         case AbortFW.TYPE_ID:
             streamFactory.writer.doAbort(connect, connectStreamId);
+            request.purge();
             break;
         default:
             streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
