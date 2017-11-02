@@ -106,6 +106,10 @@ public final class DefaultCacheEntry implements CacheEntry
             cache.scheduler.accept(scheduleAt, this::updateCache);
             expectSubscribers = false;
         }
+        else
+        {
+            polling = false;
+        }
     }
 
     private void updateCache()
@@ -577,6 +581,7 @@ public final class DefaultCacheEntry implements CacheEntry
             cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
             s.purge();
         });
+        this.polling = false;
     }
 
     @Override
