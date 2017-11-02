@@ -239,4 +239,16 @@ public class EdgeArchProxyIT
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/maintain.polling.per.multiple.auth.scopes/accept/client",
+        "${streams}/maintain.polling.per.multiple.auth.scopes/connect/server",
+    })
+    public void shouldMaintainPollingForMultipleAuthScopes() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(2, 0, 2);
+    }
 }
