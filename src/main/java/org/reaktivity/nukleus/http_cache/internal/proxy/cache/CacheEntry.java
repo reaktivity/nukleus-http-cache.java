@@ -20,7 +20,6 @@ import java.util.stream.Stream;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -44,7 +43,5 @@ public interface CacheEntry
     void refresh(AnswerableByCacheRequest request);
 
     void abortSubscribers();
-
-    void abortSubscriber(Request request);
 
 }

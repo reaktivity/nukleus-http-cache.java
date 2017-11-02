@@ -195,11 +195,4 @@ public class Cache
         }
     }
 
-    public void unsubscribe(
-        int requestURLHash,
-        Request request)
-    {
-        cachedEntries.get(requestURLHash).abortSubscriber(request);
-    }
-
 }
