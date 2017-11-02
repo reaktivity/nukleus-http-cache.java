@@ -108,4 +108,10 @@ public class UncommitedCacheEntry implements CacheEntry
             cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
         });
     }
+
+    @Override
+    public boolean expectSubscribers()
+    {
+        return true;
+    }
 }

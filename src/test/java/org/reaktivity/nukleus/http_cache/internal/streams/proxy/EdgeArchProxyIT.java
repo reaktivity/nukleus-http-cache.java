@@ -161,8 +161,13 @@ public class EdgeArchProxyIT
     })
     public void shouldUpdateCacheOnPoll() throws Exception
     {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1);
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -173,11 +178,15 @@ public class EdgeArchProxyIT
     })
     public void pollingWaitsOnSurrogateAge() throws Exception
     {
+        k3po.start();
         Instant start = Instant.now();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
         k3po.finish();
         Instant finish = Instant.now();
         Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertExpectedCacheEntries(1, 0, 1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -237,6 +246,19 @@ public class EdgeArchProxyIT
     public void shouldCancelPushPromisesOn403() throws Exception
     {
         k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.stops.if.no.subscribers/accept/client",
+        "${streams}/polling.stops.if.no.subscribers/connect/server",
+    })
+    public void shouldStopPollingIfNoSubscribers() throws Exception
+    {
+        k3po.finish();
+        Thread.sleep(10); // Wait for response to be processed
         counters.assertExpectedCacheEntries(1);
     }
 }
