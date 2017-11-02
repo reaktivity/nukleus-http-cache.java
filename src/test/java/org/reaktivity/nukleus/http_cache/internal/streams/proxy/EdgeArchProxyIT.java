@@ -114,7 +114,7 @@ public class EdgeArchProxyIT
     public void doesNotShareWithDifferentProtectedScope() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(2);
     }
 
     @Test
