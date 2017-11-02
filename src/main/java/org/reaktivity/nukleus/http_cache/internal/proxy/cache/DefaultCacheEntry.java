@@ -565,4 +565,10 @@ public final class DefaultCacheEntry implements CacheEntry
             s.purge();
         });
     }
+
+    @Override
+    public void abortSubscriber(Request request)
+    {
+        this.subscribeToUpdates.remove(request);
+    }
 }

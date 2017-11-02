@@ -23,6 +23,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -107,5 +108,11 @@ public class UncommitedCacheEntry implements CacheEntry
             long acceptCorrelationId = s.acceptCorrelationId();
             cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
         });
+    }
+
+    @Override
+    public void abortSubscriber(Request request)
+    {
+        this.subscribeToUpdates.remove(request);
     }
 }

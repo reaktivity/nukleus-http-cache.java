@@ -184,11 +184,15 @@ final class ProxyAcceptStream
 
         this.request = onUpdateRequest;
 
-        if (!streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
+        if (streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
+        {
+            this.streamState = this::handleFramesOnAbort;
+        }
+        else
         {
             streamFactory.writer.do503AndAbort(acceptReply, authScope, authScope);
+            this.streamState = this::handleAllFramesByIgnoring;
         }
-        this.streamState = this::handleAllFramesByIgnoring;
     }
 
     private void handleCacheableRequest(
@@ -306,6 +310,22 @@ final class ProxyAcceptStream
     {
         switch (msgTypeId)
         {
+            default:
+        }
+    }
+
+    private void handleFramesOnAbort(
+            int msgTypeId,
+            DirectBuffer buffer,
+            int index,
+            int length)
+    {
+        switch (msgTypeId)
+        {
+            case AbortFW.TYPE_ID:
+                streamFactory.cache.unsubscribe(requestURLHash, request);
+                request.purge();
+                break;
             default:
         }
     }
