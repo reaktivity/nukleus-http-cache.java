@@ -15,7 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
@@ -45,6 +48,22 @@ public class CacheRefreshRequest extends CacheableRequest
               etag);
         cacheEntry(cacheEntry);
     }
+
+    public void cache(
+        ListFW<HttpHeaderFW> responseHeaders,
+        Cache cache)
+    {
+        if (responseHeaders.anyMatch(h ->
+                ":status".equals(h.name().asString()) &&
+                "200".equals(h.value().asString())))
+        {
+            super.cache(responseHeaders, cache);
+        }
+        else
+        {
+            this.purge();
+        }
+}
 
     @Override
     public Type getType()
