@@ -68,31 +68,43 @@ public final class DefaultCacheEntry implements CacheEntry
 
     private final CacheableRequest cachedRequest;
 
-    private List<OnUpdateRequest> subscribeToUpdates = new ArrayList<OnUpdateRequest>(); // TODO, lazy init
+    private List<OnUpdateRequest> subscribers = new ArrayList<OnUpdateRequest>(); // TODO, lazy init
 
     private boolean polling = false;
+    boolean expectSubscribers;
 
     private CacheRefreshRequest pollingRequest;
 
-    public DefaultCacheEntry(Cache cache,
-            CacheableRequest request)
+    public DefaultCacheEntry(
+            Cache cache,
+            CacheableRequest request,
+            boolean expectSubscribers)
     {
         this.cache = cache;
         this.cachedRequest = request;
+        this.expectSubscribers = expectSubscribers;
 
-        pollBackend();
+        initialPoll();
     }
 
-    private void pollBackend()
+    private void initialPoll()
     {
         final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
         if (freshnessExtension > 0)
         {
+            pollBackend();
+        }
+    }
+
+    private void pollBackend()
+    {
+        if (expectSubscribers || !subscribers.isEmpty())
+        {
             this.polling = true;
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
-
             long scheduleAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
             cache.scheduler.accept(scheduleAt, this::updateCache);
+            expectSubscribers = false;
         }
     }
 
@@ -176,8 +188,9 @@ public final class DefaultCacheEntry implements CacheEntry
 
         // TODO should reduce freshness extension by how long it has aged
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
-        if (freshnessExtension > 0)
+        if (freshnessExtension > 0 && polling)
         {
+            expectSubscribers = true;
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
                     acceptReplyStreamId,
@@ -495,7 +508,7 @@ public final class DefaultCacheEntry implements CacheEntry
     {
         if (polling)
         {
-            this.subscribeToUpdates.add(onModificationRequest);
+            this.subscribers.add(onModificationRequest);
         }
         return polling;
     }
@@ -503,7 +516,7 @@ public final class DefaultCacheEntry implements CacheEntry
     @Override
     public Stream<OnUpdateRequest> subscribersOnUpdate()
     {
-        return subscribeToUpdates.stream();
+        return subscribers.stream();
     }
 
     @Override
@@ -564,5 +577,11 @@ public final class DefaultCacheEntry implements CacheEntry
             cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
             s.purge();
         });
+    }
+
+    @Override
+    public boolean expectSubscribers()
+    {
+        return expectSubscribers || !subscribers.isEmpty();
     }
 }

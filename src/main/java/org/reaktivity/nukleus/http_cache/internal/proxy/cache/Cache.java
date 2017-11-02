@@ -27,6 +27,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCach
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -80,9 +81,12 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
+        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
         DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                 this,
-                request);
+                request,
+                expectSubscribers);
 
         if (cacheEntry.isIntendedForSingleUser())
         {
@@ -90,7 +94,6 @@ public class Cache
             return;
         }
 
-        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
         {
             cachedEntries.put(requestUrlHash, cacheEntry);
