@@ -581,6 +581,7 @@ public final class DefaultCacheEntry implements CacheEntry
             cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
             s.purge();
         });
+        this.polling = false;
     }
 
     @Override
