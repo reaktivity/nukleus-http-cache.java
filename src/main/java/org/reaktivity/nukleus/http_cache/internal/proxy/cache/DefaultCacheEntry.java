@@ -106,6 +106,10 @@ public final class DefaultCacheEntry implements CacheEntry
             cache.scheduler.accept(scheduleAt, this::updateCache);
             expectSubscribers = false;
         }
+        else
+        {
+            polling = false;
+        }
     }
 
     private void updateCache()
