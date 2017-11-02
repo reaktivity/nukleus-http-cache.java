@@ -98,7 +98,6 @@ public final class DefaultCacheEntry implements CacheEntry
 
     private void pollBackend()
     {
-        System.out.println(expectSubscribers);
         if (expectSubscribers || !subscribers.isEmpty())
         {
             this.polling = true;
@@ -561,7 +560,6 @@ public final class DefaultCacheEntry implements CacheEntry
     @Override
     public void refresh(AnswerableByCacheRequest request)
     {
-        System.out.println("refresh");
         if (request == pollingRequest)
         {
             pollBackend();
