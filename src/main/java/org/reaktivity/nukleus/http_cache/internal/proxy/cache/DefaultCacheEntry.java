@@ -422,8 +422,7 @@ public final class DefaultCacheEntry implements CacheEntry
             int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-
-                int surrogateAge = SurrogateControl.getSurrogateFreshnessExtension(this.getCachedResponseHeaders());
+                int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
                 staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
@@ -468,7 +467,7 @@ public final class DefaultCacheEntry implements CacheEntry
         final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now); // || isRevalidating;
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now) || polling;
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
                 doesNotVaryBy &&

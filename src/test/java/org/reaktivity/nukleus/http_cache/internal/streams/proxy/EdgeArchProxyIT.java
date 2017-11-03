@@ -252,6 +252,21 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/not.use.freshness.ext.in.validation.if.not.polling/accept/client",
+        "${streams}/not.use.freshness.ext.in.validation.if.not.polling/connect/server",
+    })
+    public void shouldNotUseFreshnessExtInValidationIfNotPolling() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_STOP_POLLING");
+        Thread.sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/polling.stops.if.no.subscribers/accept/client",
         "${streams}/polling.stops.if.no.subscribers/connect/server",
     })
