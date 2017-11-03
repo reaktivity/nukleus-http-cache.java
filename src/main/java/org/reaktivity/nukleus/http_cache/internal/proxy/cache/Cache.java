@@ -22,10 +22,12 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -79,9 +81,12 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
+        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
         DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                 this,
-                request);
+                request,
+                expectSubscribers);
 
         if (cacheEntry.isIntendedForSingleUser())
         {
@@ -89,7 +94,6 @@ public class Cache
             return;
         }
 
-        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
         {
             cachedEntries.put(requestUrlHash, cacheEntry);
@@ -112,8 +116,10 @@ public class Cache
                             subscriber.authScope(),
                             subscriber))
                     {
-                        throw new RuntimeException("Not implemented yet, probably better" +
-                                " to cancel push promise, but maybe should forward request?");
+                        final MessageConsumer acceptReply = subscriber.acceptReply();
+                        final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
+                        final long acceptCorrelationId = subscriber.acceptCorrelationId();
+                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
                     }
                 }
             });

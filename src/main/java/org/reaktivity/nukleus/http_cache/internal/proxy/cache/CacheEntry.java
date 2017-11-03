@@ -44,4 +44,6 @@ public interface CacheEntry
 
     void abortSubscribers();
 
+    boolean expectSubscribers();
+
 }
