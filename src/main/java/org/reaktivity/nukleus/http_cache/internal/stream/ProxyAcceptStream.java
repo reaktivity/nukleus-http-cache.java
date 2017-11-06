@@ -184,10 +184,11 @@ final class ProxyAcceptStream
 
         this.request = onUpdateRequest;
 
-        if (!streamFactory.cache.handleOnUpdateRequest(requestURLHash, onUpdateRequest, requestHeaders, authScope))
-        {
-            streamFactory.writer.do503AndAbort(acceptReply, authScope, authScope);
-        }
+        streamFactory.cache.handleOnUpdateRequest(
+                requestURLHash,
+                onUpdateRequest,
+                requestHeaders,
+                authScope);
         this.streamState = this::handleAllFramesByIgnoring;
     }
 

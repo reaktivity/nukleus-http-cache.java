@@ -184,7 +184,6 @@ final class ProxyConnectReplyStream
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
         request.cache(responseHeaders, streamFactory.cache);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
 
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
@@ -203,7 +202,7 @@ final class ProxyConnectReplyStream
                 request.etag()
             );
 
-        streamFactory.writer.doHttpPushPromise(request, requestHeaders, responseHeaders, freshnessExtension, request.etag());
+        streamFactory.writer.doHttpPushPromise(request, responseHeaders, freshnessExtension, request.etag());
         this.streamState = this::handleCacheableRequestResponse;
     }
 
