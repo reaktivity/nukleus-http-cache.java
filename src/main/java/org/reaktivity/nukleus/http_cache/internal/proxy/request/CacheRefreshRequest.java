@@ -17,17 +17,22 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest.CacheState;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
 
+    private CacheEntry updatingEntry;
+    private Cache cache;
+
     public CacheRefreshRequest(
             CacheableRequest req,
             int requestSlot,
             String etag,
-            CacheEntry cacheEntry)
+            CacheEntry cacheEntry,
+            Cache cache)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
         super(req.acceptName,
@@ -46,7 +51,8 @@ public class CacheRefreshRequest extends CacheableRequest
               req.router,
               req.authScope(),
               etag);
-        cacheEntry(cacheEntry);
+        this.updatingEntry = cacheEntry;
+        this.cache = cache;
     }
 
     public void cache(
@@ -69,6 +75,16 @@ public class CacheRefreshRequest extends CacheableRequest
     public Type getType()
     {
         return Type.CACHE_REFRESH;
+    }
+
+    @Override
+    public void purge()
+    {
+        if (this.state != CacheState.COMMITTED)
+        {
+            this.cache.purge(updatingEntry);
+        }
+        super.purge();
     }
 
 }

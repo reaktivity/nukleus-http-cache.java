@@ -40,8 +40,7 @@ public class ControlIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .nukleus("http-cache"::equals)
-        .clean();
+        .nukleus("http-cache"::equals);
 
     @Rule
     public final TestRule chain = outerRule(k3po).around(timeout).around(reaktor);

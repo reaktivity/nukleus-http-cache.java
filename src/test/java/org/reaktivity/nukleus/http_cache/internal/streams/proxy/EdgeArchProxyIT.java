@@ -234,7 +234,7 @@ public class EdgeArchProxyIT
     public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdates() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test
@@ -246,7 +246,7 @@ public class EdgeArchProxyIT
     public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdatesAndRecovers() throws Exception
     {
         k3po.finish();
-//        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -258,7 +258,7 @@ public class EdgeArchProxyIT
     public void shouldCancelPushPromisesOn403() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test

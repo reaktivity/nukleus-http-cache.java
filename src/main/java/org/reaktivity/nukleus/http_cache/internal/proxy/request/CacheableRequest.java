@@ -24,7 +24,6 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -43,8 +42,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
-    private CacheState state;
-    private CacheEntry cacheEntry;
+    protected CacheState state;
 
     public enum CacheState
     {
@@ -155,13 +153,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             if (responseSlot != Slab.NO_SLOT)
             {
                 responseBufferPool.release(responseSlot);
+                responseSlot = Slab.NO_SLOT;
             }
-            this.responseSlot = Slab.NO_SLOT;
 
-            if (state != CacheState.COMMITTED && (cacheEntry != null))
-            {
-                cacheEntry.abortSubscribers();
-            }
             this.state = CacheState.PURGED;
         }
     }
@@ -224,10 +218,5 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     public CacheState state()
     {
         return state;
-    }
-
-    public void cacheEntry(CacheEntry cacheEntry)
-    {
-        this.cacheEntry = cacheEntry;
     }
 }
