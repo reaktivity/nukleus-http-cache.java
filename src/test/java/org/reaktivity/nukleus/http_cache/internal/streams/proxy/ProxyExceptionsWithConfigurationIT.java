@@ -25,9 +25,10 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.Description;
+import org.junit.runners.model.Statement;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.reaktor.test.ReaktorRule;
 
 @Ignore
 public class ProxyExceptionsWithConfigurationIT
@@ -47,8 +48,30 @@ public class ProxyExceptionsWithConfigurationIT
             .configure(BUFFER_SLOT_CAPACITY_PROPERTY, 0)
             .clean();
 
+    private final TestRule trace = new TestRule()
+    {
+
+        @Override
+        public Statement apply(final Statement base, final Description description)
+        {
+            return new Statement()
+            {
+
+                @Override
+                public void evaluate() throws Throwable
+                {
+                    System.out.println("Starting " + description.getMethodName());
+                    base.evaluate();
+                    System.out.println("   end of " + description.getMethodName());
+                }
+
+            };
+        }
+
+    };
+
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(trace).around(reaktor).around(k3po).around(timeout);
 
     @Ignore("ABORT vs RESET read order not yet guaranteed to match write order")
     @Test
