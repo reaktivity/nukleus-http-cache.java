@@ -99,7 +99,7 @@ public class Cache
         {
             updateCache(requestUrlHash, cacheEntry);
         }
-        else if (oldCacheEntry.isUpdateBy(request))
+        else if (oldCacheEntry.isUpdatedBy(request))
         {
             updateCache(requestUrlHash, cacheEntry);
 

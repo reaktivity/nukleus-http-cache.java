@@ -56,6 +56,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public final class CacheEntry
 {
+    private static final String HTTP_STATUS_304 = "304";
+
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     private final Cache cache;
@@ -171,6 +173,7 @@ public final class CacheEntry
                 throw new IllegalStateException("Can not serve client when entry is purged");
             default:
                 sendResponseToClient(streamCorrelation, true);
+                break;
         }
         streamCorrelation.purge();
     }
@@ -258,6 +261,7 @@ public final class CacheEntry
                     s.purge();
                 });
                 subscribers.clear();
+                break;
         }
     }
 
@@ -549,12 +553,12 @@ public final class CacheEntry
     }
 
 
-    public boolean isUpdateBy(CacheableRequest request)
+    public boolean isUpdatedBy(CacheableRequest request)
     {
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
         boolean updatedBy = false;
-        if (!status.equals("304"))
+        if (!status.equals(HTTP_STATUS_304))
         {
             MutableDirectBuffer cachedResponsePayload = getCachedData();
             MutableDirectBuffer responsePayload = request.getData(cache.responseBufferPool);
