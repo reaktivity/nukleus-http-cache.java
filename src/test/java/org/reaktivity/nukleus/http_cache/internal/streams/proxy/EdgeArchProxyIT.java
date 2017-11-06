@@ -234,6 +234,18 @@ public class EdgeArchProxyIT
     public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdates() throws Exception
     {
         k3po.finish();
+        counters.assertExpectedCacheEntries(0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/failed.polling.aborts.pending.on-update.requests.and.recovers/accept/client",
+        "${streams}/failed.polling.aborts.pending.on-update.requests.and.recovers/connect/server",
+    })
+    public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdatesAndRecovers() throws Exception
+    {
+        k3po.finish();
         counters.assertExpectedCacheEntries(1);
     }
 
@@ -246,7 +258,7 @@ public class EdgeArchProxyIT
     public void shouldCancelPushPromisesOn403() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(0);
     }
 
     @Test

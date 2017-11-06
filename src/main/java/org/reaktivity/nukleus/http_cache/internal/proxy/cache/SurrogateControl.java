@@ -35,9 +35,14 @@ public final class SurrogateControl
             ListFW<HttpHeaderFW> responseHeadersRO)
     {
         String surrogateControl = getHeader(responseHeadersRO, SURROGATE_CONTROL);
-        if (surrogateControl != null)
+        return getSurrogateFreshnessExtension(surrogateControl);
+    }
+
+    public static int getSurrogateFreshnessExtension(String headerValue)
+    {
+        if (headerValue != null)
         {
-            Matcher matcher = CACHE_PATTERN.matcher(surrogateControl);
+            Matcher matcher = CACHE_PATTERN.matcher(headerValue);
             while (matcher.find())
             {
                 if (MAX_AGE.equals(matcher.group(1)))
@@ -63,9 +68,14 @@ public final class SurrogateControl
             ListFW<HttpHeaderFW> responseHeadersRO)
     {
         String surrogateControl = getHeader(responseHeadersRO, SURROGATE_CONTROL);
-        if (surrogateControl != null)
+        return getSurrogateAge(surrogateControl);
+    }
+
+    public static int getSurrogateAge(String headerValue)
+    {
+        if (headerValue != null)
         {
-            Matcher matcher = CACHE_PATTERN.matcher(surrogateControl);
+            Matcher matcher = CACHE_PATTERN.matcher(headerValue);
             while (matcher.find())
             {
                 if (MAX_AGE.equals(matcher.group(1)))
