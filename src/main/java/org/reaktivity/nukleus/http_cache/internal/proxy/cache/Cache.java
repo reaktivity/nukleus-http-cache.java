@@ -182,9 +182,16 @@ public class Cache
         {
             cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
-        else
+        else if (cacheEntry.canServeRequest(cachedRequestHeadersRO, authScope))
         {
             cacheEntry.serveClient(onUpdateRequest);
+        }
+        else
+        {
+            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
+            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
+            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
         }
     }
 
