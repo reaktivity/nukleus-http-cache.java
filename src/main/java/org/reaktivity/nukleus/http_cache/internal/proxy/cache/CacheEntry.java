@@ -56,8 +56,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public final class CacheEntry
 {
-    private static final String HTTP_STATUS_304 = "304";
-
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     private final Cache cache;
@@ -462,8 +460,8 @@ public final class CacheEntry
         if (lazyInitiatedResponseReceivedAt == null)
         {
             final ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
-            final String dateHeaderValue = getHeader(responseHeaders, "date") != null ?
-                    getHeader(responseHeaders, "date") : getHeader(responseHeaders, "last-modified");
+            final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
+                    getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
             try
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeaderValue);
@@ -525,7 +523,7 @@ public final class CacheEntry
         {
             // TODO pull out as utility of CacheUtils
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
-            return cacheControl == null && cache.responseCacheControlFW.parse(cacheControl).contains("private");
+            return cacheControl == null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
         }
     }
 
@@ -558,7 +556,7 @@ public final class CacheEntry
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
         boolean updatedBy = false;
-        if (!status.equals(HTTP_STATUS_304))
+        if (!status.equals(HttpStatus.NOT_MODIFIED_304))
         {
             MutableDirectBuffer cachedResponsePayload = getCachedData();
             MutableDirectBuffer responsePayload = request.getData(cache.responseBufferPool);
