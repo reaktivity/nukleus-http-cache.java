@@ -594,16 +594,6 @@ public final class CacheEntry
         return expectSubscribers || !subscribers.isEmpty();
     }
 
-    public CacheEntryState state()
-    {
-        return state;
-    }
-
-    public String etag()
-    {
-        return this.cachedRequest.etag();
-    }
-
     public int requestUrl()
     {
         return this.cachedRequest.requestURLHash();
