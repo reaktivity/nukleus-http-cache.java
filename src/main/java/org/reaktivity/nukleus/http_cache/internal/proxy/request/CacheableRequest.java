@@ -101,7 +101,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             Cache cache)
     {
         etag(getHeaderOrDefault(responseHeaders, ETAG, etag()));
-        cache.notifyUncommitted(this);
 
         setupResponseBuffer();
         MutableDirectBuffer buffer = responseBuffer();
@@ -109,6 +108,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         buffer.putBytes(responseSize, responseHeaders.buffer(), responseHeaders.offset(), headersSize);
         responseSize += headersSize;
         this.responseHeadersSize = headersSize;
+
+        cache.notifyUncommitted(this);
     }
 
     private void setupResponseBuffer()

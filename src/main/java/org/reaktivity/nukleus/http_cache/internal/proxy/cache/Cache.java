@@ -191,7 +191,8 @@ public class Cache
     public void notifyUncommitted(CacheableRequest request)
     {
         CacheEntry entry = this.cachedEntries.get(request.requestURLHash());
-        if (request.getType() == Request.Type.INITIAL_REQUEST && entry == null)
+        final boolean overrideEntry = entry == null || entry.isUpdateBy(request);
+        if (request.getType() == Request.Type.INITIAL_REQUEST && overrideEntry)
         {
             final UncommitedCacheEntry cacheEntry = new UncommitedCacheEntry(this, request);
             this.cachedEntries.put(

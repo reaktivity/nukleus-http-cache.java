@@ -43,7 +43,8 @@ public class ControllerIT
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
         .counterValuesBufferCapacity(1024)
-        .controller(HttpCacheController.class::equals);
+        .controller(HttpCacheController.class::equals)
+        .clean();
 
     @Rule
     public final TestRule chain = outerRule(k3po).around(timeout).around(reaktor);
