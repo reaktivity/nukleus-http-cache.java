@@ -165,7 +165,13 @@ public final class CacheEntry
     public void serveClient(
             AnswerableByCacheRequest streamCorrelation)
     {
-        sendResponseToClient(streamCorrelation, true);
+        switch (this.state)
+        {
+            case PURGED:
+                throw new IllegalStateException("Can not serve client when entry is purged");
+            default:
+                sendResponseToClient(streamCorrelation, true);
+        }
         streamCorrelation.purge();
     }
 
@@ -207,10 +213,8 @@ public final class CacheEntry
                     freshnessExtension,
                     cachedRequest.etag());
 
-            final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(cache.requestHeadersRO);
             this.cache.writer.doHttpPushPromise(
                     request,
-                    requestHeaders,
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag());
@@ -235,20 +239,26 @@ public final class CacheEntry
 
     public void purge()
     {
-        this.state = CacheEntryState.PURGED;
-        if (clientCount == 0)
+        switch (this.state)
         {
-            cachedRequest.purge();
+            case PURGED:
+                break;
+            default:
+                this.state = CacheEntryState.PURGED;
+                if (clientCount == 0)
+                {
+                    cachedRequest.purge();
+                }
+                subscribers.stream().forEach(s ->
+                {
+                    MessageConsumer acceptReply = s.acceptReply();
+                    long acceptReplyStreamId = s.acceptReplyStreamId();
+                    long acceptCorrelationId = s.acceptCorrelationId();
+                    cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    s.purge();
+                });
+                subscribers.clear();
         }
-        subscribers.stream().forEach(s ->
-        {
-            MessageConsumer acceptReply = s.acceptReply();
-            long acceptReplyStreamId = s.acceptReplyStreamId();
-            long acceptCorrelationId = s.acceptCorrelationId();
-            cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-            s.purge();
-        });
-        subscribers.clear();
     }
 
     class ServeFromCacheStream implements MessageConsumer

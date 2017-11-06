@@ -59,6 +59,8 @@ public class Writer
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
 
+    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+
     private final MutableDirectBuffer writeBuffer;
 
     public Writer(MutableDirectBuffer writeBuffer)
@@ -247,11 +249,11 @@ public class Writer
 
     public void doHttpPushPromise(
         AnswerableByCacheRequest request,
-        ListFW<HttpHeaderFW> requestHeaders,
         ListFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
+        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply();
         final long acceptReplyStreamId = request.acceptReplyStreamId();
 

@@ -182,7 +182,7 @@ public class Cache
         {
             cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
-        else if (cacheEntry.canServeRequest(cachedRequestHeadersRO, authScope))
+        else if (cacheEntry.canServeRequest(requestHeaders, authScope))
         {
             cacheEntry.serveClient(onUpdateRequest);
         }

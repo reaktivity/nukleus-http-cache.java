@@ -63,7 +63,7 @@ public final class CacheUtils
             {
                 case CACHE_CONTROL:
                     // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                    return value.contains("no-cache") | value.contains("max-age=0");
+                    return value.contains("no-cache") || value.contains("max-age=0");
                 case METHOD:
                     return !"GET".equalsIgnoreCase(value);
                 case CONTENT_LENGTH:
