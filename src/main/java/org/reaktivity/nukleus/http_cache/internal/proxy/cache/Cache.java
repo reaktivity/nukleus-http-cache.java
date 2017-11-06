@@ -28,6 +28,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
@@ -121,7 +122,7 @@ public class Cache
         else
         {
             cacheEntry.purge();
-            if (request.getType().equals(Request.Type.CACHE_REFRESH))
+            if (request.getType() == Request.Type.CACHE_REFRESH)
             {
                 oldCacheEntry.refresh(request);
             }
@@ -165,7 +166,7 @@ public class Cache
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
-        String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, "if-none-match");
+        String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
         if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag()))
         {

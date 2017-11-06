@@ -355,7 +355,7 @@ public final class CacheEntry
         short requestAuthScope)
     {
 
-        if (SurrogateControl.isXProtected(this.getCachedResponseHeaders()))
+        if (SurrogateControl.isProtectedEx(this.getCachedResponseHeaders()))
         {
             return requestAuthScope == cachedRequest.authScope();
         }
@@ -513,20 +513,15 @@ public final class CacheEntry
     protected boolean isIntendedForSingleUser()
     {
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
-        if (SurrogateControl.isXProtected(responseHeaders))
+        if (SurrogateControl.isProtectedEx(responseHeaders))
         {
             return false;
         }
         else
         {
             // TODO pull out as utility of CacheUtils
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, "cache-control");
-            if (cacheControl == null)
-            {
-                return false;
-            }
-            final CacheControl parsedCacheControl = cache.responseCacheControlFW.parse(cacheControl);
-            return parsedCacheControl.contains("private");
+            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
+            return cacheControl == null && cache.responseCacheControlFW.parse(cacheControl).contains("private");
         }
     }
 
@@ -557,33 +552,32 @@ public final class CacheEntry
     public boolean isUpdateBy(CacheableRequest request)
     {
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
-        MutableDirectBuffer cachedResponsePayload = getCachedData();
-        MutableDirectBuffer responsePayload = request.getData(cache.responseBufferPool);
-        int cachedHeaderSize = cachedRequest.responseHeadersSize();
-        int headerSize = request.responseHeadersSize();
-        int cachedResponseSize = cachedRequest.responseSize();
-        int responseSize = request.responseSize();
-
-        int cachedPayloadSize = cachedResponseSize - cachedHeaderSize;
-        int payloadSize = responseSize - headerSize;
-
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
-        if (status.startsWith("304"))
+        boolean updatedBy = false;
+        if (!status.equals("304"))
         {
-            return false;
-        }
-        if (cachedPayloadSize == payloadSize)
-        {
-            for (int i = 0, length = payloadSize; i < length; i++)
+            MutableDirectBuffer cachedResponsePayload = getCachedData();
+            MutableDirectBuffer responsePayload = request.getData(cache.responseBufferPool);
+            int cachedHeaderSize = cachedRequest.responseHeadersSize();
+            int headerSize = request.responseHeadersSize();
+            int cachedResponseSize = cachedRequest.responseSize();
+            int responseSize = request.responseSize();
+
+            int cachedPayloadSize = cachedResponseSize - cachedHeaderSize;
+            int payloadSize = responseSize - headerSize;
+
+            if (cachedPayloadSize == payloadSize)
             {
-                if (cachedResponsePayload.getByte(cachedHeaderSize + i) != responsePayload.getByte(headerSize + i))
+                for (int i = 0, length = payloadSize; i < length && !updatedBy; i++)
                 {
-                    return true;
+                    if (cachedResponsePayload.getByte(cachedHeaderSize + i) != responsePayload.getByte(headerSize + i))
+                    {
+                        updatedBy = true;
+                    }
                 }
             }
-            return false;
         }
-        return true;
+        return updatedBy;
     }
 
     private MutableDirectBuffer getCachedData()

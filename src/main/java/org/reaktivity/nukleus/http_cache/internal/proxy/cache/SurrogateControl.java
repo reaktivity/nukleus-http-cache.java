@@ -97,7 +97,7 @@ public final class SurrogateControl
         return -1;
     }
 
-    public static boolean isXProtected(ListFW<HttpHeaderFW> response)
+    public static boolean isProtectedEx(ListFW<HttpHeaderFW> response)
     {
         String surrogateControl = getHeader(response, SURROGATE_CONTROL);
         if (surrogateControl != null)
