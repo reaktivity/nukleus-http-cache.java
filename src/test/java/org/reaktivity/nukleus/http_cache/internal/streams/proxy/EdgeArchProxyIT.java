@@ -25,6 +25,8 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.Description;
+import org.junit.runners.model.Statement;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheController;
@@ -53,8 +55,30 @@ public class EdgeArchProxyIT
 
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
 
+    private final TestRule trace = new TestRule()
+    {
+
+        @Override
+        public Statement apply(final Statement base, final Description description)
+        {
+            return new Statement()
+            {
+
+                @Override
+                public void evaluate() throws Throwable
+                {
+                    System.out.println("Starting " + description.getMethodName());
+                    base.evaluate();
+                    System.out.println("   end of " + description.getMethodName());
+                }
+
+            };
+        }
+
+    };
+
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(trace).around(reaktor).around(counters).around(k3po).around(timeout);
 
     @Test
     @Specification({
