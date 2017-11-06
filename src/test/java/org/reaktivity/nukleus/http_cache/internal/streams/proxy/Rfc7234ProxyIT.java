@@ -260,7 +260,7 @@ public class Rfc7234ProxyIT
     public void shouldRequestCacheMaxAgeZero() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
+        counters.assertExpectedCacheEntries(0); // In future this can change if we cache the entry
     }
 
     @Test
@@ -284,7 +284,7 @@ public class Rfc7234ProxyIT
     public void shouldCacheGetRequestWithNoStore() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
