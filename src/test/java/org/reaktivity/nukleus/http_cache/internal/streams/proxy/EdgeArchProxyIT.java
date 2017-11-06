@@ -30,9 +30,6 @@ import org.junit.runners.model.Statement;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheController;
-import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
-import org.reaktivity.reaktor.test.ReaktorRule;
-
 import org.junit.Assert;
 
 public class EdgeArchProxyIT

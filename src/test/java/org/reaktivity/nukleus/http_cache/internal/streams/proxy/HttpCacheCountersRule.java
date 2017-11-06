@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.test;
+package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static org.junit.Assert.assertEquals;
 
@@ -21,7 +21,6 @@ import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheController;
-import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class HttpCacheCountersRule implements TestRule
 {

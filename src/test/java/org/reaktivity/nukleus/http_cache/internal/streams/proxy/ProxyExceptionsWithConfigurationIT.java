@@ -29,7 +29,6 @@ import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.reaktor.test.ReaktorRule;
 
 @Ignore
 public class ProxyExceptionsWithConfigurationIT
