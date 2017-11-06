@@ -422,6 +422,8 @@ public final class DefaultCacheEntry implements CacheEntry
             int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
+            int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
+            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
         return lazyInitiatedResponseStaleAt;
