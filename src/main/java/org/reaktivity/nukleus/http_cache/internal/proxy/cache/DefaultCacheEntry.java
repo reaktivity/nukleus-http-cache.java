@@ -400,11 +400,11 @@ public final class DefaultCacheEntry implements CacheEntry
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
         final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeaderValue);
-        Instant receivedAt = responseReceivedAt();
 
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
+            Instant receivedAt = responseReceivedAt();
             if (receivedAt.plusSeconds(requestMaxAge).isBefore(now))
             {
                 return false;
@@ -422,8 +422,6 @@ public final class DefaultCacheEntry implements CacheEntry
             int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-                int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
-                staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
         return lazyInitiatedResponseStaleAt;
