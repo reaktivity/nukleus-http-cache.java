@@ -173,8 +173,6 @@ final class ProxyAcceptStream
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
-            streamFactory.correlationResponseBufferPool,
-            streamFactory.correlationRequestBufferPool,
             requestSlot,
             requestSize,
             streamFactory.router,
@@ -208,8 +206,6 @@ final class ProxyAcceptStream
                 streamFactory.supplyCorrelationId,
                 streamFactory.supplyStreamId,
                 requestURLHash,
-                streamFactory.correlationResponseBufferPool,
-                streamFactory.correlationRequestBufferPool,
                 requestSlot,
                 requestSize,
                 streamFactory.router,
@@ -231,7 +227,7 @@ final class ProxyAcceptStream
         }
         else
         {
-            this.request.purge();
+            this.request.purge(streamFactory.requestBufferPool);
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
@@ -286,7 +282,7 @@ final class ProxyAcceptStream
     {
         streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
         streamFactory.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-        request.purge();
+        request.purge(streamFactory.requestBufferPool);
     }
 
     private void send504()
@@ -296,7 +292,7 @@ final class ProxyAcceptStream
                         .name(STATUS)
                         .value("504")));
         streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
-        request.purge();
+        request.purge(streamFactory.requestBufferPool);
     }
 
     private void handleAllFramesByIgnoring(
@@ -329,7 +325,7 @@ final class ProxyAcceptStream
             break;
         case AbortFW.TYPE_ID:
             streamFactory.writer.doAbort(connect, connectStreamId);
-            request.purge();
+            request.purge(streamFactory.requestBufferPool);
             break;
         default:
             streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
