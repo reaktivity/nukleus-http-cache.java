@@ -568,7 +568,7 @@ public final class CacheEntry
             int cachedPayloadSize = cachedResponseSize - cachedHeaderSize;
             int payloadSize = responseSize - headerSize;
 
-            updatedBy = !DirectBufferUtil.compareTo(
+            updatedBy = !DirectBufferUtil.equals(
                     cachedResponsePayload,
                     cachedHeaderSize,
                     cachedPayloadSize,

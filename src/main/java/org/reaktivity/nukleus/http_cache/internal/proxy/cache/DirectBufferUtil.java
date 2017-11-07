@@ -20,7 +20,7 @@ import org.agrona.DirectBuffer;
 public class DirectBufferUtil
 {
 
-    public static final boolean compareTo(
+    public static final boolean equals(
             DirectBuffer buffer1,
             int offset1,
             int length1,

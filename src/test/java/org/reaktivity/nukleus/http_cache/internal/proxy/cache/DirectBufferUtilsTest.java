@@ -16,7 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil.compareTo;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil.equals;
 
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -31,10 +31,10 @@ public class DirectBufferUtilsTest
     {
         final DirectBuffer buffer1 = new UnsafeBuffer("abcdef".getBytes(UTF_8));
         final DirectBuffer buffer2 = new UnsafeBuffer("abcdefghi".getBytes(UTF_8));
-        Assert.assertTrue(compareTo(buffer1, 0, 6, buffer2, 0, 6));
-        Assert.assertFalse(compareTo(buffer1, 0, 6, buffer2, 1, 6));
-        Assert.assertFalse(compareTo(buffer1, 0, 6, buffer2, 1, 7));
-        Assert.assertFalse(compareTo(buffer1, 0, 6, buffer2, 0, 5));
+        Assert.assertTrue(equals(buffer1, 0, 6, buffer2, 0, 6));
+        Assert.assertFalse(equals(buffer1, 0, 6, buffer2, 1, 6));
+        Assert.assertFalse(equals(buffer1, 0, 6, buffer2, 1, 7));
+        Assert.assertFalse(equals(buffer1, 0, 6, buffer2, 0, 5));
     }
 
 }
