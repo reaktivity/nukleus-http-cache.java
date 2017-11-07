@@ -46,6 +46,7 @@ public class Cache
     final BufferPool cachedResponseBufferPool;
     final BufferPool responseBufferPool;
     final BufferPool requestBufferPool;
+    final BufferPool subscriberBufferPool;
     final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
@@ -76,6 +77,7 @@ public class Cache
         this.requestBufferPool = bufferPool;
         this.cachedResponseBufferPool = bufferPool.duplicate();
         this.responseBufferPool = bufferPool.duplicate();
+        this.subscriberBufferPool = bufferPool.duplicate();
         this.cachedEntries = new Int2ObjectHashMap<>();
         this.etagSupplier = etagSupplier;
     }
@@ -107,7 +109,7 @@ public class Cache
             {
                 if (!this.serveRequest(
                         cacheEntry,
-                        subscriber.getRequestHeaders(requestHeadersRO, requestBufferPool),
+                        subscriber.getRequestHeaders(requestHeadersRO, subscriberBufferPool),
                         subscriber.authScope(),
                         subscriber))
                 {

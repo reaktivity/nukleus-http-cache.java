@@ -140,7 +140,7 @@ public final class CacheEntry
                 throw new RuntimeException("Cache out of space, please reconfigure");  // TODO reconsider hard fail??
             }
             MutableDirectBuffer newBuffer = cache.requestBufferPool.buffer(newSlot);
-            this.cachedRequest.copyRequestTo(newBuffer);
+            this.cachedRequest.copyRequestTo(newBuffer, cache.cachedResponseBufferPool);
 
             final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
                     cachedRequest,
@@ -173,7 +173,7 @@ public final class CacheEntry
                 sendResponseToClient(streamCorrelation, true);
                 break;
         }
-        streamCorrelation.purge();
+        streamCorrelation.purge(cache.requestBufferPool);
     }
 
     private void sendResponseToClient(
@@ -248,7 +248,7 @@ public final class CacheEntry
                 this.state = CacheEntryState.PURGED;
                 if (clientCount == 0)
                 {
-                    cachedRequest.purge();
+                    cachedRequest.purge(cache.cachedRequestBufferPool);
                 }
                 subscribers.stream().forEach(s ->
                 {
@@ -256,7 +256,7 @@ public final class CacheEntry
                     long acceptReplyStreamId = s.acceptReplyStreamId();
                     long acceptCorrelationId = s.acceptCorrelationId();
                     cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-                    s.purge();
+                    s.purge(cache.subscriberBufferPool);
                 });
                 subscribers.clear();
                 break;
@@ -335,7 +335,7 @@ public final class CacheEntry
 
     private ListFW<HttpHeaderFW> getCachedResponseHeaders()
     {
-        return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
+        return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO, cache.cachedResponseBufferPool);
     }
 
     private void addClient()
@@ -348,7 +348,7 @@ public final class CacheEntry
         clientCount--;
         if (clientCount == 0 && this.state == CacheEntryState.PURGED)
         {
-            cachedRequest.purge(); // Force hard clean up
+            cachedRequest.purge(cache.requestBufferPool); // Force hard clean up
         }
     }
 
@@ -553,7 +553,7 @@ public final class CacheEntry
 
     public boolean isUpdatedBy(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
+        ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO, cache.responseBufferPool);
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
         boolean updatedBy = false;
         if (!status.equals(HttpStatus.NOT_MODIFIED_304))
