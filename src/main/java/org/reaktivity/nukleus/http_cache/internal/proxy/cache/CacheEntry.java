@@ -568,19 +568,18 @@ public final class CacheEntry
             int cachedPayloadSize = cachedResponseSize - cachedHeaderSize;
             int payloadSize = responseSize - headerSize;
 
-            if (cachedPayloadSize == payloadSize)
-            {
-                for (int i = 0, length = payloadSize; i < length && !updatedBy; i++)
-                {
-                    if (cachedResponsePayload.getByte(cachedHeaderSize + i) != responsePayload.getByte(headerSize + i))
-                    {
-                        updatedBy = true;
-                    }
-                }
-            }
+            updatedBy = !DirectBufferUtil.compareTo(
+                    cachedResponsePayload,
+                    cachedHeaderSize,
+                    cachedPayloadSize,
+                    responsePayload,
+                    headerSize,
+                    payloadSize);
         }
         return updatedBy;
     }
+
+
 
     private MutableDirectBuffer getCachedData()
     {
