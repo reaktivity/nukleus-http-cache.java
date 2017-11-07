@@ -16,14 +16,13 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil.equals;
 
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class DirectBufferUtilsTest
+public class DirectBufferUtilTest
 {
 
     @Test
@@ -31,10 +30,11 @@ public class DirectBufferUtilsTest
     {
         final DirectBuffer buffer1 = new UnsafeBuffer("abcdef".getBytes(UTF_8));
         final DirectBuffer buffer2 = new UnsafeBuffer("abcdefghi".getBytes(UTF_8));
-        Assert.assertTrue(equals(buffer1, 0, 6, buffer2, 0, 6));
-        Assert.assertFalse(equals(buffer1, 0, 6, buffer2, 1, 6));
-        Assert.assertFalse(equals(buffer1, 0, 6, buffer2, 1, 7));
-        Assert.assertFalse(equals(buffer1, 0, 6, buffer2, 0, 5));
+        Assert.assertTrue(DirectBufferUtil.equals(buffer1, 0, 6, buffer2, 0, 6));
+        Assert.assertTrue(DirectBufferUtil.equals(buffer1, 2, 4, buffer2, 2, 4));
+        Assert.assertFalse(DirectBufferUtil.equals(buffer1, 0, 6, buffer2, 1, 6));
+        Assert.assertFalse(DirectBufferUtil.equals(buffer1, 0, 6, buffer2, 1, 7));
+        Assert.assertFalse(DirectBufferUtil.equals(buffer1, 0, 6, buffer2, 0, 5));
     }
 
 }
