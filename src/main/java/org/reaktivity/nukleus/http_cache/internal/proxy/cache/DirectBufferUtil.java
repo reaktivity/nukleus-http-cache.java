@@ -28,20 +28,18 @@ public class DirectBufferUtil
             int offset2,
             int length2)
     {
-        if (length1 != length2)
+        boolean result = true;
+        if (length1 == length2)
         {
-            return false;
-        }
-        else
-        {
-            for (int i = 0; i < length1; i++)
+            result = true;
+            for (int i = 0; i < length1 && result; i++)
             {
                 if (buffer1.getByte(offset1 + i) != buffer2.getByte(offset2 + i))
                 {
-                    return false;
+                    result = false;
                 }
             }
         }
-        return true;
+        return result;
     }
 }
