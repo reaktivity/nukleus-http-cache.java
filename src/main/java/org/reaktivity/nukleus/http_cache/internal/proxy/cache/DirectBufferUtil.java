@@ -34,7 +34,7 @@ public class DirectBufferUtil
         }
         else
         {
-            for (int i = 0, length = length2; i < length; i++)
+            for (int i = 0; i < length1; i++)
             {
                 if (buffer1.getByte(offset1 + i) != buffer2.getByte(offset2 + i))
                 {
