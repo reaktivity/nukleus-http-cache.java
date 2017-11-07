@@ -71,7 +71,7 @@ public class Cache
     {
         this.scheduler = scheduler;
         this.correlations = correlations;
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(writeBuffer, bufferPool.duplicate());
         this.cachedRequestBufferPool = bufferPool;
         this.requestBufferPool = bufferPool;
         this.cachedResponseBufferPool = bufferPool.duplicate();
@@ -107,7 +107,7 @@ public class Cache
             {
                 if (!this.serveRequest(
                         cacheEntry,
-                        subscriber.getRequestHeaders(requestHeadersRO),
+                        subscriber.getRequestHeaders(requestHeadersRO, requestBufferPool),
                         subscriber.authScope(),
                         subscriber))
                 {

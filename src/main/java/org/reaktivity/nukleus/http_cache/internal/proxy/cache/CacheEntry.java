@@ -330,7 +330,7 @@ public final class CacheEntry
 
     private ListFW<HttpHeaderFW> getCachedRequest()
     {
-        return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
+        return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO, cache.cachedRequestBufferPool);
     }
 
     private ListFW<HttpHeaderFW> getCachedResponseHeaders()
