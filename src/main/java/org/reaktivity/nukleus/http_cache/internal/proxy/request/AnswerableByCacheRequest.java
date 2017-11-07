@@ -55,9 +55,11 @@ public abstract class AnswerableByCacheRequest extends Request
         this.etag = etag;
     }
 
-    public final ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeadersRO)
+    public final ListFW<HttpHeaderFW> getRequestHeaders(
+            ListFW<HttpHeaderFW> requestHeadersRO,
+            BufferPool pool)
     {
-        final MutableDirectBuffer buffer = requestBufferPool.buffer(requestSlot);
+        final MutableDirectBuffer buffer = pool.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, requestSize);
     }
 

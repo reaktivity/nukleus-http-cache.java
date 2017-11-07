@@ -106,7 +106,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.scheduler = requireNonNull(scheduler);
         this.cache = cache;
 
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(writeBuffer, bufferPool.duplicate());
     }
 
     @Override
