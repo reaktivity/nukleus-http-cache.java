@@ -52,7 +52,7 @@ public class Rfc7234ProxyIT
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
 
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(counters).around(k3po).around(timeout);
+    public final TestRule chain = outerRule(k3po).around(reaktor).around(counters).around(timeout);
 
     @Test
     @Specification({
