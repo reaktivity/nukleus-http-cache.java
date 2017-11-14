@@ -211,8 +211,4 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return bp.buffer(responseSlot);
     }
 
-    public CacheState state()
-    {
-        return state;
-    }
 }

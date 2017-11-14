@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 public enum CacheEntryState
 {
+    INITIALIZED,
     CAN_REFRESH,
     CANT_REFRESH,
     REFRESHING,
