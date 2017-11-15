@@ -135,6 +135,7 @@ public class Cache
             int requestUrlHash,
             CacheEntry cacheEntry)
     {
+        cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
         PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
         if (result != null)

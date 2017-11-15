@@ -84,8 +84,11 @@ public final class CacheEntry
         this.cache = cache;
         this.cachedRequest = request;
         this.expectSubscribers = expectSubscribers;
+        this.state = CacheEntryState.INITIALIZED;
+    }
 
-
+    public void commit()
+    {
         final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
         if (freshnessExtension > 0)
         {

@@ -292,6 +292,19 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/polling.stops.if.no.subscribers.and.not.updated/accept/client",
+        "${streams}/polling.stops.if.no.subscribers.and.not.updated/connect/server",
+    })
+    public void shouldStopPollingIfNoSubscribersAndNotUpdated() throws Exception
+    {
+        k3po.finish();
+        Thread.sleep(10); // Wait for response to be processed
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/maintain.polling.per.multiple.auth.scopes/accept/client",
         "${streams}/maintain.polling.per.multiple.auth.scopes/connect/server",
     })
