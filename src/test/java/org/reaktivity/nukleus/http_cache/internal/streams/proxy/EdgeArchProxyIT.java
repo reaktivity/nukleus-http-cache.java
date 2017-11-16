@@ -186,7 +186,7 @@ public class EdgeArchProxyIT
         k3po.finish();
         Instant finish = Instant.now();
         Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(1, 1);
     }
 
     @Test
@@ -259,21 +259,6 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/not.use.freshness.ext.in.validation.if.not.polling/accept/client",
-        "${streams}/not.use.freshness.ext.in.validation.if.not.polling/connect/server",
-    })
-    public void shouldNotUseFreshnessExtInValidationIfNotPolling() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_STOP_POLLING");
-        Thread.sleep(1000);
-        k3po.notifyBarrier("CACHE_EXPIRED");
-        k3po.finish();
     }
 
     @Test
