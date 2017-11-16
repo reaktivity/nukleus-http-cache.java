@@ -186,7 +186,7 @@ public class EdgeArchProxyIT
         k3po.finish();
         Instant finish = Instant.now();
         Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(1, 1);
     }
 
     @Test
@@ -264,25 +264,23 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/not.use.freshness.ext.in.validation.if.not.polling/accept/client",
-        "${streams}/not.use.freshness.ext.in.validation.if.not.polling/connect/server",
+        "${streams}/polling.stops.if.no.subscribers/accept/client",
+        "${streams}/polling.stops.if.no.subscribers/connect/server",
     })
-    public void shouldNotUseFreshnessExtInValidationIfNotPolling() throws Exception
+    public void shouldStopPollingIfNoSubscribers() throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_STOP_POLLING");
-        Thread.sleep(1000);
-        k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
+        Thread.sleep(10); // Wait for response to be processed
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/polling.stops.if.no.subscribers/accept/client",
-        "${streams}/polling.stops.if.no.subscribers/connect/server",
+        "${streams}/polling.stops.if.no.subscribers.and.not.updated/accept/client",
+        "${streams}/polling.stops.if.no.subscribers.and.not.updated/connect/server",
     })
-    public void shouldStopPollingIfNoSubscribers() throws Exception
+    public void shouldStopPollingIfNoSubscribersAndNotUpdated() throws Exception
     {
         k3po.finish();
         Thread.sleep(10); // Wait for response to be processed
