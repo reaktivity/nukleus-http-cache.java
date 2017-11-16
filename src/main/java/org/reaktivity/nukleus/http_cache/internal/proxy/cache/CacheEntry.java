@@ -76,6 +76,8 @@ public final class CacheEntry
 
     private CacheEntryState state;
 
+    private long pollAt = -1;
+
     public CacheEntry(
             Cache cache,
             CacheableRequest request,
@@ -107,8 +109,15 @@ public final class CacheEntry
         {
             this.state = CacheEntryState.REFRESHING;
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
-            long scheduleAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
-            cache.scheduler.accept(scheduleAt, this::sendRefreshRequest);
+            if (this.pollAt == -1)
+            {
+                this.pollAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
+            }
+            else
+            {
+                this.pollAt += surrogateMaxAge * 1000;
+            }
+            cache.scheduler.accept(pollAt, this::sendRefreshRequest);
             expectSubscribers = false;
         }
         else
@@ -501,7 +510,7 @@ public final class CacheEntry
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
-                /*|| this.state == CAN_REFRESH */|| this.state == REFRESHING;
+                || this.state == CAN_REFRESH || this.state == REFRESHING;
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
                 doesNotVaryBy &&
@@ -542,6 +551,10 @@ public final class CacheEntry
         if (polling)
         {
             this.subscribers.add(onModificationRequest);
+        }
+        if (this.state == CacheEntryState.CAN_REFRESH)
+        {
+            pollBackend();
         }
         return polling;
     }
