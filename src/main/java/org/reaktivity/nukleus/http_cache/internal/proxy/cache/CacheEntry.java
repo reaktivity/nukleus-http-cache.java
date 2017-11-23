@@ -329,6 +329,7 @@ public final class CacheEntry
                 MutableDirectBuffer buffer = CacheEntry.this.cache.cachedResponseBufferPool.buffer(responseSlot);
                 final MessageConsumer acceptReply = request.acceptReply();
                 final long acceptReplyStreamId = request.acceptReplyStreamId();
+                budget -= padding;
                 CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
                 payloadWritten += toWrite;
                 if (payloadWritten == responseSize)
