@@ -64,7 +64,7 @@ public final class CacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
-    private CacheControl cacheControlFW;
+    private CacheControl cacheControlFW = new CacheControl();
 
     private final CacheableRequest cachedRequest;
 
