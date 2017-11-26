@@ -58,13 +58,13 @@ public final class CacheEntry
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
+    private final CacheControl cacheControlFW = new CacheControl();
+
     private final Cache cache;
     private int clientCount = 0;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
-
-    private CacheControl cacheControlFW = new CacheControl();
 
     private final CacheableRequest cachedRequest;
 
