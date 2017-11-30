@@ -549,11 +549,11 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/accept/client",
-            "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/accept/client",
+        "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/connect/server",
     })
-    public void shouldCacheWithFreshenedResponseThatUpdatedByStromgValidator() throws Exception
+    public void shouldCacheWithFreshenedResponseThatUpdatedByStrongValidator() throws Exception
     {
         k3po.finish();
     }
