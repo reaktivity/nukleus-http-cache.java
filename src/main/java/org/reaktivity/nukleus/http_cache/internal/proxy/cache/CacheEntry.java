@@ -58,13 +58,13 @@ public final class CacheEntry
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
+    private final CacheControl cacheControlFW = new CacheControl();
+
     private final Cache cache;
     private int clientCount = 0;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
-
-    private CacheControl cacheControlFW;
 
     private final CacheableRequest cachedRequest;
 
@@ -329,6 +329,7 @@ public final class CacheEntry
                 MutableDirectBuffer buffer = CacheEntry.this.cache.cachedResponseBufferPool.buffer(responseSlot);
                 final MessageConsumer acceptReply = request.acceptReply();
                 final long acceptReplyStreamId = request.acceptReplyStreamId();
+                budget -= padding;
                 CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
                 payloadWritten += toWrite;
                 if (payloadWritten == responseSize)
