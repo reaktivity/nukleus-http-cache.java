@@ -129,9 +129,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/request.greater.max-age/accept/client",
-            "${streams}/request.greater.max-age/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/request.greater.max-age/accept/client",
+        "${streams}/request.greater.max-age/connect/server",
     })
     public void shouldNotCacheWhenResponseAgeIsGreaterThanRequestMaxAge() throws Exception
     {
@@ -145,9 +145,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/request.lesser.max-age/accept/client",
-            "${streams}/request.lesser.max-age/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/request.lesser.max-age/accept/client",
+        "${streams}/request.lesser.max-age/connect/server",
     })
     public void shouldCacheWhenResponseAgeIsLessthanRequestMaxAge() throws Exception
     {
@@ -209,9 +209,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/cache.max-stale.with.max-age/accept/client",
-            "${streams}/cache.max-stale.with.max-age/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/cache.max-stale.with.max-age/accept/client",
+        "${streams}/cache.max-stale.with.max-age/connect/server",
     })
     public void shouldCacheMaxStaleWithMaxAge() throws Exception
     {
@@ -225,9 +225,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/expire.max-stale/accept/client",
-            "${streams}/expire.max-stale/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/expire.max-stale/accept/client",
+        "${streams}/expire.max-stale/connect/server",
     })
     public void shouldExpireMaxStale() throws Exception
     {
@@ -241,9 +241,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/expire.min-fresh/accept/client",
-            "${streams}/expire.min-fresh/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/expire.min-fresh/accept/client",
+        "${streams}/expire.min-fresh/connect/server",
     })
     public void shouldExpireMinFresh() throws Exception
     {
@@ -277,9 +277,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/cache.get.request.with.no-store/accept/client",
-            "${streams}/cache.get.request.with.no-store/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/cache.get.request.with.no-store/accept/client",
+        "${streams}/cache.get.request.with.no-store/connect/server",
     })
     public void shouldCacheGetRequestWithNoStore() throws Exception
     {
@@ -292,8 +292,8 @@ public class Rfc7234ProxyIT
             "(can be served by cache but is not CacheableRequest)")
     @Specification({
             "${route}/proxy/controller",
-            "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
-            "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/connect/server",
+        "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
+        "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/connect/server",
     })
     public void shouldCacheGetRequestWithNoStoreAndResponeMarkedCacheable() throws Exception
     {
@@ -318,9 +318,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/request.no-cache/accept/client",
-            "${streams}/request.no-cache/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/request.no-cache/accept/client",
+        "${streams}/request.no-cache/connect/server",
     })
     public void shouldRequestNoCache() throws Exception
     {
@@ -522,4 +522,5 @@ public class Rfc7234ProxyIT
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
     }
+
 }

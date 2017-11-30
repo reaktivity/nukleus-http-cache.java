@@ -298,4 +298,28 @@ public class EdgeArchProxyIT
         k3po.finish();
         counters.assertExpectedCacheEntries(2, 0, 2);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/override.injected.stale-while-revalidate.with.explicit.one/accept/client",
+        "${streams}/override.injected.stale-while-revalidate.with.explicit.one/connect/server",
+    })
+    public void shouldOverrideInjectedStaleWhileRevalidateValueWithExplicitOne() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/proxy.cache-control.explicitly/accept/client",
+        "${streams}/proxy.cache-control.explicitly/connect/server",
+    })
+    public void shouldProxyCacheControlDirectiveExplicitly() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
 }
