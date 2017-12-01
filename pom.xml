@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
   <artifactId>nukleus-http-cache</artifactId>
-  <version>0.31</version>
+  <version>0.32</version>
   <name>HTTP Cache Nukleus Implementation</name>
   <description>HTTP Cache Nukleus Implementation</description>
   <url>https://github.com/reaktivity/nukleus-http-cache.java</url>
@@ -56,7 +56,7 @@
     <nukleus.plugin.version>0.19</nukleus.plugin.version>
     <nukleus.version>0.12</nukleus.version>
 
-    <nukleus.http.cache.spec.version>0.27</nukleus.http.cache.spec.version>
+    <nukleus.http.cache.spec.version>0.28</nukleus.http.cache.spec.version>
     <reaktor.version>0.32</reaktor.version>
   </properties>
 
@@ -181,6 +181,13 @@
             </goals>
           </execution>
         </executions>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>8.3</version>
+          </dependency>
+        </dependencies>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
