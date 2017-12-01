@@ -540,9 +540,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/ignore.expires.if.response.contains.s-maxage/accept/client",
-            "${streams}/ignore.expires.if.response.contains.s-maxage/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/ignore.expires.if.response.contains.s-maxage/accept/client",
+        "${streams}/ignore.expires.if.response.contains.s-maxage/connect/server",
     })
     public void shouldCacheSMaxAgeWithExpires() throws Exception
     {
@@ -550,6 +550,17 @@ public class Rfc7234ProxyIT
         k3po.awaitBarrier("REQUEST_CACHED");
         sleep(3000);
         k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.cache.when.authorization.is.provided/accept/client",
+        "${streams}/not.cache.when.authorization.is.provided/connect/server",
+    })
+    public void shouldNotCacheWithRequestAuthorizationHeader() throws Exception
+    {
         k3po.finish();
     }
 
@@ -566,9 +577,20 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/response.no-cache.with.max-stale/accept/client",
-            "${streams}/response.no-cache.with.max-stale/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/explicitly.smaxage.and.authorization/accept/client",
+        "${streams}/explicitly.smaxage.and.authorization/connect/server",
+    })
+    public void shouldCacheWithRequestAuthorizationHeaderAndSmaxage() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/response.no-cache.with.max-stale/accept/client",
+        "${streams}/response.no-cache.with.max-stale/connect/server",
     })
     public void shouldRevalidateOnResponseNoCacheWithStaleResponseConfigured() throws Exception
     {
