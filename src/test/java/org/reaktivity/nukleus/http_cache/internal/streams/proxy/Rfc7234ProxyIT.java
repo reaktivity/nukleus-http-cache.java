@@ -540,9 +540,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/ignore.expires.if.response.contains.s-maxage/accept/client",
-            "${streams}/ignore.expires.if.response.contains.s-maxage/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/ignore.expires.if.response.contains.s-maxage/accept/client",
+        "${streams}/ignore.expires.if.response.contains.s-maxage/connect/server",
     })
     public void shouldCacheSMaxAgeWithExpires() throws Exception
     {
@@ -588,9 +588,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/response.no-cache.with.max-stale/accept/client",
-            "${streams}/response.no-cache.with.max-stale/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/response.no-cache.with.max-stale/accept/client",
+        "${streams}/response.no-cache.with.max-stale/connect/server",
     })
     public void shouldRevalidateOnResponseNoCacheWithStaleResponseConfigured() throws Exception
     {
