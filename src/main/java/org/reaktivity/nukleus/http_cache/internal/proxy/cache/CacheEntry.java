@@ -536,7 +536,7 @@ public final class CacheEntry
         {
             // TODO pull out as utility of CacheUtils
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
-            return cacheControl == null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
+            return cacheControl == null || cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
         }
     }
 

@@ -322,4 +322,16 @@ public class EdgeArchProxyIT
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/does.not.cache.with.invalid.max-age.extension.separator/accept/client",
+        "${streams}/does.not.cache.with.invalid.max-age.extension.separator/connect/server",
+    })
+    public void shouldNotCacheWithInvalidMaxAgeFreshnessExtensionSeparator() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
 }

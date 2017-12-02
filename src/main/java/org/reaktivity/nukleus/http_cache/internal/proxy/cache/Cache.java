@@ -113,10 +113,7 @@ public class Cache
                         subscriber.authScope(),
                         subscriber))
                 {
-                    final MessageConsumer acceptReply = subscriber.acceptReply();
-                    final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
-                    final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                    this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    this.do503AndAbort(subscriber);
                 }
             });
             oldCacheEntry.purge();
@@ -142,6 +139,14 @@ public class Cache
         {
             result.addSubscribers(cacheEntry);
         }
+    }
+
+    private void do503AndAbort(OnUpdateRequest onUpdateRequest)
+    {
+        final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
+        final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
+        final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
     }
 
     public boolean handleInitialRequest(
@@ -177,10 +182,7 @@ public class Cache
         }
         else if(cacheEntry == null)
         {
-            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
-            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            this.do503AndAbort(onUpdateRequest);
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
@@ -192,10 +194,7 @@ public class Cache
         }
         else
         {
-            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
-            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
     }
 

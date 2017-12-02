@@ -602,6 +602,7 @@ public class Rfc7234ProxyIT
         k3po.finish();
     }
 
+    @Ignore
     @Test
     @Specification({
         "${route}/proxy/controller",
