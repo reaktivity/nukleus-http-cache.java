@@ -524,7 +524,6 @@ public class Rfc7234ProxyIT
     }
 
 
-    //
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -532,6 +531,58 @@ public class Rfc7234ProxyIT
         "${streams}/invalidate.multiple.max-age/accept/server",
     })
     public void shouldNotCacheWithMultipleMaxAge() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/ignore.expires.if.response.contains.max-age/accept/client",
+        "${streams}/ignore.expires.if.response.contains.max-age/connect/server",
+    })
+    public void shouldCacheMaxAgeAndExpires() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(3000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/ignore.expires.if.response.contains.s-maxage/accept/client",
+        "${streams}/ignore.expires.if.response.contains.s-maxage/connect/server",
+    })
+    public void shouldCacheSMaxAgeWithExpires() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(3000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.cache.when.authorization.is.provided/accept/client",
+        "${streams}/not.cache.when.authorization.is.provided/connect/server",
+    })
+    public void shouldNotCacheWithRequestAuthorizationHeader() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/response.no-cache/accept/client",
+        "${streams}/response.no-cache/connect/server",
+    })
+    public void shouldRevalidateOnResponseNoCache() throws Exception
     {
         k3po.finish();
     }
@@ -549,6 +600,17 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+        "${streams}/explicitly.smaxage.and.authorization/accept/client",
+        "${streams}/explicitly.smaxage.and.authorization/connect/server",
+    })
+    public void shouldCacheWithRequestAuthorizationHeaderAndSmaxage() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/accept/client",
         "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/connect/server",
@@ -558,4 +620,55 @@ public class Rfc7234ProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/response.no-cache.with.max-stale/accept/client",
+        "${streams}/response.no-cache.with.max-stale/connect/server",
+    })
+    public void shouldRevalidateOnResponseNoCacheWithStaleResponseConfigured() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(3000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/do.not.cache.response.with.no-store/accept/client",
+        "${streams}/do.not.cache.response.with.no-store/connect/server",
+    })
+    public void shouldNotCacheResponseWithResponseNoStore() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/not.cache.private.cache.with.s-maxage/accept/client",
+        "${streams}/not.cache.private.cache.with.s-maxage/connect/server",
+    })
+    public void shouldNotCacheResponseWithSMaxageInPrivateCache() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/override.max-age.with.s-maxage/accept/client",
+        "${streams}/override.max-age.with.s-maxage/connect/server",
+    })
+    public void shouldOverrideMaxAgeWithSMaxage() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(3000);
+        k3po.notifyBarrier("MAX_AGE_EXPIRED");
+        k3po.finish();
+    }
 }

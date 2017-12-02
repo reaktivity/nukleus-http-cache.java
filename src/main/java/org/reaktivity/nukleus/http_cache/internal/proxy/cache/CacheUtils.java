@@ -135,6 +135,10 @@ public final class CacheUtils
         {
             return true;
         }
+        else if (cachedResponse.contains(CacheDirectives.S_MAXAGE))
+        {
+            return true;
+        }
 
         if (cachedResponse.contains(CacheDirectives.PRIVATE))
         {
