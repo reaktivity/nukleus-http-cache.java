@@ -523,6 +523,18 @@ public class Rfc7234ProxyIT
         counters.assertExpectedCacheEntries(0);
     }
 
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/invalidate.multiple.max-age/accept/client",
+        "${streams}/invalidate.multiple.max-age/accept/server",
+    })
+    public void shouldNotCacheWithMultipleMaxAge() throws Exception
+    {
+        k3po.finish();
+    }
+
     @Test
     @Specification({
             "${route}/proxy/controller",
@@ -589,10 +601,32 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/not.use.cache.that.varys.with.asterisk.value/accept/client",
+        "${streams}/not.use.cache.that.varys.with.asterisk.value/connect/server",
+    })
+    public void shouldNotUseCacheForRequestThatHasAsteriskSymbolValueInVary() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
         "${streams}/explicitly.smaxage.and.authorization/accept/client",
         "${streams}/explicitly.smaxage.and.authorization/connect/server",
     })
     public void shouldCacheWithRequestAuthorizationHeaderAndSmaxage() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/accept/client",
+        "${streams}/cache.with.freshened.response.that.updated.by.strong.validator/connect/server",
+    })
+    public void shouldCacheWithFreshenedResponseThatUpdatedByStrongValidator() throws Exception
     {
         k3po.finish();
     }
@@ -637,9 +671,9 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/override.max-age.with.s-maxage/accept/client",
-            "${streams}/override.max-age.with.s-maxage/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/override.max-age.with.s-maxage/accept/client",
+        "${streams}/override.max-age.with.s-maxage/connect/server",
     })
     public void shouldOverrideMaxAgeWithSMaxage() throws Exception
     {
