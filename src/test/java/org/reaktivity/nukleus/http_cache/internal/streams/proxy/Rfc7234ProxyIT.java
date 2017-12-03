@@ -343,8 +343,8 @@ public class Rfc7234ProxyIT
     @Test
     @Ignore("Can not guarantee race between RESET and ABORT")
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/request.only-if-cached.and.504/accept/client"
+        "${route}/proxy/controller",
+        "${streams}/request.only-if-cached.and.504/accept/client"
     })
     public void shouldRequestOnlyIfCachedAnd504() throws Exception
     {
