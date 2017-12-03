@@ -525,6 +525,17 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+            "${streams}/serve.from.cache.if.server.returns.503.on.forced.revalidation/accept/client",
+            "${streams}/serve.from.cache.if.server.returns.503.on.forced.revalidation/connect/server",
+    })
+    public void shouldServeFromCacheIfServerReturns503OnForcedRevalidation() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/ignore.expires.if.response.contains.max-age/accept/client",
         "${streams}/ignore.expires.if.response.contains.max-age/connect/server",
