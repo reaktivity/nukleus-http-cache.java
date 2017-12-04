@@ -64,6 +64,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -76,6 +78,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -88,6 +92,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -100,6 +106,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(0);
     }
 
 
@@ -113,6 +121,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -125,6 +135,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -141,6 +153,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("WAIT_2_SECONDS");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -157,6 +171,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_WAITS_1_SEC");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -173,6 +189,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -189,6 +207,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_WAIT_1_SEC");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -205,6 +225,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -221,6 +243,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -237,6 +261,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED_AND_STALE_FOR_2_SECONDS");
         k3po.finish();
         counters.assertExpectedCacheEntries(1); // NOTE lazy cache purge
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -249,6 +275,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -261,6 +289,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0); // In future this can change if we cache the entry
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -273,6 +303,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0); // In future this can change if we cache the entry
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -285,6 +317,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -298,6 +332,8 @@ public class Rfc7234ProxyIT
     public void shouldCacheGetRequestWithNoStoreAndResponeMarkedCacheable() throws Exception
     {
         k3po.start();
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -314,6 +350,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -326,6 +364,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -338,6 +378,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -365,6 +407,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -377,6 +421,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -389,6 +435,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -405,6 +453,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -421,6 +471,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -433,6 +485,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -449,6 +503,8 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -461,6 +517,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -473,6 +531,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -485,6 +545,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -497,6 +559,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test
@@ -509,6 +573,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
     @Test
@@ -521,6 +587,8 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertCacheMisses(2);
+        counters.assertCacheHits(0);
     }
 
     @Test

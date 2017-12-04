@@ -151,6 +151,7 @@ final class ProxyAcceptStream
             }
             else
             {
+                this.streamFactory.cacheMisses.getAsLong();
                 proxyRequest(requestHeaders);
             }
         }
@@ -221,12 +222,14 @@ final class ProxyAcceptStream
             }
             else
             {
+                this.streamFactory.cacheMisses.getAsLong();
                 sendBeginToConnect(requestHeaders);
                 streamFactory.writer.doHttpEnd(connect, connectStreamId);
             }
         }
         else
         {
+            this.streamFactory.cacheHits.getAsLong();
             this.request.purge(streamFactory.requestBufferPool);
         }
         this.streamState = this::handleAllFramesByIgnoring;
