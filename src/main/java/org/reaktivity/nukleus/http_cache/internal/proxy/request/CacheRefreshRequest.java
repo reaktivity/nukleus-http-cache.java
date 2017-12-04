@@ -59,10 +59,18 @@ public class CacheRefreshRequest extends CacheableRequest
         BufferPool bufferPool)
     {
         if (responseHeaders.anyMatch(h ->
-                ":status".equals(h.name().asString()) &&
-                "200".equals(h.value().asString())))
+            ":status".equals(h.name().asString()) &&
+            h.value().asString().startsWith("2")))
         {
             super.cache(responseHeaders, cache, bufferPool);
+        }
+        else if (responseHeaders.anyMatch(h ->
+            ":status".equals(h.name().asString()) &&
+            "304".equals(h.value().asString())))
+        {
+            updatingEntry.refresh(this);
+            this.state = CacheState.COMMITTED;
+            this.purge(bufferPool);
         }
         else
         {
