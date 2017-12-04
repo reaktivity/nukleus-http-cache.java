@@ -137,7 +137,7 @@ public class Writer
                         StringBuilder cacheControlDirectives = new StringBuilder();
                         cacheControlFW.getValues().entrySet().stream().forEach(e ->
                         {
-                            String directive = e.getKey(); e.getValue();
+                            String directive = e.getKey();
                             String optionalValue = e.getValue();
                             if (cacheControlDirectives.length() > 0)
                             {
