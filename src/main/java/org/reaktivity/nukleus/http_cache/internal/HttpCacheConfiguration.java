@@ -38,7 +38,7 @@ public class HttpCacheConfiguration extends Configuration
 
     public int httpCacheSlotCapacity()
     {
-        return getInteger(HTTP_CACHE_CAPACITY, HTTP_CACHE_SLOT_CAPACITY_DEFAULT);
+        return getInteger(HTTP_CACHE_SLOT_CAPACITY, HTTP_CACHE_SLOT_CAPACITY_DEFAULT);
     }
 
 }
