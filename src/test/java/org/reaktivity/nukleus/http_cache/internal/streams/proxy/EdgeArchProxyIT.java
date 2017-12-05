@@ -264,6 +264,18 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/polling.304.response.does.not.cancel.pending.on-update.requests/accept/client",
+        "${streams}/polling.304.response.does.not.cancel.pending.on-update.requests/connect/server",
+    })
+    public void shouldNotCancelPushPromiseOn304() throws Exception
+    {
+        k3po.finish();
+//        counters.assertExpectedCacheEntries(0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/polling.stops.if.no.subscribers/accept/client",
         "${streams}/polling.stops.if.no.subscribers/connect/server",
     })

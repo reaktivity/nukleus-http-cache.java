@@ -580,10 +580,10 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/proxy.response.too.large.to.cache/accept/client",
-        "${streams}/proxy.response.too.large.to.cache/connect/server",
+        "${streams}/cache.large.response/accept/client",
+        "${streams}/cache.large.response/connect/server",
     })
-    public void shouldProxyResponseTooLargeToCache() throws Exception
+    public void shouldCacheLargeResponse() throws Exception
     {
         k3po.finish();
         counters.assertCacheMisses(1);
