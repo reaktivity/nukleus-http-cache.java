@@ -25,7 +25,7 @@ import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class HttpCacheCountersRule implements TestRule
 {
-    private static final int NUM_OF_SLOTS_PER_CACHE_ENTRY = 2;
+    private static final int NUM_OF_SLOTS_PER_CACHE_ENTRY = 3;
     private final ReaktorRule reaktor;
 
     public HttpCacheCountersRule(ReaktorRule reaktor)
