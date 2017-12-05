@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
+import static java.lang.Math.min;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
@@ -315,24 +316,28 @@ public final class CacheEntry
         private void writePayload(int credit, int padding)
         {
             budget += credit;
-            if (budget > padding)
+            while (budget > padding)
             {
                 final MessageConsumer acceptReply = request.acceptReply();
                 final long acceptReplyStreamId = request.acceptReplyStreamId();
 
-                int toWrite = Math.min(budget, this.cachedRequest.responseSize() - payloadWritten);
+                final int toWrite = min(
+                        min(budget - padding, this.cachedRequest.responseSize() - payloadWritten),
+                        65535);  // limit by nukleus DATA frame length (2 bytes)
+
                 cache.writer.doHttpData(
                         acceptReply,
                         acceptReplyStreamId,
                         p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
-                budget -= credit;
                 payloadWritten += toWrite;
+                budget -= (payloadWritten + padding);
 
                 if (payloadWritten == cachedRequest.responseSize())
                 {
                     CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
                     this.onEnd.accept(EndFW.TYPE_ID, null, 0, toWrite);  // TODO remove magic values
+                    break;
                 }
             }
         }

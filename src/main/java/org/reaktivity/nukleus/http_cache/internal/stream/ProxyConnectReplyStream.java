@@ -124,9 +124,25 @@ final class ProxyConnectReplyStream
             ListFW<HttpHeaderFW> responseHeaders)
     {
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
-        request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool);
-        this.streamState = this::handleCacheRefresh;
-        streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 32767, 0);
+        if (request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        {
+            this.streamState = this::handleCacheRefresh;
+            streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 32767, 0);
+        }
+        else
+        {
+            this.streamState = this::reset;
+            streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
+        }
+    }
+
+    private void reset(
+            int msgTypeId,
+            DirectBuffer buffer,
+            int index,
+            int length)
+    {
+        // NOOP
     }
 
     private void handleCacheRefresh(
@@ -183,33 +199,42 @@ final class ProxyConnectReplyStream
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
-        request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool);
+        if (request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        {
+            final MessageConsumer acceptReply = streamCorrelation.acceptReply();
+            final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+            final long acceptReplyRef = streamCorrelation.acceptRef();
+            final long correlationId = streamCorrelation.acceptCorrelationId();
 
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
-        final long acceptReplyRef = streamCorrelation.acceptRef();
-        final long correlationId = streamCorrelation.acceptCorrelationId();
+            streamCorrelation.setThrottle(this::handleProxyThrottle);
+            streamFactory.writer.doHttpResponseWithUpdatedCacheControl(
+                    acceptReply,
+                    acceptReplyStreamId,
+                    acceptReplyRef,
+                    correlationId,
+                    streamFactory.cacheControlParser,
+                    responseHeaders,
+                    freshnessExtension,
+                    request.etag()
+                    );
 
-        streamCorrelation.setThrottle(this::handleProxyThrottle);
-        streamFactory.writer.doHttpResponseWithUpdatedCacheControl(
-                acceptReply,
-                acceptReplyStreamId,
-                acceptReplyRef,
-                correlationId,
-                streamFactory.cacheControlParser,
-                responseHeaders,
-                freshnessExtension,
-                request.etag()
-            );
-
-        streamFactory.writer.doHttpPushPromise(request, responseHeaders, freshnessExtension, request.etag());
-        this.streamState = this::handleCacheableRequestResponse;
+            streamFactory.writer.doHttpPushPromise(request, responseHeaders, freshnessExtension, request.etag());
+            this.streamState = this::handleCacheableRequestResponse;
+        }
+        else
+        {
+            request.purge(streamFactory.responseBufferPool);
+            doProxyBegin(responseHeaders);
+        }
     }
 
     private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool);
+        if (request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        {
+            request.purge(streamFactory.responseBufferPool);
+        }
         doProxyBegin(responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
     }

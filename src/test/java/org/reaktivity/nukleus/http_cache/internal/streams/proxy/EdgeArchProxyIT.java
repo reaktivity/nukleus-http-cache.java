@@ -270,7 +270,7 @@ public class EdgeArchProxyIT
     public void shouldNotCancelPushPromiseOn304() throws Exception
     {
         k3po.finish();
-//        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test

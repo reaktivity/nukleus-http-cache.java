@@ -26,6 +26,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -36,15 +37,16 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class CacheableRequest extends AnswerableByCacheRequest
 {
+    private IntArrayList responseSlots = new IntArrayList();
     private static final int NUM_OF_HEADER_SLOTS = 1;
-    IntArrayList responseSlots = new IntArrayList();  // index 0 is headers, index < 1 is payload data
-    int responseHeadersSize = 0;
-    int responseSize = 0;
+    private int responseHeadersSize = 0;
+    private int responseSize = 0;
+
     final MessageConsumer connect;
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
-    protected CacheState state;
+    CacheState state;
 
     public enum CacheState
     {
@@ -94,18 +96,24 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         requestBuffer.getBytes(0, buffer, 0, requestSize());
     }
 
-    public void cache(
+    public boolean cache(
             ListFW<HttpHeaderFW> responseHeaders,
             Cache cache,
             BufferPool bp)
     {
         etag(getHeaderOrDefault(responseHeaders, ETAG, etag()));
 
-
-//        final int slotCapacity = bp.slotCapacity();
-        // TODO if (slotCapacity > responseHeaders.sizeof())
+        final int slotCapacity = bp.slotCapacity();
+        if (slotCapacity < responseHeaders.sizeof())
+        {
+            return false;
+        }
         int headerSlot = bp.acquire(this.etag().hashCode());
-//            if (headerSlot == ) TODO slab capacity error
+        if (headerSlot == Slab.NO_SLOT)
+        {
+            // TODO LRU clean up of cache
+            throw new RuntimeException("HTTP cache out of memory, please reconfigure");
+        }
         responseSlots.add(headerSlot);
 
         MutableDirectBuffer buffer = bp.buffer(headerSlot);
@@ -113,6 +121,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.responseHeadersSize = responseHeaders.sizeof();
 
         cache.notifyUncommitted(this);
+        return true;
     }
 
     public void cache(
@@ -198,7 +207,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         {
             slotSpaceRemaining = slotCapacity;
             int newSlot = bp.acquire(this.etag().hashCode());
-//            if (newSlot == ) TODO slab capacity error
             responseSlots.add(newSlot);
         }
 
@@ -242,7 +250,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         Builder p,
         BufferPool bp)
     {
-        buildResponsePayload(index, length, p, bp, NUM_OF_HEADER_SLOTS);
+        final int slotCapacity = bp.slotCapacity();
+        final int startSlot = Math.floorDiv(index, slotCapacity) + NUM_OF_HEADER_SLOTS;
+        buildResponsePayload(index, length, p, bp, startSlot);
     }
 
     public void buildResponsePayload(
