@@ -331,7 +331,7 @@ public final class CacheEntry
                         p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
-                budget -= (payloadWritten + padding);
+                budget -= (toWrite + padding);
 
                 if (payloadWritten == cachedRequest.responseSize())
                 {

@@ -37,7 +37,7 @@ public class Rfc7234ProxyIT
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy/rfc7234");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(25, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
             .nukleus("http-cache"::equals)
