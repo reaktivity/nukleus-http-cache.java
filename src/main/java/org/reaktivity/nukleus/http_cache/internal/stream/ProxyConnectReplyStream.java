@@ -231,7 +231,7 @@ final class ProxyConnectReplyStream
     private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        if (request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (!request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
             request.purge(streamFactory.responseBufferPool);
         }
