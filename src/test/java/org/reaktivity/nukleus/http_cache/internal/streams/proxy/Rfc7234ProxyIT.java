@@ -592,6 +592,7 @@ public class Rfc7234ProxyIT
     }
 
 
+    @Ignore
     @Test
     @Specification({
         "${route}/proxy/controller",
