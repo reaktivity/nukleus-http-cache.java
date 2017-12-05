@@ -535,11 +535,12 @@ public class Rfc7234ProxyIT
         k3po.finish();
     }
 
+
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/serve.from.cache.if.server.returns.503.on.forced.revalidation/accept/client",
-            "${streams}/serve.from.cache.if.server.returns.503.on.forced.revalidation/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/serve.from.cache.if.server.returns.503.on.forced.revalidation/accept/client",
+        "${streams}/serve.from.cache.if.server.returns.503.on.forced.revalidation/connect/server",
     })
     public void shouldServeFromCacheIfServerReturns503OnForcedRevalidation() throws Exception
     {
@@ -611,7 +612,7 @@ public class Rfc7234ProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
+        "${route}/proxy/controller",
         "${streams}/explicitly.smaxage.and.authorization/accept/client",
         "${streams}/explicitly.smaxage.and.authorization/connect/server",
     })
