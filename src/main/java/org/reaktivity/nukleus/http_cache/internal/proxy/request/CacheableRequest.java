@@ -229,7 +229,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         int read = 0;
         boolean match = this.responseSize == that.responseSize;
-        for(int i = 1; match && i < this.responseSlots.size(); i++)
+        for (int i = 1; match && i < this.responseSlots.size(); i++)
         {
             int length = Math.min(bp1.slotCapacity(), this.responseSize - read);
             MutableDirectBuffer buffer1 = bp1.buffer(this.responseSlots.get(i));
