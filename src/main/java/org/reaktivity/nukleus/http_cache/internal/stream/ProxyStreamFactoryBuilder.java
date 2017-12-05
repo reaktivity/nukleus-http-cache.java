@@ -123,9 +123,9 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         if (cache == null)
         {
-            final int slotCapacity = supplyBufferPool.get().slotCapacity();
             final int httpCacheCapacity = config.httpCacheCapacity();
-            this.bufferPool = new Slab(httpCacheCapacity, slotCapacity, entryAcquires, entryReleases);
+            final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
+            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity, entryAcquires, entryReleases);
 
             this.cache = new Cache(
                     scheduler,
