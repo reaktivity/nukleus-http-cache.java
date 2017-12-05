@@ -165,11 +165,12 @@ public final class CacheEntry
         }
     }
 
+
     private void handleEndOfStream(
-            int msgTypeId,
-            DirectBuffer buffer,
-            int index,
-            int length)
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
     {
         this.removeClient();
     }
@@ -197,9 +198,7 @@ public final class CacheEntry
 
         ServeFromCacheStream serveFromCacheStream = new ServeFromCacheStream(
                 request,
-                cachedRequest.responseSlot(),   // TODO hide abstraction
-                cachedRequest.responseHeadersSize(),
-                cachedRequest.responseSize(),
+                cachedRequest,
                 this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
 
@@ -279,24 +278,18 @@ public final class CacheEntry
     {
         private final Request request;
         private int payloadWritten;
-        private int responseSlot;
-        private int responseHeaderSize;
-        private int responseSize;
         private MessageConsumer onEnd;
         private int budget;
+        private CacheableRequest cachedRequest;
 
          ServeFromCacheStream(
             Request request,
-            int responseSlot,
-            int responseHeaderSize,
-            int responseSize,
+            CacheableRequest cachedRequest,
             MessageConsumer onEnd)
         {
             this.payloadWritten = 0;
             this.request = request;
-            this.responseSlot = responseSlot;
-            this.responseHeaderSize = responseHeaderSize;
-            this.responseSize = responseSize - responseHeaderSize;
+            this.cachedRequest = cachedRequest;
             this.onEnd = onEnd;
         }
 
@@ -309,7 +302,7 @@ public final class CacheEntry
             switch(msgTypeId)
             {
                 case WindowFW.TYPE_ID:
-                    final WindowFW window = CacheEntry.this.cache.windowRO.wrap(buffer, index, index + length);
+                    final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
                     writePayload(window.credit(), window.padding());
                     break;
                 case ResetFW.TYPE_ID:
@@ -324,18 +317,22 @@ public final class CacheEntry
             budget += credit;
             if (budget > padding)
             {
-                final int toWrite = Math.min(budget - padding, responseSize - payloadWritten);
-                final int offset = responseHeaderSize + payloadWritten;
-                MutableDirectBuffer buffer = CacheEntry.this.cache.cachedResponseBufferPool.buffer(responseSlot);
                 final MessageConsumer acceptReply = request.acceptReply();
                 final long acceptReplyStreamId = request.acceptReplyStreamId();
-                budget -= padding;
-                CacheEntry.this.cache.writer.doHttpData(acceptReply, acceptReplyStreamId, buffer, offset, toWrite);
+
+                int toWrite = Math.min(budget, this.cachedRequest.responseSize() - payloadWritten);
+                cache.writer.doHttpData(
+                        acceptReply,
+                        acceptReplyStreamId,
+                        p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
+                );
+                budget -= credit;
                 payloadWritten += toWrite;
-                if (payloadWritten == responseSize)
+
+                if (payloadWritten == cachedRequest.responseSize())
                 {
                     CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
-                    this.onEnd.accept(EndFW.TYPE_ID, buffer, offset, toWrite);
+                    this.onEnd.accept(EndFW.TYPE_ID, null, 0, toWrite);  // TODO remove magic values
                 }
             }
         }
@@ -572,35 +569,8 @@ public final class CacheEntry
     {
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO, cache.responseBufferPool);
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
-        boolean updatedBy = false;
-        if (!status.equals(HttpStatus.NOT_MODIFIED_304))
-        {
-            MutableDirectBuffer cachedResponsePayload = getCachedData();
-            MutableDirectBuffer responsePayload = request.getData(cache.responseBufferPool);
-            int cachedHeaderSize = cachedRequest.responseHeadersSize();
-            int headerSize = request.responseHeadersSize();
-            int cachedResponseSize = cachedRequest.responseSize();
-            int responseSize = request.responseSize();
-
-            int cachedPayloadSize = cachedResponseSize - cachedHeaderSize;
-            int payloadSize = responseSize - headerSize;
-
-            updatedBy = !DirectBufferUtil.equals(
-                    cachedResponsePayload,
-                    cachedHeaderSize,
-                    cachedPayloadSize,
-                    responsePayload,
-                    headerSize,
-                    payloadSize);
-        }
-        return updatedBy;
-    }
-
-
-
-    private MutableDirectBuffer getCachedData()
-    {
-        return this.cachedRequest.getData(cache.cachedResponseBufferPool);
+        return !status.equals(HttpStatus.NOT_MODIFIED_304) &&
+               !this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.responseBufferPool);
     }
 
     public void refresh(AnswerableByCacheRequest request)
