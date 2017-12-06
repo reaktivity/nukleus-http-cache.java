@@ -37,7 +37,7 @@ public class Rfc7234ProxyIT
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
         .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/proxy/rfc7234");
 
-    private final TestRule timeout = new DisableOnDebug(new Timeout(15, SECONDS));
+    private final TestRule timeout = new DisableOnDebug(new Timeout(25, SECONDS));
 
     private final ReaktorRule reaktor = new ReaktorRule()
             .nukleus("http-cache"::equals)
@@ -580,15 +580,14 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/proxy.response.too.large.to.cache/accept/client",
-        "${streams}/proxy.response.too.large.to.cache/connect/server",
+        "${streams}/cache.large.response/accept/client",
+        "${streams}/cache.large.response/connect/server",
     })
-    public void shouldProxyResponseTooLargeToCache() throws Exception
+    public void shouldCacheLargeResponse() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
-        counters.assertCacheMisses(2);
-        counters.assertCacheHits(0);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
     }
 
 

@@ -53,20 +53,36 @@ public class CacheRefreshRequest extends CacheableRequest
         this.cache = cache;
     }
 
-    public void cache(
+    @Override
+    public boolean cache(
         ListFW<HttpHeaderFW> responseHeaders,
         Cache cache,
         BufferPool bufferPool)
     {
         if (responseHeaders.anyMatch(h ->
-                ":status".equals(h.name().asString()) &&
-                "200".equals(h.value().asString())))
+            ":status".equals(h.name().asString()) &&
+            h.value().asString().startsWith("2")))
         {
-            super.cache(responseHeaders, cache, bufferPool);
+            boolean noError = super.cache(responseHeaders, cache, bufferPool);
+            if (!noError)
+            {
+                this.purge(bufferPool);
+            }
+            return noError;
+        }
+        else if (responseHeaders.anyMatch(h ->
+            ":status".equals(h.name().asString()) &&
+            "304".equals(h.value().asString())))
+        {
+            updatingEntry.refresh(this);
+            this.state = CacheState.COMMITTED;
+            this.purge(bufferPool);
+            return true;
         }
         else
         {
             this.purge(bufferPool);
+            return false;
         }
 }
 
