@@ -160,10 +160,12 @@ public class Writer
                                 }
                             }
                         });
+                        builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
                     }
                     else
                     {
-                        builder.item(header -> header.name(nameFW).value(valueFW));
+                        builder.item(header ->
+                            header.name(nameFW).value(valueFW.asString() + ", stale-while-revalidate=" + staleWhileRevalidate));
                     }
                     break;
                 default: builder.item(header -> header.name(nameFW).value(valueFW));
