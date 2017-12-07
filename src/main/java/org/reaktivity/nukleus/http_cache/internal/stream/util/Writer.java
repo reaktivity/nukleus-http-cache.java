@@ -37,6 +37,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
+import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
 import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
@@ -137,7 +138,7 @@ public class Writer
                         StringBuilder cacheControlDirectives = new StringBuilder();
                         cacheControlFW.getValues().entrySet().stream().forEach(e ->
                         {
-                            String directive = e.getKey(); e.getValue();
+                            String directive = e.getKey();
                             String optionalValue = e.getValue();
                             if (cacheControlDirectives.length() > 0)
                             {
@@ -190,6 +191,19 @@ public class Writer
                             .streamId(targetStreamId)
                             .payload(p -> p.set(payload, offset, length))
                             .build();
+
+        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+    }
+
+    public void doHttpData(
+        MessageConsumer target,
+        long targetStreamId,
+        Consumer<OctetsFW.Builder> mutator)
+    {
+        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+            .streamId(targetStreamId)
+            .payload(mutator)
+            .build();
 
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
@@ -381,4 +395,5 @@ public class Writer
                 .value("503")));
         this.doAbort(acceptReply, acceptReplyStreamId);
     }
+
 }

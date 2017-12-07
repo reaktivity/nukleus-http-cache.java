@@ -55,6 +55,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     };
     private LongSupplier entryAcquires;
     private LongSupplier entryReleases;
+    private LongSupplier cacheHits;
+    private LongSupplier cacheMisses;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -111,6 +113,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         entryAcquires = supplyCounter.apply("entry.acquires");
         entryReleases = supplyCounter.apply("entry.releases");
+        cacheHits = supplyCounter.apply("cache.hits");
+        cacheMisses = supplyCounter.apply("cache.misses");
         return this;
     }
 
@@ -119,9 +123,9 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         if (cache == null)
         {
-            final int slotCapacity = supplyBufferPool.get().slotCapacity();
             final int httpCacheCapacity = config.httpCacheCapacity();
-            this.bufferPool = new Slab(httpCacheCapacity, slotCapacity, entryAcquires, entryReleases);
+            final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
+            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity, entryAcquires, entryReleases);
 
             this.cache = new Cache(
                     scheduler,
@@ -139,6 +143,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 correlations,
                 scheduler,
                 cache,
-                supplyEtag);
+                supplyEtag,
+                cacheHits,
+                cacheMisses);
     }
 }

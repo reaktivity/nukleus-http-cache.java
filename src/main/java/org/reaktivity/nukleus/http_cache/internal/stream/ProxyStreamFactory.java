@@ -80,8 +80,9 @@ public class ProxyStreamFactory implements StreamFactory
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
-
     final Cache cache;
+    final LongSupplier cacheHits;
+    final LongSupplier cacheMisses;
 
     public ProxyStreamFactory(
         RouteManager router,
@@ -92,7 +93,9 @@ public class ProxyStreamFactory implements StreamFactory
         Long2ObjectHashMap<Request> correlations,
         LongObjectBiConsumer<Runnable> scheduler,
         Cache cache,
-        Supplier<String> supplyEtag)
+        Supplier<String> supplyEtag,
+        LongSupplier cacheHits,
+        LongSupplier cacheMisses)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
@@ -105,6 +108,8 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.scheduler = requireNonNull(scheduler);
         this.cache = cache;
+        this.cacheHits = cacheHits;
+        this.cacheMisses = cacheMisses;
 
         this.writer = new Writer(writeBuffer, bufferPool.duplicate());
     }
