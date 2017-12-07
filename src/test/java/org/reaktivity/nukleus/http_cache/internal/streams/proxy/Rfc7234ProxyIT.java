@@ -655,7 +655,7 @@ public class Rfc7234ProxyIT
         k3po.finish();
     }
 
-    @Ignore
+    @Ignore("if the Vary header value is * then request considered as not matched and cache should be invalidated.")
     @Test
     @Specification({
         "${route}/proxy/controller",
