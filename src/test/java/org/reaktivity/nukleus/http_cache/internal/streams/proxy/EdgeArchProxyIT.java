@@ -20,6 +20,7 @@ import static org.junit.rules.RuleChain.outerRule;
 
 import java.time.Instant;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -196,6 +197,18 @@ public class EdgeArchProxyIT
         "${streams}/polling.updates.pending.on-update.requests/connect/server",
     })
     public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1, 1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.updates.pending.on-update.requests.without.default.headers/accept/client",
+        "${streams}/polling.updates.pending.on-update.requests.without.default.headers/connect/server",
+    })
+    public void shouldUpdateOnUpdateRequestsByDefaultingMissingHeaders() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1, 1);
