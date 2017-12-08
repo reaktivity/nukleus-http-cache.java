@@ -591,7 +591,7 @@ public class Rfc7234ProxyIT
     }
 
 
-    @Ignore("Refer to tickets/issues/1249")
+    @Ignore("Refer to issues/62")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -655,7 +655,7 @@ public class Rfc7234ProxyIT
         k3po.finish();
     }
 
-    @Ignore("Refer to tickets/issues/1251")
+    @Ignore("Refer to issues/63")
     @Test
     @Specification({
         "${route}/proxy/controller",
