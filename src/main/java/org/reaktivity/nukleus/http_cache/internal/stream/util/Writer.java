@@ -191,6 +191,8 @@ public class Writer
 
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                             .streamId(targetStreamId)
+                            .groupId(0)
+                            .padding(0)
                             .payload(p -> p.set(payload, offset, length))
                             .build();
 
@@ -204,6 +206,8 @@ public class Writer
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetStreamId)
+            .groupId(0)
+            .padding(0)
             .payload(mutator)
             .build();
 
@@ -242,6 +246,7 @@ public class Writer
                 .streamId(throttleStreamId)
                 .credit(credit)
                 .padding(padding)
+                .groupId(0)
                 .build();
 
         throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
@@ -379,6 +384,8 @@ public class Writer
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetId)
+            .groupId(0)
+            .padding(0)
             .payload(e -> {})
             .extension(e -> e.set(visitHttpBeginEx(mutator)))
             .build();
