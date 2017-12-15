@@ -184,6 +184,7 @@ public class Writer
     public void doHttpData(
         MessageConsumer target,
         long targetStreamId,
+        int padding,
         DirectBuffer payload,
         int offset,
         int length)
@@ -192,7 +193,7 @@ public class Writer
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                             .streamId(targetStreamId)
                             .groupId(0)
-                            .padding(0)
+                            .padding(padding)
                             .payload(p -> p.set(payload, offset, length))
                             .build();
 
@@ -202,12 +203,13 @@ public class Writer
     public void doHttpData(
         MessageConsumer target,
         long targetStreamId,
+        int padding,
         Consumer<OctetsFW.Builder> mutator)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetStreamId)
             .groupId(0)
-            .padding(0)
+            .padding(padding)
             .payload(mutator)
             .build();
 
@@ -285,7 +287,7 @@ public class Writer
 
         doH2PushPromise(
             acceptReply,
-            acceptReplyStreamId,
+            acceptReplyStreamId, 0,
             setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
     }
 
@@ -380,12 +382,13 @@ public class Writer
     private void doH2PushPromise(
         MessageConsumer target,
         long targetId,
+        int padding,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetId)
             .groupId(0)
-            .padding(0)
+            .padding(padding)
             .payload(e -> {})
             .extension(e -> e.set(visitHttpBeginEx(mutator)))
             .build();

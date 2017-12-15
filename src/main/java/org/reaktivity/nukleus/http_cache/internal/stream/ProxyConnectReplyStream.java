@@ -302,6 +302,7 @@ final class ProxyConnectReplyStream
                 streamFactory.writer.doHttpData(
                         acceptReply,
                         acceptReplyStreamId,
+                        data.padding(),
                         payload.buffer(),
                         payload.offset(),
                         payload.sizeof());

@@ -314,7 +314,8 @@ final class ProxyAcceptStream
         case DataFW.TYPE_ID:
             final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
             final OctetsFW payload = data.payload();
-            streamFactory.writer.doHttpData(connect, connectStreamId, payload.buffer(), payload.offset(), payload.sizeof());
+            streamFactory.writer.doHttpData(connect, connectStreamId, data.padding(),
+                    payload.buffer(), payload.offset(), payload.sizeof());
             break;
         case EndFW.TYPE_ID:
             streamFactory.writer.doHttpEnd(connect, connectStreamId);

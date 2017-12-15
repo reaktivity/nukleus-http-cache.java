@@ -336,6 +336,7 @@ public final class CacheEntry
                 cache.writer.doHttpData(
                         acceptReply,
                         acceptReplyStreamId,
+                        padding,
                         p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
