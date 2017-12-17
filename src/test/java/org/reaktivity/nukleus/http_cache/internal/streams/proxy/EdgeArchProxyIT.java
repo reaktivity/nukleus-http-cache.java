@@ -144,6 +144,18 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/inject.and.update.stale-while-revalidate/accept/client",
+        "${streams}/inject.and.update.stale-while-revalidate/connect/server",
+    })
+    public void shouldInjectAndUpdateStaleWhileRevalidate() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/accept/client",
         "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/connect/server",
     })
@@ -259,6 +271,18 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.304.response.does.not.cancel.pending.on-update.requests/accept/client",
+        "${streams}/polling.304.response.does.not.cancel.pending.on-update.requests/connect/server",
+    })
+    public void shouldNotCancelPushPromiseOn304() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
