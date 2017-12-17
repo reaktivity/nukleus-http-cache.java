@@ -51,13 +51,13 @@
     <jmh.version>1.12</jmh.version>
 
     <k3po.version>3.0.0-alpha-87</k3po.version>
-    <k3po.nukleus.ext.version>0.14</k3po.nukleus.ext.version>
+    <k3po.nukleus.ext.version>0.15</k3po.nukleus.ext.version>
 
     <nukleus.plugin.version>0.20</nukleus.plugin.version>
-    <nukleus.version>0.12</nukleus.version>
+    <nukleus.version>0.13</nukleus.version>
 
-    <nukleus.http.cache.spec.version>develop-SNAPSHOT</nukleus.http.cache.spec.version>
-    <reaktor.version>0.32</reaktor.version>
+    <nukleus.http.cache.spec.version>0.33</nukleus.http.cache.spec.version>
+    <reaktor.version>0.33</reaktor.version>
   </properties>
 
   <dependencies>
@@ -230,9 +230,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.17</version>
-        <!--<configuration>-->
-          <!--<argLine>@{argLine}</argLine>-->
-        <!--</configuration>-->
+        <configuration>
+          <argLine>@{argLine}</argLine>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.kaazing</groupId>
@@ -258,9 +258,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
         <version>2.19.1</version>
-        <!--<configuration>-->
-          <!--<argLine>@{argLine}</argLine>-->
-        <!--</configuration>-->
+        <configuration>
+          <argLine>@{argLine}</argLine>
+        </configuration>
         <executions>
           <execution>
             <goals>

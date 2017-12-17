@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import java.util.Random;
 import java.util.function.Function;
+import java.util.function.IntUnaryOperator;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -43,7 +45,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private MutableDirectBuffer writeBuffer;
     private LongSupplier supplyStreamId;
     private LongSupplier supplyCorrelationId;
-    private Supplier<BufferPool> supplyBufferPool;
     private Slab bufferPool;
     private Cache cache;
 
@@ -92,6 +93,20 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public ProxyStreamFactoryBuilder setGroupBudgetClaimer(
+        LongFunction<IntUnaryOperator> groupBudgetClaimer)
+    {
+        return this;
+    }
+
+    @Override
+    public ProxyStreamFactoryBuilder setGroupBudgetReleaser(
+        LongFunction<IntUnaryOperator> groupBudgetReleaser)
+    {
+        return this;
+    }
+
+    @Override
     public ProxyStreamFactoryBuilder setCorrelationIdSupplier(
         LongSupplier supplyCorrelationId)
     {
@@ -103,7 +118,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setBufferPoolSupplier(
         Supplier<BufferPool> supplyBufferPool)
     {
-        this.supplyBufferPool = supplyBufferPool;
         return this;
     }
 
