@@ -328,7 +328,6 @@
   <profiles>
     <profile>
       <id>release</id>
-
       <distributionManagement>
         <snapshotRepository>
           <id>ossrh</id>
