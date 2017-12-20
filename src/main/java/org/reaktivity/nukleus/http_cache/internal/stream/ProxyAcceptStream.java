@@ -314,7 +314,7 @@ final class ProxyAcceptStream
         case DataFW.TYPE_ID:
             final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
             final OctetsFW payload = data.payload();
-            streamFactory.writer.doHttpData(connect, connectStreamId, data.padding(),
+            streamFactory.writer.doHttpData(connect, connectStreamId, data.groupId(), data.padding(),
                     payload.buffer(), payload.offset(), payload.sizeof());
             break;
         case EndFW.TYPE_ID:
@@ -342,7 +342,8 @@ final class ProxyAcceptStream
                 final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
                 final int credit = window.credit();
                 final int padding = window.padding();
-                streamFactory.writer.doWindow(acceptThrottle, acceptStreamId, credit, padding);
+                final long groupId = window.groupId();
+                streamFactory.writer.doWindow(acceptThrottle, acceptStreamId, credit, padding, groupId);
                 break;
             case ResetFW.TYPE_ID:
                 streamFactory.writer.doReset(acceptThrottle, acceptStreamId);

@@ -127,7 +127,7 @@ final class ProxyConnectReplyStream
         if (request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
             this.streamState = this::handleCacheRefresh;
-            streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 32767, 0);
+            streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, 32767, 0, 0L);
         }
         else
         {
@@ -158,7 +158,7 @@ final class ProxyConnectReplyStream
             case DataFW.TYPE_ID:
                 final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
                 request.cache(this.streamFactory.cache, data, streamFactory.responseBufferPool);
-                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, length, 0);
+                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, length, 0, 0L);
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
@@ -302,6 +302,7 @@ final class ProxyConnectReplyStream
                 streamFactory.writer.doHttpData(
                         acceptReply,
                         acceptReplyStreamId,
+                        data.groupId(),
                         data.padding(),
                         payload.buffer(),
                         payload.offset(),
@@ -331,7 +332,8 @@ final class ProxyConnectReplyStream
                 final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
                 final int credit = window.credit();
                 final int padding = window.padding();
-                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, credit, padding);
+                final long groupId = window.groupId();
+                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, credit, padding, groupId);
                 break;
             case ResetFW.TYPE_ID:
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
