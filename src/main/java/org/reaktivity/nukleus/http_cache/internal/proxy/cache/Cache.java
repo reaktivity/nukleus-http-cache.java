@@ -56,7 +56,6 @@ public class Cache
 
     final CacheControl responseCacheControlFW = new CacheControl();
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
-    final CacheControl requestCacheControlFW = new CacheControl();
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
@@ -193,7 +192,7 @@ public class Cache
         }
         else
         {
-            cacheEntry.subscribeToUpdate(onUpdateRequest);
+            this.do503AndAbort(onUpdateRequest);
         }
     }
 

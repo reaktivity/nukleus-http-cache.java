@@ -50,7 +50,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
 
     public enum CacheState
     {
-        COMMITING, COMMITTED, PURGED
+        COMMITTING, COMMITTED, PURGED
     }
 
     public CacheableRequest(
@@ -79,7 +79,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               requestURLHash,
               authScope,
               etag);
-        this.state = CacheState.COMMITING;
+        this.state = CacheState.COMMITTING;
         this.supplyCorrelationId = supplyCorrelationId;
         this.supplyStreamId = supplyStreamId;
 
@@ -129,7 +129,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         DataFW data,
         BufferPool cacheBufferPool)
     {
-        if (state == CacheState.COMMITING)
+        if (state == CacheState.COMMITTING)
         {
             putResponse(cache, cacheBufferPool, data.payload());
         }
@@ -137,7 +137,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
 
     public void cache(EndFW end, Cache cache)
     {
-        if (state == CacheState.COMMITING)
+        if (state == CacheState.COMMITTING)
         {
             state = CacheState.COMMITTED;
             cache.put(requestURLHash(), this);

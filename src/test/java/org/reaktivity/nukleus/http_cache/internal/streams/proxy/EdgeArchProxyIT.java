@@ -253,6 +253,34 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/polling.updates.pending.on-update.requests.on.etag.mismatch/accept/client",
+        "${streams}/polling.updates.pending.on-update.requests.on.etag.mismatch/connect/server",
+    })
+    public void shouldUpdateOnUpdateRequestOnEtagMismatch() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.updates.cache.for.single.user/accept/client",
+        "${streams}/polling.updates.cache.for.single.user/connect/server",
+    })
+    public void shouldNotUpdateCacheForSingleUser() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/failed.polling.aborts.pending.on-update.requests/accept/client",
         "${streams}/failed.polling.aborts.pending.on-update.requests/connect/server",
     })

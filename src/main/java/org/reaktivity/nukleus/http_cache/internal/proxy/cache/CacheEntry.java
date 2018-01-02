@@ -523,11 +523,15 @@ public final class CacheEntry
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
                 || this.state == CAN_REFRESH || this.state == REFRESHING;
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
-        return canBeServedToAuthorized &&
+        if(canBeServedToAuthorized &&
                 doesNotVaryBy &&
                 satisfiesFreshnessRequirements &&
                 satisfiesStalenessRequirements &&
-                satisfiesAgeRequirements;
+                satisfiesAgeRequirements) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private boolean isStale()
@@ -546,7 +550,7 @@ public final class CacheEntry
         {
             // TODO pull out as utility of CacheUtils
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
-            return cacheControl == null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
+            return cacheControl != null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
         }
     }
 
