@@ -20,6 +20,7 @@ import static org.junit.rules.RuleChain.outerRule;
 
 import java.time.Instant;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -384,6 +385,7 @@ public class EdgeArchProxyIT
         counters.assertExpectedCacheEntries(1);
     }
 
+    @Ignore("Refer to issues/69")
     @Test
     @Specification({
         "${route}/proxy/controller",
