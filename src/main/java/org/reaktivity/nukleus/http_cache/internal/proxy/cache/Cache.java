@@ -126,27 +126,6 @@ public class Cache
         }
     }
 
-    private void updateCache(
-            int requestUrlHash,
-            CacheEntry cacheEntry)
-    {
-        cacheEntry.commit();
-        cachedEntries.put(requestUrlHash, cacheEntry);
-        PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
-        if (result != null)
-        {
-            result.addSubscribers(cacheEntry);
-        }
-    }
-
-    private void do503AndAbort(OnUpdateRequest onUpdateRequest)
-    {
-        final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-        final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-        final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
-        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-    }
-
     public boolean handleInitialRequest(
             int requestURLHash,
             ListFW<HttpHeaderFW> request,
@@ -196,20 +175,6 @@ public class Cache
         }
     }
 
-    private boolean serveRequest(
-            CacheEntry entry,
-            ListFW<HttpHeaderFW> request,
-            short authScope,
-            AnswerableByCacheRequest cacheableRequest)
-    {
-        if (entry.canServeRequest(request, authScope))
-        {
-            entry.serveClient(cacheableRequest);
-            return true;
-        }
-        return false;
-    }
-
     public void notifyUncommitted(CacheableRequest request)
     {
         if (request.getType() == Request.Type.INITIAL_REQUEST)
@@ -227,6 +192,41 @@ public class Cache
     public void purgeOld()
     {
         this.cachedEntries.purgeLRU();
+    }
+
+    private boolean serveRequest(
+            CacheEntry entry,
+            ListFW<HttpHeaderFW> request,
+            short authScope,
+            AnswerableByCacheRequest cacheableRequest)
+    {
+        if (entry.canServeRequest(request, authScope))
+        {
+            entry.serveClient(cacheableRequest);
+            return true;
+        }
+        return false;
+    }
+
+    private void do503AndAbort(OnUpdateRequest onUpdateRequest)
+    {
+        final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
+        final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
+        final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+    }
+
+    private void updateCache(
+            int requestUrlHash,
+            CacheEntry cacheEntry)
+    {
+        cacheEntry.commit();
+        cachedEntries.put(requestUrlHash, cacheEntry);
+        PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
+        if (result != null)
+        {
+            result.addSubscribers(cacheEntry);
+        }
     }
 
 }
