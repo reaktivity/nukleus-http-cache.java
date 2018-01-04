@@ -74,20 +74,6 @@ public final class HttpCacheController implements Controller
         return "http-cache";
     }
 
-    public <T> T supplySource(
-        String source,
-        BiFunction<MessagePredicate, ToIntFunction<MessageConsumer>, T> factory)
-    {
-        return controllerSpi.doSupplySource(source, factory);
-    }
-
-    public <T> T supplyTarget(
-        String target,
-        BiFunction<ToIntFunction<MessageConsumer>, MessagePredicate, T> factory)
-    {
-        return controllerSpi.doSupplyTarget(target, factory);
-    }
-
     public CompletableFuture<Long> routeServer(
         String source,
         long sourceRef,
