@@ -523,15 +523,11 @@ public final class CacheEntry
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
                 || this.state == CAN_REFRESH || this.state == REFRESHING;
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
-        if(canBeServedToAuthorized &&
+        return canBeServedToAuthorized &&
                 doesNotVaryBy &&
                 satisfiesFreshnessRequirements &&
                 satisfiesStalenessRequirements &&
-                satisfiesAgeRequirements) {
-            return true;
-        } else {
-            return false;
-        }
+                satisfiesAgeRequirements;
     }
 
     private boolean isStale()
