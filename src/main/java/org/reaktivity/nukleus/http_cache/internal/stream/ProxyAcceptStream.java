@@ -62,7 +62,6 @@ final class ProxyAcceptStream
     private MessageConsumer streamState;
 
     private int requestSlot = NO_SLOT;
-    private int requestSize;
     private Request request;
     private int requestURLHash;
 
@@ -175,7 +174,6 @@ final class ProxyAcceptStream
             acceptReplyStreamId,
             acceptCorrelationId,
             requestSlot,
-            requestSize,
             streamFactory.router,
             requestURLHash,
             authScope,
@@ -208,7 +206,6 @@ final class ProxyAcceptStream
                 streamFactory.supplyStreamId,
                 requestURLHash,
                 requestSlot,
-                requestSize,
                 streamFactory.router,
                 authScope,
                 streamFactory.supplyEtag.get());
@@ -263,7 +260,7 @@ final class ProxyAcceptStream
         streamFactory.router.setThrottle(connectName, connectStreamId, this::handleConnectThrottle);
     }
 
-    private int storeRequest(final ListFW<HttpHeaderFW> headers)
+    private void storeRequest(final ListFW<HttpHeaderFW> headers)
     {
         this.requestSlot = streamFactory.streamBufferPool.acquire(acceptStreamId);
         while (requestSlot == NO_SLOT)
@@ -271,14 +268,8 @@ final class ProxyAcceptStream
             this.streamFactory.cache.purgeOld();
             this.requestSlot = streamFactory.streamBufferPool.acquire(acceptStreamId);
         }
-        this.requestSize = 0;
         MutableDirectBuffer requestCacheBuffer = streamFactory.streamBufferPool.buffer(requestSlot);
-        headers.forEach(h ->
-        {
-            requestCacheBuffer.putBytes(this.requestSize, h.buffer(), h.offset(), h.sizeof());
-            this.requestSize += h.sizeof();
-        });
-        return this.requestSize;
+        requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
     }
 
     private void send504()
