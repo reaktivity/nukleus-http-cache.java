@@ -294,7 +294,7 @@ public class EdgeArchProxyIT
     public void shouldStopPollingIfNoSubscribers() throws Exception
     {
         k3po.finish();
-        Thread.sleep(10); // Wait for response to be processed
+        Thread.sleep(100); // Wait for response to be processed
         counters.assertExpectedCacheEntries(1);
     }
 
