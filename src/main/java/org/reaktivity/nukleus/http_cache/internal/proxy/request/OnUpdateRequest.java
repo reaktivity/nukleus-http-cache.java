@@ -27,7 +27,6 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
         long acceptReplyStreamId,
         long acceptCorrelationId,
         int requestSlot,
-        int requestSize,
         RouteManager router,
         int requestURLHash,
         short authScope,
@@ -40,7 +39,6 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
             acceptCorrelationId,
             router,
             requestSlot,
-            requestSize,
             requestURLHash,
             authScope,
             etag);

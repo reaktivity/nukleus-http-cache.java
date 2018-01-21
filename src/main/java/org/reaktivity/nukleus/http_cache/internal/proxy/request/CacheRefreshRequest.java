@@ -45,7 +45,6 @@ public class CacheRefreshRequest extends CacheableRequest
               req.supplyStreamId,
               req.requestURLHash(),
               requestSlot,
-              req.requestSize(),
               req.router,
               req.authScope(),
               etag);
