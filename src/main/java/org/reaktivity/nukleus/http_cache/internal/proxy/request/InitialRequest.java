@@ -34,7 +34,6 @@ public class InitialRequest extends CacheableRequest
             LongSupplier supplyStreamId,
             int requestURLHash,
             int requestSlot,
-            int requestSize,
             RouteManager router,
             short authScope,
             String etag)
@@ -49,7 +48,6 @@ public class InitialRequest extends CacheableRequest
               supplyStreamId,
               requestURLHash,
               requestSlot,
-              requestSize,
               router,
               authScope,
               etag);
