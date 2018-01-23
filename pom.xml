@@ -44,17 +44,17 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <checkstyle.config.location>src/conf/checkstyle/configuration.xml</checkstyle.config.location>
     <checkstyle.suppressions.location>src/conf/checkstyle/suppressions.xml</checkstyle.suppressions.location>
-    <jacoco.coverage.ratio>0.60</jacoco.coverage.ratio>
-    <jacoco.missed.count>52</jacoco.missed.count>
+    <jacoco.coverage.ratio>0.50</jacoco.coverage.ratio>
+    <jacoco.missed.count>58</jacoco.missed.count>
 
     <junit.version>4.12</junit.version>
     <jmh.version>1.12</jmh.version>
 
-    <k3po.version>3.0.0-alpha-87</k3po.version>
+    <k3po.version>3.0.0-alpha-88</k3po.version>
     <k3po.nukleus.ext.version>develop-SNAPSHOT</k3po.nukleus.ext.version>
 
-    <nukleus.plugin.version>0.23</nukleus.plugin.version>
-    <nukleus.version>0.14</nukleus.version>
+    <nukleus.plugin.version>develop-SNAPSHOT</nukleus.plugin.version>
+    <nukleus.version>0.17</nukleus.version>
 
     <nukleus.http.cache.spec.version>develop-SNAPSHOT</nukleus.http.cache.spec.version>
     <reaktor.version>develop-SNAPSHOT</reaktor.version>

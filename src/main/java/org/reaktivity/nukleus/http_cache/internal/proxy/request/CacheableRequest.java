@@ -64,7 +64,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         LongSupplier supplyStreamId,
         int requestURLHash,
         int requestSlot,
-        int requestSize,
         RouteManager router,
         short authScope,
         String etag)
@@ -75,7 +74,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               acceptCorrelationId,
               router,
               requestSlot,
-              requestSize,
               requestURLHash,
               authScope,
               etag);
@@ -93,7 +91,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             BufferPool readFromBufferPool)
     {
         MutableDirectBuffer requestBuffer = readFromBufferPool.buffer(requestSlot());
-        requestBuffer.getBytes(0, buffer, 0, requestSize());
+        requestBuffer.getBytes(0, buffer, 0, requestBuffer.capacity());
     }
 
     public boolean cache(

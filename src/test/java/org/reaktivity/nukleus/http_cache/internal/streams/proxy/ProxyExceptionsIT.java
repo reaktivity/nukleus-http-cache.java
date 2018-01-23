@@ -119,7 +119,7 @@ public class ProxyExceptionsIT
         "${route}/proxy/controller",
         "${streams}/client.sent.abort.on.scheduled.poll/accept/client"
     })
-    public void shouldClientSentAbortOnScheduledPoll() throws Exception
+    public void shouldAcceptAbortOnScheduledPoll() throws Exception
     {
         k3po.finish();
 //        counters.assertExpectedCacheEntries(0); // TODO, fix. Sporadically failing today,
