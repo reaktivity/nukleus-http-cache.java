@@ -19,6 +19,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -115,6 +116,7 @@ public class ProxyExceptionsIT
     }
 
     @Test
+    @Ignore("https://github.com/reaktivity/nukleus-http-cache.java/issues/72")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/client.sent.abort.on.scheduled.poll/accept/client"
