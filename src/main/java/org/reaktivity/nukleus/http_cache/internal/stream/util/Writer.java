@@ -393,7 +393,7 @@ public class Writer
             .streamId(targetId)
             .groupId(groupId)
             .padding(padding)
-            .payload(e -> {})
+            .payload((OctetsFW) null)
             .extension(e -> e.set(visitHttpBeginEx(mutator)))
             .build();
 
