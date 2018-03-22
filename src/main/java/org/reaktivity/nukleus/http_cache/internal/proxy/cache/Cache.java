@@ -86,46 +86,53 @@ public class Cache
         CacheableRequest request)
     {
         CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
-        boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
-        CacheEntry cacheEntry = new CacheEntry(
-                this,
-                request,
-                expectSubscribers);
-
-        if (cacheEntry.isIntendedForSingleUser())
+        if (oldCacheEntry == null)
         {
-            cacheEntry.purge();
-        }
-        else if (oldCacheEntry == null)
-        {
+            CacheEntry cacheEntry = new CacheEntry(
+                    this,
+                    request,
+                    true);
             updateCache(requestUrlHash, cacheEntry);
-        }
-        else if (oldCacheEntry.isUpdatedBy(request))
-        {
-            updateCache(requestUrlHash, cacheEntry);
-
-            oldCacheEntry.subscribers(subscriber ->
-            {
-                if (!this.serveRequest(
-                        cacheEntry,
-                        subscriber.getRequestHeaders(requestHeadersRO, subscriberBufferPool),
-                        subscriber.authScope(),
-                        subscriber))
-                {
-                    final MessageConsumer acceptReply = subscriber.acceptReply();
-                    final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
-                    final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                    this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-                }
-            });
-            oldCacheEntry.purge();
         }
         else
         {
-            cacheEntry.purge();
-            if (request.getType() == Request.Type.CACHE_REFRESH)
+            boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
+            CacheEntry cacheEntry = new CacheEntry(
+                    this,
+                    request,
+                    expectSubscribers);
+
+            if (cacheEntry.isIntendedForSingleUser())
             {
-                oldCacheEntry.refresh(request);
+                cacheEntry.purge();
+            }
+            else if (oldCacheEntry.isUpdatedBy(request))
+            {
+                updateCache(requestUrlHash, cacheEntry);
+
+                oldCacheEntry.subscribers(subscriber ->
+                {
+                    if (!this.serveRequest(
+                            cacheEntry,
+                            subscriber.getRequestHeaders(requestHeadersRO, subscriberBufferPool),
+                            subscriber.authScope(),
+                            subscriber))
+                    {
+                        final MessageConsumer acceptReply = subscriber.acceptReply();
+                        final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
+                        final long acceptCorrelationId = subscriber.acceptCorrelationId();
+                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    }
+                });
+                oldCacheEntry.purge();
+            }
+            else
+            {
+                cacheEntry.purge();
+                if (request.getType() == Request.Type.CACHE_REFRESH)
+                {
+                    oldCacheEntry.refresh(request);
+                }
             }
         }
     }
