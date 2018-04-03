@@ -52,7 +52,7 @@ public class EdgeArchProxyIT
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
 
     @Rule
-    public final TestRule chain = outerRule(k3po).around(reaktor).around(counters).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(counters).around(timeout);
 
     @Test
     @Specification({
