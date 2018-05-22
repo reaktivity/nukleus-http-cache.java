@@ -188,7 +188,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            ((CacheableRequest) streamCorrelation).purge(streamFactory.responseBufferPool);
+            streamCorrelation.purge(streamFactory.responseBufferPool);
             doProxyBegin(responseHeaders);
         }
     }
