@@ -56,7 +56,6 @@ public class Cache
 
     final CacheControl responseCacheControlFW = new CacheControl();
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
-    final CacheControl requestCacheControlFW = new CacheControl();
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
@@ -96,7 +95,7 @@ public class Cache
         }
         else
         {
-            boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
+            boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST || oldCacheEntry.expectSubscribers();
             CacheEntry cacheEntry = new CacheEntry(
                     this,
                     request,

@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -79,10 +78,10 @@ public abstract class AnswerableByCacheRequest extends Request
 
     public void purge(BufferPool bufferPool)
     {
-        if (requestSlot != Slab.NO_SLOT)
+        if (requestSlot != BufferPool.NO_SLOT)
         {
             bufferPool.release(requestSlot);
-            this.requestSlot = Slab.NO_SLOT;
+            this.requestSlot = BufferPool.NO_SLOT;
         }
     }
 
