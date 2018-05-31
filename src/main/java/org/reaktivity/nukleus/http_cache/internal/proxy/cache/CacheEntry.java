@@ -287,7 +287,6 @@ public final class CacheEntry
         private CacheableRequest cachedRequest;
         private long groupId;
         private int padding;
-        private int unackedBudget;
 
          ServeFromCacheStream(
             Request request,
@@ -314,17 +313,12 @@ public final class CacheEntry
                     padding = window.padding();
                     long streamId = window.streamId();
                     int credit = window.credit();
-                    if (unackedBudget > 0)
-                    {
-                        System.out.printf("CACHE WINDOW unackedBudget = %d credit = %d\n", unackedBudget, credit);
-
-                        unackedBudget -= credit;
-                        assert unackedBudget >= 0;
-                    }
                     cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit, this::writePayload);
-                    if (payloadWritten == cachedRequest.responseSize() && unackedBudget == 0)
+
+                    boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
+                    if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
                     {
-                        System.out.println("Sending END from WINDOW for cache stream");
+System.out.println("Sending END from WINDOW for cache stream");
 
                         final MessageConsumer acceptReply = request.acceptReply();
                         final long acceptReplyStreamId = request.acceptReplyStreamId();
@@ -358,7 +352,6 @@ public final class CacheEntry
                 );
                 payloadWritten += toWrite;
                 budget -= (toWrite + padding);
-                unackedBudget += toWrite + padding;
             }
 
             return budget;

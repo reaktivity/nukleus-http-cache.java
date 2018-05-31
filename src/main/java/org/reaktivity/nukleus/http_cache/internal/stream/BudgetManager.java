@@ -21,13 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.function.IntUnaryOperator;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 public class BudgetManager
 {
-
     private final Long2ObjectHashMap<GroupBudget> groups;             // group id -> GroupBudget
     private final Random random;
 
@@ -44,24 +42,20 @@ public class BudgetManager
         int unackedBudget;
         int index;
         IntUnaryOperator budgetAvailable;
+        boolean closing;
 
         StreamBudget(long streamId, StreamKind kind, IntUnaryOperator budgetAvailable, int index)
         {
             this.streamId = streamId;
             this.streamKind = requireNonNull(kind);
             this.budgetAvailable = budgetAvailable;
-            setIndex(index);
-        }
-
-        void setIndex(int index)
-        {
             this.index = index;
         }
 
         @Override
         public String toString()
         {
-            return String.format("(id=%d kind=%s budget=%d)", streamId, streamKind, unackedBudget);
+            return String.format("(id=%d kind=%s closing=%s unackedBudget=%d)", streamId, streamKind, closing, unackedBudget);
         }
     }
 
@@ -109,7 +103,7 @@ public class BudgetManager
             {
                 // replace the removed one with the last streamBudget
                 StreamBudget last = streamList.get(streamList.size() - 1);
-                last.setIndex(streamBudget.index);
+                last.index = streamBudget.index;
                 streamList.set(streamBudget.index, last);
                 streamList.remove(streamList.size() - 1);
             }
@@ -122,18 +116,25 @@ public class BudgetManager
             budget += credit;
             assert budget <= initialBudget;
 
-            int start, index;
-            start = index = random.nextInt(streamList.size());
-            do
+            if (!streamList.isEmpty())
             {
-                StreamBudget stream = streamList.get(index);
+                // Give budget to streams in round-robin starting at a random index
+                int start, index;
+                start = index = random.nextInt(streamList.size());
+                do
+                {
+                    StreamBudget stream = streamList.get(index);
+                    if (!stream.closing)
+                    {
 System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budget, groupId, index, stream);
-                stream.unackedBudget += budget;
-                budget = stream.budgetAvailable.applyAsInt(budget);
-                stream.unackedBudget -= budget;
-                index = (index + 1) % streamList.size();
+                        stream.unackedBudget += budget;
+                        budget = stream.budgetAvailable.applyAsInt(budget);
+                        stream.unackedBudget -= budget;
+                    }
+                    index = (index + 1) % streamList.size();
+                }
+                while (budget > 0 && index != start);
             }
-            while(budget > 0 && index != start);
         }
 
         @Override
@@ -141,12 +142,10 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
         {
             long proxyStreams = streamList.stream().filter(s -> s.streamKind == StreamKind.PROXY).count();
             long cacheStreams = streamList.stream().filter(s -> s.streamKind == StreamKind.CACHE).count();
-            List<StreamBudget> activeStreams = streamList.stream()
-                                                         .filter(s -> s.unackedBudget > 0)
-                                                         .collect(Collectors.toList());
+            long unackedStreams = streamList.stream().filter(s -> s.unackedBudget > 0).count();
 
-            return String.format("(groupId=%d budget=%d proxyStreams=%d cacheStreams=%d activeStreams=%s)",
-                    groupId, budget, proxyStreams, cacheStreams, activeStreams);
+            return String.format("(groupId=%d budget=%d proxyStreams=%d cacheStreams=%d unackedStreams=%d)",
+                    groupId, budget, proxyStreams, cacheStreams, unackedStreams);
         }
     }
 
@@ -154,6 +153,19 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
     {
         groups = new Long2ObjectHashMap<>();
         random = new Random();
+    }
+
+    public void closing(long groupId, long streamId, int credit)
+    {
+        if (groupId != 0)
+        {
+            GroupBudget groupBudget = groups.get(groupId);
+            StreamBudget streamBudget = groupBudget.get(streamId);
+            streamBudget.unackedBudget -= credit;
+            streamBudget.closing = true;
+System.out.printf("closing kind=%s (streamBudget=%s) after returning credit=%d\n", streamBudget.streamKind, streamBudget, credit);
+            groupBudget.moreBudget(credit);
+        }
     }
 
     public void done(StreamKind streamKind, long groupId, long streamId)
@@ -173,8 +185,8 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
                     groupBudget.moreBudget(streamBudget.unackedBudget);
                 }
             }
+System.out.printf("DONE (kind=%s groupId=%d streamId=%d groups=%s)\n", streamKind, groupId, streamId, groups);
         }
-        System.out.printf("DONE (kind=%s groupId=%d streamId=%d groups=%s)\n", streamKind, groupId, streamId, groups);
     }
 
     public void window(StreamKind streamKind, long groupId, long streamId, int credit, IntUnaryOperator budgetAvailable)
@@ -207,13 +219,27 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
                 assert streamBudget.unackedBudget >= 0;
                 gotBudget = true;
             }
-System.out.printf("WINDOW (kind=%s groupId=%d streamId=%d credit=%d groupBudget=%s)\n", streamKind, groupId, streamId, credit,
-groupBudget);
+System.out.printf("WINDOW (kind=%s groupId=%d streamId=%d credit=%d groupBudget=%s)\n",
+streamKind, groupId, streamId, credit, groupBudget);
 
             if (gotBudget)
             {
                 groupBudget.moreBudget(credit);
             }
+        }
+    }
+
+    public boolean hasUnackedBudget(long groupId, long streamId)
+    {
+        if (groupId == 0)
+        {
+            return false;
+        }
+        else
+        {
+            GroupBudget groupBudget = groups.get(groupId);
+            StreamBudget streamBudget = groupBudget.get(streamId);
+            return streamBudget.unackedBudget != 0;
         }
     }
 }

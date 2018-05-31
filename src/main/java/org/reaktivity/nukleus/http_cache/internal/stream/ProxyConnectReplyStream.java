@@ -50,7 +50,6 @@ final class ProxyConnectReplyStream
     private long groupId;
     private int padding;
     private boolean endDeferred;
-    private int unackedData;
 
     ProxyConnectReplyStream(
             ProxyStreamFactory proxyStreamFactory,
@@ -315,7 +314,6 @@ final class ProxyConnectReplyStream
                     final OctetsFW payload = data.payload();
                     acceptReplyBudget -= payload.sizeof() + data.padding();
                     assert acceptReplyBudget >= 0;
-                    unackedData += payload.sizeof() + data.padding();
                     streamFactory.writer.doHttpData(
                             acceptReply,
                             acceptReplyStreamId,
@@ -327,7 +325,8 @@ final class ProxyConnectReplyStream
                 }
                 break;
             case EndFW.TYPE_ID:
-                if (unackedData > 0)
+                streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget);
+                if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
                 {
                     endDeferred = true;
                 }
@@ -361,18 +360,13 @@ final class ProxyConnectReplyStream
                 final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
                 final long streamId = window.streamId();
                 final int credit = window.credit();
-                if (unackedData > 0)
-                {
-                    unackedData -= credit;
-                    assert unackedData >= 0;
-                }
                 acceptReplyBudget += credit;
                 padding = window.padding();
                 groupId = window.groupId();
                 streamFactory.budgetManager.window(BudgetManager.StreamKind.PROXY, groupId, streamId, credit, this::sendWindow);
-                if (endDeferred && unackedData == 0)
+                if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
                 {
-                    System.out.println("Sending END from WINDOW for proxy stream");
+System.out.println("Sending END from WINDOW for proxy stream");
                     final MessageConsumer acceptReply = streamCorrelation.acceptReply();
                     streamFactory.budgetManager.done(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                     streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
@@ -389,7 +383,7 @@ final class ProxyConnectReplyStream
             }
     }
 
-    int sendWindow(int credit)
+    private int sendWindow(int credit)
     {
         if (endDeferred)
         {
