@@ -332,12 +332,12 @@ final class ProxyConnectReplyStream
                 }
                 else
                 {
-                    streamFactory.budgetManager.done(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
+                    streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                     streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
                 }
                 break;
             case AbortFW.TYPE_ID:
-                streamFactory.budgetManager.done(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
+                streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                 streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
                 break;
             default:
@@ -366,14 +366,13 @@ final class ProxyConnectReplyStream
                 streamFactory.budgetManager.window(BudgetManager.StreamKind.PROXY, groupId, streamId, credit, this::sendWindow);
                 if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
                 {
-System.out.println("Sending END from WINDOW for proxy stream");
                     final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-                    streamFactory.budgetManager.done(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
+                    streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                     streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
                 }
                 break;
             case ResetFW.TYPE_ID:
-                streamFactory.budgetManager.done(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
+                streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
                 streamCorrelation.purge(streamFactory.responseBufferPool);
                 break;

@@ -118,7 +118,7 @@ public class BudgetManager
 
             if (!streamList.isEmpty())
             {
-                // Give budget to streams in round-robin starting at a random index
+                // Give budget to streams in round-robin order (starting at a random index)
                 int start, index;
                 start = index = random.nextInt(streamList.size());
                 do
@@ -126,7 +126,6 @@ public class BudgetManager
                     StreamBudget stream = streamList.get(index);
                     if (!stream.closing)
                     {
-System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budget, groupId, index, stream);
                         stream.unackedBudget += budget;
                         budget = stream.budgetAvailable.applyAsInt(budget);
                         stream.unackedBudget -= budget;
@@ -155,7 +154,7 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
         random = new Random();
     }
 
-    public void closing(long groupId, long streamId, int credit)
+    void closing(long groupId, long streamId, int credit)
     {
         if (groupId != 0)
         {
@@ -163,12 +162,11 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
             StreamBudget streamBudget = groupBudget.get(streamId);
             streamBudget.unackedBudget -= credit;
             streamBudget.closing = true;
-System.out.printf("closing kind=%s (streamBudget=%s) after returning credit=%d\n", streamBudget.streamKind, streamBudget, credit);
             groupBudget.moreBudget(credit);
         }
     }
 
-    public void done(StreamKind streamKind, long groupId, long streamId)
+    public void closed(StreamKind streamKind, long groupId, long streamId)
     {
         if (groupId != 0)
         {
@@ -185,7 +183,6 @@ System.out.printf("closing kind=%s (streamBudget=%s) after returning credit=%d\n
                     groupBudget.moreBudget(streamBudget.unackedBudget);
                 }
             }
-System.out.printf("DONE (kind=%s groupId=%d streamId=%d groups=%s)\n", streamKind, groupId, streamId, groups);
         }
     }
 
@@ -219,8 +216,6 @@ System.out.printf("DONE (kind=%s groupId=%d streamId=%d groups=%s)\n", streamKin
                 assert streamBudget.unackedBudget >= 0;
                 gotBudget = true;
             }
-System.out.printf("WINDOW (kind=%s groupId=%d streamId=%d credit=%d groupBudget=%s)\n",
-streamKind, groupId, streamId, credit, groupBudget);
 
             if (gotBudget)
             {

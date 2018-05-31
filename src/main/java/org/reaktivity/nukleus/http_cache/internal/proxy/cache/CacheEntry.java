@@ -318,18 +318,16 @@ public final class CacheEntry
                     boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
                     if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
                     {
-System.out.println("Sending END from WINDOW for cache stream");
-
                         final MessageConsumer acceptReply = request.acceptReply();
                         final long acceptReplyStreamId = request.acceptReplyStreamId();
                         CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
                         this.onEnd.run();
-                        cache.budgetManager.done(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
+                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
                     }
                     break;
                 case ResetFW.TYPE_ID:
                 default:
-                    cache.budgetManager.done(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyStreamId());
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyStreamId());
                     this.onEnd.run();
                     break;
             }
