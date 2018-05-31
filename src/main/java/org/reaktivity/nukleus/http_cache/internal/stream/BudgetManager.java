@@ -20,7 +20,7 @@ import org.agrona.collections.Long2ObjectHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.function.IntFunction;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -37,15 +37,15 @@ public class BudgetManager
         PROXY
     }
 
-    private class StreamBudget
+    private static class StreamBudget
     {
         final long streamId;
         final StreamKind streamKind;
-        int inflightBudget;
+        int unackedBudget;
         int index;
-        IntFunction<Integer> budgetAvailable;
+        IntUnaryOperator budgetAvailable;
 
-        StreamBudget(long streamId, StreamKind kind, IntFunction budgetAvailable, int index)
+        StreamBudget(long streamId, StreamKind kind, IntUnaryOperator budgetAvailable, int index)
         {
             this.streamId = streamId;
             this.streamKind = requireNonNull(kind);
@@ -61,7 +61,7 @@ public class BudgetManager
         @Override
         public String toString()
         {
-            return String.format("(id=%d kind=%s budget=%d)", streamId, streamKind, inflightBudget);
+            return String.format("(id=%d kind=%s budget=%d)", streamId, streamKind, unackedBudget);
         }
     }
 
@@ -128,9 +128,9 @@ public class BudgetManager
             {
                 StreamBudget stream = streamList.get(index);
 System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budget, groupId, index, stream);
-                stream.inflightBudget += budget;
-                budget = stream.budgetAvailable.apply(budget);
-                stream.inflightBudget -= budget;
+                stream.unackedBudget += budget;
+                budget = stream.budgetAvailable.applyAsInt(budget);
+                stream.unackedBudget -= budget;
                 index = (index + 1) % streamList.size();
             }
             while(budget > 0 && index != start);
@@ -142,7 +142,7 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
             long proxyStreams = streamList.stream().filter(s -> s.streamKind == StreamKind.PROXY).count();
             long cacheStreams = streamList.stream().filter(s -> s.streamKind == StreamKind.CACHE).count();
             List<StreamBudget> activeStreams = streamList.stream()
-                                                         .filter(s -> s.inflightBudget > 0)
+                                                         .filter(s -> s.unackedBudget > 0)
                                                          .collect(Collectors.toList());
 
             return String.format("(groupId=%d budget=%d proxyStreams=%d cacheStreams=%d activeStreams=%s)",
@@ -168,20 +168,20 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
                 {
                     groups.remove(groupId);
                 }
-                else if (streamBudget != null && streamBudget.inflightBudget > 0)
+                else if (streamBudget != null && streamBudget.unackedBudget > 0)
                 {
-                    groupBudget.moreBudget(streamBudget.inflightBudget);
+                    groupBudget.moreBudget(streamBudget.unackedBudget);
                 }
             }
         }
         System.out.printf("DONE (kind=%s groupId=%d streamId=%d groups=%s)\n", streamKind, groupId, streamId, groups);
     }
 
-    public void window(StreamKind streamKind, long groupId, long streamId, int credit, IntFunction budgetAvailable)
+    public void window(StreamKind streamKind, long groupId, long streamId, int credit, IntUnaryOperator budgetAvailable)
     {
         if (groupId == 0)
         {
-            budgetAvailable.apply(credit);
+            budgetAvailable.applyAsInt(credit);
         }
         else
         {
@@ -203,8 +203,8 @@ System.out.printf("Giving budget=%d to (groupId=%d, index=%d stream=%s)\n", budg
             }
             else
             {
-                streamBudget.inflightBudget -= credit;
-                assert streamBudget.inflightBudget >= 0;
+                streamBudget.unackedBudget -= credit;
+                assert streamBudget.unackedBudget >= 0;
                 gotBudget = true;
             }
 System.out.printf("WINDOW (kind=%s groupId=%d streamId=%d credit=%d groupBudget=%s)\n", streamKind, groupId, streamId, credit,
