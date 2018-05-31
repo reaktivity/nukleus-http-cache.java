@@ -135,6 +135,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
+        BudgetManager budgetManager = new BudgetManager();
         if (cache == null)
         {
             final int httpCacheCapacity = config.httpCacheCapacity();
@@ -143,6 +144,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
             this.cache = new Cache(
                     scheduler,
+                    budgetManager,
                     writeBuffer,
                     bufferPool,
                     correlations,
@@ -150,6 +152,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         }
         return new ProxyStreamFactory(
                 router,
+                budgetManager,
                 writeBuffer,
                 bufferPool,
                 supplyStreamId,

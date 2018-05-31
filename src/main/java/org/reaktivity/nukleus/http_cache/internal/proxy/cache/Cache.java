@@ -27,6 +27,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
+import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
@@ -40,6 +41,7 @@ public class Cache
 {
 
     final Writer writer;
+    final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
     final BufferPool cachedRequestBufferPool;
     final BufferPool cachedResponseBufferPool;
@@ -63,12 +65,14 @@ public class Cache
 
     public Cache(
             LongObjectBiConsumer<Runnable> scheduler,
+            BudgetManager budgetManager,
             MutableDirectBuffer writeBuffer,
             BufferPool bufferPool,
             Long2ObjectHashMap<Request> correlations,
             Supplier<String> etagSupplier)
     {
         this.scheduler = scheduler;
+        this.budgetManager = budgetManager;
         this.correlations = correlations;
         this.writer = new Writer(writeBuffer, bufferPool.duplicate());
         this.cachedRequestBufferPool = bufferPool;

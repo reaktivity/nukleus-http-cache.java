@@ -51,6 +51,7 @@ public class ProxyStreamFactory implements StreamFactory
     final WindowFW windowRO = new WindowFW();
 
     final RouteManager router;
+    final BudgetManager budgetManager;
 
     final LongSupplier supplyStreamId;
     final BufferPool streamBufferPool;
@@ -70,6 +71,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     public ProxyStreamFactory(
         RouteManager router,
+        BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
         LongSupplier supplyStreamId,
@@ -83,6 +85,7 @@ public class ProxyStreamFactory implements StreamFactory
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
+        this.budgetManager = requireNonNull(budgetManager);
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.streamBufferPool = requireNonNull(bufferPool);
         this.requestBufferPool = bufferPool.duplicate();
