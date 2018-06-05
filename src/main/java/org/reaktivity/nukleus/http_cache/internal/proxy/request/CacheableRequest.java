@@ -26,6 +26,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -106,7 +107,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             return false;
         }
         int headerSlot = bp.acquire(this.etag().hashCode());
-        while (headerSlot == BufferPool.NO_SLOT)
+        while (headerSlot == Slab.NO_SLOT)
         {
             cache.purgeOld();
             headerSlot = bp.acquire(this.etag().hashCode());
@@ -207,7 +208,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         {
             slotSpaceRemaining = slotCapacity;
             int newSlot = bp.acquire(this.etag().hashCode());
-            while (newSlot == BufferPool.NO_SLOT)
+            while (newSlot == Slab.NO_SLOT)
             {
                 cache.purgeOld();
                 if (this.state == CacheState.PURGED)

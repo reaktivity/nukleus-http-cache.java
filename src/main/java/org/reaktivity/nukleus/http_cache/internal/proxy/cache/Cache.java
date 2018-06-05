@@ -99,7 +99,7 @@ public class Cache
         }
         else
         {
-            boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST || oldCacheEntry.expectSubscribers();
+            boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
             CacheEntry cacheEntry = new CacheEntry(
                     this,
                     request,
