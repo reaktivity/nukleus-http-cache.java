@@ -62,7 +62,7 @@ public final class CacheEntry
     private final CacheControl cacheControlFW = new CacheControl();
 
     private final Cache cache;
-    private int clientCount = 0;
+    private int clientCount;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -283,7 +283,7 @@ public final class CacheEntry
     {
         private final Request request;
         private int payloadWritten;
-        private Runnable onEnd;
+        private final Runnable onEnd;
         private CacheableRequest cachedRequest;
         private long groupId;
         private int padding;
@@ -374,10 +374,6 @@ public final class CacheEntry
     private void removeClient()
     {
         clientCount--;
-        if (clientCount == 0 && this.state == CacheEntryState.PURGED)
-        {
-            cachedRequest.purge(cache.requestBufferPool); // Force hard clean up
-        }
     }
 
     private boolean canBeServedToAuthorized(

@@ -50,6 +50,7 @@ final class ProxyConnectReplyStream
     private long groupId;
     private int padding;
     private boolean endDeferred;
+    private boolean cached;
 
     ProxyConnectReplyStream(
             ProxyStreamFactory proxyStreamFactory,
@@ -262,6 +263,7 @@ final class ProxyConnectReplyStream
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
                 request.cache(end, streamFactory.cache);
+                cached = true;
                 break;
             case AbortFW.TYPE_ID:
             default:
@@ -329,7 +331,6 @@ final class ProxyConnectReplyStream
                 if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
                 {
                     endDeferred = true;
-                    streamCorrelation.setThrottle(this::handleProxyThrottleCacheble);
                 }
                 else
                 {
@@ -345,40 +346,6 @@ final class ProxyConnectReplyStream
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
                 break;
             }
-    }
-
-    private void handleProxyThrottleCacheble(
-            int msgTypeId,
-            DirectBuffer buffer,
-            int index,
-            int length)
-    {
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
-
-        switch (msgTypeId)
-        {
-            case WindowFW.TYPE_ID:
-                final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
-                final long streamId = window.streamId();
-                final int credit = window.credit();
-                acceptReplyBudget += credit;
-                padding = window.padding();
-                groupId = window.groupId();
-                streamFactory.budgetManager.window(BudgetManager.StreamKind.PROXY, groupId, streamId, credit, this::sendWindow);
-                if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
-                {
-                    final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-                    streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
-                    streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
-                }
-                break;
-            case ResetFW.TYPE_ID:
-                streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
-                break;
-            default:
-                // TODO,  ABORT and RESET
-                break;
-        }
     }
 
     private void handleProxyThrottle(
@@ -409,7 +376,11 @@ final class ProxyConnectReplyStream
             case ResetFW.TYPE_ID:
                 streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
-                streamCorrelation.purge(streamFactory.responseBufferPool);
+                // if cached, do not purge the buffer slots as it may be used by other clients
+                if (!cached)
+                {
+                    streamCorrelation.purge(streamFactory.responseBufferPool);
+                }
                 break;
             default:
                 // TODO,  ABORT and RESET
