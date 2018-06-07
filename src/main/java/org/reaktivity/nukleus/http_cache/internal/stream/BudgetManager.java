@@ -126,9 +126,12 @@ public class BudgetManager
                     StreamBudget stream = streamList.get(index);
                     if (!stream.closing)
                     {
-                        stream.unackedBudget += budget;
-                        budget = stream.budgetAvailable.applyAsInt(budget);
-                        stream.unackedBudget -= budget;
+                        int slice = budget < 1024 ? budget : budget/2;
+                        budget -= slice;
+                        stream.unackedBudget += slice;
+                        int remaining = stream.budgetAvailable.applyAsInt(slice);
+                        budget += remaining;
+                        stream.unackedBudget -= remaining;
                     }
                     index = (index + 1) % streamList.size();
                 }
@@ -162,7 +165,10 @@ public class BudgetManager
             StreamBudget streamBudget = groupBudget.get(streamId);
             streamBudget.unackedBudget -= credit;
             streamBudget.closing = true;
-            groupBudget.moreBudget(credit);
+            if (credit > 0)
+            {
+                groupBudget.moreBudget(credit);
+            }
         }
     }
 
@@ -217,7 +223,7 @@ public class BudgetManager
                 gotBudget = true;
             }
 
-            if (gotBudget)
+            if (gotBudget && credit > 0)
             {
                 groupBudget.moreBudget(credit);
             }
