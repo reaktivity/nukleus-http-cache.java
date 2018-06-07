@@ -47,6 +47,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyCorrelationId;
     private Slab bufferPool;
     private Cache cache;
+    private BudgetManager budgetManager;
 
     private int etagCnt = 0;
     private final int etagPrefix = new Random().nextInt(99999);
@@ -135,9 +136,9 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        BudgetManager budgetManager = new BudgetManager();
         if (cache == null)
         {
+            budgetManager = new BudgetManager();
             final int httpCacheCapacity = config.httpCacheCapacity();
             final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
             this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity, entryAcquires, entryReleases);
