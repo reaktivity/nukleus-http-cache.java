@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import java.util.function.LongSupplier;
 
+import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
@@ -33,6 +34,7 @@ public class InitialRequest extends CacheableRequest
             LongSupplier supplyCorrelationId,
             LongSupplier supplyStreamId,
             int requestURLHash,
+            BufferPool bufferPool,
             int requestSlot,
             RouteManager router,
             long authorization,
@@ -48,6 +50,7 @@ public class InitialRequest extends CacheableRequest
               supplyCorrelationId,
               supplyStreamId,
               requestURLHash,
+              bufferPool,
               requestSlot,
               router,
               authorization,

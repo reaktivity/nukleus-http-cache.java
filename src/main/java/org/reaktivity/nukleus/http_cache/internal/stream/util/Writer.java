@@ -393,7 +393,7 @@ public class Writer
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetId)
-            .authorization(authorization)
+            .authorization(0L)
             .groupId(groupId)
             .padding(padding)
             .payload((OctetsFW) null)

@@ -22,6 +22,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
@@ -146,7 +147,6 @@ final class ProxyAcceptStream
             }
             else if (canBeServedByCache(requestHeaders))
             {
-                storeRequest(requestHeaders);
                 handleCacheableRequest(requestHeaders, requestURL, authorization, authorizationScope);
             }
             else
@@ -167,7 +167,7 @@ final class ProxyAcceptStream
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        storeRequest(requestHeaders);
+        storeRequest(requestHeaders, streamFactory.updateBufferPool);
         final String etag = streamFactory.supplyEtag.get();
 
         final OnUpdateRequest onUpdateRequest = new OnUpdateRequest(
@@ -175,6 +175,7 @@ final class ProxyAcceptStream
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
+            streamFactory.updateBufferPool,
             requestSlot,
             streamFactory.router,
             requestURLHash,
@@ -198,6 +199,7 @@ final class ProxyAcceptStream
         long authorization,
         short authScope)
     {
+        storeRequest(requestHeaders, streamFactory.streamBufferPool);
         CacheableRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 acceptName,
@@ -209,6 +211,7 @@ final class ProxyAcceptStream
                 streamFactory.supplyCorrelationId,
                 streamFactory.supplyStreamId,
                 requestURLHash,
+                streamFactory.streamBufferPool,
                 requestSlot,
                 streamFactory.router,
                 authorization,
@@ -232,7 +235,7 @@ final class ProxyAcceptStream
         else
         {
             this.streamFactory.cacheHits.getAsLong();
-            this.request.purge(streamFactory.requestBufferPool);
+            this.request.purge();
         }
         this.streamState = this::handleAllFramesByIgnoring;
     }
@@ -265,15 +268,15 @@ final class ProxyAcceptStream
         streamFactory.router.setThrottle(connectName, connectStreamId, this::handleConnectThrottle);
     }
 
-    private void storeRequest(final ListFW<HttpHeaderFW> headers)
+    private void storeRequest(final ListFW<HttpHeaderFW> headers, final BufferPool bufferPool)
     {
-        this.requestSlot = streamFactory.streamBufferPool.acquire(acceptStreamId);
+        this.requestSlot = bufferPool.acquire(acceptStreamId);
         while (requestSlot == NO_SLOT)
         {
             this.streamFactory.cache.purgeOld();
-            this.requestSlot = streamFactory.streamBufferPool.acquire(acceptStreamId);
+            this.requestSlot = bufferPool.acquire(acceptStreamId);
         }
-        MutableDirectBuffer requestCacheBuffer = streamFactory.streamBufferPool.buffer(requestSlot);
+        MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestSlot);
         requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
     }
 
@@ -284,7 +287,7 @@ final class ProxyAcceptStream
                         .name(STATUS)
                         .value("504")));
         streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
-        request.purge(streamFactory.requestBufferPool);
+        request.purge();
     }
 
     private void handleAllFramesByIgnoring(
@@ -318,7 +321,7 @@ final class ProxyAcceptStream
             break;
         case AbortFW.TYPE_ID:
             streamFactory.writer.doAbort(connect, connectStreamId);
-            request.purge(streamFactory.requestBufferPool);
+            request.purge();
             break;
         default:
             streamFactory.writer.doReset(acceptThrottle, acceptStreamId);
