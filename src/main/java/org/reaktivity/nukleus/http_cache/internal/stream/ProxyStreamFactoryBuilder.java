@@ -47,6 +47,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyCorrelationId;
     private Slab bufferPool;
     private Cache cache;
+    private BudgetManager budgetManager;
 
     private int etagCnt = 0;
     private final int etagPrefix = new Random().nextInt(99999);
@@ -140,12 +141,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         if (cache == null)
         {
+            budgetManager = new BudgetManager();
             final int httpCacheCapacity = config.httpCacheCapacity();
             final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
             this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity, entryAcquires, entryReleases);
 
             this.cache = new Cache(
                     scheduler,
+                    budgetManager,
                     writeBuffer,
                     bufferPool,
                     correlations,
@@ -154,6 +157,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         }
         return new ProxyStreamFactory(
                 router,
+                budgetManager,
                 writeBuffer,
                 bufferPool,
                 supplyStreamId,
