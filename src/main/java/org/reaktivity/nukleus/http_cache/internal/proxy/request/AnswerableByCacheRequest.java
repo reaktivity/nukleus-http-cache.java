@@ -26,6 +26,7 @@ import org.reaktivity.nukleus.route.RouteManager;
 public abstract class AnswerableByCacheRequest extends Request
 {
 
+    private BufferPool requestPool;
     private int requestSlot;
     private final int requestURLHash;
     private final short authScope;
@@ -37,12 +38,14 @@ public abstract class AnswerableByCacheRequest extends Request
             long acceptReplyStreamId,
             long acceptCorrelationId,
             RouteManager router,
+            BufferPool requestPool,
             int requestSlot,
             int requestURLHash,
             short authScope,
             String etag)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
+        this.requestPool = requestPool;
         this.requestSlot = requestSlot;
         this.requestURLHash = requestURLHash;
         this.authScope = authScope;
@@ -77,11 +80,11 @@ public abstract class AnswerableByCacheRequest extends Request
         return requestSlot;
     }
 
-    public void purge(BufferPool bufferPool)
+    public void purge()
     {
         if (requestSlot != Slab.NO_SLOT)
         {
-            bufferPool.release(requestSlot);
+            requestPool.release(requestSlot);
             this.requestSlot = Slab.NO_SLOT;
         }
     }

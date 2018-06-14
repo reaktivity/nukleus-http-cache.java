@@ -29,6 +29,7 @@ public class CacheRefreshRequest extends CacheableRequest
 
     public CacheRefreshRequest(
             CacheableRequest req,
+            BufferPool bufferPool,
             int requestSlot,
             String etag,
             CacheEntry cacheEntry,
@@ -44,6 +45,7 @@ public class CacheRefreshRequest extends CacheableRequest
               req.supplyCorrelationId,
               req.supplyStreamId,
               req.requestURLHash(),
+              bufferPool,
               requestSlot,
               req.router,
               req.authScope(),
@@ -65,7 +67,7 @@ public class CacheRefreshRequest extends CacheableRequest
             boolean noError = super.cache(responseHeaders, cache, bufferPool);
             if (!noError)
             {
-                this.purge(bufferPool);
+                this.purge();
             }
             return noError;
         }
@@ -75,12 +77,12 @@ public class CacheRefreshRequest extends CacheableRequest
         {
             updatingEntry.refresh(this);
             this.state = CacheState.COMMITTED;
-            this.purge(bufferPool);
+            this.purge();
             return true;
         }
         else
         {
-            this.purge(bufferPool);
+            this.purge();
             return false;
         }
 }
@@ -92,13 +94,13 @@ public class CacheRefreshRequest extends CacheableRequest
     }
 
     @Override
-    public void purge(BufferPool cacheBufferPool)
+    public void purge()
     {
         if (this.state != CacheState.COMMITTED)
         {
             this.cache.purge(updatingEntry);
         }
-        super.purge(cacheBufferPool);
+        super.purge();
     }
 
 }
