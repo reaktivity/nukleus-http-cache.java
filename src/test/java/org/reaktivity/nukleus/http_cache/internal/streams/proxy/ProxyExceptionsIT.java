@@ -115,6 +115,18 @@ public class ProxyExceptionsIT
     }
 
     @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/accept.reply.sent.reset.cacheble.response/accept/client",
+        "${streams}/accept.reply.sent.reset.cacheble.response/connect/server",
+    })
+    public void shouldAcceptReplySentResetCachebleResponse() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
     @Ignore("https://github.com/reaktivity/nukleus-http-cache.java/issues/72")
     @Specification({
         "${route}/proxy/controller",

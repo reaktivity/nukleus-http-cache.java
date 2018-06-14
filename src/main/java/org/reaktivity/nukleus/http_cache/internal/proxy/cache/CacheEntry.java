@@ -47,11 +47,11 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequ
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
@@ -62,7 +62,7 @@ public final class CacheEntry
     private final CacheControl cacheControlFW = new CacheControl();
 
     private final Cache cache;
-    private int clientCount = 0;
+    private int clientCount;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -176,11 +176,7 @@ public final class CacheEntry
     }
 
 
-    private void handleEndOfStream(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
+    private void handleEndOfStream()
     {
         this.removeClient();
     }
@@ -288,14 +284,15 @@ public final class CacheEntry
     {
         private final Request request;
         private int payloadWritten;
-        private MessageConsumer onEnd;
-        private int budget;
+        private final Runnable onEnd;
         private CacheableRequest cachedRequest;
+        private long groupId;
+        private int padding;
 
          ServeFromCacheStream(
             Request request,
             CacheableRequest cachedRequest,
-            MessageConsumer onEnd)
+            Runnable onEnd)
         {
             this.payloadWritten = 0;
             this.request = request;
@@ -313,27 +310,38 @@ public final class CacheEntry
             {
                 case WindowFW.TYPE_ID:
                     final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
-                    writePayload(window.credit(), window.padding());
+                    groupId = window.groupId();
+                    padding = window.padding();
+                    long streamId = window.streamId();
+                    int credit = window.credit();
+                    cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit, this::writePayload);
+
+                    boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
+                    if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
+                    {
+                        final MessageConsumer acceptReply = request.acceptReply();
+                        final long acceptReplyStreamId = request.acceptReplyStreamId();
+                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+                        this.onEnd.run();
+                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
+                    }
                     break;
                 case ResetFW.TYPE_ID:
                 default:
-                    this.onEnd.accept(msgTypeId, buffer, index, length);
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyStreamId());
+                    this.onEnd.run();
                     break;
             }
         }
 
-        private void writePayload(int credit, int padding)
+        private int writePayload(int budget)
         {
-            budget += credit;
-            while (budget > padding)
+            final MessageConsumer acceptReply = request.acceptReply();
+            final long acceptReplyStreamId = request.acceptReplyStreamId();
+
+            final int toWrite = min(budget - padding, this.cachedRequest.responseSize() - payloadWritten);
+            if (toWrite > 0)
             {
-                final MessageConsumer acceptReply = request.acceptReply();
-                final long acceptReplyStreamId = request.acceptReplyStreamId();
-
-                final int toWrite = min(
-                        min(budget - padding, this.cachedRequest.responseSize() - payloadWritten),
-                        65535);  // limit by nukleus DATA frame length (2 bytes)
-
                 cache.writer.doHttpData(
                         acceptReply,
                         acceptReplyStreamId,
@@ -343,14 +351,9 @@ public final class CacheEntry
                 );
                 payloadWritten += toWrite;
                 budget -= (toWrite + padding);
-
-                if (payloadWritten == cachedRequest.responseSize())
-                {
-                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
-                    this.onEnd.accept(EndFW.TYPE_ID, null, 0, toWrite);  // TODO remove magic values
-                    break;
-                }
             }
+
+            return budget;
         }
     }
 
@@ -372,10 +375,6 @@ public final class CacheEntry
     private void removeClient()
     {
         clientCount--;
-        if (clientCount == 0 && this.state == CacheEntryState.PURGED)
-        {
-            cachedRequest.purge(); // Force hard clean up
-        }
     }
 
     private boolean canBeServedToAuthorized(
