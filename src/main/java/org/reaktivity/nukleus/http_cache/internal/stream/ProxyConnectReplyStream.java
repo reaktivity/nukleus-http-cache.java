@@ -166,7 +166,7 @@ final class ProxyConnectReplyStream
                 break;
             case AbortFW.TYPE_ID:
             default:
-                request.purge(streamFactory.responseBufferPool);
+                request.purge();
                 break;
         }
     }
@@ -188,7 +188,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            ((CacheableRequest) streamCorrelation).purge(streamFactory.responseBufferPool);
+            ((CacheableRequest) streamCorrelation).purge();
             doProxyBegin(responseHeaders);
         }
     }
@@ -223,7 +223,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            request.purge(streamFactory.responseBufferPool);
+            request.purge();
             doProxyBegin(responseHeaders);
         }
     }
@@ -233,7 +233,7 @@ final class ProxyConnectReplyStream
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         if (!request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
-            request.purge(streamFactory.responseBufferPool);
+            request.purge();
         }
         doProxyBegin(responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
@@ -251,7 +251,7 @@ final class ProxyConnectReplyStream
         {
             case DataFW.TYPE_ID:
                 final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-                request.cache(streamFactory.cache, data, streamFactory.cacheBufferPool);
+                request.cache(streamFactory.cache, data, streamFactory.responseBufferPool);
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
@@ -259,7 +259,7 @@ final class ProxyConnectReplyStream
                 break;
             case AbortFW.TYPE_ID:
             default:
-                request.purge(streamFactory.responseBufferPool);
+                request.purge();
                 break;
         }
         this.handleFramesWhenProxying(msgTypeId, buffer, index, length);
@@ -337,7 +337,7 @@ final class ProxyConnectReplyStream
                 break;
             case ResetFW.TYPE_ID:
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
-                streamCorrelation.purge(streamFactory.responseBufferPool);
+                streamCorrelation.purge();
                 break;
             default:
                 // TODO,  ABORT and RESET

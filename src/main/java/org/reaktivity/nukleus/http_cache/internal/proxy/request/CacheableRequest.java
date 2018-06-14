@@ -37,6 +37,7 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class CacheableRequest extends AnswerableByCacheRequest
 {
+    private BufferPool responsePool;
     private IntArrayList responseSlots = new IntArrayList();
     private static final int NUM_OF_HEADER_SLOTS = 1;
     private int responseHeadersSize = 0;
@@ -63,6 +64,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         LongSupplier supplyCorrelationId,
         LongSupplier supplyStreamId,
         int requestURLHash,
+        BufferPool bufferPool,
         int requestSlot,
         RouteManager router,
         short authScope,
@@ -73,6 +75,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               acceptReplyStreamId,
               acceptCorrelationId,
               router,
+              bufferPool,
               requestSlot,
               requestURLHash,
               authScope,
@@ -99,6 +102,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             Cache cache,
             BufferPool bp)
     {
+        responsePool = bp;
         etag(getHeaderOrDefault(responseHeaders, ETAG, etag()));
 
         final int slotCapacity = bp.slotCapacity();
@@ -142,12 +146,12 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         }
     }
 
-    public void purge(BufferPool bp)
+    public void purge()
     {
         if (state != CacheState.PURGED)
         {
-            super.purge(bp);
-            this.responseSlots.stream().forEach(i -> bp.release(i));
+            super.purge();
+            this.responseSlots.stream().forEach(i -> responsePool.release(i));
             this.responseSlots = null;
             this.state = CacheState.PURGED;
         }
@@ -196,7 +200,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         Flyweight data,
         int written)
     {
-
+        responsePool = bp;
         if (data.sizeof() - written == 0)
         {
             return;
