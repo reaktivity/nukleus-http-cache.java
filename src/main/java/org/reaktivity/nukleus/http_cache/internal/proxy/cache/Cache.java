@@ -16,6 +16,8 @@
 
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import java.util.function.Function;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
@@ -28,6 +30,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
@@ -69,14 +72,18 @@ public class Cache
             MutableDirectBuffer writeBuffer,
             BufferPool bufferPool,
             Long2ObjectHashMap<Request> correlations,
-            Supplier<String> etagSupplier)
+            Supplier<String> etagSupplier,
+            Function<String, LongSupplier> supplyCounter)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
         this.correlations = correlations;
         this.writer = new Writer(writeBuffer, bufferPool.duplicate());
-        this.cachedRequestBufferPool = bufferPool;
-        this.requestBufferPool = bufferPool;
+        this.cachedRequestBufferPool = bufferPool.duplicate();
+        this.requestBufferPool = new CountingBufferPool(
+                bufferPool.duplicate(),
+                supplyCounter.apply("refresh.request.acquires"),
+                supplyCounter.apply("refresh.request.releases"));
         this.cachedResponseBufferPool = bufferPool.duplicate();
         this.responseBufferPool = bufferPool.duplicate();
         this.subscriberBufferPool = bufferPool.duplicate();

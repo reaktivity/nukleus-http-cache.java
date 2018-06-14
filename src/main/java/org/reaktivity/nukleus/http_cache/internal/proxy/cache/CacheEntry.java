@@ -165,6 +165,7 @@ public final class CacheEntry
 
             final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
                     cachedRequest,
+                    cache.requestBufferPool,
                     newSlot,
                     cache.etagSupplier.get(),
                     this,
@@ -191,7 +192,7 @@ public final class CacheEntry
                 sendResponseToClient(streamCorrelation, true);
                 break;
         }
-        streamCorrelation.purge(cache.requestBufferPool);
+        streamCorrelation.purge();
     }
 
     private void sendResponseToClient(
@@ -264,7 +265,7 @@ public final class CacheEntry
                 this.state = CacheEntryState.PURGED;
                 if (clientCount == 0)
                 {
-                    cachedRequest.purge(cache.cachedRequestBufferPool);
+                    cachedRequest.purge();
                 }
                 subscribers.stream().forEach(s ->
                 {
@@ -272,7 +273,7 @@ public final class CacheEntry
                     long acceptReplyStreamId = s.acceptReplyStreamId();
                     long acceptCorrelationId = s.acceptCorrelationId();
                     cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-                    s.purge(cache.subscriberBufferPool);
+                    s.purge();
                 });
                 subscribers.clear();
                 break;

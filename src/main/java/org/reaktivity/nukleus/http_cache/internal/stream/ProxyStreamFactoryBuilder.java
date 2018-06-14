@@ -59,6 +59,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier entryReleases;
     private LongSupplier cacheHits;
     private LongSupplier cacheMisses;
+    private Function<String, LongSupplier> supplyCounter;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -126,6 +127,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setCounterSupplier(
         Function<String, LongSupplier> supplyCounter)
     {
+        this.supplyCounter = supplyCounter;
+
         entryAcquires = supplyCounter.apply("entry.acquires");
         entryReleases = supplyCounter.apply("entry.releases");
         cacheHits = supplyCounter.apply("cache.hits");
@@ -149,7 +152,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     writeBuffer,
                     bufferPool,
                     correlations,
-                    supplyEtag);
+                    supplyEtag,
+                    supplyCounter);
         }
         return new ProxyStreamFactory(
                 router,
@@ -163,6 +167,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 cache,
                 supplyEtag,
                 cacheHits,
-                cacheMisses);
+                cacheMisses,
+                supplyCounter);
     }
 }

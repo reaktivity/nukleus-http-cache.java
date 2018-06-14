@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -29,6 +30,7 @@ import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
@@ -55,9 +57,8 @@ public class ProxyStreamFactory implements StreamFactory
 
     final LongSupplier supplyStreamId;
     final BufferPool streamBufferPool;
-    final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
-    final BufferPool cacheBufferPool;
+    final BufferPool updateBufferPool;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyCorrelationId;
     final LongObjectBiConsumer<Runnable> scheduler;
@@ -81,16 +82,25 @@ public class ProxyStreamFactory implements StreamFactory
         Cache cache,
         Supplier<String> supplyEtag,
         LongSupplier cacheHits,
-        LongSupplier cacheMisses)
+        LongSupplier cacheMisses,
+        Function<String, LongSupplier> supplyCounter)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyStreamId = requireNonNull(supplyStreamId);
-        this.streamBufferPool = requireNonNull(bufferPool);
-        this.requestBufferPool = bufferPool.duplicate();
-        this.responseBufferPool = bufferPool.duplicate();
-        this.cacheBufferPool = bufferPool.duplicate();
+        this.streamBufferPool = new CountingBufferPool(
+                bufferPool,
+                supplyCounter.apply("initial.request.acquires"),
+                supplyCounter.apply("initial.request.releases"));
+        this.updateBufferPool = new CountingBufferPool(
+                bufferPool.duplicate(),
+                supplyCounter.apply("update.request.acquires"),
+                supplyCounter.apply("update.request.releases"));
+        this.responseBufferPool = new CountingBufferPool(
+                bufferPool.duplicate(),
+                supplyCounter.apply("response.acquires"),
+                supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.scheduler = requireNonNull(scheduler);
