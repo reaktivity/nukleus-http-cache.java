@@ -45,6 +45,13 @@ final class ProxyConnectReplyStream
 
     private Request streamCorrelation;
 
+    private int acceptReplyBudget;
+    private int connectReplyBudget;
+    private long groupId;
+    private int padding;
+    private boolean endDeferred;
+    private boolean cached;
+
     ProxyConnectReplyStream(
             ProxyStreamFactory proxyStreamFactory,
             MessageConsumer connectReplyThrottle,
@@ -188,7 +195,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            ((CacheableRequest) streamCorrelation).purge();
+            streamCorrelation.purge();
             doProxyBegin(responseHeaders);
         }
     }
@@ -256,6 +263,7 @@ final class ProxyConnectReplyStream
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
                 request.cache(end, streamFactory.cache);
+                cached = true;
                 break;
             case AbortFW.TYPE_ID:
             default:
@@ -298,20 +306,40 @@ final class ProxyConnectReplyStream
         {
             case DataFW.TYPE_ID:
                 final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-                final OctetsFW payload = data.payload();
-                streamFactory.writer.doHttpData(
-                        acceptReply,
-                        acceptReplyStreamId,
-                        data.groupId(),
-                        data.padding(),
-                        payload.buffer(),
-                        payload.offset(),
-                        payload.sizeof());
+                connectReplyBudget -= data.length() + data.padding();
+                if (connectReplyBudget < 0)
+                {
+                    streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
+                }
+                else
+                {
+                    final OctetsFW payload = data.payload();
+                    acceptReplyBudget -= payload.sizeof() + data.padding();
+                    assert acceptReplyBudget >= 0;
+                    streamFactory.writer.doHttpData(
+                            acceptReply,
+                            acceptReplyStreamId,
+                            data.groupId(),
+                            data.padding(),
+                            payload.buffer(),
+                            payload.offset(),
+                            payload.sizeof());
+                }
                 break;
             case EndFW.TYPE_ID:
-                streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+                streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget);
+                if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
+                {
+                    endDeferred = true;
+                }
+                else
+                {
+                    streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
+                    streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+                }
                 break;
             case AbortFW.TYPE_ID:
+                streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                 streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
                 break;
             default:
@@ -326,23 +354,52 @@ final class ProxyConnectReplyStream
             int index,
             int length)
     {
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+
         switch (msgTypeId)
         {
             case WindowFW.TYPE_ID:
                 final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
+                final long streamId = window.streamId();
                 final int credit = window.credit();
-                final int padding = window.padding();
-                final long groupId = window.groupId();
-                streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, credit, padding, groupId);
+                acceptReplyBudget += credit;
+                padding = window.padding();
+                groupId = window.groupId();
+                streamFactory.budgetManager.window(BudgetManager.StreamKind.PROXY, groupId, streamId, credit, this::sendWindow);
+                if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
+                {
+                    final MessageConsumer acceptReply = streamCorrelation.acceptReply();
+                    streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
+                    streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+                }
                 break;
             case ResetFW.TYPE_ID:
+                streamFactory.budgetManager.closed(BudgetManager.StreamKind.PROXY, groupId, acceptReplyStreamId);
                 streamFactory.writer.doReset(connectReplyThrottle, connectReplyStreamId);
-                streamCorrelation.purge();
+                // if cached, do not purge the buffer slots as it may be used by other clients
+                if (!cached)
+                {
+                    streamCorrelation.purge();
+                }
                 break;
             default:
                 // TODO,  ABORT and RESET
                 break;
             }
+    }
+
+    private int sendWindow(int credit)
+    {
+        if (endDeferred)
+        {
+            return credit;
+        }
+        else
+        {
+            connectReplyBudget += credit;
+            streamFactory.writer.doWindow(connectReplyThrottle, connectReplyStreamId, credit, padding, groupId);
+            return 0;
+        }
     }
 
 }

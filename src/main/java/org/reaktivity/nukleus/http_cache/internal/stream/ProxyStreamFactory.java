@@ -33,42 +33,27 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
-import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class ProxyStreamFactory implements StreamFactory
 {
-
-    static final String STALE_WHILE_REVALIDATE_2147483648 = "stale-while-revalidate=2147483648";
-
-    // TODO, remove need for RW in simplification of inject headers
-    final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
-
     final BeginFW beginRO = new BeginFW();
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> pendingRequestHeadersRO = new HttpBeginExFW().headers();
     final DataFW dataRO = new DataFW();
-    final OctetsFW octetsRO = new OctetsFW();
     final EndFW endRO = new EndFW();
     private final RouteFW routeRO = new RouteFW();
 
     final WindowFW windowRO = new WindowFW();
-    final ResetFW resetRO = new ResetFW();
-    final AbortFW abortRO = new AbortFW();
 
     final RouteManager router;
+    final BudgetManager budgetManager;
 
     final LongSupplier supplyStreamId;
     final BufferPool streamBufferPool;
@@ -87,6 +72,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     public ProxyStreamFactory(
         RouteManager router,
+        BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool bufferPool,
         LongSupplier supplyStreamId,
@@ -101,6 +87,7 @@ public class ProxyStreamFactory implements StreamFactory
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
+        this.budgetManager = requireNonNull(budgetManager);
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.streamBufferPool = new CountingBufferPool(
                 bufferPool,
