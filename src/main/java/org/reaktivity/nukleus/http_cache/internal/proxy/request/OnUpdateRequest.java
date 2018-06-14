@@ -29,6 +29,7 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
         int requestSlot,
         RouteManager router,
         int requestURLHash,
+        long authorization,
         short authScope,
         String etag)
     {
@@ -40,6 +41,7 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
             router,
             requestSlot,
             requestURLHash,
+            authorization,
             authScope,
             etag);
     }

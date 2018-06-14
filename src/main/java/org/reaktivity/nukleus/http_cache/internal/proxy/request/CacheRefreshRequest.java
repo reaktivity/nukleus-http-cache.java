@@ -46,6 +46,7 @@ public class CacheRefreshRequest extends CacheableRequest
               req.requestURLHash(),
               requestSlot,
               req.router,
+              req.authorization(),
               req.authScope(),
               etag);
         this.updatingEntry = cacheEntry;

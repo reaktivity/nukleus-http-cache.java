@@ -140,13 +140,14 @@ final class ProxyAcceptStream
             if (PreferHeader.preferResponseWhenModified(requestHeaders))
             {
                 handleRequestForWhenUpdated(
+                        authorization,
                         authorizationScope,
                         requestHeaders);
             }
             else if (canBeServedByCache(requestHeaders))
             {
                 storeRequest(requestHeaders);
-                handleCacheableRequest(requestHeaders, requestURL, authorizationScope);
+                handleCacheableRequest(requestHeaders, requestURL, authorization, authorizationScope);
             }
             else
             {
@@ -162,6 +163,7 @@ final class ProxyAcceptStream
     }
 
     private void handleRequestForWhenUpdated(
+        long authorization,
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
@@ -176,6 +178,7 @@ final class ProxyAcceptStream
             requestSlot,
             streamFactory.router,
             requestURLHash,
+            authorization,
             authScope,
             etag);
 
@@ -192,6 +195,7 @@ final class ProxyAcceptStream
     private void handleCacheableRequest(
         final ListFW<HttpHeaderFW> requestHeaders,
         final String requestURL,
+        long authorization,
         short authScope)
     {
         CacheableRequest cacheableRequest;
@@ -207,6 +211,7 @@ final class ProxyAcceptStream
                 requestURLHash,
                 requestSlot,
                 streamFactory.router,
+                authorization,
                 authScope,
                 streamFactory.supplyEtag.get());
 

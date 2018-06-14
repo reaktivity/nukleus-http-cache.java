@@ -28,6 +28,7 @@ public abstract class AnswerableByCacheRequest extends Request
 
     private int requestSlot;
     private final int requestURLHash;
+    private final long authorization;
     private final short authScope;
     private String etag;
 
@@ -39,12 +40,14 @@ public abstract class AnswerableByCacheRequest extends Request
             RouteManager router,
             int requestSlot,
             int requestURLHash,
+            long authorization,
             short authScope,
             String etag)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
         this.requestSlot = requestSlot;
         this.requestURLHash = requestURLHash;
+        this.authorization = authorization;
         this.authScope = authScope;
         this.etag = etag;
     }
@@ -55,6 +58,11 @@ public abstract class AnswerableByCacheRequest extends Request
     {
         final MutableDirectBuffer buffer = pool.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
+    }
+
+    public final long authorization()
+    {
+        return authorization;
     }
 
     public final short authScope()

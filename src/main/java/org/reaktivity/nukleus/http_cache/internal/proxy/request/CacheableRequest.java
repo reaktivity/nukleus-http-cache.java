@@ -65,6 +65,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         int requestURLHash,
         int requestSlot,
         RouteManager router,
+        long authorization,
         short authScope,
         String etag)
     {
@@ -75,6 +76,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               router,
               requestSlot,
               requestURLHash,
+              authorization,
               authScope,
               etag);
         this.state = CacheState.COMMITING;

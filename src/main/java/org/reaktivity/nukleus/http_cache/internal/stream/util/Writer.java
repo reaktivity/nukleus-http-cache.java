@@ -287,10 +287,11 @@ public class Writer
         final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO, bufferPool);
         final MessageConsumer acceptReply = request.acceptReply();
         final long acceptReplyStreamId = request.acceptReplyStreamId();
+        final long authorization = request.authorization();
 
         doH2PushPromise(
             acceptReply,
-            acceptReplyStreamId, 0L, 0,
+            acceptReplyStreamId, authorization, 0L, 0,
             setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
     }
 
@@ -385,12 +386,14 @@ public class Writer
     private void doH2PushPromise(
         MessageConsumer target,
         long targetId,
+        long authorization,
         long groupId,
         int padding,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetId)
+            .authorization(authorization)
             .groupId(groupId)
             .padding(padding)
             .payload((OctetsFW) null)
