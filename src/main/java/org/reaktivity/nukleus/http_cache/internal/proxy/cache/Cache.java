@@ -122,9 +122,8 @@ public class Cache
 
                 oldCacheEntry.subscribers(subscriber ->
                 {
-                    if (!this.serveRequest(
+                    if (!this.serveRequest1(
                             cacheEntry,
-                            subscriber.getRequestHeaders(requestHeadersRO, subscriberBufferPool),
                             subscriber.authScope(),
                             subscriber))
                     {
@@ -227,6 +226,16 @@ public class Cache
             return true;
         }
         return false;
+    }
+
+    private boolean serveRequest1(
+            CacheEntry entry,
+            short authScope,
+            AnswerableByCacheRequest cacheableRequest)
+    {
+        // TODO authorization
+        entry.serveClient(cacheableRequest);
+        return true;
     }
 
     public void notifyUncommitted(CacheableRequest request)

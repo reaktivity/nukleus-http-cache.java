@@ -233,6 +233,7 @@ public final class CacheEntry
 
             this.cache.writer.doHttpPushPromise(
                     request,
+                    cachedRequest,
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag());

@@ -167,7 +167,7 @@ final class ProxyAcceptStream
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        storeRequest(requestHeaders, streamFactory.updateBufferPool);
+        //storeRequest(requestHeaders, streamFactory.updateBufferPool);
         final String etag = streamFactory.supplyEtag.get();
 
         final OnUpdateRequest onUpdateRequest = new OnUpdateRequest(
@@ -176,7 +176,7 @@ final class ProxyAcceptStream
             acceptReplyStreamId,
             acceptCorrelationId,
             streamFactory.updateBufferPool,
-            requestSlot,
+            NO_SLOT,
             streamFactory.router,
             requestURLHash,
             authorization,

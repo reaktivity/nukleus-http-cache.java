@@ -280,11 +280,12 @@ public class Writer
 
     public void doHttpPushPromise(
         AnswerableByCacheRequest request,
+        AnswerableByCacheRequest cachedRequest,
         ListFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
-        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO, bufferPool);
+        final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO, bufferPool);
         final MessageConsumer acceptReply = request.acceptReply();
         final long acceptReplyStreamId = request.acceptReplyStreamId();
         final long authorization = request.authorization();
@@ -324,6 +325,12 @@ public class Writer
 
                switch(name)
                {
+                   case HttpHeaders.METHOD:
+                   case HttpHeaders.AUTHORITY:
+                   case HttpHeaders.SCHEME:
+                   case HttpHeaders.PATH:
+                       builder.item(header -> header.name(nameFW).value(valueFW));
+                       break;
                    case HttpHeaders.CACHE_CONTROL:
                        if (value.contains(CacheDirectives.NO_CACHE))
                        {
@@ -365,8 +372,7 @@ public class Writer
                     case HttpHeaders.IF_MATCH:
                     case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
-                   default: builder.item(header -> header.name(nameFW)
-                                                         .value(valueFW));
+                   default:
                }
            });
            if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
@@ -393,7 +399,7 @@ public class Writer
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .streamId(targetId)
-            .authorization(0L)
+            .authorization(authorization)
             .groupId(groupId)
             .padding(padding)
             .payload((OctetsFW) null)

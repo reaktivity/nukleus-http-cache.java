@@ -97,10 +97,10 @@ final class ProxyConnectReplyStream
 
         this.streamCorrelation = connectReplyRef == 0L ?
             this.streamFactory.correlations.remove(connectCorrelationId) : null;
+        final OctetsFW extension = streamFactory.beginRO.extension();
 
-        if (streamCorrelation != null)
+        if (streamCorrelation != null && extension.sizeof() > 0)
         {
-            final OctetsFW extension = streamFactory.beginRO.extension();
             final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
@@ -225,7 +225,7 @@ final class ProxyConnectReplyStream
                     request.etag()
                     );
 
-            streamFactory.writer.doHttpPushPromise(request, responseHeaders, freshnessExtension, request.etag());
+            streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());
             this.streamState = this::handleCacheableRequestResponse;
         }
         else

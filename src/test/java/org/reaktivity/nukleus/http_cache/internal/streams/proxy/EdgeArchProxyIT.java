@@ -124,7 +124,7 @@ public class EdgeArchProxyIT
     public void shouldInjectIndividualizedPushPromisesOnSharedFreshnessExtension() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 1);
+        counters.assertExpectedCacheEntries(1, 1, 0);
     }
 
     @Test
