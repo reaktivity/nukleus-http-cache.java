@@ -533,6 +533,18 @@ public final class CacheEntry
                 satisfiesAgeRequirements;
     }
 
+    boolean canServeUpdateRequest(
+            ListFW<HttpHeaderFW> request)
+    {
+        if (this.state == CacheEntryState.PURGED)
+        {
+            return false;
+        }
+        return true;
+
+        // TODO X-Request-ID check
+    }
+
     private boolean isStale()
     {
         return Instant.now().isAfter(staleAt());

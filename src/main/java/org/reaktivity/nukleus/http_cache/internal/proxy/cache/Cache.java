@@ -120,19 +120,7 @@ public class Cache
             {
                 updateCache(requestUrlHash, cacheEntry);
 
-                oldCacheEntry.subscribers(subscriber ->
-                {
-                    if (!this.serveRequest1(
-                            cacheEntry,
-                            subscriber.authScope(),
-                            subscriber))
-                    {
-                        final MessageConsumer acceptReply = subscriber.acceptReply();
-                        final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
-                        final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
-                    }
-                });
+                oldCacheEntry.subscribers(cacheEntry::serveClient);
                 oldCacheEntry.purge();
             }
             else
@@ -201,7 +189,7 @@ public class Cache
         {
             cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
-        else if (cacheEntry.canServeRequest(requestHeaders, authScope))
+        else if (cacheEntry.canServeUpdateRequest(requestHeaders))
         {
             cacheEntry.serveClient(onUpdateRequest);
         }
@@ -226,16 +214,6 @@ public class Cache
             return true;
         }
         return false;
-    }
-
-    private boolean serveRequest1(
-            CacheEntry entry,
-            short authScope,
-            AnswerableByCacheRequest cacheableRequest)
-    {
-        // TODO authorization
-        entry.serveClient(cacheableRequest);
-        return true;
     }
 
     public void notifyUncommitted(CacheableRequest request)
