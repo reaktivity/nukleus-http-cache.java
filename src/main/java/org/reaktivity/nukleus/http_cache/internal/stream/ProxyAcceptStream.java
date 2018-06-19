@@ -175,8 +175,6 @@ final class ProxyAcceptStream
             acceptReply,
             acceptReplyStreamId,
             acceptCorrelationId,
-            streamFactory.updateBufferPool,
-            NO_SLOT,
             streamFactory.router,
             requestURLHash,
             authorization,

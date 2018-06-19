@@ -33,6 +33,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -280,7 +281,7 @@ public class Writer
 
     public void doHttpPushPromise(
         AnswerableByCacheRequest request,
-        AnswerableByCacheRequest cachedRequest,
+        CacheableRequest cachedRequest,
         ListFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)

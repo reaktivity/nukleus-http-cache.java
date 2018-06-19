@@ -15,19 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
-import org.agrona.MutableDirectBuffer;
-import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
-import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class AnswerableByCacheRequest extends Request
 {
-
-    private BufferPool requestPool;
-    private int requestSlot;
     private final int requestURLHash;
     private final long authorization;
     private final short authScope;
@@ -39,28 +31,16 @@ public abstract class AnswerableByCacheRequest extends Request
             long acceptReplyStreamId,
             long acceptCorrelationId,
             RouteManager router,
-            BufferPool requestPool,
-            int requestSlot,
             int requestURLHash,
             long authorization,
             short authScope,
             String etag)
     {
         super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
-        this.requestPool = requestPool;
-        this.requestSlot = requestSlot;
         this.requestURLHash = requestURLHash;
         this.authorization = authorization;
         this.authScope = authScope;
         this.etag = etag;
-    }
-
-    public final ListFW<HttpHeaderFW> getRequestHeaders(
-            ListFW<HttpHeaderFW> requestHeadersRO,
-            BufferPool pool)
-    {
-        final MutableDirectBuffer buffer = pool.buffer(requestSlot);
-        return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
     public final long authorization()
@@ -81,20 +61,6 @@ public abstract class AnswerableByCacheRequest extends Request
     public final int requestURLHash()
     {
         return requestURLHash;
-    }
-
-    public final int requestSlot()
-    {
-        return requestSlot;
-    }
-
-    public void purge()
-    {
-        if (requestSlot != Slab.NO_SLOT)
-        {
-            requestPool.release(requestSlot);
-            this.requestSlot = Slab.NO_SLOT;
-        }
     }
 
     protected void etag(String etag)

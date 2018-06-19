@@ -58,7 +58,6 @@ public class ProxyStreamFactory implements StreamFactory
     final LongSupplier supplyStreamId;
     final BufferPool streamBufferPool;
     final BufferPool responseBufferPool;
-    final BufferPool updateBufferPool;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyCorrelationId;
     final LongObjectBiConsumer<Runnable> scheduler;
@@ -93,10 +92,6 @@ public class ProxyStreamFactory implements StreamFactory
                 bufferPool,
                 supplyCounter.apply("initial.request.acquires"),
                 supplyCounter.apply("initial.request.releases"));
-        this.updateBufferPool = new CountingBufferPool(
-                bufferPool.duplicate(),
-                supplyCounter.apply("update.request.acquires"),
-                supplyCounter.apply("update.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
                 bufferPool.duplicate(),
                 supplyCounter.apply("response.acquires"),

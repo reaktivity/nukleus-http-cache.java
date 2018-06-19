@@ -37,6 +37,8 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class CacheableRequest extends AnswerableByCacheRequest
 {
+    private BufferPool requestPool;
+    private int requestSlot;
     private BufferPool responsePool;
     private IntArrayList responseSlots = new IntArrayList();
     private static final int NUM_OF_HEADER_SLOTS = 1;
@@ -76,8 +78,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               acceptReplyStreamId,
               acceptCorrelationId,
               router,
-              bufferPool,
-              requestSlot,
               requestURLHash,
               authorization,
               authScope,
@@ -85,6 +85,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.state = CacheState.COMMITING;
         this.supplyCorrelationId = supplyCorrelationId;
         this.supplyStreamId = supplyStreamId;
+        this.requestPool = bufferPool;
+        this.requestSlot = requestSlot;
 
         this.connect = connect;
         this.connectRef = connectRef;
@@ -152,7 +154,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         if (state != CacheState.PURGED)
         {
-            super.purge();
+            if (requestSlot != Slab.NO_SLOT)
+            {
+                requestPool.release(requestSlot);
+                this.requestSlot = Slab.NO_SLOT;
+            }
             this.responseSlots.stream().forEach(i -> responsePool.release(i));
             this.responseSlots = null;
             this.state = CacheState.PURGED;
@@ -172,6 +178,19 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     public LongSupplier supplyStreamId()
     {
         return supplyStreamId;
+    }
+
+    public final int requestSlot()
+    {
+        return requestSlot;
+    }
+
+    public final ListFW<HttpHeaderFW> getRequestHeaders(
+            ListFW<HttpHeaderFW> requestHeadersRO,
+            BufferPool pool)
+    {
+        final MutableDirectBuffer buffer = pool.buffer(requestSlot);
+        return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
     public ListFW<HttpHeaderFW> getResponseHeaders(
