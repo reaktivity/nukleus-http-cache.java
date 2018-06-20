@@ -51,12 +51,16 @@ public class HttpCacheCountersRule implements TestRule
 
     public long slabAquires()
     {
-        return controller().count("entry.acquires");
+        return controller().count("initial.request.acquires") +
+                controller().count("refresh.request.acquires") +
+                controller().count("response.acquires");
     }
 
     public long slabReleases()
     {
-        return controller().count("entry.releases");
+        return controller().count("initial.request.releases") +
+                controller().count("refresh.request.releases") +
+                controller().count("response.releases");
     }
 
     public long cacheHits()

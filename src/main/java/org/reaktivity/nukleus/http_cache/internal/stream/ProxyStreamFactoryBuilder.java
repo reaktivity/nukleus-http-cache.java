@@ -55,8 +55,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
     };
-    private LongSupplier entryAcquires;
-    private LongSupplier entryReleases;
     private LongSupplier cacheHits;
     private LongSupplier cacheMisses;
     private Function<String, LongSupplier> supplyCounter;
@@ -129,8 +127,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         this.supplyCounter = supplyCounter;
 
-        entryAcquires = supplyCounter.apply("entry.acquires");
-        entryReleases = supplyCounter.apply("entry.releases");
         cacheHits = supplyCounter.apply("cache.hits");
         cacheMisses = supplyCounter.apply("cache.misses");
         return this;
@@ -144,7 +140,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             budgetManager = new BudgetManager();
             final int httpCacheCapacity = config.httpCacheCapacity();
             final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
-            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity, entryAcquires, entryReleases);
+            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
 
             this.cache = new Cache(
                     scheduler,
