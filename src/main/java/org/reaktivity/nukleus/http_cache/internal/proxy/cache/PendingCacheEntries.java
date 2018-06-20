@@ -15,38 +15,33 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class PendingCacheEntries
 {
     private final String etag;
-    private final List<OnUpdateRequest> subscribers = new ArrayList<OnUpdateRequest>();
+    private final List<OnUpdateRequest> subscribers = new ArrayList<>();
 
-    public PendingCacheEntries(CacheableRequest request)
+    PendingCacheEntries(String etag)
     {
-        this.etag = request.etag();
+        this.etag = etag;
     }
-
-    final Set<OnUpdateRequest> pendingRequests = new HashSet<OnUpdateRequest>();
 
     public String etag()
     {
         return etag;
     }
 
-    public void subscribe(OnUpdateRequest onUpdateRequest)
+    void subscribe(OnUpdateRequest onUpdateRequest)
     {
         this.subscribers.add(onUpdateRequest);
     }
 
-    public void addSubscribers(CacheEntry cacheEntry)
+    void addSubscribers(CacheEntry cacheEntry)
     {
-        subscribers.forEach(r -> cacheEntry.subscribeToUpdate(r));
+        subscribers.forEach(cacheEntry::subscribeToUpdate);
     }
 }

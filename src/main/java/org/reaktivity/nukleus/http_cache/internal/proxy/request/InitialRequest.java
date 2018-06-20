@@ -19,6 +19,9 @@ import java.util.function.LongSupplier;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public class InitialRequest extends CacheableRequest
@@ -62,6 +65,17 @@ public class InitialRequest extends CacheableRequest
     public Type getType()
     {
         return Type.INITIAL_REQUEST;
+    }
+
+    @Override
+    public boolean cache(
+            ListFW<HttpHeaderFW> responseHeaders,
+            Cache cache,
+            BufferPool bp)
+    {
+        super.cache(responseHeaders, cache, bp);
+        cache.notifyUncommitted(this);
+        return true;
     }
 
 }

@@ -126,7 +126,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         buffer.putBytes(0, responseHeaders.buffer(), responseHeaders.offset(), responseHeaders.sizeof());
         this.responseHeadersSize = responseHeaders.sizeof();
 
-        cache.notifyUncommitted(this);
         return true;
     }
 

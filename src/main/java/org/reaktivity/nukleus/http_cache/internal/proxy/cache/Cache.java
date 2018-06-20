@@ -26,6 +26,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
@@ -216,12 +217,9 @@ public class Cache
         return false;
     }
 
-    public void notifyUncommitted(CacheableRequest request)
+    public void notifyUncommitted(InitialRequest request)
     {
-        if (request.getType() == Request.Type.INITIAL_REQUEST)
-        {
-            this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
-        }
+        this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request.etag()));
     }
 
     public void purge(CacheEntry entry)
