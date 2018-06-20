@@ -17,6 +17,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -74,7 +75,8 @@ public class Cache
             BufferPool bufferPool,
             Long2ObjectHashMap<Request> correlations,
             Supplier<String> etagSupplier,
-            Function<String, LongSupplier> supplyCounter)
+            Function<String, LongSupplier> supplyCounter,
+            LongConsumer entryCount)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
@@ -88,7 +90,7 @@ public class Cache
         this.cachedResponseBufferPool = bufferPool.duplicate();
         this.responseBufferPool = bufferPool.duplicate();
         this.subscriberBufferPool = bufferPool.duplicate();
-        this.cachedEntries = new Int2CacheHashMapWithLRUEviction();
+        this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.etagSupplier = etagSupplier;
     }
 

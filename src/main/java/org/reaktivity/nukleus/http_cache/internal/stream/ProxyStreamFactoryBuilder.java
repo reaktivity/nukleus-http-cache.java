@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -58,6 +59,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier cacheHits;
     private LongSupplier cacheMisses;
     private Function<String, LongSupplier> supplyCounter;
+    private LongConsumer cacheEntries;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -133,6 +135,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setAccumulatorSupplier(
+            Function<String, LongConsumer> supplyAccumulator)
+    {
+        cacheEntries = supplyAccumulator.apply("cache.entries");
+        return this;
+    }
+
+    @Override
     public StreamFactory build()
     {
         if (cache == null)
@@ -149,7 +159,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     bufferPool,
                     correlations,
                     supplyEtag,
-                    supplyCounter);
+                    supplyCounter,
+                    cacheEntries);
         }
         return new ProxyStreamFactory(
                 router,

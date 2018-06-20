@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.List;
+import java.util.function.LongConsumer;
 
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.IntArrayList;
@@ -26,11 +27,13 @@ public class Int2CacheHashMapWithLRUEviction
     private static final int PURGE_SIZE = 1;
     private final Int2ObjectHashMap<CacheEntry> cachedEntries;
     private final IntArrayList lruEntryList;
+    private final LongConsumer entryCount;
 
-    public Int2CacheHashMapWithLRUEviction()
+    public Int2CacheHashMapWithLRUEviction(LongConsumer entryCount)
     {
         cachedEntries = new Int2ObjectHashMap<>();
         lruEntryList = new IntArrayList();
+        this.entryCount = entryCount;
     }
 
     public void put(
@@ -40,6 +43,9 @@ public class Int2CacheHashMapWithLRUEviction
         cachedEntries.put(requestUrlHash, cacheEntry);
         lruEntryList.removeInt(requestUrlHash);
         lruEntryList.add(requestUrlHash);
+
+        entryCount.accept(1);
+        assert cachedEntries.size() == lruEntryList.size();
     }
 
     public CacheEntry get(int requestUrlHash)
@@ -59,7 +65,11 @@ public class Int2CacheHashMapWithLRUEviction
         if (result != null)
         {
             lruEntryList.removeInt(requestUrlHash);
+            entryCount.accept(-1);
         }
+
+        assert cachedEntries.size() == lruEntryList.size();
+
         return result;
     }
 
@@ -73,5 +83,8 @@ public class Int2CacheHashMapWithLRUEviction
             rm.purge();
         });
         subList.clear();
+        entryCount.accept(-subList.size());
+
+        assert cachedEntries.size() == lruEntryList.size();
     }
 }
