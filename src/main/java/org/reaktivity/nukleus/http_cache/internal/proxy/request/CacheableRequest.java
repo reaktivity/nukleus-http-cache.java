@@ -158,7 +158,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
                 requestPool.release(requestSlot);
                 this.requestSlot = Slab.NO_SLOT;
             }
-            this.responseSlots.stream().forEach(i -> responsePool.release(i));
+            this.responseSlots.forEach(i -> responsePool.release(i));
             this.responseSlots = null;
             this.state = CacheState.PURGED;
         }

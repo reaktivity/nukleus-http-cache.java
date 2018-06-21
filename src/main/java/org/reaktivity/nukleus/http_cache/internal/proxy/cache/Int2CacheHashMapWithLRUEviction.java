@@ -40,11 +40,14 @@ public class Int2CacheHashMapWithLRUEviction
         int requestUrlHash,
         CacheEntry cacheEntry)
     {
-        cachedEntries.put(requestUrlHash, cacheEntry);
+        CacheEntry old = cachedEntries.put(requestUrlHash, cacheEntry);
+        if (old == null)
+        {
+            entryCount.accept(1);
+        }
         lruEntryList.removeInt(requestUrlHash);
         lruEntryList.add(requestUrlHash);
 
-        entryCount.accept(1);
         assert cachedEntries.size() == lruEntryList.size();
     }
 
@@ -76,14 +79,14 @@ public class Int2CacheHashMapWithLRUEviction
     public void purgeLRU()
     {
         final List<Integer> subList = lruEntryList.subList(0, PURGE_SIZE);
-        subList.stream().forEach(i ->
+        subList.forEach(i ->
         {
             CacheEntry rm = cachedEntries.remove(i);
             assert rm != null;
             rm.purge();
         });
-        subList.clear();
         entryCount.accept(-subList.size());
+        subList.clear();
 
         assert cachedEntries.size() == lruEntryList.size();
     }
