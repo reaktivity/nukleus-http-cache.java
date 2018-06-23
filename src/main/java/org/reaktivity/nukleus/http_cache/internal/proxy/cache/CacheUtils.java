@@ -131,6 +131,8 @@ public final class CacheUtils
         ListFW<HttpHeaderFW> cachedRequest,
         CacheControl cachedResponse)
     {
+        assert request.buffer() != cachedRequest.buffer();
+
         if (cachedResponse.contains(CacheDirectives.PUBLIC))
         {
             return true;
@@ -159,6 +161,9 @@ public final class CacheUtils
         ListFW<HttpHeaderFW> cachedResponse,
         ListFW<HttpHeaderFW> cachedRequest)
     {
+        assert request.buffer() != cachedRequest.buffer();
+        assert request.buffer() != cachedResponse.buffer();
+
         final String cachedVaryHeader = getHeader(cachedResponse, "vary");
         if (cachedVaryHeader == null)
         {

@@ -48,7 +48,6 @@ public class Cache
     final Writer writer;
     final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
-    final BufferPool cachedRequestBufferPool;
     final BufferPool cachedResponseBufferPool;
     final BufferPool responseBufferPool;
     final BufferPool requestBufferPool;
@@ -81,8 +80,7 @@ public class Cache
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
         this.correlations = correlations;
-        this.writer = new Writer(writeBuffer, bufferPool.duplicate());
-        this.cachedRequestBufferPool = bufferPool.duplicate();
+        this.writer = new Writer(writeBuffer);
         this.requestBufferPool = new CountingBufferPool(
                 bufferPool.duplicate(),
                 supplyCounter.apply("refresh.request.acquires"),

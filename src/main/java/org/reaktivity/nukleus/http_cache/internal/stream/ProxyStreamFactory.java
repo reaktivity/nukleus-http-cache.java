@@ -103,7 +103,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.cacheHits = cacheHits;
         this.cacheMisses = cacheMisses;
 
-        this.writer = new Writer(writeBuffer, bufferPool.duplicate());
+        this.writer = new Writer(writeBuffer);
     }
 
     @Override

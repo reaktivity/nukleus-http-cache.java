@@ -185,19 +185,17 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     }
 
     public final ListFW<HttpHeaderFW> getRequestHeaders(
-            ListFW<HttpHeaderFW> requestHeadersRO,
-            BufferPool pool)
+            ListFW<HttpHeaderFW> requestHeadersRO)
     {
-        final MutableDirectBuffer buffer = pool.buffer(requestSlot);
+        final MutableDirectBuffer buffer = requestPool.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
     public ListFW<HttpHeaderFW> getResponseHeaders(
-        ListFW<HttpHeaderFW> responseHeadersRO,
-        BufferPool cacheBufferPool)
+        ListFW<HttpHeaderFW> responseHeadersRO)
     {
         Integer firstResponseSlot = responseSlots.get(0);
-        MutableDirectBuffer responseBuffer = cacheBufferPool.buffer(firstResponseSlot);
+        MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
     }
 
@@ -268,6 +266,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             int length = Math.min(bp1.slotCapacity(), this.responseSize - read);
             MutableDirectBuffer buffer1 = bp1.buffer(this.responseSlots.get(i));
             MutableDirectBuffer buffer2 = bp2.buffer(that.responseSlots.get(i));
+            assert buffer1 != buffer2;
             match = DirectBufferUtil.equals(buffer1, 0, length, buffer2, 0, length);
         }
         return match;

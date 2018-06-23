@@ -289,6 +289,7 @@ public final class CacheEntry
         private CacheableRequest cachedRequest;
         private long groupId;
         private int padding;
+        private int acceptReplyBudget;
 
          ServeFromCacheStream(
             Request request,
@@ -315,6 +316,7 @@ public final class CacheEntry
                     padding = window.padding();
                     long streamId = window.streamId();
                     int credit = window.credit();
+                    acceptReplyBudget += credit;
                     cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit, this::writePayload);
 
                     boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
@@ -340,7 +342,8 @@ public final class CacheEntry
             final MessageConsumer acceptReply = request.acceptReply();
             final long acceptReplyStreamId = request.acceptReplyStreamId();
 
-            final int toWrite = min(budget - padding, this.cachedRequest.responseSize() - payloadWritten);
+            final int minBudget = min(budget, acceptReplyBudget);
+            final int toWrite = min(minBudget - padding, this.cachedRequest.responseSize() - payloadWritten);
             if (toWrite > 0)
             {
                 cache.writer.doHttpData(
@@ -352,6 +355,8 @@ public final class CacheEntry
                 );
                 payloadWritten += toWrite;
                 budget -= (toWrite + padding);
+                acceptReplyBudget -= (toWrite + padding);
+                assert acceptReplyBudget >= 0;
             }
 
             return budget;
@@ -360,12 +365,12 @@ public final class CacheEntry
 
     private ListFW<HttpHeaderFW> getCachedRequest()
     {
-        return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO, cache.cachedRequestBufferPool);
+        return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
     }
 
     private ListFW<HttpHeaderFW> getCachedResponseHeaders()
     {
-        return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO, cache.cachedResponseBufferPool);
+        return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
     }
 
     private void addClient()
@@ -561,7 +566,7 @@ public final class CacheEntry
         {
             // TODO pull out as utility of CacheUtils
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
-            return cacheControl == null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
+            return cacheControl != null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
         }
     }
 
@@ -595,7 +600,7 @@ public final class CacheEntry
 
     public boolean isUpdatedBy(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO, cache.responseBufferPool);
+        ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
         return !status.equals(HttpStatus.NOT_MODIFIED_304) &&
                !this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.responseBufferPool);
