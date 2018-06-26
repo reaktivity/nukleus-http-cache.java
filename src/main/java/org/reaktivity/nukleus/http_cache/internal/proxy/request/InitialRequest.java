@@ -40,6 +40,7 @@ public class InitialRequest extends CacheableRequest
             BufferPool bufferPool,
             int requestSlot,
             RouteManager router,
+            boolean authorizationHeader,
             long authorization,
             short authScope,
             String etag)
@@ -56,6 +57,7 @@ public class InitialRequest extends CacheableRequest
               bufferPool,
               requestSlot,
               router,
+              authorizationHeader,
               authorization,
               authScope,
               etag);

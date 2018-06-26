@@ -229,7 +229,8 @@ public final class CacheEntry
                     cacheControlFW,
                     responseHeaders,
                     freshnessExtension,
-                    cachedRequest.etag());
+                    cachedRequest.etag(),
+                    request instanceof OnUpdateRequest && cachedRequest.authorizationHeader());
 
             this.cache.writer.doHttpPushPromise(
                     request,

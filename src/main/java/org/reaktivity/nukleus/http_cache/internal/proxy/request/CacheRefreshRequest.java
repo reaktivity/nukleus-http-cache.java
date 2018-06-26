@@ -48,6 +48,7 @@ public class CacheRefreshRequest extends CacheableRequest
               bufferPool,
               requestSlot,
               req.router,
+              req.authorizationHeader(),
               req.authorization(),
               req.authScope(),
               etag);

@@ -222,7 +222,8 @@ final class ProxyConnectReplyStream
                     streamFactory.cacheControlParser,
                     responseHeaders,
                     freshnessExtension,
-                    request.etag()
+                    request.etag(),
+                    false
                     );
 
             streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());

@@ -20,12 +20,20 @@ import java.util.function.Predicate;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORITY;
+
 public final class HttpHeadersUtil
 {
     public static final Predicate<? super HttpHeaderFW> HAS_CACHE_CONTROL = h ->
     {
         String name = h.name().asString();
         return "cache-control".equals(name);
+    };
+
+    public static final Predicate<? super HttpHeaderFW> HAS_AUTHORIZATION = h ->
+    {
+        String name = h.name().asString();
+        return AUTHORITY.equalsIgnoreCase(name);
     };
 
     public static String getRequestURL(ListFW<HttpHeaderFW> headers)
@@ -39,7 +47,7 @@ public final class HttpHeadersUtil
         {
             switch (h.name().asString())
             {
-                case HttpHeaders.AUTHORITY:
+                case AUTHORITY:
                     authority.append(h.value().asString());
                     break;
                 case HttpHeaders.PATH:

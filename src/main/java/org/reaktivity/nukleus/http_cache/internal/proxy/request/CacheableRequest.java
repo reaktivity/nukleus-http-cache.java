@@ -69,6 +69,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         BufferPool bufferPool,
         int requestSlot,
         RouteManager router,
+        boolean authorizationHeader,
         long authorization,
         short authScope,
         String etag)
@@ -79,6 +80,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               acceptCorrelationId,
               router,
               requestURLHash,
+              authorizationHeader,
               authorization,
               authScope,
               etag);

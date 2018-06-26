@@ -99,10 +99,12 @@ public class Writer
             CacheControl cacheControlFW,
             ListFW<HttpHeaderFW> responseHeaders,
             int staleWhileRevalidate,
-            String etag)
+            String etag,
+            boolean cacheControlPrivate)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate, etag);
+                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
+                        etag, cacheControlPrivate);
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(targetStreamId)
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
@@ -118,7 +120,8 @@ public class Writer
             CacheControl cacheControlFW,
             ListFW<HttpHeaderFW> responseHeadersRO,
             int staleWhileRevalidate,
-            String etag)
+            String etag,
+            boolean cacheControlPrivate)
     {
         responseHeadersRO.forEach(h ->
         {
@@ -131,47 +134,32 @@ public class Writer
             {
                 case HttpHeaders.CACHE_CONTROL:
                     cacheControlFW.parse(value);
-                    if (cacheControlFW.contains("stale-while-revalidate"))
+                    cacheControlFW.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
+                    if (cacheControlPrivate && !(cacheControlFW.contains("private") || cacheControlFW.contains("public")))
                     {
-                        StringBuilder cacheControlDirectives = new StringBuilder();
-                        cacheControlFW.getValues().entrySet().stream().forEach(e ->
+                        cacheControlFW.getValues().put("private", null);
+                    }
+                    StringBuilder cacheControlDirectives = new StringBuilder();
+                    cacheControlFW.getValues().forEach((k, v) ->
+                    {
+                        cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
+                        cacheControlDirectives.append(k);
+                        if (v != null)
                         {
-                            String directive = e.getKey();
-                            String optionalValue = e.getValue();
-                            if (cacheControlDirectives.length() > 0)
-                            {
-                                cacheControlDirectives.append(", ");
-                            }
-                            if ("stale-while-revalidate".equals(directive))
-                            {
-                                cacheControlDirectives.append("stale-while-revalidate=" + staleWhileRevalidate);
-                            }
-                            else
-                            {
-                                if (optionalValue == null)
-                                {
-                                    cacheControlDirectives.append(directive);
-                                }
-                                else
-                                {
-                                    cacheControlDirectives.append(directive + "=" + optionalValue);
-                                }
-                            }
-                        });
-                        builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
-                    }
-                    else
-                    {
-                        builder.item(header ->
-                            header.name(nameFW).value(valueFW.asString() + ", stale-while-revalidate=" + staleWhileRevalidate));
-                    }
+                            cacheControlDirectives.append('=').append(v);
+                        }
+                    });
+                    builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
                     break;
                 default: builder.item(header -> header.name(nameFW).value(valueFW));
             }
         });
         if (!responseHeadersRO.anyMatch(HAS_CACHE_CONTROL))
         {
-            builder.item(header -> header.name("cache-control").value("stale-while-revalidate=" + staleWhileRevalidate));
+            final String value = cacheControlPrivate
+                    ? "private, stale-while-revalidate=" + staleWhileRevalidate
+                    : "stale-while-revalidate=" + staleWhileRevalidate;
+            builder.item(header -> header.name("cache-control").value(value));
         }
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
         {

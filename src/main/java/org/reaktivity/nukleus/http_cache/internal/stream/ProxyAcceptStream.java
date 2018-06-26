@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import org.agrona.DirectBuffer;
@@ -132,6 +133,7 @@ final class ProxyAcceptStream
             final OctetsFW extension = streamFactory.beginRO.extension();
             final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+            final boolean authorizationHeader = requestHeaders.anyMatch(HAS_AUTHORIZATION);
 
             // Should already be canonicalized in http / http2 nuklei
             final String requestURL = getRequestURL(requestHeaders);
@@ -141,13 +143,14 @@ final class ProxyAcceptStream
             if (PreferHeader.preferResponseWhenModified(requestHeaders))
             {
                 handleRequestForWhenUpdated(
+                        authorizationHeader,
                         authorization,
                         authorizationScope,
                         requestHeaders);
             }
             else if (canBeServedByCache(requestHeaders))
             {
-                handleCacheableRequest(requestHeaders, requestURL, authorization, authorizationScope);
+                handleCacheableRequest(requestHeaders, requestURL, authorizationHeader, authorization, authorizationScope);
             }
             else
             {
@@ -163,6 +166,7 @@ final class ProxyAcceptStream
     }
 
     private void handleRequestForWhenUpdated(
+        boolean authorizationHeader,
         long authorization,
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
@@ -177,6 +181,7 @@ final class ProxyAcceptStream
             acceptCorrelationId,
             streamFactory.router,
             requestURLHash,
+            authorizationHeader,
             authorization,
             authScope,
             etag);
@@ -194,6 +199,7 @@ final class ProxyAcceptStream
     private void handleCacheableRequest(
         final ListFW<HttpHeaderFW> requestHeaders,
         final String requestURL,
+        boolean authorizationHeader,
         long authorization,
         short authScope)
     {
@@ -212,6 +218,7 @@ final class ProxyAcceptStream
                 streamFactory.streamBufferPool,
                 requestSlot,
                 streamFactory.router,
+                authorizationHeader,
                 authorization,
                 authScope,
                 streamFactory.supplyEtag.get());
