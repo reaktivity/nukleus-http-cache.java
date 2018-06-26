@@ -21,6 +21,7 @@ import static org.junit.rules.RuleChain.outerRule;
 import java.time.Instant;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -316,6 +317,57 @@ public class EdgeArchProxyIT
         "${streams}/maintain.polling.per.multiple.auth.scopes/connect/server",
     })
     public void shouldMaintainPollingForMultipleAuthScopes() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(2, 0, 2);
+    }
+
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/no.authorization.sends.cache.control.private/accept/client",
+        "${streams}/no.authorization.sends.cache.control.private/connect/server",
+    })
+    public void noAuthorizationSendsCacheControlPrivate() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(2, 0, 2);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/no.authorization.sends.cache.control.private.except.when.public/accept/client",
+        "${streams}/no.authorization.sends.cache.control.private.except.when.public/connect/server",
+    })
+    public void noAuthorizationSendsCacheControlPrivateExceptWhenPublic() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(2, 0, 2);
+    }
+
+    @Ignore
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.vary.header.mismatch/accept/client",
+        "${streams}/polling.vary.header.mismatch/connect/server",
+    })
+    public void pollingVaryHeaderMismatch() throws Exception
+    {
+        k3po.finish();
+        //counters.assertExpectedCacheEntries(2, 0, 2);
+    }
+
+    @Ignore
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.vary.header.value.mismatch/accept/client",
+        "${streams}/polling.vary.header.value.mismatch/connect/server",
+    })
+    public void pollingVaryHeadeValuerMismatch() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(2, 0, 2);

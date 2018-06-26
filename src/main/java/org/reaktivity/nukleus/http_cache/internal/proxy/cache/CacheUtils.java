@@ -178,6 +178,19 @@ public final class CacheUtils
         });
     }
 
+    public static boolean isVaryHeader(
+            String header,
+            ListFW<HttpHeaderFW> cachedResponse)
+    {
+        final String cachedVaryHeader = getHeader(cachedResponse, "vary");
+        if (cachedVaryHeader == null)
+        {
+            return false;
+        }
+
+        return stream(cachedVaryHeader.split("\\s*,\\s*")).anyMatch(h -> h.equalsIgnoreCase(header));
+    }
+
     public static boolean isMatchByEtag(
         ListFW<HttpHeaderFW> requestHeaders,
         String etag)

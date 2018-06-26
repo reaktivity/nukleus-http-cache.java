@@ -30,6 +30,7 @@ import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
@@ -370,6 +371,10 @@ public class Writer
                     case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
                    default:
+                       if (CacheUtils.isVaryHeader(name, responseHeadersFW))
+                       {
+                           builder.item(header -> header.name(nameFW).value(valueFW));
+                       }
                }
            });
            if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
