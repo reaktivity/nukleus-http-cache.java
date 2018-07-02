@@ -360,13 +360,25 @@ public class EdgeArchProxyIT
 
     @Test
     @Specification({
+            "${route}/proxy/controller",
+            "${streams}/polling.vary.header.asterisk/accept/client",
+            "${streams}/polling.vary.header.asterisk/connect/server",
+    })
+    public void pollingVaryHeaderAsterisk() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1, 1, 0);
+    }
+
+    @Test
+    @Specification({
         "${route}/proxy/controller",
         "${streams}/polling.vary.header.value.mismatch/accept/client",
         "${streams}/polling.vary.header.value.mismatch/connect/server",
     })
-    public void pollingVaryHeadeValuerMismatch() throws Exception
+    public void pollingVaryHeaderValueMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 0, 0);
+        counters.assertExpectedCacheEntries(2, 0, 0);
     }
 }
