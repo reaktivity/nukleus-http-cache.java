@@ -329,7 +329,7 @@ public class Writer
                                                         .value(value + ", no-cache"));
                        }
                        break;
-                    case HttpHeaders.IF_MODIFIED_SINCE:
+                   case HttpHeaders.IF_MODIFIED_SINCE:
                        if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
                        {
                            final String newValue = getHeader(responseHeadersFW, "last-modified");
@@ -337,7 +337,7 @@ public class Writer
                                                         .value(newValue));
                        }
                        break;
-                    case HttpHeaders.IF_NONE_MATCH:
+                   case HttpHeaders.IF_NONE_MATCH:
                        String result = etag;
                        if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
                        {
@@ -355,8 +355,8 @@ public class Writer
                        builder.item(header -> header.name(nameFW)
                                .value(finalEtag));
                        break;
-                    case HttpHeaders.IF_MATCH:
-                    case HttpHeaders.IF_UNMODIFIED_SINCE:
+                   case HttpHeaders.IF_MATCH:
+                   case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
                    default:
                        if (CacheUtils.isVaryHeader(name, responseHeadersFW))

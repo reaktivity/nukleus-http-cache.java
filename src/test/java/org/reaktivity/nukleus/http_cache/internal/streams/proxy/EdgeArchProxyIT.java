@@ -21,7 +21,6 @@ import static org.junit.rules.RuleChain.outerRule;
 import java.time.Instant;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -347,7 +346,6 @@ public class EdgeArchProxyIT
         counters.assertExpectedCacheEntries(1, 1, 0);
     }
 
-    @Ignore
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -357,10 +355,9 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(2, 0, 2);
+        counters.assertExpectedCacheEntries(1, 1, 0);
     }
 
-    @Ignore
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -370,6 +367,6 @@ public class EdgeArchProxyIT
     public void pollingVaryHeadeValuerMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(2, 0, 2);
+        counters.assertExpectedCacheEntries(1, 0, 0);
     }
 }

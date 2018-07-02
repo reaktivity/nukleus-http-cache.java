@@ -187,17 +187,31 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     }
 
     public final ListFW<HttpHeaderFW> getRequestHeaders(
-            ListFW<HttpHeaderFW> requestHeadersRO)
+        ListFW<HttpHeaderFW> requestHeadersRO)
     {
-        final MutableDirectBuffer buffer = requestPool.buffer(requestSlot);
+        return getRequestHeaders(requestHeadersRO, requestPool);
+    }
+
+    public final ListFW<HttpHeaderFW> getRequestHeaders(
+        ListFW<HttpHeaderFW> requestHeadersRO,
+        BufferPool bp)
+    {
+        final MutableDirectBuffer buffer = bp.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
     public ListFW<HttpHeaderFW> getResponseHeaders(
         ListFW<HttpHeaderFW> responseHeadersRO)
     {
+        return getResponseHeaders(responseHeadersRO, responsePool);
+    }
+
+    public ListFW<HttpHeaderFW> getResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        BufferPool bp)
+    {
         Integer firstResponseSlot = responseSlots.get(0);
-        MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
+        MutableDirectBuffer responseBuffer = bp.buffer(firstResponseSlot);
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
     }
 

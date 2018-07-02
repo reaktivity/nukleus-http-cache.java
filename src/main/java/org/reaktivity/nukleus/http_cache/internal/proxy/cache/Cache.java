@@ -50,10 +50,13 @@ public class Cache
     final Int2CacheHashMapWithLRUEviction cachedEntries;
     final BufferPool cachedResponseBufferPool;
     final BufferPool responseBufferPool;
-    final BufferPool requestBufferPool;
+    final BufferPool refreshBufferPool;
     final BufferPool subscriberBufferPool;
+    final BufferPool request1BufferPool;
+    final BufferPool request2BufferPool;
     final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final ListFW<HttpHeaderFW> request2HeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
     final WindowFW windowRO = new WindowFW();
@@ -81,10 +84,13 @@ public class Cache
         this.budgetManager = budgetManager;
         this.correlations = correlations;
         this.writer = new Writer(writeBuffer);
-        this.requestBufferPool = new CountingBufferPool(
+        this.refreshBufferPool = new CountingBufferPool(
                 bufferPool.duplicate(),
                 supplyCounter.apply("refresh.request.acquires"),
                 supplyCounter.apply("refresh.request.releases"));
+        this.request1BufferPool = bufferPool.duplicate();
+        this.request2BufferPool = bufferPool.duplicate();
+
         this.cachedResponseBufferPool = bufferPool.duplicate();
         this.responseBufferPool = bufferPool.duplicate();
         this.subscriberBufferPool = bufferPool.duplicate();
@@ -121,7 +127,22 @@ public class Cache
             {
                 updateCache(requestUrlHash, cacheEntry);
 
-                oldCacheEntry.subscribers(cacheEntry::serveClient);
+                boolean notVaries = oldCacheEntry.doesNotVaryBy(cacheEntry);
+                if (notVaries)
+                {
+                    oldCacheEntry.subscribers(cacheEntry::serveClient);
+                }
+                else
+                {
+                    oldCacheEntry.subscribers(subscriber ->
+                    {
+                        final MessageConsumer acceptReply = subscriber.acceptReply();
+                        final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
+                        final long acceptCorrelationId = subscriber.acceptCorrelationId();
+                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    });
+                }
+
                 oldCacheEntry.purge();
             }
             else
@@ -173,13 +194,16 @@ public class Cache
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
+        assert cacheEntry != null && uncommittedRequest == null || uncommittedRequest != null && cacheEntry == null;
+
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
-        if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag()))
+        if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag())
+                && doesNotVary(requestHeaders, uncommittedRequest.request))
         {
             uncommittedRequest.subscribe(onUpdateRequest);
         }
-        else if(cacheEntry == null)
+        else if (cacheEntry == null)
         {
             final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
             final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
@@ -188,6 +212,7 @@ public class Cache
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
+            // TODO return value ??
             cacheEntry.subscribeToUpdate(onUpdateRequest);
         }
         else if (cacheEntry.canServeUpdateRequest(requestHeaders))
@@ -201,6 +226,15 @@ public class Cache
             final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
             writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
         }
+    }
+
+    private boolean doesNotVary(
+            ListFW<HttpHeaderFW> requestHeaders,
+            InitialRequest request)
+    {
+        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
+        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
+        return CacheUtils.doesNotVary(requestHeaders, cachedResponseHeaders, cachedRequestHeaders);
     }
 
     private boolean serveRequest(
@@ -217,9 +251,22 @@ public class Cache
         return false;
     }
 
+    private boolean serveUpdateRequest(
+            CacheEntry entry,
+            ListFW<HttpHeaderFW> request,
+            OnUpdateRequest updateRequest)
+    {
+        if (entry.canServeUpdateRequest(request))
+        {
+            entry.serveClient(updateRequest);
+            return true;
+        }
+        return false;
+    }
+
     public void notifyUncommitted(InitialRequest request)
     {
-        this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request.etag()));
+        this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
     }
 
     public void purge(CacheEntry entry)

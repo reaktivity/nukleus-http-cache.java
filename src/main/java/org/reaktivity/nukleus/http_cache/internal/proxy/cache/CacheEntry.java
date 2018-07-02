@@ -41,6 +41,7 @@ import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
@@ -129,17 +130,17 @@ public final class CacheEntry
 
     private void sendRefreshRequest()
     {
-        int newSlot = cache.requestBufferPool.acquire(cachedRequest.requestURLHash());
+        int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
         while (newSlot == NO_SLOT)
         {
             cache.purgeOld();
-            newSlot = cache.requestBufferPool.acquire(cachedRequest.requestURLHash());
+            newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
         }
 
         // may have purged this
         if (this.state == CacheEntryState.PURGED)
         {
-            cache.requestBufferPool.release(newSlot);
+            cache.refreshBufferPool.release(newSlot);
         }
         else
         {
@@ -160,12 +161,12 @@ public final class CacheEntry
 
             // duplicate request into new slot (TODO optimize to single request)
 
-            MutableDirectBuffer newBuffer = cache.requestBufferPool.buffer(newSlot);
+            MutableDirectBuffer newBuffer = cache.refreshBufferPool.buffer(newSlot);
             this.cachedRequest.copyRequestTo(newBuffer, cache.cachedResponseBufferPool);
 
             final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
                     cachedRequest,
-                    cache.requestBufferPool,
+                    cache.refreshBufferPool,
                     newSlot,
                     cache.etagSupplier.get(),
                     this,
@@ -374,6 +375,11 @@ public final class CacheEntry
         return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
     }
 
+    private ListFW<HttpHeaderFW> getCachedResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO, BufferPool bp)
+    {
+        return cachedRequest.getResponseHeaders(responseHeadersRO, bp);
+    }
+
     private void addClient()
     {
         this.clientCount++;
@@ -404,6 +410,26 @@ public final class CacheEntry
         final ListFW<HttpHeaderFW> responseHeaders = this.getCachedResponseHeaders();
         final ListFW<HttpHeaderFW> cachedRequest = getCachedRequest();
         return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
+    }
+
+    // Checks this entry's vary header with the given entry's vary header
+    public boolean doesNotVaryBy(CacheEntry entry)
+    {
+        final ListFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
+        final ListFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(
+                cache.responseHeadersRO, cache.cachedResponseBufferPool);
+        assert thisHeaders.buffer() != entryHeaders.buffer();
+
+        String thisVary = HttpHeadersUtil.getHeader(thisHeaders, HttpHeaders.VARY);
+        String entryVary = HttpHeadersUtil.getHeader(entryHeaders, HttpHeaders.VARY);
+        boolean varyMatches = (thisVary == entryVary) || (thisVary != null && thisVary.equalsIgnoreCase(entryVary));
+        if (varyMatches)
+        {
+            final ListFW<HttpHeaderFW> requestHeaders = entry.cachedRequest.getRequestHeaders(
+                    cache.request2HeadersRO, cache.request2BufferPool);
+            return doesNotVaryBy(requestHeaders);
+        }
+        return false;
     }
 
 
@@ -546,9 +572,9 @@ public final class CacheEntry
         {
             return false;
         }
-        return true;
-
-        // TODO X-Request-ID check
+        ListFW<HttpHeaderFW> cachedRequestHeaders = cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
+        ListFW<HttpHeaderFW> cachedResponseHeaders = cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
+        return CacheUtils.doesNotVary(request, cachedResponseHeaders, cachedRequestHeaders);
     }
 
     private boolean isStale()
@@ -573,7 +599,7 @@ public final class CacheEntry
 
     public boolean isUpdateRequestForThisEntry(ListFW<HttpHeaderFW> requestHeaders)
     {
-        return CacheUtils.isMatchByEtag(requestHeaders, this.cachedRequest.etag());
+        return CacheUtils.isMatchByEtag(requestHeaders, this.cachedRequest.etag()) && doesNotVaryBy(requestHeaders);
     }
 
 

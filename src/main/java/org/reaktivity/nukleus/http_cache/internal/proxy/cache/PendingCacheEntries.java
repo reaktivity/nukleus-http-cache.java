@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 
 import java.util.ArrayList;
@@ -22,17 +23,17 @@ import java.util.List;
 
 public class PendingCacheEntries
 {
-    private final String etag;
+    final InitialRequest request;
     private final List<OnUpdateRequest> subscribers = new ArrayList<>();
 
-    PendingCacheEntries(String etag)
+    PendingCacheEntries(InitialRequest request)
     {
-        this.etag = etag;
+        this.request = request;
     }
 
     public String etag()
     {
-        return etag;
+        return request.etag();
     }
 
     void subscribe(OnUpdateRequest onUpdateRequest)

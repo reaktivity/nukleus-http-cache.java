@@ -69,7 +69,7 @@ public final class HttpHeadersUtil
         final StringBuilder header = new StringBuilder();
         cachedRequestHeadersRO.forEach(h ->
         {
-            if (headerName.equals(h.name().asString()))
+            if (headerName.equalsIgnoreCase(h.name().asString()))
             {
                 header.append(h.value().asString());
             }

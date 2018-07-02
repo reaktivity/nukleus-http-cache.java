@@ -161,6 +161,7 @@ public final class CacheUtils
         ListFW<HttpHeaderFW> cachedResponse,
         ListFW<HttpHeaderFW> cachedRequest)
     {
+        assert request != cachedRequest;
         assert request.buffer() != cachedRequest.buffer();
         assert request.buffer() != cachedResponse.buffer();
 
