@@ -27,7 +27,10 @@ import org.reaktivity.nukleus.route.RouteManager;
 public class InitialRequest extends CacheableRequest
 {
 
+    private final Cache cache;
+
     public InitialRequest(
+            Cache cache,
             String acceptName,
             MessageConsumer acceptReply,
             long acceptReplyStreamId,
@@ -61,6 +64,7 @@ public class InitialRequest extends CacheableRequest
               authorization,
               authScope,
               etag);
+        this.cache = cache;
     }
 
     @Override
@@ -78,6 +82,12 @@ public class InitialRequest extends CacheableRequest
         super.cache(responseHeaders, cache, bp);
         cache.notifyUncommitted(this);
         return true;
+    }
+
+    public void purge()
+    {
+        super.purge();
+        cache.removeUncommitted(this);
     }
 
 }

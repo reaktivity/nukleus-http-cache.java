@@ -20,6 +20,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class PendingCacheEntries
 {
@@ -44,5 +45,10 @@ public class PendingCacheEntries
     void addSubscribers(CacheEntry cacheEntry)
     {
         subscribers.forEach(cacheEntry::subscribeToUpdate);
+    }
+
+    void removeSubscribers(Consumer<OnUpdateRequest> consumer)
+    {
+        subscribers.forEach(consumer);
     }
 }

@@ -22,6 +22,7 @@ import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -68,7 +69,7 @@ public class Cache
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
-    final Long2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Long2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
 
     public Cache(
             LongObjectBiConsumer<Runnable> scheduler,
@@ -266,6 +267,21 @@ public class Cache
     public void notifyUncommitted(InitialRequest request)
     {
         this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
+    }
+
+    public void removeUncommitted(InitialRequest request)
+    {
+        this.uncommittedRequests.computeIfPresent(request.requestURLHash(), (k, v) ->
+        {
+            v.removeSubscribers(subscriber ->
+            {
+                final MessageConsumer acceptReply = subscriber.acceptReply();
+                final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
+                final long acceptCorrelationId = subscriber.acceptCorrelationId();
+                this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            });
+            return null;
+        });
     }
 
     public void purge(CacheEntry entry)

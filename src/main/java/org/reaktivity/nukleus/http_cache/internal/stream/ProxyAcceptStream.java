@@ -205,6 +205,7 @@ final class ProxyAcceptStream
         storeRequest(requestHeaders, streamFactory.streamBufferPool);
         CacheableRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
+                streamFactory.cache,
                 acceptName,
                 acceptReply,
                 acceptReplyStreamId,
