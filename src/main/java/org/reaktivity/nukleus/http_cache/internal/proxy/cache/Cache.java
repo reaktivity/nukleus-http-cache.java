@@ -194,7 +194,6 @@ public class Cache
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
-        assert cacheEntry != null && uncommittedRequest == null || uncommittedRequest != null && cacheEntry == null;
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
