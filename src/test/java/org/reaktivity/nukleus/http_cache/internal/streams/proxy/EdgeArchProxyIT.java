@@ -379,6 +379,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderValueMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(2, 0, 0);
+        Thread.sleep(100); // Wait for response to be processed
+        counters.assertExpectedCacheEntries(1, 0, 0);
     }
 }

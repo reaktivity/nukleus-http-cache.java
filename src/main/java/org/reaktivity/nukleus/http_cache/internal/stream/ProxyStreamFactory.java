@@ -60,7 +60,6 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyCorrelationId;
-    final LongObjectBiConsumer<Runnable> scheduler;
     final Supplier<String> supplyEtag;
 
     final Writer writer;
@@ -98,7 +97,6 @@ public class ProxyStreamFactory implements StreamFactory
                 supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
-        this.scheduler = requireNonNull(scheduler);
         this.cache = cache;
         this.cacheHits = cacheHits;
         this.cacheMisses = cacheMisses;

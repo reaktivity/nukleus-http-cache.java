@@ -70,7 +70,7 @@ public final class CacheEntry
 
     private final CacheableRequest cachedRequest;
 
-    private List<OnUpdateRequest> subscribers = new ArrayList<OnUpdateRequest>(); // TODO, lazy init
+    private List<OnUpdateRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 
     boolean expectSubscribers;
 
