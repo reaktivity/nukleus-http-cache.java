@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongConsumer;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -55,11 +56,10 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
     };
-    private LongSupplier entryAcquires;
-    private LongSupplier entryReleases;
     private LongSupplier cacheHits;
     private LongSupplier cacheMisses;
     private Function<String, LongSupplier> supplyCounter;
+    private LongConsumer cacheEntries;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -129,10 +129,16 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         this.supplyCounter = supplyCounter;
 
-        entryAcquires = supplyCounter.apply("entry.acquires");
-        entryReleases = supplyCounter.apply("entry.releases");
         cacheHits = supplyCounter.apply("cache.hits");
         cacheMisses = supplyCounter.apply("cache.misses");
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setAccumulatorSupplier(
+            Function<String, LongConsumer> supplyAccumulator)
+    {
+        cacheEntries = supplyAccumulator.apply("cache.entries");
         return this;
     }
 
@@ -144,7 +150,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             budgetManager = new BudgetManager();
             final int httpCacheCapacity = config.httpCacheCapacity();
             final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
-            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity, entryAcquires, entryReleases);
+            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
 
             this.cache = new Cache(
                     scheduler,
@@ -153,7 +159,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     bufferPool,
                     correlations,
                     supplyEtag,
-                    supplyCounter);
+                    supplyCounter,
+                    cacheEntries);
         }
         return new ProxyStreamFactory(
                 router,

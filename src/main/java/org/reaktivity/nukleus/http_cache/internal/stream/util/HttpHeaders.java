@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 public final class HttpHeaders
 {
+    public static final String VARY = "vary";
     public static final String STATUS = ":status";
     public static final String CACHE_CONTROL = "cache-control";
     public static final String IF_MATCH = "if-match";

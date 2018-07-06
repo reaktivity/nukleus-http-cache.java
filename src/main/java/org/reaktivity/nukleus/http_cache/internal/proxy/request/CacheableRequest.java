@@ -37,6 +37,8 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class CacheableRequest extends AnswerableByCacheRequest
 {
+    private BufferPool requestPool;
+    private int requestSlot;
     private BufferPool responsePool;
     private IntArrayList responseSlots = new IntArrayList();
     private static final int NUM_OF_HEADER_SLOTS = 1;
@@ -67,6 +69,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         BufferPool bufferPool,
         int requestSlot,
         RouteManager router,
+        boolean authorizationHeader,
+        long authorization,
         short authScope,
         String etag)
     {
@@ -75,14 +79,16 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               acceptReplyStreamId,
               acceptCorrelationId,
               router,
-              bufferPool,
-              requestSlot,
               requestURLHash,
+              authorizationHeader,
+              authorization,
               authScope,
               etag);
         this.state = CacheState.COMMITING;
         this.supplyCorrelationId = supplyCorrelationId;
         this.supplyStreamId = supplyStreamId;
+        this.requestPool = bufferPool;
+        this.requestSlot = requestSlot;
 
         this.connect = connect;
         this.connectRef = connectRef;
@@ -122,7 +128,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         buffer.putBytes(0, responseHeaders.buffer(), responseHeaders.offset(), responseHeaders.sizeof());
         this.responseHeadersSize = responseHeaders.sizeof();
 
-        cache.notifyUncommitted(this);
         return true;
     }
 
@@ -150,8 +155,12 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         if (state != CacheState.PURGED)
         {
-            super.purge();
-            this.responseSlots.stream().forEach(i -> responsePool.release(i));
+            if (requestSlot != Slab.NO_SLOT)
+            {
+                requestPool.release(requestSlot);
+                this.requestSlot = Slab.NO_SLOT;
+            }
+            this.responseSlots.forEach(i -> responsePool.release(i));
             this.responseSlots = null;
             this.state = CacheState.PURGED;
         }
@@ -172,12 +181,37 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return supplyStreamId;
     }
 
+    public final int requestSlot()
+    {
+        return requestSlot;
+    }
+
+    public final ListFW<HttpHeaderFW> getRequestHeaders(
+        ListFW<HttpHeaderFW> requestHeadersRO)
+    {
+        return getRequestHeaders(requestHeadersRO, requestPool);
+    }
+
+    public final ListFW<HttpHeaderFW> getRequestHeaders(
+        ListFW<HttpHeaderFW> requestHeadersRO,
+        BufferPool bp)
+    {
+        final MutableDirectBuffer buffer = bp.buffer(requestSlot);
+        return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
+    }
+
+    public ListFW<HttpHeaderFW> getResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeadersRO)
+    {
+        return getResponseHeaders(responseHeadersRO, responsePool);
+    }
+
     public ListFW<HttpHeaderFW> getResponseHeaders(
         ListFW<HttpHeaderFW> responseHeadersRO,
-        BufferPool cacheBufferPool)
+        BufferPool bp)
     {
         Integer firstResponseSlot = responseSlots.get(0);
-        MutableDirectBuffer responseBuffer = cacheBufferPool.buffer(firstResponseSlot);
+        MutableDirectBuffer responseBuffer = bp.buffer(firstResponseSlot);
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
     }
 
@@ -248,6 +282,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             int length = Math.min(bp1.slotCapacity(), this.responseSize - read);
             MutableDirectBuffer buffer1 = bp1.buffer(this.responseSlots.get(i));
             MutableDirectBuffer buffer2 = bp2.buffer(that.responseSlots.get(i));
+            assert buffer1 != buffer2;
             match = DirectBufferUtil.equals(buffer1, 0, length, buffer2, 0, length);
         }
         return match;

@@ -89,7 +89,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        return new ServerStreamFactory(router, writeBuffer, supplyStreamId, bufferPool);
+        return new ServerStreamFactory(router, writeBuffer, supplyStreamId);
     }
 
 }
