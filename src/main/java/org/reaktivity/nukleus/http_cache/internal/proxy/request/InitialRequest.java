@@ -19,12 +19,18 @@ import java.util.function.LongSupplier;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public class InitialRequest extends CacheableRequest
 {
 
+    private final Cache cache;
+
     public InitialRequest(
+            Cache cache,
             String acceptName,
             MessageConsumer acceptReply,
             long acceptReplyStreamId,
@@ -37,6 +43,8 @@ public class InitialRequest extends CacheableRequest
             BufferPool bufferPool,
             int requestSlot,
             RouteManager router,
+            boolean authorizationHeader,
+            long authorization,
             short authScope,
             String etag)
     {
@@ -52,14 +60,34 @@ public class InitialRequest extends CacheableRequest
               bufferPool,
               requestSlot,
               router,
+              authorizationHeader,
+              authorization,
               authScope,
               etag);
+        this.cache = cache;
     }
 
     @Override
     public Type getType()
     {
         return Type.INITIAL_REQUEST;
+    }
+
+    @Override
+    public boolean cache(
+            ListFW<HttpHeaderFW> responseHeaders,
+            Cache cache,
+            BufferPool bp)
+    {
+        super.cache(responseHeaders, cache, bp);
+        cache.notifyUncommitted(this);
+        return true;
+    }
+
+    public void purge()
+    {
+        super.purge();
+        cache.removeUncommitted(this);
     }
 
 }

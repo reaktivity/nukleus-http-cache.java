@@ -15,38 +15,40 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
 public class PendingCacheEntries
 {
-    private final String etag;
-    private final List<OnUpdateRequest> subscribers = new ArrayList<OnUpdateRequest>();
+    final InitialRequest request;
+    private final List<OnUpdateRequest> subscribers = new ArrayList<>();
 
-    public PendingCacheEntries(CacheableRequest request)
+    PendingCacheEntries(InitialRequest request)
     {
-        this.etag = request.etag();
+        this.request = request;
     }
-
-    final Set<OnUpdateRequest> pendingRequests = new HashSet<OnUpdateRequest>();
 
     public String etag()
     {
-        return etag;
+        return request.etag();
     }
 
-    public void subscribe(OnUpdateRequest onUpdateRequest)
+    void subscribe(OnUpdateRequest onUpdateRequest)
     {
         this.subscribers.add(onUpdateRequest);
     }
 
-    public void addSubscribers(CacheEntry cacheEntry)
+    void addSubscribers(CacheEntry cacheEntry)
     {
-        subscribers.forEach(r -> cacheEntry.subscribeToUpdate(r));
+        subscribers.forEach(cacheEntry::subscribeToUpdate);
+    }
+
+    void removeSubscribers(Consumer<OnUpdateRequest> consumer)
+    {
+        subscribers.forEach(consumer);
     }
 }

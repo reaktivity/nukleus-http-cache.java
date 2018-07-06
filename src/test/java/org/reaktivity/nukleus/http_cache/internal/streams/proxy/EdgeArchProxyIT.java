@@ -124,7 +124,7 @@ public class EdgeArchProxyIT
     public void shouldInjectIndividualizedPushPromisesOnSharedFreshnessExtension() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 1);
+        counters.assertExpectedCacheEntries(1, 1, 0);
     }
 
     @Test
@@ -319,5 +319,67 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(2, 0, 2);
+    }
+
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/no.authorization.sends.cache.control.private/accept/client",
+        "${streams}/no.authorization.sends.cache.control.private/connect/server",
+    })
+    public void noAuthorizationSendsCacheControlPrivate() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1, 1, 0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/no.authorization.sends.cache.control.private.except.when.public/accept/client",
+        "${streams}/no.authorization.sends.cache.control.private.except.when.public/connect/server",
+    })
+    public void noAuthorizationSendsCacheControlPrivateExceptWhenPublic() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1, 1, 0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.vary.header.mismatch/accept/client",
+        "${streams}/polling.vary.header.mismatch/connect/server",
+    })
+    public void pollingVaryHeaderMismatch() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1, 1, 0);
+    }
+
+    @Test
+    @Specification({
+            "${route}/proxy/controller",
+            "${streams}/polling.vary.header.asterisk/accept/client",
+            "${streams}/polling.vary.header.asterisk/connect/server",
+    })
+    public void pollingVaryHeaderAsterisk() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1, 1, 0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.vary.header.value.mismatch/accept/client",
+        "${streams}/polling.vary.header.value.mismatch/connect/server",
+    })
+    public void pollingVaryHeaderValueMismatch() throws Exception
+    {
+        k3po.finish();
+        Thread.sleep(100); // Wait for response to be processed
+        counters.assertExpectedCacheEntries(1, 0, 0);
     }
 }
