@@ -52,12 +52,11 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     private int etagCnt = 0;
     private final int etagPrefix = new Random().nextInt(99999);
-    final Supplier<String> supplyEtag = () ->
-    {
-        return "\"" + etagPrefix + "a" + etagCnt++ + "\"";
-    };
+    private final Supplier<String> supplyEtag = () -> "\"" + etagPrefix + "a" + etagCnt++ + "\"";
     private LongSupplier cacheHits;
     private LongSupplier cacheMisses;
+    private LongSupplier scheduledRetries;
+    private LongSupplier executedRetries;
     private Function<String, LongSupplier> supplyCounter;
     private LongConsumer cacheEntries;
 
@@ -131,6 +130,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
         cacheHits = supplyCounter.apply("cache.hits");
         cacheMisses = supplyCounter.apply("cache.misses");
+        scheduledRetries = supplyCounter.apply("scheduled.retries");
+        executedRetries = supplyCounter.apply("executed.retries");
         return this;
     }
 
@@ -162,6 +163,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     supplyCounter,
                     cacheEntries);
         }
+        final int retryMin = config.httpCacheMinRetryInterval();
+        final int retryMax = config.httpCacheMaxRetryInterval();
         return new ProxyStreamFactory(
                 router,
                 budgetManager,
@@ -175,6 +178,10 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyEtag,
                 cacheHits,
                 cacheMisses,
-                supplyCounter);
+                supplyCounter,
+                retryMin,
+                retryMax,
+                scheduledRetries,
+                executedRetries);
     }
 }

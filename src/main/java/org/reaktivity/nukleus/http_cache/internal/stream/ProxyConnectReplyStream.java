@@ -23,6 +23,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -33,6 +35,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+
+import java.time.Instant;
 
 final class ProxyConnectReplyStream
 {
@@ -110,8 +114,7 @@ final class ProxyConnectReplyStream
                     doProxyBegin(responseHeaders);
                     break;
                 case INITIAL_REQUEST:
-                case ON_UPDATE:
-                    handleCacheableRequest(responseHeaders);
+                    handleInitialRequest(responseHeaders);
                     break;
                 case CACHE_REFRESH:
                     handleCacheRefresh(responseHeaders);
@@ -130,6 +133,12 @@ final class ProxyConnectReplyStream
     private void handleCacheRefresh(
             ListFW<HttpHeaderFW> responseHeaders)
     {
+        boolean retry = HttpHeadersUtil.retry(responseHeaders);
+        if (retry)
+        {
+            retryCacheableRequest(responseHeaders);
+            return;
+        }
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
         if (request.cache(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
@@ -179,9 +188,15 @@ final class ProxyConnectReplyStream
     }
 
     ///////////// INITIAL_REQUEST REQUEST
-    private void handleCacheableRequest(
+    private void handleInitialRequest(
             ListFW<HttpHeaderFW> responseHeaders)
     {
+        boolean retry = HttpHeadersUtil.retry(responseHeaders);
+        if (retry)
+        {
+            retryCacheableRequest(responseHeaders);
+            return;
+        }
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
@@ -234,6 +249,87 @@ final class ProxyConnectReplyStream
             request.purge();
             doProxyBegin(responseHeaders);
         }
+    }
+
+    /*
+    private void sendInitialRequest()
+    {
+        InitialRequest request = (InitialRequest) streamCorrelation;
+        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectRef = request.connectRef();
+        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+
+        streamFactory.correlations.put(connectCorrelationId, request);
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
+
+        streamFactory.writer.doHttpBegin(request.connect(), connectStreamId, connectRef, connectCorrelationId,
+                builder -> requestHeaders.forEach(
+                        h -> builder.item(item -> item.name(h.name()).value(h.value()))
+                )
+        );
+        streamFactory.writer.doHttpEnd(request.connect(), connectStreamId);
+    }
+
+    private void retryInitialRequest(
+        ListFW<HttpHeaderFW> responseHeaders)
+    {
+        // TODO exponential backoff based on number of attempts
+        // TODO Retry-After header value
+        long wait = 0;
+        long retryAt = Instant.now().plusMillis(wait).toEpochMilli();
+        streamFactory.scheduler.accept(retryAt, this::sendInitialRequest);
+    }*/
+
+    private void sendCacheableRequest()
+    {
+System.out.printf("Sending a retry request = %s\n", streamCorrelation);
+
+        CacheableRequest request = (CacheableRequest) streamCorrelation;
+
+        MessageConsumer connect = request.connect();
+        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectRef = request.connectRef();
+        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+
+        streamFactory.correlations.put(connectCorrelationId, request);
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
+        final String etag = request.etag();
+        streamFactory.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,
+                builder ->
+                {
+                    requestHeaders.forEach(
+                            h ->  builder.item(item -> item.name(h.name()).value(h.value())));
+                    if (request instanceof CacheRefreshRequest)
+                    {
+                        builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                    }
+                });
+        streamFactory.writer.doHttpEnd(connect, connectStreamId);
+        streamFactory.executedRetries.getAsLong();
+    }
+
+    private void retryCacheableRequest(
+            ListFW<HttpHeaderFW> responseHeaders)
+    {
+        long retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
+
+        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        int retryAttempt = request.incRetryAttemptAndGet();
+        if (retryAttempt > 31)
+        {
+            retryAttempt = 31;
+        }
+        // Exponential backoff based on number of attempts
+        // retryAfter + random_between(0, min(cap, base * 2 ** attempt))
+        int waitTime = Math.abs(((int) Math.pow(2, retryAttempt) * streamFactory.retryMin));
+        waitTime = streamFactory.random.nextInt(Math.min(streamFactory.retryMax, waitTime));
+        retryAfter += waitTime;
+
+        long retryAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
+System.out.printf("Scheduling a retry request = %s after retryAfter = %d attempts=%d\n",
+streamCorrelation, retryAfter, retryAttempt);
+        streamFactory.scheduler.accept(retryAt, this::sendCacheableRequest);
+        streamFactory.scheduledRetries.getAsLong();
     }
 
     private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)

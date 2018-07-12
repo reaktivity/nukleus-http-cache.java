@@ -49,6 +49,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
+    int attempt;
     CacheState state;
 
     public enum CacheState
@@ -330,4 +331,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         }
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
     }
+
+
+    public int incRetryAttemptAndGet()
+    {
+        return ++attempt;
+    }
+
 }
