@@ -251,39 +251,8 @@ final class ProxyConnectReplyStream
         }
     }
 
-    /*
-    private void sendInitialRequest()
-    {
-        InitialRequest request = (InitialRequest) streamCorrelation;
-        long connectStreamId = request.supplyStreamId().getAsLong();
-        long connectRef = request.connectRef();
-        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
-
-        streamFactory.correlations.put(connectCorrelationId, request);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
-
-        streamFactory.writer.doHttpBegin(request.connect(), connectStreamId, connectRef, connectCorrelationId,
-                builder -> requestHeaders.forEach(
-                        h -> builder.item(item -> item.name(h.name()).value(h.value()))
-                )
-        );
-        streamFactory.writer.doHttpEnd(request.connect(), connectStreamId);
-    }
-
-    private void retryInitialRequest(
-        ListFW<HttpHeaderFW> responseHeaders)
-    {
-        // TODO exponential backoff based on number of attempts
-        // TODO Retry-After header value
-        long wait = 0;
-        long retryAt = Instant.now().plusMillis(wait).toEpochMilli();
-        streamFactory.scheduler.accept(retryAt, this::sendInitialRequest);
-    }*/
-
     private void sendCacheableRequest()
     {
-System.out.printf("Sending a retry request = %s\n", streamCorrelation);
-
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
         MessageConsumer connect = request.connect();
@@ -320,14 +289,12 @@ System.out.printf("Sending a retry request = %s\n", streamCorrelation);
             retryAttempt = 31;
         }
         // Exponential backoff based on number of attempts
-        // retryAfter + random_between(0, min(cap, base * 2 ** attempt))
+        // max(retryAfter, random_between(0, min(cap, base * 2 ^ attempt)))
         int waitTime = Math.abs(((int) Math.pow(2, retryAttempt) * streamFactory.retryMin));
         waitTime = streamFactory.random.nextInt(Math.min(streamFactory.retryMax, waitTime));
-        retryAfter += waitTime;
+        retryAfter = Math.max(retryAfter, waitTime);
 
         long retryAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
-System.out.printf("Scheduling a retry request = %s after retryAfter = %d attempts=%d\n",
-streamCorrelation, retryAfter, retryAttempt);
         streamFactory.scheduler.accept(retryAt, this::sendCacheableRequest);
         streamFactory.scheduledRetries.getAsLong();
     }

@@ -183,6 +183,23 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/polling.updates.cache.after.503.retry-after/accept/client",
+        "${streams}/polling.updates.cache.after.503.retry-after/connect/server",
+    })
+    public void shouldUpdateCacheOnPollAfter503RetryAfter() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/polling.waits.on.surrogate-age/accept/client",
         "${streams}/polling.waits.on.surrogate-age/connect/server",
     })
