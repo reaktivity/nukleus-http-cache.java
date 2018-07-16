@@ -36,22 +36,22 @@ public class HttpCacheConfiguration extends Configuration
         super(config);
     }
 
-    public int httpCacheCapacity()
+    public int cacheCapacity()
     {
         return getInteger(HTTP_CACHE_CAPACITY, HTTP_CACHE_CAPACITY_DEFAULT);
     }
 
-    public int httpCacheSlotCapacity()
+    public int cacheSlotCapacity()
     {
         return getInteger(HTTP_CACHE_SLOT_CAPACITY, HTTP_CACHE_SLOT_CAPACITY_DEFAULT);
     }
 
-    public int httpCacheMinRetryInterval()
+    public int minRetryInterval()
     {
         return getInteger(HTTP_CACHE_MIN_RETRY_INTERVAL, HTTP_CACHE_MIN_RETRY_INTERVAL_DEFAULT);
     }
 
-    public int httpCacheMaxRetryInterval()
+    public int maxRetryInterval()
     {
         return getInteger(HTTP_CACHE_MAX_RETRY_INTERVAL, HTTP_CACHE_MAX_RETRY_INTERVAL_DEFAULT);
     }
