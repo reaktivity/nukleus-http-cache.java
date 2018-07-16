@@ -57,6 +57,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier cacheMisses;
     private LongSupplier scheduledRetries;
     private LongSupplier executedRetries;
+    private LongSupplier sentRetries;
     private Function<String, LongSupplier> supplyCounter;
     private LongConsumer cacheEntries;
 
@@ -132,6 +133,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         cacheMisses = supplyCounter.apply("cache.misses");
         scheduledRetries = supplyCounter.apply("scheduled.retries");
         executedRetries = supplyCounter.apply("executed.retries");
+        sentRetries = supplyCounter.apply("sent.retries");
         return this;
     }
 
@@ -182,6 +184,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 retryMin,
                 retryMax,
                 scheduledRetries,
-                executedRetries);
+                executedRetries,
+                sentRetries);
     }
 }
