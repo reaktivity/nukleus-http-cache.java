@@ -105,7 +105,7 @@ public final class HttpHeadersUtil
         int statusCode)
     {
         return  (responseHeaders.anyMatch(h ->
-                STATUS.equals(h.name().asString()) && ("" + statusCode).equals(h.value().asString())));
+                STATUS.equals(h.name().asString()) && (Integer.toString(statusCode)).equals(h.value().asString())));
     }
 
     public static boolean retry(

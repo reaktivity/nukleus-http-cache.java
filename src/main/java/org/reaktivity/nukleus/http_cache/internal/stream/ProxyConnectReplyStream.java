@@ -36,8 +36,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-import java.time.Instant;
-
 final class ProxyConnectReplyStream
 {
     private final ProxyStreamFactory streamFactory;
@@ -290,21 +288,11 @@ final class ProxyConnectReplyStream
     private void retryCacheableRequest(
             ListFW<HttpHeaderFW> responseHeaders)
     {
-        long retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
 
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        int retryAttempt = request.incRetryAttemptAndGet();
-        if (retryAttempt > 31)
-        {
-            retryAttempt = 31;
-        }
-        // Exponential backoff based on number of attempts
-        // max(retryAfter, random_between(0, min(cap, base * 2 ^ attempt)))
-        int waitTime = Math.abs(((int) Math.pow(2, retryAttempt) * streamFactory.retryMin));
-        waitTime = streamFactory.random.nextInt(Math.min(streamFactory.retryMax, waitTime));
-        retryAfter = Math.max(retryAfter, waitTime);
+        long retryAt = request.nextRetryAt(responseHeaders, streamFactory.retryMin, streamFactory.retryMax,
+                streamFactory.random);
 
-        long retryAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
         streamFactory.scheduler.accept(retryAt, this::sendCacheableRequest);
         streamFactory.scheduledRetries.getAsLong();
     }

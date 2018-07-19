@@ -151,8 +151,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         if (cache == null)
         {
             budgetManager = new BudgetManager();
-            final int httpCacheCapacity = config.httpCacheCapacity();
-            final int httpCacheSlotCapacity = config.httpCacheSlotCapacity();
+            final int httpCacheCapacity = config.cacheCapacity();
+            final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
 
             this.cache = new Cache(
@@ -165,8 +165,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     supplyCounter,
                     cacheEntries);
         }
-        final int retryMin = config.httpCacheMinRetryInterval();
-        final int retryMax = config.httpCacheMaxRetryInterval();
+        final int retryMin = config.minRetryInterval();
+        final int retryMax = config.maxRetryInterval();
         return new ProxyStreamFactory(
                 router,
                 budgetManager,
