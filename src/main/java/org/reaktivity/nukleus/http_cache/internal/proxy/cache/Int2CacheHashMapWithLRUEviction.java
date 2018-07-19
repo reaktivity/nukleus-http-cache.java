@@ -76,8 +76,17 @@ public class Int2CacheHashMapWithLRUEviction
         return result;
     }
 
-    public void purgeLRU()
+    /*
+     * @return true if entries are purged
+     *         false otherwise
+     */
+    public boolean purgeLRU()
     {
+        if (lruEntryList.size() < PURGE_SIZE)
+        {
+            return false;
+        }
+
         final List<Integer> subList = lruEntryList.subList(0, PURGE_SIZE);
         subList.forEach(i ->
         {
@@ -89,5 +98,6 @@ public class Int2CacheHashMapWithLRUEviction
         subList.clear();
 
         assert cachedEntries.size() == lruEntryList.size();
+        return true;
     }
 }

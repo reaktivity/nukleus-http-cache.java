@@ -70,7 +70,7 @@ public final class CacheEntry
 
     private final CacheableRequest cachedRequest;
 
-    private List<OnUpdateRequest> subscribers = new ArrayList<>(); // TODO, lazy init
+    private final List<OnUpdateRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 
     boolean expectSubscribers;
 
@@ -130,10 +130,19 @@ public final class CacheEntry
 
     private void sendRefreshRequest()
     {
+        if (this.state == CacheEntryState.PURGED)
+        {
+            return;
+        }
         int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
         while (newSlot == NO_SLOT)
         {
-            cache.purgeOld();
+            boolean purged = cache.purgeOld();
+            if (!purged)
+            {
+                pollBackend();
+                return;
+            }
             newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
         }
 
@@ -388,6 +397,10 @@ public final class CacheEntry
     private void removeClient()
     {
         clientCount--;
+        if (clientCount == 0 && this.state == CacheEntryState.PURGED)
+        {
+            cachedRequest.purge();
+        }
     }
 
     private boolean canBeServedToAuthorized(

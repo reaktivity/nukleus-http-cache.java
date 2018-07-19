@@ -251,19 +251,6 @@ public class Cache
         return false;
     }
 
-    private boolean serveUpdateRequest(
-            CacheEntry entry,
-            ListFW<HttpHeaderFW> request,
-            OnUpdateRequest updateRequest)
-    {
-        if (entry.canServeUpdateRequest(request))
-        {
-            entry.serveClient(updateRequest);
-            return true;
-        }
-        return false;
-    }
-
     public void notifyUncommitted(InitialRequest request)
     {
         this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
@@ -290,9 +277,9 @@ public class Cache
         entry.purge();
     }
 
-    public void purgeOld()
+    public boolean purgeOld()
     {
-        this.cachedEntries.purgeLRU();
+        return this.cachedEntries.purgeLRU();
     }
 
 }

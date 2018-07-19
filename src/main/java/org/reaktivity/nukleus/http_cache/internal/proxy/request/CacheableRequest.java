@@ -107,7 +107,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         requestBuffer.getBytes(0, buffer, 0, requestBuffer.capacity());
     }
 
-    public boolean cache(
+    public boolean storeResponseHeaders(
             ListFW<HttpHeaderFW> responseHeaders,
             Cache cache,
             BufferPool bp)
@@ -123,7 +123,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         int headerSlot = bp.acquire(this.etag().hashCode());
         while (headerSlot == Slab.NO_SLOT)
         {
-            cache.purgeOld();
+            boolean purged = cache.purgeOld();
+            if (!purged)
+            {
+                return false;
+            }
             headerSlot = bp.acquire(this.etag().hashCode());
         }
         responseSlots.add(headerSlot);
@@ -135,15 +139,16 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return true;
     }
 
-    public void cache(
+    public boolean storeResponseData(
         Cache cache,
         DataFW data,
         BufferPool cacheBufferPool)
     {
         if (state == CacheState.COMMITING)
         {
-            putResponse(cache, cacheBufferPool, data.payload());
+            return storeResponseData(cache, cacheBufferPool, data.payload());
         }
+        return false;
     }
 
     public void cache(EndFW end, Cache cache)
@@ -224,15 +229,15 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return connect;
     }
 
-    private void putResponse(
+    private boolean storeResponseData(
         Cache cache,
         BufferPool bp,
         Flyweight data)
     {
-        this.putResponseData(cache, bp, data, 0);
+        return this.storeResponseData(cache, bp, data, 0);
     }
 
-    private void putResponseData(
+    private boolean storeResponseData(
         Cache cache,
         BufferPool bp,
         Flyweight data,
@@ -241,7 +246,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         responsePool = bp;
         if (data.sizeof() - written == 0)
         {
-            return;
+            return true;
         }
 
         final int slotCapacity = bp.slotCapacity();
@@ -252,10 +257,14 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             int newSlot = bp.acquire(this.etag().hashCode());
             while (newSlot == Slab.NO_SLOT)
             {
-                cache.purgeOld();
+                boolean purged = cache.purgeOld();
+                if (!purged)
+                {
+                    return false;
+                }
                 if (this.state == CacheState.PURGED)
                 {
-                    return;
+                    return false;
                 }
                 newSlot = bp.acquire(this.etag().hashCode());
             }
@@ -270,8 +279,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         buffer.putBytes(slotCapacity - slotSpaceRemaining, data.buffer(), data.offset() + written, toWrite);
         written += toWrite;
         responseSize += toWrite;
-        putResponseData(cache, bp, data, written);
-
+        return storeResponseData(cache, bp, data, written);
     }
 
     public boolean payloadEquals(

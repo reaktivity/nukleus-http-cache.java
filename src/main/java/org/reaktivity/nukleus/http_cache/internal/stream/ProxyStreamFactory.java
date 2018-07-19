@@ -74,6 +74,7 @@ public class ProxyStreamFactory implements StreamFactory
     final LongSupplier cacheMisses;
     final LongSupplier scheduledRetries;
     final LongSupplier executedRetries;
+    final LongSupplier sentRetries;
     final Random random;
     final int retryMin;
     final int retryMax;
@@ -95,7 +96,8 @@ public class ProxyStreamFactory implements StreamFactory
         int retryMin,
         int retryMax,
         LongSupplier scheduledRetries,
-        LongSupplier executedRetries)
+        LongSupplier executedRetries,
+        LongSupplier sentRetries)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
@@ -122,6 +124,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.retryMax = retryMax;
         this.scheduledRetries = scheduledRetries;
         this.executedRetries = executedRetries;
+        this.sentRetries = sentRetries;
     }
 
     @Override
