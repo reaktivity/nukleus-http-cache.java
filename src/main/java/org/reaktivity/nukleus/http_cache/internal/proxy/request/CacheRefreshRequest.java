@@ -57,7 +57,7 @@ public class CacheRefreshRequest extends CacheableRequest
     }
 
     @Override
-    public boolean cache(
+    public boolean storeResponseHeaders(
         ListFW<HttpHeaderFW> responseHeaders,
         Cache cache,
         BufferPool bufferPool)
@@ -66,7 +66,7 @@ public class CacheRefreshRequest extends CacheableRequest
             ":status".equals(h.name().asString()) &&
             h.value().asString().startsWith("2")))
         {
-            boolean noError = super.cache(responseHeaders, cache, bufferPool);
+            boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
             {
                 this.purge();

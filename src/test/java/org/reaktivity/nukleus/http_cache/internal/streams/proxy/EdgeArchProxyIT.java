@@ -30,6 +30,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configure;
 
 public class EdgeArchProxyIT
 {
@@ -398,5 +399,20 @@ public class EdgeArchProxyIT
         k3po.finish();
         Thread.sleep(100); // Wait for response to be processed
         counters.assertExpectedCacheEntries(1, 0, 0);
+    }
+
+    // First response gets proxied (but doesn't get stored in cache
+    // as there is no buffer slot for headers)
+    // Second request gets 503 + retry-after
+    @Test
+    @Configure(name="nukleus.http_cache.capacity", value="16384")       // 1 buffer slot
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/cache.sends.503.retry-after/accept/client",
+        "${streams}/cache.sends.503.retry-after/connect/server",
+    })
+    public void sends503RetryAfterForSecondRequest() throws Exception
+    {
+        k3po.finish();
     }
 }

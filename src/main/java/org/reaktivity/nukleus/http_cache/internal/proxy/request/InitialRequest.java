@@ -74,14 +74,17 @@ public class InitialRequest extends CacheableRequest
     }
 
     @Override
-    public boolean cache(
+    public boolean storeResponseHeaders(
             ListFW<HttpHeaderFW> responseHeaders,
             Cache cache,
             BufferPool bp)
     {
-        super.cache(responseHeaders, cache, bp);
-        cache.notifyUncommitted(this);
-        return true;
+        boolean stored = super.storeResponseHeaders(responseHeaders, cache, bp);
+        if (stored)
+        {
+            cache.notifyUncommitted(this);
+        }
+        return stored;
     }
 
     public void purge()

@@ -200,7 +200,12 @@ final class ProxyAcceptStream
         long authorization,
         short authScope)
     {
-        storeRequest(requestHeaders, streamFactory.streamBufferPool);
+        boolean stored = storeRequest(requestHeaders, streamFactory.streamBufferPool);
+        if (!stored)
+        {
+            send503RetryAfter();
+            return;
+        }
         CacheableRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
@@ -272,16 +277,21 @@ final class ProxyAcceptStream
         streamFactory.router.setThrottle(connectName, connectStreamId, this::handleConnectThrottle);
     }
 
-    private void storeRequest(final ListFW<HttpHeaderFW> headers, final BufferPool bufferPool)
+    private boolean storeRequest(final ListFW<HttpHeaderFW> headers, final BufferPool bufferPool)
     {
         this.requestSlot = bufferPool.acquire(acceptStreamId);
         while (requestSlot == NO_SLOT)
         {
-            this.streamFactory.cache.purgeOld();
+            boolean purged = this.streamFactory.cache.purgeOld();
+            if (!purged)
+            {
+                return false;
+            }
             this.requestSlot = bufferPool.acquire(acceptStreamId);
         }
         MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestSlot);
         requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
+        return true;
     }
 
     private void send504()
@@ -292,6 +302,16 @@ final class ProxyAcceptStream
                         .value("504")));
         streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId);
         request.purge();
+    }
+
+    private void send503RetryAfter()
+    {
+        streamFactory.writer.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+                e.item(h -> h.name(STATUS).value("503"))
+                 .item(h -> h.name("retry-after").value("0")));
+        streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+
+        streamFactory.sentRetries.getAsLong();
     }
 
     private void handleAllFramesByIgnoring(
