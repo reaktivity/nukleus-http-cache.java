@@ -24,8 +24,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 public class CacheRefreshRequest extends CacheableRequest
 {
 
-    private CacheEntry updatingEntry;
-    private Cache cache;
+    private final CacheEntry updatingEntry;
+    private final Cache cache;
 
     public CacheRefreshRequest(
             CacheableRequest req,

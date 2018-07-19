@@ -36,5 +36,5 @@ public final class HttpHeaders
     public static final String ETAG = "etag";
     public static final String DATE = "date";
     public static final String LAST_MODIFIED = "last-modified";
-
+    public static final String RETRY_AFTER = "retry-after";
 }
