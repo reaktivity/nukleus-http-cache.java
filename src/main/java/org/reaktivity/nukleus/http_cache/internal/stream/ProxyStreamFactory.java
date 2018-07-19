@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Random;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -33,6 +34,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -46,6 +49,7 @@ public class ProxyStreamFactory implements StreamFactory
 {
     final BeginFW beginRO = new BeginFW();
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
+    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     final DataFW dataRO = new DataFW();
     final EndFW endRO = new EndFW();
     private final RouteFW routeRO = new RouteFW();
@@ -59,6 +63,7 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool streamBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
+    final LongObjectBiConsumer<Runnable> scheduler;
     final LongSupplier supplyCorrelationId;
     final Supplier<String> supplyEtag;
 
@@ -67,6 +72,11 @@ public class ProxyStreamFactory implements StreamFactory
     final Cache cache;
     final LongSupplier cacheHits;
     final LongSupplier cacheMisses;
+    final LongSupplier scheduledRetries;
+    final LongSupplier executedRetries;
+    final Random random;
+    final int retryMin;
+    final int retryMax;
 
     public ProxyStreamFactory(
         RouteManager router,
@@ -81,7 +91,11 @@ public class ProxyStreamFactory implements StreamFactory
         Supplier<String> supplyEtag,
         LongSupplier cacheHits,
         LongSupplier cacheMisses,
-        Function<String, LongSupplier> supplyCounter)
+        Function<String, LongSupplier> supplyCounter,
+        int retryMin,
+        int retryMax,
+        LongSupplier scheduledRetries,
+        LongSupplier executedRetries)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
@@ -96,12 +110,18 @@ public class ProxyStreamFactory implements StreamFactory
                 supplyCounter.apply("response.acquires"),
                 supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);
+        this.scheduler = scheduler;
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.cache = cache;
         this.cacheHits = cacheHits;
         this.cacheMisses = cacheMisses;
 
         this.writer = new Writer(writeBuffer);
+        this.random = new Random();
+        this.retryMin = retryMin;
+        this.retryMax = retryMax;
+        this.scheduledRetries = scheduledRetries;
+        this.executedRetries = executedRetries;
     }
 
     @Override

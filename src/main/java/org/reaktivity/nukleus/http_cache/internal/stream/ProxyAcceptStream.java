@@ -58,7 +58,6 @@ final class ProxyAcceptStream
     private MessageConsumer connect;
     private String connectName;
     private long connectRef;
-    private long connectCorrelationId;
     private long connectStreamId;
 
     private MessageConsumer streamState;
@@ -123,7 +122,6 @@ final class ProxyAcceptStream
             this.connectName = connectRoute.target().asString();
             this.connect = streamFactory.router.supplyTarget(connectName);
             this.connectRef = connectRoute.targetRef();
-            this.connectCorrelationId = streamFactory.supplyCorrelationId.getAsLong();
             this.connectStreamId = streamFactory.supplyStreamId.getAsLong();
 
             this.acceptReply = streamFactory.router.supplyTarget(acceptName);
@@ -262,6 +260,7 @@ final class ProxyAcceptStream
 
     private void sendBeginToConnect(final ListFW<HttpHeaderFW> requestHeaders)
     {
+        long connectCorrelationId = streamFactory.supplyCorrelationId.getAsLong();
         streamFactory.correlations.put(connectCorrelationId, request);
 
         streamFactory.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,

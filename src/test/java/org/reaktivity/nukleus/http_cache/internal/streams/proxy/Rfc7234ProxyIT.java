@@ -141,6 +141,20 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/503.retry-after/accept/client",
+        "${streams}/503.retry-after/connect/server",
+    })
+    public void shouldRetryFor503RetryAfter() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+        counters.assertCacheMisses(1);
+        counters.assertCacheHits(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/request.greater.max-age/accept/client",
         "${streams}/request.greater.max-age/connect/server",
     })

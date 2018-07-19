@@ -168,7 +168,7 @@ public final class CacheEntry
                     cachedRequest,
                     cache.refreshBufferPool,
                     newSlot,
-                    cache.etagSupplier.get(),
+                    etag,
                     this,
                     this.cache);
             this.pollingRequest = refreshRequest;
