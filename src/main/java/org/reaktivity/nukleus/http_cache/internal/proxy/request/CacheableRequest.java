@@ -352,7 +352,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         int retryAttempt = attempt > 31 ? 31 : attempt;
         // Exponential backoff based on number of attempts
         // max(retryAfter, random_between(0, min(cap, base * 2 ^ attempt)))
-        int waitTime = Math.abs(((int) Math.pow(2, retryAttempt) * retryMin));
+        int waitTime = ((int) Math.pow(2, retryAttempt) * retryMin);
+        if (waitTime <= 0)
+        {
+            waitTime = retryMax;
+        }
         waitTime = random.nextInt(Math.min(retryMax, waitTime));
         retryAfter = Math.max(retryAfter, waitTime);
 
