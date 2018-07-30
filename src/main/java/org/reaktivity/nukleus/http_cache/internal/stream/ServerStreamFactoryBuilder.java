@@ -72,7 +72,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setCorrelationIdSupplier(
+    public ServerStreamFactoryBuilder setTargetCorrelationIdSupplier(
         LongSupplier supplyCorrelationId)
     {
         return this;
