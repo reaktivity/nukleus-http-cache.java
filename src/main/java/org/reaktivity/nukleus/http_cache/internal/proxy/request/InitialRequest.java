@@ -26,7 +26,6 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public class InitialRequest extends CacheableRequest
 {
-
     private final Cache cache;
 
     public InitialRequest(
@@ -92,5 +91,4 @@ public class InitialRequest extends CacheableRequest
         super.purge();
         cache.removeUncommitted(this);
     }
-
 }

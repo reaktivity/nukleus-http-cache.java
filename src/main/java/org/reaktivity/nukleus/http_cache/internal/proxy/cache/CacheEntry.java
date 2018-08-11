@@ -82,9 +82,9 @@ public final class CacheEntry
     private long pollAt = -1;
 
     public CacheEntry(
-            Cache cache,
-            CacheableRequest request,
-            boolean expectSubscribers)
+        Cache cache,
+        CacheableRequest request,
+        boolean expectSubscribers)
     {
         this.cache = cache;
         this.cachedRequest = request;
@@ -160,7 +160,7 @@ public final class CacheEntry
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             final String etag = this.cachedRequest.etag();
-            cache.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,
+            cache.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
                     builder ->
                         {
                             requestHeaders.forEach(
@@ -207,8 +207,8 @@ public final class CacheEntry
     }
 
     private void sendResponseToClient(
-            AnswerableByCacheRequest request,
-            boolean injectWarnings)
+        AnswerableByCacheRequest request,
+        boolean injectWarnings)
     {
         addClient();
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
@@ -243,12 +243,18 @@ public final class CacheEntry
                     cachedRequest.etag(),
                     request instanceof OnUpdateRequest && cachedRequest.authorizationHeader());
 
+            // count cached responses (cache hits)
+            cache.counters.responsesCached.getAsLong();
+
             this.cache.writer.doHttpPushPromise(
                     request,
                     cachedRequest,
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag());
+
+            // count all promises (prefer wait, if-none-match)
+            cache.counters.promises.getAsLong();
         }
         else
         {
@@ -259,8 +265,11 @@ public final class CacheEntry
                         x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
                 );
             }
-            this.cache.writer.doHttpBegin(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
+            this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
         }
+
+        // count all responses
+        cache.counters.responses.getAsLong();
 
         if(this.state == CacheEntryState.CAN_REFRESH)
         {
@@ -287,6 +296,12 @@ public final class CacheEntry
                     long acceptCorrelationId = s.acceptCorrelationId();
                     cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
                     s.purge();
+
+                    // count all responses
+                    cache.counters.responses.getAsLong();
+
+                    // count ABORTed responses
+                    cache.counters.responses.getAsLong();
                 });
                 subscribers.clear();
                 break;

@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Random;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
@@ -28,6 +27,7 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
+import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -70,14 +70,10 @@ public class ProxyStreamFactory implements StreamFactory
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
     final Cache cache;
-    final LongSupplier cacheHits;
-    final LongSupplier cacheMisses;
-    final LongSupplier scheduledRetries;
-    final LongSupplier executedRetries;
-    final LongSupplier sentRetries;
     final Random random;
     final int retryMin;
     final int retryMax;
+    final HttpCacheCounters counters;
 
     public ProxyStreamFactory(
         RouteManager router,
@@ -90,14 +86,9 @@ public class ProxyStreamFactory implements StreamFactory
         LongObjectBiConsumer<Runnable> scheduler,
         Cache cache,
         Supplier<String> supplyEtag,
-        LongSupplier cacheHits,
-        LongSupplier cacheMisses,
-        Function<String, LongSupplier> supplyCounter,
+        HttpCacheCounters counters,
         int retryMin,
-        int retryMax,
-        LongSupplier scheduledRetries,
-        LongSupplier executedRetries,
-        LongSupplier sentRetries)
+        int retryMax)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
@@ -105,26 +96,22 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyStreamId = requireNonNull(supplyStreamId);
         this.streamBufferPool = new CountingBufferPool(
                 bufferPool,
-                supplyCounter.apply("initial.request.acquires"),
-                supplyCounter.apply("initial.request.releases"));
+                counters.supplyCounter.apply("initial.request.acquires"),
+                counters.supplyCounter.apply("initial.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
                 bufferPool.duplicate(),
-                supplyCounter.apply("response.acquires"),
-                supplyCounter.apply("response.releases"));
+                counters.supplyCounter.apply("response.acquires"),
+                counters.supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);
         this.scheduler = scheduler;
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.cache = cache;
-        this.cacheHits = cacheHits;
-        this.cacheMisses = cacheMisses;
 
         this.writer = new Writer(writeBuffer);
         this.random = new Random();
         this.retryMin = retryMin;
         this.retryMax = retryMax;
-        this.scheduledRetries = scheduledRetries;
-        this.executedRetries = executedRetries;
-        this.sentRetries = sentRetries;
+        this.counters = counters;
     }
 
     @Override

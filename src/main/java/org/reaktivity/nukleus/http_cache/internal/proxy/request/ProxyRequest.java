@@ -20,7 +20,6 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public class ProxyRequest extends Request
 {
-
     public ProxyRequest(
         String acceptName,
         MessageConsumer acceptReply,
@@ -42,5 +41,4 @@ public class ProxyRequest extends Request
     {
         // NOOP, can't purge non cache-able request, TODO clean up interfaces?
     }
-
 }
