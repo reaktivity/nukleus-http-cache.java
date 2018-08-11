@@ -92,7 +92,7 @@ final class ProxyConnectReplyStream
     }
 
     private void handleBegin(
-            BeginFW begin)
+        BeginFW begin)
     {
         final long connectReplyRef = begin.sourceRef();
         final long connectCorrelationId = begin.correlationId();
@@ -197,7 +197,7 @@ final class ProxyConnectReplyStream
 
     ///////////// INITIAL_REQUEST REQUEST
     private void handleInitialRequest(
-            ListFW<HttpHeaderFW> responseHeaders)
+        ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
         if (retry)
@@ -205,6 +205,7 @@ final class ProxyConnectReplyStream
             retryCacheableRequest(responseHeaders);
             return;
         }
+
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
@@ -249,7 +250,14 @@ final class ProxyConnectReplyStream
                     false
                     );
 
+            // count all responses
+            streamFactory.counters.responses.getAsLong();
+
             streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());
+
+            // count all promises (prefer wait, if-none-match)
+            streamFactory.counters.promises.getAsLong();
+
             this.streamState = this::handleCacheableRequestResponse;
         }
         else
@@ -271,7 +279,7 @@ final class ProxyConnectReplyStream
         streamFactory.correlations.put(connectCorrelationId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
         final String etag = request.etag();
-        streamFactory.writer.doHttpBegin(connect, connectStreamId, connectRef, connectCorrelationId,
+        streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
                 builder ->
                 {
                     requestHeaders.forEach(
@@ -282,22 +290,23 @@ final class ProxyConnectReplyStream
                     }
                 });
         streamFactory.writer.doHttpEnd(connect, connectStreamId);
-        streamFactory.executedRetries.getAsLong();
+        streamFactory.counters.executedRetries.getAsLong();
     }
 
     private void retryCacheableRequest(
-            ListFW<HttpHeaderFW> responseHeaders)
+        ListFW<HttpHeaderFW> responseHeaders)
     {
-
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         long retryAt = request.nextRetryAt(responseHeaders, streamFactory.retryMin, streamFactory.retryMax,
                 streamFactory.random);
 
         streamFactory.scheduler.accept(retryAt, this::sendCacheableRequest);
-        streamFactory.scheduledRetries.getAsLong();
+
+        streamFactory.counters.scheduledRetries.getAsLong();
     }
 
-    private void handleCacheableResponse(ListFW<HttpHeaderFW> responseHeaders)
+    private void handleCacheableResponse(
+        ListFW<HttpHeaderFW> responseHeaders)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         if (!request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
@@ -309,10 +318,10 @@ final class ProxyConnectReplyStream
     }
 
     private void handleCacheableRequestResponse(
-            int msgTypeId,
-            DirectBuffer buffer,
-            int index,
-            int length)
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
@@ -340,7 +349,8 @@ final class ProxyConnectReplyStream
     }
 
     ///////////// PROXY
-    private void doProxyBegin(ListFW<HttpHeaderFW> responseHeaders)
+    private void doProxyBegin(
+        ListFW<HttpHeaderFW> responseHeaders)
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
@@ -348,7 +358,7 @@ final class ProxyConnectReplyStream
         final long correlationId = streamCorrelation.acceptCorrelationId();
 
         streamCorrelation.setThrottle(this::handleProxyThrottle);
-        streamFactory.writer.doHttpBegin(
+        streamFactory.writer.doHttpResponse(
                 acceptReply,
                 acceptReplyStreamId,
                 acceptReplyRef,
@@ -356,6 +366,9 @@ final class ProxyConnectReplyStream
                 builder -> responseHeaders.forEach(
                         h -> builder.item(item -> item.name(h.name()).value(h.value()))
             ));
+
+        // count all responses
+        streamFactory.counters.responses.getAsLong();
 
         this.streamState = this::handleFramesWhenProxying;
     }

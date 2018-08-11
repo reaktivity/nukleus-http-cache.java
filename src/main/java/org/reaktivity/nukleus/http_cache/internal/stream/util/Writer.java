@@ -51,7 +51,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public class Writer
 {
-
     private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer("http-cache".getBytes(UTF_8));
 
     private final BeginFW.Builder beginRW = new BeginFW.Builder();
@@ -67,12 +66,12 @@ public class Writer
     private final MutableDirectBuffer writeBuffer;
 
     public Writer(
-            MutableDirectBuffer writeBuffer)
+        MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
     }
 
-    public void doHttpBegin(
+    public void doHttpRequest(
         MessageConsumer target,
         long targetStreamId,
         long targetRef,
@@ -88,7 +87,24 @@ public class Writer
                                .build();
 
         target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+    }
 
+    public void doHttpResponse(
+        MessageConsumer target,
+        long targetStreamId,
+        long targetRef,
+        long correlationId,
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+    {
+        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                               .streamId(targetStreamId)
+                               .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
+                               .sourceRef(targetRef)
+                               .correlationId(correlationId)
+                               .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                               .build();
+
+        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
     public void doHttpResponseWithUpdatedCacheControl(
@@ -369,7 +385,7 @@ public class Writer
            {
                builder.item(header -> header.name("cache-control").value("no-cache"));
            }
-           if (!requestHeadersFW.anyMatch(PreferHeader.HAS_HEADER))
+           if (!requestHeadersFW.anyMatch(PreferHeader.PREFER_HEADER_NAME))
            {
                builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
            }
@@ -404,7 +420,7 @@ public class Writer
         long acceptReplyStreamId,
         long acceptCorrelationId)
     {
-        this.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+        this.doHttpResponse(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
         e.item(h -> h.representation((byte) 0)
                 .name(STATUS)
                 .value("503")));

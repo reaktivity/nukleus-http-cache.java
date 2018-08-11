@@ -20,7 +20,6 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public class OnUpdateRequest extends AnswerableByCacheRequest
 {
-
     public OnUpdateRequest(
         String acceptName,
         MessageConsumer acceptReply,
@@ -57,6 +56,4 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
     {
         // no-op
     }
-
-
 }

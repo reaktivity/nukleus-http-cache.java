@@ -16,9 +16,7 @@
 
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import java.util.function.Function;
 import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
@@ -26,6 +24,7 @@ import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
@@ -45,7 +44,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public class Cache
 {
-
     final Writer writer;
     final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
@@ -70,16 +68,17 @@ public class Cache
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
+    final HttpCacheCounters counters;
 
     public Cache(
-            LongObjectBiConsumer<Runnable> scheduler,
-            BudgetManager budgetManager,
-            MutableDirectBuffer writeBuffer,
-            BufferPool bufferPool,
-            Long2ObjectHashMap<Request> correlations,
-            Supplier<String> etagSupplier,
-            Function<String, LongSupplier> supplyCounter,
-            LongConsumer entryCount)
+        LongObjectBiConsumer<Runnable> scheduler,
+        BudgetManager budgetManager,
+        MutableDirectBuffer writeBuffer,
+        BufferPool bufferPool,
+        Long2ObjectHashMap<Request> correlations,
+        Supplier<String> etagSupplier,
+        HttpCacheCounters counters,
+        LongConsumer entryCount)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
@@ -87,8 +86,8 @@ public class Cache
         this.writer = new Writer(writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
                 bufferPool.duplicate(),
-                supplyCounter.apply("refresh.request.acquires"),
-                supplyCounter.apply("refresh.request.releases"));
+                counters.supplyCounter.apply("refresh.request.acquires"),
+                counters.supplyCounter.apply("refresh.request.releases"));
         this.request1BufferPool = bufferPool.duplicate();
         this.request2BufferPool = bufferPool.duplicate();
 
@@ -97,6 +96,7 @@ public class Cache
         this.subscriberBufferPool = bufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.etagSupplier = etagSupplier;
+        this.counters = counters;
     }
 
     public void put(
@@ -141,6 +141,12 @@ public class Cache
                         final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                         final long acceptCorrelationId = subscriber.acceptCorrelationId();
                         this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+
+                        // count all responses
+                        counters.responses.getAsLong();
+
+                        // count ABORTed responses
+                        counters.responses.getAsLong();
                     });
                 }
 
@@ -188,10 +194,10 @@ public class Cache
     }
 
     public void handleOnUpdateRequest(
-            int requestURLHash,
-            OnUpdateRequest onUpdateRequest,
-            ListFW<HttpHeaderFW> requestHeaders,
-            short authScope)
+        int requestURLHash,
+        OnUpdateRequest onUpdateRequest,
+        ListFW<HttpHeaderFW> requestHeaders,
+        short authScope)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
@@ -209,6 +215,12 @@ public class Cache
             final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
             final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
             writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+
+            // count all responses
+            counters.responses.getAsLong();
+
+            // count ABORTed responses
+            counters.responses.getAsLong();
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
@@ -224,7 +236,14 @@ public class Cache
             final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
             final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
             final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+
             writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+
+            // count all responses
+            counters.responses.getAsLong();
+
+            // count ABORTed responses
+            counters.responses.getAsLong();
         }
     }
 
@@ -266,6 +285,12 @@ public class Cache
                 final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                 final long acceptCorrelationId = subscriber.acceptCorrelationId();
                 this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+
+                // count all responses
+                counters.responses.getAsLong();
+
+                // count ABORTed responses
+                counters.responses.getAsLong();
             });
             return null;
         });

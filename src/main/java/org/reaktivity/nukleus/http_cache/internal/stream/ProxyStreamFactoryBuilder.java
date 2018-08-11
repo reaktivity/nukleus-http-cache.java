@@ -27,6 +27,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
+import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
@@ -49,17 +50,12 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private Slab bufferPool;
     private Cache cache;
     private BudgetManager budgetManager;
+    private Function<String, LongSupplier> supplyCounter;
+    private Function<String, LongConsumer> supplyAccumulator;
 
     private int etagCnt = 0;
     private final int etagPrefix = new Random().nextInt(99999);
     private final Supplier<String> supplyEtag = () -> "\"" + etagPrefix + "a" + etagCnt++ + "\"";
-    private LongSupplier cacheHits;
-    private LongSupplier cacheMisses;
-    private LongSupplier scheduledRetries;
-    private LongSupplier executedRetries;
-    private LongSupplier sentRetries;
-    private Function<String, LongSupplier> supplyCounter;
-    private LongConsumer cacheEntries;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -128,12 +124,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         Function<String, LongSupplier> supplyCounter)
     {
         this.supplyCounter = supplyCounter;
-
-        cacheHits = supplyCounter.apply("cache.hits");
-        cacheMisses = supplyCounter.apply("cache.misses");
-        scheduledRetries = supplyCounter.apply("scheduled.retries");
-        executedRetries = supplyCounter.apply("executed.retries");
-        sentRetries = supplyCounter.apply("sent.retries");
         return this;
     }
 
@@ -141,13 +131,15 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     public StreamFactoryBuilder setAccumulatorSupplier(
             Function<String, LongConsumer> supplyAccumulator)
     {
-        cacheEntries = supplyAccumulator.apply("cache.entries");
+        this.supplyAccumulator = supplyAccumulator;
         return this;
     }
 
     @Override
     public StreamFactory build()
     {
+        final HttpCacheCounters counters = new HttpCacheCounters(supplyCounter, supplyAccumulator);
+
         if (cache == null)
         {
             budgetManager = new BudgetManager();
@@ -155,6 +147,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
 
+            LongConsumer cacheEntries = supplyAccumulator.apply("cache.entries");
             this.cache = new Cache(
                     scheduler,
                     budgetManager,
@@ -162,11 +155,13 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     bufferPool,
                     correlations,
                     supplyEtag,
-                    supplyCounter,
+                    counters,
                     cacheEntries);
         }
+
         final int retryMin = config.minRetryInterval();
         final int retryMax = config.maxRetryInterval();
+
         return new ProxyStreamFactory(
                 router,
                 budgetManager,
@@ -178,13 +173,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 scheduler,
                 cache,
                 supplyEtag,
-                cacheHits,
-                cacheMisses,
-                supplyCounter,
+                counters,
                 retryMin,
-                retryMax,
-                scheduledRetries,
-                executedRetries,
-                sentRetries);
+                retryMax);
     }
 }
