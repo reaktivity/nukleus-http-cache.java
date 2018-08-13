@@ -159,9 +159,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     cacheEntries);
         }
 
-        final int retryMin = config.minRetryInterval();
-        final int retryMax = config.maxRetryInterval();
-
         return new ProxyStreamFactory(
                 router,
                 budgetManager,
@@ -173,8 +170,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 scheduler,
                 cache,
                 supplyEtag,
-                counters,
-                retryMin,
-                retryMax);
+                counters);
     }
 }
