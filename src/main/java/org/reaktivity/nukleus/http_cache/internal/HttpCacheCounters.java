@@ -33,10 +33,6 @@ public class HttpCacheCounters
     public final LongSupplier promises;
     public final LongSupplier promisesCanceled;
 
-    public final LongSupplier scheduledRetries;
-    public final LongSupplier executedRetries;
-    public final LongSupplier sentRetries;
-
     public HttpCacheCounters(
         Function<String, LongSupplier> supplyCounter,
         Function<String, LongConsumer> supplyAccumulator)
@@ -52,12 +48,5 @@ public class HttpCacheCounters
         this.responsesAborted = supplyCounter.apply("responses.aborted");
         this.promises = supplyCounter.apply("promises");
         this.promisesCanceled = supplyCounter.apply("promises.canceled");
-
-        // TODO replace with above (plus status specific)
-        this.sentRetries = supplyCounter.apply("sent.retries");
-
-        // TODO replace with nukleus-http counters (per route, status specific)
-        this.scheduledRetries = supplyCounter.apply("scheduled.retries");
-        this.executedRetries = supplyCounter.apply("executed.retries");
     }
 }

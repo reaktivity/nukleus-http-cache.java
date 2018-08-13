@@ -71,8 +71,6 @@ public class ProxyStreamFactory implements StreamFactory
     final CacheControl cacheControlParser = new CacheControl();
     final Cache cache;
     final Random random;
-    final int retryMin;
-    final int retryMax;
     final HttpCacheCounters counters;
 
     public ProxyStreamFactory(
@@ -86,9 +84,7 @@ public class ProxyStreamFactory implements StreamFactory
         LongObjectBiConsumer<Runnable> scheduler,
         Cache cache,
         Supplier<String> supplyEtag,
-        HttpCacheCounters counters,
-        int retryMin,
-        int retryMax)
+        HttpCacheCounters counters)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
@@ -109,8 +105,6 @@ public class ProxyStreamFactory implements StreamFactory
 
         this.writer = new Writer(writeBuffer);
         this.random = new Random();
-        this.retryMin = retryMin;
-        this.retryMax = retryMax;
         this.counters = counters;
     }
 
