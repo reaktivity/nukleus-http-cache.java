@@ -21,14 +21,9 @@ public class HttpCacheConfiguration extends Configuration
 {
     public static final String HTTP_CACHE_CAPACITY = "nukleus.http_cache.capacity";
     public static final String HTTP_CACHE_SLOT_CAPACITY = "nukleus.http_cache.slot.capacity";
-    public static final String HTTP_CACHE_MIN_RETRY_INTERVAL = "nukleus.http_cache.min.retry.interval";
-    public static final String HTTP_CACHE_MAX_RETRY_INTERVAL = "nukleus.http_cache.max.retry.interval";
 
     private static final int HTTP_CACHE_CAPACITY_DEFAULT = 65536 * 64;
     private static final int HTTP_CACHE_SLOT_CAPACITY_DEFAULT = 0x4000; // ALSO is max header size
-
-    private static final int HTTP_CACHE_MIN_RETRY_INTERVAL_DEFAULT = 200;       // in millis
-    private static final int HTTP_CACHE_MAX_RETRY_INTERVAL_DEFAULT = 30_000;    // in millis
 
     public HttpCacheConfiguration(
         Configuration config)
@@ -44,16 +39,6 @@ public class HttpCacheConfiguration extends Configuration
     public int cacheSlotCapacity()
     {
         return getInteger(HTTP_CACHE_SLOT_CAPACITY, HTTP_CACHE_SLOT_CAPACITY_DEFAULT);
-    }
-
-    public int minRetryInterval()
-    {
-        return getInteger(HTTP_CACHE_MIN_RETRY_INTERVAL, HTTP_CACHE_MIN_RETRY_INTERVAL_DEFAULT);
-    }
-
-    public int maxRetryInterval()
-    {
-        return getInteger(HTTP_CACHE_MAX_RETRY_INTERVAL, HTTP_CACHE_MAX_RETRY_INTERVAL_DEFAULT);
     }
 
 }

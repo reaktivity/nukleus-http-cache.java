@@ -325,8 +325,6 @@ final class ProxyAcceptStream
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
-
-        streamFactory.counters.sentRetries.getAsLong();
     }
 
     private void handleAllFramesByIgnoring(

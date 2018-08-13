@@ -23,8 +23,6 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -131,12 +129,6 @@ final class ProxyConnectReplyStream
     private void handleCacheRefresh(
             ListFW<HttpHeaderFW> responseHeaders)
     {
-        boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        if (retry)
-        {
-            retryCacheableRequest(responseHeaders);
-            return;
-        }
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
         if (request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
@@ -199,13 +191,6 @@ final class ProxyConnectReplyStream
     private void handleInitialRequest(
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        if (retry)
-        {
-            retryCacheableRequest(responseHeaders);
-            return;
-        }
-
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
@@ -265,44 +250,6 @@ final class ProxyConnectReplyStream
             request.purge();
             doProxyBegin(responseHeaders);
         }
-    }
-
-    private void sendCacheableRequest()
-    {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
-
-        MessageConsumer connect = request.connect();
-        long connectStreamId = request.supplyStreamId().getAsLong();
-        long connectRef = request.connectRef();
-        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
-
-        streamFactory.correlations.put(connectCorrelationId, request);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
-        final String etag = request.etag();
-        streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
-                builder ->
-                {
-                    requestHeaders.forEach(
-                            h ->  builder.item(item -> item.name(h.name()).value(h.value())));
-                    if (request instanceof CacheRefreshRequest)
-                    {
-                        builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-                    }
-                });
-        streamFactory.writer.doHttpEnd(connect, connectStreamId);
-        streamFactory.counters.executedRetries.getAsLong();
-    }
-
-    private void retryCacheableRequest(
-        ListFW<HttpHeaderFW> responseHeaders)
-    {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
-        long retryAt = request.nextRetryAt(responseHeaders, streamFactory.retryMin, streamFactory.retryMax,
-                streamFactory.random);
-
-        streamFactory.scheduler.accept(retryAt, this::sendCacheableRequest);
-
-        streamFactory.counters.scheduledRetries.getAsLong();
     }
 
     private void handleCacheableResponse(

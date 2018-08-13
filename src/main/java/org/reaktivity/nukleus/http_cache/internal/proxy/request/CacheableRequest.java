@@ -18,8 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
 
-import java.time.Instant;
-import java.util.Random;
 import java.util.function.LongSupplier;
 
 import org.agrona.MutableDirectBuffer;
@@ -28,7 +26,6 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -52,7 +49,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
-    int attempt;
     CacheState state;
 
     public enum CacheState
@@ -341,26 +337,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             length -= chunkLength;
         }
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
-    }
-
-
-    public long nextRetryAt(ListFW<HttpHeaderFW> responseHeaders, int retryMin, int retryMax, Random random)
-    {
-        ++attempt;
-
-        long retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
-        int retryAttempt = attempt > 31 ? 31 : attempt;
-        // Exponential backoff based on number of attempts
-        // max(retryAfter, random_between(0, min(cap, base * 2 ^ attempt)))
-        int waitTime = ((int) Math.pow(2, retryAttempt) * retryMin);
-        if (waitTime <= 0)
-        {
-            waitTime = retryMax;
-        }
-        waitTime = random.nextInt(Math.min(retryMax, waitTime));
-        retryAfter = Math.max(retryAfter, waitTime);
-
-        return Instant.now().plusMillis(retryAfter).toEpochMilli();
     }
 
 }
