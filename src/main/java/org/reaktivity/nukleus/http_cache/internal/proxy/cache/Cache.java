@@ -68,6 +68,7 @@ public class Cache
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingRequests> pendingRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
 
     public Cache(
@@ -146,7 +147,7 @@ public class Cache
                         counters.responses.getAsLong();
 
                         // count ABORTed responses
-                        counters.responses.getAsLong();
+                        counters.responsesAborted.getAsLong();
                     });
                 }
 
@@ -169,6 +170,10 @@ public class Cache
     {
         cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
+        System.out.printf("urlHash=%s PUT path=%s\n", requestUrlHash,
+                HttpHeadersUtil.getHeader(
+                        cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":path"));
+
         PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
         if (result != null)
         {
@@ -185,12 +190,71 @@ public class Cache
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
         {
+            System.out.printf("urlHash=%s HIT path=%s\n", requestURLHash, HttpHeadersUtil.getHeader(request, ":path"));
             return serveRequest(cacheEntry, request, authScope, cacheableRequest);
         }
         else
         {
             return false;
         }
+    }
+
+    public void removePendingRequests(
+        int requestURLHash)
+    {
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        pendingRequestsMap.computeIfPresent(requestURLHash, (k, v) ->
+        {
+            v.removeSubscribers(s ->
+            {
+                boolean served = false;
+                if (cacheEntry != null)
+                {
+                    served = serveRequest(cacheEntry, s.getRequestHeaders(requestHeadersRO), s.authScope(), s);
+                }
+                if (!served)
+                {
+                    sendPendingInitialRequest(s);
+                }
+            });
+            return null;
+        });
+    }
+
+    private void sendPendingInitialRequest(
+        final InitialRequest request)
+    {
+        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        correlations.put(connectCorrelationId, request);
+
+        writer.doHttpRequest(request.connect(), connectStreamId, request.connectRef(), connectCorrelationId,
+                builder -> requestHeaders.forEach(
+                        h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+                )
+        );
+        writer.doHttpEnd(request.connect(), connectStreamId);
+    }
+
+    public boolean hasPendingRequests(
+        int requestURLHash)
+    {
+        return pendingRequestsMap.containsKey(requestURLHash);
+    }
+
+    public void addPendingRequest(
+        InitialRequest initialRequest)
+    {
+        PendingRequests pendingRequests = pendingRequestsMap.get(initialRequest.requestURLHash());
+        pendingRequests.subscribe(initialRequest);
+    }
+
+    public void createPendingRequests(
+        InitialRequest initialRequest)
+    {
+        pendingRequestsMap.put(initialRequest.requestURLHash(), new PendingRequests(initialRequest));
     }
 
     public void handleOnUpdateRequest(
@@ -220,7 +284,7 @@ public class Cache
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responses.getAsLong();
+            counters.responsesAborted.getAsLong();
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
@@ -243,7 +307,7 @@ public class Cache
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responses.getAsLong();
+            counters.responsesAborted.getAsLong();
         }
     }
 
@@ -290,7 +354,7 @@ public class Cache
                 counters.responses.getAsLong();
 
                 // count ABORTed responses
-                counters.responses.getAsLong();
+                counters.responsesAborted.getAsLong();
             });
             return null;
         });

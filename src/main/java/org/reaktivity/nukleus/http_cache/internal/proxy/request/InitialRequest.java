@@ -22,6 +22,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public class InitialRequest extends CacheableRequest
@@ -90,5 +91,30 @@ public class InitialRequest extends CacheableRequest
     {
         super.purge();
         cache.removeUncommitted(this);
+        cache.removePendingRequests(requestURLHash());
     }
+
+    @Override
+    public void cache(EndFW end, Cache cache)
+    {
+        super.cache(end, cache);
+        cache.removePendingRequests(requestURLHash());
+    }
+
+//    public void send()
+//    {
+//        long connectStreamId = supplyStreamId().getAsLong();
+//        long connectCorrelationId = supplyCorrelationId().getAsLong();
+//        ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(streamFactory.requestHeadersRO);
+//
+//        streamFactory.correlations.put(connectCorrelationId, this);
+//
+//        streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
+//                builder -> requestHeaders.forEach(
+//                        h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+//                )
+//        );
+//        streamFactory.writer.doHttpEnd(connect, connectStreamId);
+//    }
+
 }

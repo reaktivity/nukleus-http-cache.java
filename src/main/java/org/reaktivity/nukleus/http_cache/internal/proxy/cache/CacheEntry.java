@@ -47,6 +47,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
@@ -69,9 +70,10 @@ public final class CacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
-    private final CacheableRequest cachedRequest;
+    final CacheableRequest cachedRequest;
 
     private final List<OnUpdateRequest> subscribers = new ArrayList<>(); // TODO, lazy init
+    private final List<InitialRequest> initialSubscribers = new ArrayList<>();
 
     boolean expectSubscribers;
 
@@ -301,7 +303,7 @@ public final class CacheEntry
                     cache.counters.responses.getAsLong();
 
                     // count ABORTed responses
-                    cache.counters.responses.getAsLong();
+                    cache.counters.responsesAborted.getAsLong();
                 });
                 subscribers.clear();
                 break;
