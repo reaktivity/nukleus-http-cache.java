@@ -26,7 +26,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class PreferHeader
 {
-    public static boolean preferResponseWhenNoneMatch(
+    public static boolean isPreferIfNoneMatch(
         ListFW<HttpHeaderFW> headers)
     {
         return HttpHeadersUtil.getHeader(headers, IF_NONE_MATCH) != null &&

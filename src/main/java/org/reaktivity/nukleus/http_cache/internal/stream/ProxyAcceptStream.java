@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.preferResponseWhenNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -28,7 +28,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -141,10 +141,10 @@ final class ProxyAcceptStream
             // count all requests
             streamFactory.counters.requests.getAsLong();
 
-            if (preferResponseWhenNoneMatch(requestHeaders))
+            if (isPreferIfNoneMatch(requestHeaders))
             {
                 streamFactory.counters.requestsPreferWait.getAsLong();
-                handleRequestForWhenNoneMatch(
+                handlePreferWaitIfNoneMatchRequest(
                         authorizationHeader,
                         authorization,
                         authorizationScope,
@@ -168,7 +168,7 @@ final class ProxyAcceptStream
         return (short) (authorization >>> 48);
     }
 
-    private void handleRequestForWhenNoneMatch(
+    private void handlePreferWaitIfNoneMatchRequest(
         boolean authorizationHeader,
         long authorization,
         short authScope,
@@ -176,7 +176,7 @@ final class ProxyAcceptStream
     {
         final String etag = streamFactory.supplyEtag.get();
 
-        final OnUpdateRequest onUpdateRequest = new OnUpdateRequest(
+        final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
             acceptName,
             acceptReply,
             acceptReplyStreamId,
@@ -188,11 +188,11 @@ final class ProxyAcceptStream
             authScope,
             etag);
 
-        this.request = onUpdateRequest;
+        this.request = preferWaitRequest;
 
-        streamFactory.cache.handleOnUpdateRequest(
+        streamFactory.cache.handlePreferWaitIfNoneMatchRequest(
                 requestURLHash,
-                onUpdateRequest,
+                preferWaitRequest,
                 requestHeaders,
                 authScope);
         this.streamState = this::handleAllFramesByIgnoring;

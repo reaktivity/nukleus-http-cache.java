@@ -28,7 +28,7 @@ import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
@@ -141,13 +141,13 @@ public class Cache
                         final MessageConsumer acceptReply = subscriber.acceptReply();
                         final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                         final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                        this.writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
                         // count all responses
                         counters.responses.getAsLong();
 
                         // count ABORTed responses
-                        counters.responsesAborted.getAsLong();
+                        counters.responsesAbortedVary.getAsLong();
                     });
                 }
 
@@ -257,9 +257,9 @@ public class Cache
         pendingRequestsMap.put(initialRequest.requestURLHash(), new PendingRequests(initialRequest));
     }
 
-    public void handleOnUpdateRequest(
+    public void handlePreferWaitIfNoneMatchRequest(
         int requestURLHash,
-        OnUpdateRequest onUpdateRequest,
+        PreferWaitIfNoneMatchRequest preferWaitRequest,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
@@ -271,43 +271,43 @@ public class Cache
         if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag())
                 && doesNotVary(requestHeaders, uncommittedRequest.request))
         {
-            uncommittedRequest.subscribe(onUpdateRequest);
+            uncommittedRequest.subscribe(preferWaitRequest);
         }
         else if (cacheEntry == null)
         {
-            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
-            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
+            final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
+            final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
+            writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responsesAborted.getAsLong();
+            counters.responsesAbortedEvicted.getAsLong();
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
             // TODO return value ??
-            cacheEntry.subscribeToUpdate(onUpdateRequest);
+            cacheEntry.subscribeWhenNoneMatch(preferWaitRequest);
         }
         else if (cacheEntry.canServeUpdateRequest(requestHeaders))
         {
-            cacheEntry.serveClient(onUpdateRequest);
+            cacheEntry.serveClient(preferWaitRequest);
         }
         else
         {
-            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+            final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
+            final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
+            final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
 
-            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responsesAborted.getAsLong();
+            counters.responsesAbortedMiss.getAsLong();
         }
     }
 
@@ -348,13 +348,13 @@ public class Cache
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                 final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                this.writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
                 // count all responses
                 counters.responses.getAsLong();
 
                 // count ABORTed responses
-                counters.responsesAborted.getAsLong();
+                counters.responsesAbortedUncommited.getAsLong();
             });
             return null;
         });

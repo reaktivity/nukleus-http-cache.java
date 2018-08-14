@@ -18,9 +18,9 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class OnUpdateRequest extends AnswerableByCacheRequest
+public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
 {
-    public OnUpdateRequest(
+    public PreferWaitIfNoneMatchRequest(
         String acceptName,
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
@@ -48,7 +48,7 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
     @Override
     public Type getType()
     {
-        return Type.ON_UPDATE;
+        return Type.PREFER_WAIT;
     }
 
     @Override
