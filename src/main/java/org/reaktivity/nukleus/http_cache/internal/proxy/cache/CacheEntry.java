@@ -301,7 +301,7 @@ public final class CacheEntry
                     cache.counters.responses.getAsLong();
 
                     // count ABORTed responses
-                    cache.counters.responses.getAsLong();
+                    cache.counters.responsesAborted.getAsLong();
                 });
                 subscribers.clear();
                 break;

@@ -146,7 +146,7 @@ public class Cache
                         counters.responses.getAsLong();
 
                         // count ABORTed responses
-                        counters.responses.getAsLong();
+                        counters.responsesAborted.getAsLong();
                     });
                 }
 
@@ -220,7 +220,7 @@ public class Cache
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responses.getAsLong();
+            counters.responsesAborted.getAsLong();
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
@@ -243,7 +243,7 @@ public class Cache
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responses.getAsLong();
+            counters.responsesAborted.getAsLong();
         }
     }
 
@@ -290,7 +290,7 @@ public class Cache
                 counters.responses.getAsLong();
 
                 // count ABORTed responses
-                counters.responses.getAsLong();
+                counters.responsesAborted.getAsLong();
             });
             return null;
         });
