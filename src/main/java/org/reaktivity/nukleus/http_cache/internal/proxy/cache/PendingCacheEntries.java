@@ -16,7 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 public class PendingCacheEntries
 {
     final InitialRequest request;
-    private final List<OnUpdateRequest> subscribers = new ArrayList<>();
+    private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>();
 
     PendingCacheEntries(InitialRequest request)
     {
@@ -37,17 +37,17 @@ public class PendingCacheEntries
         return request.etag();
     }
 
-    void subscribe(OnUpdateRequest onUpdateRequest)
+    void subscribe(PreferWaitIfNoneMatchRequest preferWaitRequest)
     {
-        this.subscribers.add(onUpdateRequest);
+        this.subscribers.add(preferWaitRequest);
     }
 
     void addSubscribers(CacheEntry cacheEntry)
     {
-        subscribers.forEach(cacheEntry::subscribeToUpdate);
+        subscribers.forEach(cacheEntry::subscribeWhenNoneMatch);
     }
 
-    void removeSubscribers(Consumer<OnUpdateRequest> consumer)
+    void removeSubscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
     {
         subscribers.forEach(consumer);
     }

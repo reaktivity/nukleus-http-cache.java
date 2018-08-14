@@ -29,7 +29,11 @@ public class HttpCacheCounters
     public final LongSupplier requestsPreferWait;
     public final LongSupplier responses;
     public final LongSupplier responsesCached;
-    public final LongSupplier responsesAborted;
+    public final LongSupplier responsesAbortedPurge;
+    public final LongSupplier responsesAbortedVary;
+    public final LongSupplier responsesAbortedMiss;
+    public final LongSupplier responsesAbortedEvicted;
+    public final LongSupplier responsesAbortedUncommited;
     public final LongSupplier promises;
     public final LongSupplier promisesCanceled;
 
@@ -45,7 +49,11 @@ public class HttpCacheCounters
         this.requestsPreferWait = supplyCounter.apply("requests.prefer.wait");
         this.responses = supplyCounter.apply("responses");
         this.responsesCached = supplyCounter.apply("responses.cached");
-        this.responsesAborted = supplyCounter.apply("responses.aborted");
+        this.responsesAbortedVary = supplyCounter.apply("responses.aborted.vary");
+        this.responsesAbortedMiss = supplyCounter.apply("responses.aborted.miss");
+        this.responsesAbortedEvicted = supplyCounter.apply("responses.aborted.evicted");
+        this.responsesAbortedUncommited = supplyCounter.apply("responses.aborted.uncommited");
+        this.responsesAbortedPurge = supplyCounter.apply("responses.aborted.purge");
         this.promises = supplyCounter.apply("promises");
         this.promisesCanceled = supplyCounter.apply("promises.canceled");
     }

@@ -47,7 +47,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -71,7 +71,7 @@ public final class CacheEntry
 
     private final CacheableRequest cachedRequest;
 
-    private final List<OnUpdateRequest> subscribers = new ArrayList<>(); // TODO, lazy init
+    private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 
     boolean expectSubscribers;
 
@@ -241,7 +241,7 @@ public final class CacheEntry
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag(),
-                    request instanceof OnUpdateRequest && cachedRequest.authorizationHeader());
+                    request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader());
 
             // count cached responses (cache hits)
             cache.counters.responsesCached.getAsLong();
@@ -294,14 +294,14 @@ public final class CacheEntry
                     MessageConsumer acceptReply = s.acceptReply();
                     long acceptReplyStreamId = s.acceptReplyStreamId();
                     long acceptCorrelationId = s.acceptCorrelationId();
-                    cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    cache.writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
                     s.purge();
 
                     // count all responses
                     cache.counters.responses.getAsLong();
 
                     // count ABORTed responses
-                    cache.counters.responsesAborted.getAsLong();
+                    cache.counters.responsesAbortedPurge.getAsLong();
                 });
                 subscribers.clear();
                 break;
@@ -632,12 +632,12 @@ public final class CacheEntry
     }
 
 
-    public boolean subscribeToUpdate(OnUpdateRequest onModificationRequest)
+    public boolean subscribeWhenNoneMatch(PreferWaitIfNoneMatchRequest preferWaitRequest)
     {
         final boolean polling = this.state == REFRESHING || this.state == CAN_REFRESH;
         if (polling)
         {
-            this.subscribers.add(onModificationRequest);
+            this.subscribers.add(preferWaitRequest);
         }
         if (this.state == CacheEntryState.CAN_REFRESH)
         {
@@ -647,7 +647,7 @@ public final class CacheEntry
     }
 
 
-    public void subscribers(Consumer<OnUpdateRequest> consumer)
+    public void subscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
     {
         subscribers.stream().forEach(consumer);
         subscribers.clear();
