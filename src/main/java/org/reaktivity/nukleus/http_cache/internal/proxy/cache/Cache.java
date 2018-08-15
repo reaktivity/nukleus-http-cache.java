@@ -28,7 +28,7 @@ import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
@@ -68,6 +68,7 @@ public class Cache
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
 
     public Cache(
@@ -146,7 +147,7 @@ public class Cache
                         counters.responses.getAsLong();
 
                         // count ABORTed responses
-                        counters.responses.getAsLong();
+                        counters.responsesAbortedVary.getAsLong();
                     });
                 }
 
@@ -193,9 +194,80 @@ public class Cache
         }
     }
 
-    public void handleOnUpdateRequest(
+    public void servePendingInitialRequests(
+        int requestURLHash)
+    {
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        if (pendingInitialRequests != null)
+        {
+            pendingInitialRequests.removeSubscribers(s ->
+            {
+                boolean served = false;
+
+                if (cacheEntry != null)
+                {
+                    served = serveRequest(cacheEntry, s.getRequestHeaders(request2HeadersRO, request2BufferPool),
+                            s.authScope(), s);
+                }
+
+                if (!served)
+                {
+                    sendPendingInitialRequest(s);
+                }
+            });
+        }
+    }
+
+    public void sendPendingInitialRequests(
+        int requestURLHash)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        if (pendingInitialRequests != null)
+        {
+            pendingInitialRequests.removeSubscribers(this::sendPendingInitialRequest);
+        }
+    }
+
+    private void sendPendingInitialRequest(
+        final InitialRequest request)
+    {
+        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        correlations.put(connectCorrelationId, request);
+
+        writer.doHttpRequest(request.connect(), connectStreamId, request.connectRef(), connectCorrelationId,
+                builder -> requestHeaders.forEach(
+                        h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+                )
+        );
+        writer.doHttpEnd(request.connect(), connectStreamId);
+    }
+
+    public boolean hasPendingInitialRequests(
+        int requestURLHash)
+    {
+        return pendingInitialRequestsMap.containsKey(requestURLHash);
+    }
+
+    public void addPendingRequest(
+        InitialRequest initialRequest)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
+        pendingInitialRequests.subscribe(initialRequest);
+    }
+
+    public void createPendingInitialRequests(
+        InitialRequest initialRequest)
+    {
+        pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
+    }
+
+    public void handlePreferWaitIfNoneMatchRequest(
         int requestURLHash,
-        OnUpdateRequest onUpdateRequest,
+        PreferWaitIfNoneMatchRequest preferWaitRequest,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
@@ -207,35 +279,35 @@ public class Cache
         if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag())
                 && doesNotVary(requestHeaders, uncommittedRequest.request))
         {
-            uncommittedRequest.subscribe(onUpdateRequest);
+            uncommittedRequest.subscribe(preferWaitRequest);
         }
         else if (cacheEntry == null)
         {
-            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+            final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
+            final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
+            final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
             writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responses.getAsLong();
+            counters.responsesAbortedEvicted.getAsLong();
         }
         else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
             // TODO return value ??
-            cacheEntry.subscribeToUpdate(onUpdateRequest);
+            cacheEntry.subscribeWhenNoneMatch(preferWaitRequest);
         }
         else if (cacheEntry.canServeUpdateRequest(requestHeaders))
         {
-            cacheEntry.serveClient(onUpdateRequest);
+            cacheEntry.serveClient(preferWaitRequest);
         }
         else
         {
-            final MessageConsumer acceptReply = onUpdateRequest.acceptReply();
-            final long acceptReplyStreamId = onUpdateRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = onUpdateRequest.acceptCorrelationId();
+            final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
+            final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
+            final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
 
             writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
@@ -243,7 +315,7 @@ public class Cache
             counters.responses.getAsLong();
 
             // count ABORTed responses
-            counters.responses.getAsLong();
+            counters.responsesAbortedMiss.getAsLong();
         }
     }
 
@@ -290,7 +362,7 @@ public class Cache
                 counters.responses.getAsLong();
 
                 // count ABORTed responses
-                counters.responses.getAsLong();
+                counters.responsesAbortedUncommited.getAsLong();
             });
             return null;
         });

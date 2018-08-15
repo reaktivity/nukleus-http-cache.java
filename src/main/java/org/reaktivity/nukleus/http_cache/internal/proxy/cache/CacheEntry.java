@@ -47,7 +47,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -71,7 +71,7 @@ public final class CacheEntry
 
     private final CacheableRequest cachedRequest;
 
-    private final List<OnUpdateRequest> subscribers = new ArrayList<>(); // TODO, lazy init
+    private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 
     boolean expectSubscribers;
 
@@ -220,7 +220,7 @@ public final class CacheEntry
         request.setThrottle(serveFromCacheStream);
 
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-                .forEach(h -> x.item(y -> y.representation((byte) 0).name(h.name()).value(h.value())));
+                .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptReplyStreamId = request.acceptReplyStreamId();
@@ -241,10 +241,7 @@ public final class CacheEntry
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag(),
-                    request instanceof OnUpdateRequest && cachedRequest.authorizationHeader());
-
-            // count cached responses (cache hits)
-            cache.counters.responsesCached.getAsLong();
+                    request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader());
 
             this.cache.writer.doHttpPushPromise(
                     request,
@@ -262,7 +259,7 @@ public final class CacheEntry
             if (injectWarnings && isStale())
             {
                 headers = headers.andThen(
-                        x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
+                        x ->  x.item(h -> h.name(WARNING).value(Cache.RESPONSE_IS_STALE))
                 );
             }
             this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
@@ -270,6 +267,9 @@ public final class CacheEntry
 
         // count all responses
         cache.counters.responses.getAsLong();
+
+        // count cached responses (cache hits)
+        cache.counters.responsesCached.getAsLong();
 
         if(this.state == CacheEntryState.CAN_REFRESH)
         {
@@ -301,7 +301,7 @@ public final class CacheEntry
                     cache.counters.responses.getAsLong();
 
                     // count ABORTed responses
-                    cache.counters.responses.getAsLong();
+                    cache.counters.responsesAbortedPurge.getAsLong();
                 });
                 subscribers.clear();
                 break;
@@ -632,12 +632,12 @@ public final class CacheEntry
     }
 
 
-    public boolean subscribeToUpdate(OnUpdateRequest onModificationRequest)
+    public boolean subscribeWhenNoneMatch(PreferWaitIfNoneMatchRequest preferWaitRequest)
     {
         final boolean polling = this.state == REFRESHING || this.state == CAN_REFRESH;
         if (polling)
         {
-            this.subscribers.add(onModificationRequest);
+            this.subscribers.add(preferWaitRequest);
         }
         if (this.state == CacheEntryState.CAN_REFRESH)
         {
@@ -647,7 +647,7 @@ public final class CacheEntry
     }
 
 
-    public void subscribers(Consumer<OnUpdateRequest> consumer)
+    public void subscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
     {
         subscribers.stream().forEach(consumer);
         subscribers.clear();

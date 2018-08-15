@@ -22,6 +22,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public class InitialRequest extends CacheableRequest
@@ -90,5 +91,14 @@ public class InitialRequest extends CacheableRequest
     {
         super.purge();
         cache.removeUncommitted(this);
+        cache.sendPendingInitialRequests(requestURLHash());
     }
+
+    @Override
+    public void cache(EndFW end, Cache cache)
+    {
+        super.cache(end, cache);
+        cache.servePendingInitialRequests(requestURLHash());
+    }
+
 }

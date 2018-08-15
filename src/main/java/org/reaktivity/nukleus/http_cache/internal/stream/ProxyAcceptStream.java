@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.preferResponseWhenNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -27,9 +27,8 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.OnUpdateRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -142,10 +141,10 @@ final class ProxyAcceptStream
             // count all requests
             streamFactory.counters.requests.getAsLong();
 
-            if (preferResponseWhenNoneMatch(requestHeaders))
+            if (isPreferIfNoneMatch(requestHeaders))
             {
                 streamFactory.counters.requestsPreferWait.getAsLong();
-                handleRequestForWhenNoneMatch(
+                handlePreferWaitIfNoneMatchRequest(
                         authorizationHeader,
                         authorization,
                         authorizationScope,
@@ -169,7 +168,7 @@ final class ProxyAcceptStream
         return (short) (authorization >>> 48);
     }
 
-    private void handleRequestForWhenNoneMatch(
+    private void handlePreferWaitIfNoneMatchRequest(
         boolean authorizationHeader,
         long authorization,
         short authScope,
@@ -177,7 +176,7 @@ final class ProxyAcceptStream
     {
         final String etag = streamFactory.supplyEtag.get();
 
-        final OnUpdateRequest onUpdateRequest = new OnUpdateRequest(
+        final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
             acceptName,
             acceptReply,
             acceptReplyStreamId,
@@ -189,11 +188,11 @@ final class ProxyAcceptStream
             authScope,
             etag);
 
-        this.request = onUpdateRequest;
+        this.request = preferWaitRequest;
 
-        streamFactory.cache.handleOnUpdateRequest(
+        streamFactory.cache.handlePreferWaitIfNoneMatchRequest(
                 requestURLHash,
-                onUpdateRequest,
+                preferWaitRequest,
                 requestHeaders,
                 authScope);
         this.streamState = this::handleAllFramesByIgnoring;
@@ -212,7 +211,7 @@ final class ProxyAcceptStream
             send503RetryAfter();
             return;
         }
-        CacheableRequest cacheableRequest;
+        InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
                 acceptName,
@@ -234,21 +233,22 @@ final class ProxyAcceptStream
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
-            this.streamFactory.counters.responsesCached.getAsLong();
             this.request.purge();
+        }
+        else if (streamFactory.cache.hasPendingInitialRequests(requestURLHash))
+        {
+            streamFactory.cache.addPendingRequest(cacheableRequest);
+        }
+        else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+        {
+            // TODO move this logic and edge case inside of cache
+            send504();
         }
         else
         {
-            if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
-            {
-                // TODO move this logic and edge case inside of cache
-                send504();
-            }
-            else
-            {
-                sendBeginToConnect(requestHeaders);
-                streamFactory.writer.doHttpEnd(connect, connectStreamId);
-            }
+            sendBeginToConnect(requestHeaders);
+            streamFactory.writer.doHttpEnd(connect, connectStreamId);
+            streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
 
         this.streamState = this::handleAllFramesByIgnoring;
@@ -325,6 +325,9 @@ final class ProxyAcceptStream
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
+
+        // count retry responses
+        streamFactory.counters.responsesRetry.getAsLong();
     }
 
     private void handleAllFramesByIgnoring(
