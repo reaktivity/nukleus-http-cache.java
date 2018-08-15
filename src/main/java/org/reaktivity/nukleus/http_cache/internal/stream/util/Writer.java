@@ -415,7 +415,7 @@ public class Writer
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
-    public void do503AndEnd(
+    public void do503AndAbort(
         MessageConsumer acceptReply,
         long acceptReplyStreamId,
         long acceptCorrelationId)
@@ -424,7 +424,7 @@ public class Writer
         e.item(h -> h.representation((byte) 0)
                 .name(STATUS)
                 .value("503")));
-        this.doHttpEnd(acceptReply, acceptReplyStreamId);
+        this.doAbort(acceptReply, acceptReplyStreamId);
     }
 
 }

@@ -141,7 +141,7 @@ public class Cache
                         final MessageConsumer acceptReply = subscriber.acceptReply();
                         final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                         final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                        this.writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -297,7 +297,7 @@ cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
             final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
-            writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
@@ -320,7 +320,7 @@ cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":
             final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
             final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
 
-            writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
@@ -367,7 +367,7 @@ cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                 final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                this.writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
 
                 // count all responses
                 counters.responses.getAsLong();
