@@ -22,12 +22,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class PendingRequests
+public class PendingInitialRequests
 {
     private final InitialRequest request;
     private final List<InitialRequest> subscribers = new ArrayList<>();
 
-    PendingRequests(InitialRequest request)
+    PendingInitialRequests(InitialRequest request)
     {
         this.request = request;
     }

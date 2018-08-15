@@ -114,7 +114,6 @@ public class BudgetManager
         private void moreBudget(int credit)
         {
             budget += credit;
-            System.out.printf("moreBudget %s\n", this);
             assert budget <= initialBudget;
 
             if (!streamList.isEmpty())
@@ -184,7 +183,6 @@ public class BudgetManager
                 if (groupBudget.isEmpty())
                 {
                     groups.remove(groupId);
-                    System.out.printf("closed %s\n", groupBudget);
                 }
                 else if (streamBudget != null && streamBudget.unackedBudget > 0)
                 {

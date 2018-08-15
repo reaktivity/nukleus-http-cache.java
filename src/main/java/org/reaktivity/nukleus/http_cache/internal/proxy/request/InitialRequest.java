@@ -91,30 +91,14 @@ public class InitialRequest extends CacheableRequest
     {
         super.purge();
         cache.removeUncommitted(this);
-        cache.sendPendingRequests(requestURLHash());
+        cache.sendPendingInitialRequests(requestURLHash());
     }
 
     @Override
     public void cache(EndFW end, Cache cache)
     {
         super.cache(end, cache);
-        cache.servePendingRequests(requestURLHash());
+        cache.servePendingInitialRequests(requestURLHash());
     }
-
-//    public void send()
-//    {
-//        long connectStreamId = supplyStreamId().getAsLong();
-//        long connectCorrelationId = supplyCorrelationId().getAsLong();
-//        ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(streamFactory.requestHeadersRO);
-//
-//        streamFactory.correlations.put(connectCorrelationId, this);
-//
-//        streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
-//                builder -> requestHeaders.forEach(
-//                        h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-//                )
-//        );
-//        streamFactory.writer.doHttpEnd(connect, connectStreamId);
-//    }
 
 }

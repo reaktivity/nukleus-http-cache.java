@@ -68,7 +68,7 @@ public class Cache
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
-    final Int2ObjectHashMap<PendingRequests> pendingRequestsMap = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
 
     public Cache(
@@ -170,10 +170,6 @@ public class Cache
     {
         cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
-        System.out.printf("urlHash=%s PUT path=%s\n", requestUrlHash,
-                HttpHeadersUtil.getHeader(
-                        cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":path"));
-
         PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
         if (result != null)
         {
@@ -190,7 +186,6 @@ public class Cache
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
         {
-            System.out.printf("urlHash=%s HIT path=%s\n", requestURLHash, HttpHeadersUtil.getHeader(request, ":path"));
             return serveRequest(cacheEntry, request, authScope, cacheableRequest);
         }
         else
@@ -199,14 +194,14 @@ public class Cache
         }
     }
 
-    public void servePendingRequests(
+    public void servePendingInitialRequests(
         int requestURLHash)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingRequests pendingRequests = pendingRequestsMap.remove(requestURLHash);
-        if (pendingRequests != null)
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        if (pendingInitialRequests != null)
         {
-            pendingRequests.removeSubscribers(s ->
+            pendingInitialRequests.removeSubscribers(s ->
             {
                 boolean served = false;
                 if (cacheEntry != null)
@@ -217,10 +212,6 @@ public class Cache
                 if (served)
                 {
                     counters.responsesCached.getAsLong();
-
-System.out.printf("urlHash=%s FIT path=%s\n", requestURLHash,
-HttpHeadersUtil.getHeader(
-cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":path"));
                 }
                 else
                 {
@@ -230,13 +221,13 @@ cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":
         }
     }
 
-    public void sendPendingRequests(
-            int requestURLHash)
+    public void sendPendingInitialRequests(
+        int requestURLHash)
     {
-        PendingRequests pendingRequests = pendingRequestsMap.remove(requestURLHash);
-        if (pendingRequests != null)
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        if (pendingInitialRequests != null)
         {
-            pendingRequests.removeSubscribers(this::sendPendingInitialRequest);
+            pendingInitialRequests.removeSubscribers(this::sendPendingInitialRequest);
         }
     }
 
@@ -257,23 +248,23 @@ cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":
         writer.doHttpEnd(request.connect(), connectStreamId);
     }
 
-    public boolean hasPendingRequests(
+    public boolean hasPendingInitialRequests(
         int requestURLHash)
     {
-        return pendingRequestsMap.containsKey(requestURLHash);
+        return pendingInitialRequestsMap.containsKey(requestURLHash);
     }
 
     public void addPendingRequest(
         InitialRequest initialRequest)
     {
-        PendingRequests pendingRequests = pendingRequestsMap.get(initialRequest.requestURLHash());
-        pendingRequests.subscribe(initialRequest);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
+        pendingInitialRequests.subscribe(initialRequest);
     }
 
-    public void createPendingRequests(
+    public void createPendingInitialRequests(
         InitialRequest initialRequest)
     {
-        pendingRequestsMap.put(initialRequest.requestURLHash(), new PendingRequests(initialRequest));
+        pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
     public void handlePreferWaitIfNoneMatchRequest(

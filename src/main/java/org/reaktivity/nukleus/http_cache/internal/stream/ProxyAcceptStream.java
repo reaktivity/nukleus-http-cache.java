@@ -208,7 +208,6 @@ final class ProxyAcceptStream
         boolean stored = storeRequest(requestHeaders, streamFactory.streamBufferPool);
         if (!stored)
         {
-            System.out.printf("Not enough space to store cacheableRequest\n");
             send503RetryAfter();
             return;
         }
@@ -237,7 +236,7 @@ final class ProxyAcceptStream
             this.streamFactory.counters.responsesCached.getAsLong();
             this.request.purge();
         }
-        else if (streamFactory.cache.hasPendingRequests(requestURLHash))
+        else if (streamFactory.cache.hasPendingInitialRequests(requestURLHash))
         {
             streamFactory.cache.addPendingRequest(cacheableRequest);
         }
@@ -250,7 +249,7 @@ final class ProxyAcceptStream
         {
             sendBeginToConnect(requestHeaders);
             streamFactory.writer.doHttpEnd(connect, connectStreamId);
-            streamFactory.cache.createPendingRequests(cacheableRequest);
+            streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
 
         this.streamState = this::handleAllFramesByIgnoring;
