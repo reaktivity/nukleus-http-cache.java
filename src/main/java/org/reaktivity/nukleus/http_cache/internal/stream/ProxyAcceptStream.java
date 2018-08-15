@@ -233,7 +233,6 @@ final class ProxyAcceptStream
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
-            this.streamFactory.counters.responsesCached.getAsLong();
             this.request.purge();
         }
         else if (streamFactory.cache.hasPendingInitialRequests(requestURLHash))

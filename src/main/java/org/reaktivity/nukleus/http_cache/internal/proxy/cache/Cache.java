@@ -204,16 +204,14 @@ public class Cache
             pendingInitialRequests.removeSubscribers(s ->
             {
                 boolean served = false;
+
                 if (cacheEntry != null)
                 {
                     served = serveRequest(cacheEntry, s.getRequestHeaders(request2HeadersRO, request2BufferPool),
                             s.authScope(), s);
                 }
-                if (served)
-                {
-                    counters.responsesCached.getAsLong();
-                }
-                else
+
+                if (!served)
                 {
                     sendPendingInitialRequest(s);
                 }
