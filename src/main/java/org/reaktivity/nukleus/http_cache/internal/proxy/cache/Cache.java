@@ -68,6 +68,7 @@ public class Cache
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
 
     public Cache(
@@ -191,6 +192,79 @@ public class Cache
         {
             return false;
         }
+    }
+
+    public void servePendingInitialRequests(
+        int requestURLHash)
+    {
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        if (pendingInitialRequests != null)
+        {
+            pendingInitialRequests.removeSubscribers(s ->
+            {
+                boolean served = false;
+                if (cacheEntry != null)
+                {
+                    served = serveRequest(cacheEntry, s.getRequestHeaders(request2HeadersRO, request2BufferPool),
+                            s.authScope(), s);
+                }
+                if (served)
+                {
+                    counters.responsesCached.getAsLong();
+                }
+                else
+                {
+                    sendPendingInitialRequest(s);
+                }
+            });
+        }
+    }
+
+    public void sendPendingInitialRequests(
+        int requestURLHash)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        if (pendingInitialRequests != null)
+        {
+            pendingInitialRequests.removeSubscribers(this::sendPendingInitialRequest);
+        }
+    }
+
+    private void sendPendingInitialRequest(
+        final InitialRequest request)
+    {
+        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        correlations.put(connectCorrelationId, request);
+
+        writer.doHttpRequest(request.connect(), connectStreamId, request.connectRef(), connectCorrelationId,
+                builder -> requestHeaders.forEach(
+                        h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+                )
+        );
+        writer.doHttpEnd(request.connect(), connectStreamId);
+    }
+
+    public boolean hasPendingInitialRequests(
+        int requestURLHash)
+    {
+        return pendingInitialRequestsMap.containsKey(requestURLHash);
+    }
+
+    public void addPendingRequest(
+        InitialRequest initialRequest)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
+        pendingInitialRequests.subscribe(initialRequest);
+    }
+
+    public void createPendingInitialRequests(
+        InitialRequest initialRequest)
+    {
+        pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
     public void handlePreferWaitIfNoneMatchRequest(

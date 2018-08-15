@@ -27,7 +27,6 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
@@ -212,7 +211,7 @@ final class ProxyAcceptStream
             send503RetryAfter();
             return;
         }
-        CacheableRequest cacheableRequest;
+        InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
                 acceptName,
@@ -237,18 +236,20 @@ final class ProxyAcceptStream
             this.streamFactory.counters.responsesCached.getAsLong();
             this.request.purge();
         }
+        else if (streamFactory.cache.hasPendingInitialRequests(requestURLHash))
+        {
+            streamFactory.cache.addPendingRequest(cacheableRequest);
+        }
+        else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+        {
+            // TODO move this logic and edge case inside of cache
+            send504();
+        }
         else
         {
-            if(requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
-            {
-                // TODO move this logic and edge case inside of cache
-                send504();
-            }
-            else
-            {
-                sendBeginToConnect(requestHeaders);
-                streamFactory.writer.doHttpEnd(connect, connectStreamId);
-            }
+            sendBeginToConnect(requestHeaders);
+            streamFactory.writer.doHttpEnd(connect, connectStreamId);
+            streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
 
         this.streamState = this::handleAllFramesByIgnoring;
