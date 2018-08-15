@@ -199,26 +199,45 @@ public class Cache
         }
     }
 
-    public void removePendingRequests(
+    public void servePendingRequests(
         int requestURLHash)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        pendingRequestsMap.computeIfPresent(requestURLHash, (k, v) ->
+        PendingRequests pendingRequests = pendingRequestsMap.remove(requestURLHash);
+        if (pendingRequests != null)
         {
-            v.removeSubscribers(s ->
+            pendingRequests.removeSubscribers(s ->
             {
                 boolean served = false;
                 if (cacheEntry != null)
                 {
-                    served = serveRequest(cacheEntry, s.getRequestHeaders(requestHeadersRO), s.authScope(), s);
+                    served = serveRequest(cacheEntry, s.getRequestHeaders(request2HeadersRO, request2BufferPool),
+                            s.authScope(), s);
                 }
-                if (!served)
+                if (served)
+                {
+                    counters.responsesCached.getAsLong();
+
+System.out.printf("urlHash=%s FIT path=%s\n", requestURLHash,
+HttpHeadersUtil.getHeader(
+cacheEntry.cachedRequest.getRequestHeaders(new ListFW<>(new HttpHeaderFW())), ":path"));
+                }
+                else
                 {
                     sendPendingInitialRequest(s);
                 }
             });
-            return null;
-        });
+        }
+    }
+
+    public void sendPendingRequests(
+            int requestURLHash)
+    {
+        PendingRequests pendingRequests = pendingRequestsMap.remove(requestURLHash);
+        if (pendingRequests != null)
+        {
+            pendingRequests.removeSubscribers(this::sendPendingInitialRequest);
+        }
     }
 
     private void sendPendingInitialRequest(

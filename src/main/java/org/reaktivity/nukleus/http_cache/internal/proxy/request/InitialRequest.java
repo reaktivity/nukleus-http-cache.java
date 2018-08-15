@@ -91,14 +91,14 @@ public class InitialRequest extends CacheableRequest
     {
         super.purge();
         cache.removeUncommitted(this);
-        cache.removePendingRequests(requestURLHash());
+        cache.sendPendingRequests(requestURLHash());
     }
 
     @Override
     public void cache(EndFW end, Cache cache)
     {
         super.cache(end, cache);
-        cache.removePendingRequests(requestURLHash());
+        cache.servePendingRequests(requestURLHash());
     }
 
 //    public void send()
