@@ -294,7 +294,7 @@ public final class CacheEntry
                     MessageConsumer acceptReply = s.acceptReply();
                     long acceptReplyStreamId = s.acceptReplyStreamId();
                     long acceptCorrelationId = s.acceptCorrelationId();
-                    cache.writer.do503AndEnd(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
                     s.purge();
 
                     // count all responses
