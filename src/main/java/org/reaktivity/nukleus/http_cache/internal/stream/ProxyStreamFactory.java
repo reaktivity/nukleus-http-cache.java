@@ -60,7 +60,7 @@ public class ProxyStreamFactory implements StreamFactory
     final BudgetManager budgetManager;
 
     final LongSupplier supplyStreamId;
-    final BufferPool streamBufferPool;
+    final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
     final LongObjectBiConsumer<Runnable> scheduler;
@@ -77,7 +77,7 @@ public class ProxyStreamFactory implements StreamFactory
         RouteManager router,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
-        BufferPool bufferPool,
+        BufferPool requestBufferPool,
         LongSupplier supplyStreamId,
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
@@ -90,12 +90,12 @@ public class ProxyStreamFactory implements StreamFactory
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyStreamId = requireNonNull(supplyStreamId);
-        this.streamBufferPool = new CountingBufferPool(
-                bufferPool,
+        this.requestBufferPool = new CountingBufferPool(
+                requestBufferPool,
                 counters.supplyCounter.apply("initial.request.acquires"),
                 counters.supplyCounter.apply("initial.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
-                bufferPool.duplicate(),
+                requestBufferPool.duplicate(),
                 counters.supplyCounter.apply("response.acquires"),
                 counters.supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);

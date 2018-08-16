@@ -69,7 +69,7 @@ public final class CacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
-    private final CacheableRequest cachedRequest;
+    final CacheableRequest cachedRequest;
 
     private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 
@@ -136,15 +136,10 @@ public final class CacheEntry
             return;
         }
         int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
-        while (newSlot == NO_SLOT)
+        if (newSlot == NO_SLOT)
         {
-            boolean purged = cache.purgeOld();
-            if (!purged)
-            {
-                pollBackend();
-                return;
-            }
-            newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
+            pollBackend();
+            return;
         }
 
         // may have purged this
@@ -172,7 +167,7 @@ public final class CacheEntry
             // duplicate request into new slot (TODO optimize to single request)
 
             MutableDirectBuffer newBuffer = cache.refreshBufferPool.buffer(newSlot);
-            this.cachedRequest.copyRequestTo(newBuffer, cache.cachedResponseBufferPool);
+            this.cachedRequest.copyRequestTo(newBuffer);
 
             final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
                     cachedRequest,
@@ -446,7 +441,7 @@ public final class CacheEntry
     {
         final ListFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
         final ListFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(
-                cache.responseHeadersRO, cache.cachedResponseBufferPool);
+                cache.cachedResponse1HeadersRO, cache.cachedResponse1BufferPool);
         assert thisHeaders.buffer() != entryHeaders.buffer();
 
         String thisVary = HttpHeadersUtil.getHeader(thisHeaders, HttpHeaders.VARY);
@@ -455,7 +450,7 @@ public final class CacheEntry
         if (varyMatches)
         {
             final ListFW<HttpHeaderFW> requestHeaders = entry.cachedRequest.getRequestHeaders(
-                    cache.request2HeadersRO, cache.request2BufferPool);
+                    cache.cachedRequest1HeadersRO, cache.cachedRequest1BufferPool);
             return doesNotVaryBy(requestHeaders);
         }
         return false;
@@ -659,7 +654,7 @@ public final class CacheEntry
         ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
         return !status.equals(HttpStatus.NOT_MODIFIED_304) &&
-               !this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.responseBufferPool);
+               !this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.cachedResponse1BufferPool);
     }
 
     public void refresh(AnswerableByCacheRequest request)

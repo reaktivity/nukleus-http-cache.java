@@ -15,11 +15,13 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
 
 import java.util.function.LongSupplier;
 
+import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -96,10 +98,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
 
     // TODO remove need for duplication
     public void copyRequestTo(
-            MutableDirectBuffer buffer,
-            BufferPool readFromBufferPool)
+            MutableDirectBuffer buffer)
     {
-        MutableDirectBuffer requestBuffer = readFromBufferPool.buffer(requestSlot());
+        MutableDirectBuffer requestBuffer = requestPool.buffer(requestSlot());
         requestBuffer.getBytes(0, buffer, 0, requestBuffer.capacity());
     }
 
@@ -117,14 +118,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             return false;
         }
         int headerSlot = bp.acquire(this.etag().hashCode());
-        while (headerSlot == Slab.NO_SLOT)
+        if (headerSlot == Slab.NO_SLOT)
         {
-            boolean purged = cache.purgeOld();
-            if (!purged)
-            {
-                return false;
-            }
-            headerSlot = bp.acquire(this.etag().hashCode());
+            return false;
         }
         responseSlots.add(headerSlot);
 
@@ -147,13 +143,22 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return false;
     }
 
-    public void cache(EndFW end, Cache cache)
+    public boolean cache(EndFW end, Cache cache)
     {
         if (state == CacheState.COMMITING)
         {
             state = CacheState.COMMITTED;
+            toCachedRequest(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
             cache.put(requestURLHash(), this);
+            return true;
+//            CachedRequest cachedRequest = toCachedRequest(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
+//            if (cachedRequest != null)
+//            {
+//                cache.put(requestURLHash(), cachedRequest);
+//                return true;
+//            }
         }
+        return false;
     }
 
     public void purge()
@@ -251,18 +256,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         {
             slotSpaceRemaining = slotCapacity;
             int newSlot = bp.acquire(this.etag().hashCode());
-            while (newSlot == Slab.NO_SLOT)
+            if (newSlot == Slab.NO_SLOT)
             {
-                boolean purged = cache.purgeOld();
-                if (!purged)
-                {
-                    return false;
-                }
-                if (this.state == CacheState.PURGED)
-                {
-                    return false;
-                }
-                newSlot = bp.acquire(this.etag().hashCode());
+                return false;
             }
             responseSlots.add(newSlot);
         }
@@ -337,6 +333,67 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             length -= chunkLength;
         }
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
+    }
+
+    private boolean toCachedRequest(BufferPool cachedRequestBufferPool, BufferPool cachedResponseBufferPool)
+    {
+        int cachedRequestSlot = NO_SLOT;
+
+        if (requestSlot != NO_SLOT)
+        {
+            cachedRequestSlot = copy(requestSlot, requestPool, cachedRequestBufferPool);
+            if (cachedRequestSlot == NO_SLOT)
+            {
+                return false;
+            }
+
+            requestPool.release(requestSlot);
+        }
+
+        IntArrayList cachedResponseSlots = null;
+        if (responseSlots != null)
+        {
+            cachedResponseSlots = new IntArrayList();
+            for (int slot : responseSlots)
+            {
+                int cachedResponseSlot = copy(slot, responsePool, cachedResponseBufferPool);
+                if (cachedResponseSlot == NO_SLOT)
+                {
+                    cachedRequestBufferPool.release(cachedRequestSlot);
+
+                    for (int responseSlot : cachedResponseSlots)
+                    {
+                        cachedResponseBufferPool.release(responseSlot);
+                    }
+                    return false;
+                }
+                else
+                {
+                    cachedResponseSlots.add(cachedResponseSlot);
+                }
+            }
+
+            this.responseSlots.forEach(i -> responsePool.release(i));
+        }
+
+        this.requestSlot = cachedRequestSlot;
+        this.requestPool = cachedRequestBufferPool;
+        this.responseSlots = cachedResponseSlots;
+        this.responsePool = cachedResponseBufferPool;
+        return true;
+    }
+
+    private static int copy(int fromSlot, BufferPool fromBP, BufferPool toBP)
+    {
+        int toSlot = toBP.acquire(0);
+        if (toSlot != NO_SLOT)
+        {
+            DirectBuffer fromBuffer = fromBP.buffer(fromSlot);
+            MutableDirectBuffer toBuffer = toBP.buffer(toSlot);
+            toBuffer.putBytes(0, fromBuffer, 0, fromBuffer.capacity());
+        }
+
+        return toSlot;
     }
 
 }

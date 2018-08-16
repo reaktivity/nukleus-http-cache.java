@@ -47,17 +47,23 @@ public class Cache
     final Writer writer;
     final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
-    final BufferPool cachedResponseBufferPool;
-    final BufferPool responseBufferPool;
+    public final BufferPool cachedRequestBufferPool;
+    public final BufferPool cachedResponseBufferPool;
+    public final BufferPool cachedRequest1BufferPool;
+    public final BufferPool cachedResponse1BufferPool;
+
     final BufferPool refreshBufferPool;
-    final BufferPool subscriberBufferPool;
-    final BufferPool request1BufferPool;
-    final BufferPool request2BufferPool;
+    final BufferPool requestBufferPool;
+    final BufferPool responseBufferPool;
+
     final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> request2HeadersRO = new HttpBeginExFW().headers();
+    final ListFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
+    final ListFW<HttpHeaderFW> cachedResponse1HeadersRO = new HttpBeginExFW().headers();
+
+    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
+
     final WindowFW windowRO = new WindowFW();
 
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
@@ -75,7 +81,8 @@ public class Cache
         LongObjectBiConsumer<Runnable> scheduler,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
-        BufferPool bufferPool,
+        BufferPool requestBufferPool,
+        BufferPool cacheBufferPool,
         Long2ObjectHashMap<Request> correlations,
         Supplier<String> etagSupplier,
         HttpCacheCounters counters,
@@ -86,15 +93,21 @@ public class Cache
         this.correlations = correlations;
         this.writer = new Writer(writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
-                bufferPool.duplicate(),
+                requestBufferPool.duplicate(),
                 counters.supplyCounter.apply("refresh.request.acquires"),
                 counters.supplyCounter.apply("refresh.request.releases"));
-        this.request1BufferPool = bufferPool.duplicate();
-        this.request2BufferPool = bufferPool.duplicate();
-
-        this.cachedResponseBufferPool = bufferPool.duplicate();
-        this.responseBufferPool = bufferPool.duplicate();
-        this.subscriberBufferPool = bufferPool.duplicate();
+        this.cachedRequestBufferPool = new CountingBufferPool(
+                cacheBufferPool,
+                counters.supplyCounter.apply("cached.request.acquires"),
+                counters.supplyCounter.apply("cached.request.releases"));
+        this.cachedResponseBufferPool = new CountingBufferPool(
+                cacheBufferPool.duplicate(),
+                counters.supplyCounter.apply("cached.response.acquires"),
+                counters.supplyCounter.apply("cached.response.releases"));
+        this.cachedRequest1BufferPool = cacheBufferPool.duplicate();
+        this.cachedResponse1BufferPool = cacheBufferPool.duplicate();
+        this.requestBufferPool = requestBufferPool.duplicate();
+        this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.etagSupplier = etagSupplier;
         this.counters = counters;
@@ -206,7 +219,7 @@ public class Cache
                 boolean served = false;
                 if (cacheEntry != null)
                 {
-                    served = serveRequest(cacheEntry, s.getRequestHeaders(request2HeadersRO, request2BufferPool),
+                    served = serveRequest(cacheEntry, s.getRequestHeaders(requestHeadersRO),
                             s.authScope(), s);
                 }
                 if (served)
