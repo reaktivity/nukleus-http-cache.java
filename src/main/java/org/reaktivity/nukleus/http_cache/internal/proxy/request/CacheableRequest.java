@@ -148,15 +148,12 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         if (state == CacheState.COMMITING)
         {
             state = CacheState.COMMITTED;
-            toCachedRequest(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
-            cache.put(requestURLHash(), this);
-            return true;
-//            CachedRequest cachedRequest = toCachedRequest(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
-//            if (cachedRequest != null)
-//            {
-//                cache.put(requestURLHash(), cachedRequest);
-//                return true;
-//            }
+            boolean copied = moveDataToCachePools(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
+            if (copied)
+            {
+                cache.put(requestURLHash(), this);
+            }
+            return copied;
         }
         return false;
     }
@@ -335,13 +332,14 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
     }
 
-    private boolean toCachedRequest(BufferPool cachedRequestBufferPool, BufferPool cachedResponseBufferPool)
+    private boolean moveDataToCachePools(BufferPool cachedRequestBufferPool, BufferPool cachedResponseBufferPool)
     {
+        int id = etag().hashCode();
         int cachedRequestSlot = NO_SLOT;
 
         if (requestSlot != NO_SLOT)
         {
-            cachedRequestSlot = copy(requestSlot, requestPool, cachedRequestBufferPool);
+            cachedRequestSlot = copy(id, requestSlot, requestPool, cachedRequestBufferPool);
             if (cachedRequestSlot == NO_SLOT)
             {
                 return false;
@@ -356,7 +354,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             cachedResponseSlots = new IntArrayList();
             for (int slot : responseSlots)
             {
-                int cachedResponseSlot = copy(slot, responsePool, cachedResponseBufferPool);
+                int cachedResponseSlot = copy(id, slot, responsePool, cachedResponseBufferPool);
                 if (cachedResponseSlot == NO_SLOT)
                 {
                     cachedRequestBufferPool.release(cachedRequestSlot);
@@ -383,9 +381,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return true;
     }
 
-    private static int copy(int fromSlot, BufferPool fromBP, BufferPool toBP)
+    private static int copy(int id, int fromSlot, BufferPool fromBP, BufferPool toBP)
     {
         int toSlot = toBP.acquire(0);
+        // should we purge old cache entries ?
         if (toSlot != NO_SLOT)
         {
             DirectBuffer fromBuffer = fromBP.buffer(fromSlot);

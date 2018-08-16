@@ -69,7 +69,7 @@ public final class CacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
-    final CacheableRequest cachedRequest;
+    private final CacheableRequest cachedRequest;
 
     private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 

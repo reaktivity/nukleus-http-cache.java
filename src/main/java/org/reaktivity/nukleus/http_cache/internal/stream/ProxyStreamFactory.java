@@ -95,7 +95,7 @@ public class ProxyStreamFactory implements StreamFactory
                 counters.supplyCounter.apply("initial.request.acquires"),
                 counters.supplyCounter.apply("initial.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
-                requestBufferPool.duplicate(),
+                requestBufferPool,
                 counters.supplyCounter.apply("response.acquires"),
                 counters.supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);

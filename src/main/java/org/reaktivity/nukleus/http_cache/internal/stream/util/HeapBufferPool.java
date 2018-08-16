@@ -99,7 +99,7 @@ public class HeapBufferPool implements BufferPool
     @Override
     public BufferPool duplicate()
     {
-        return new HeapBufferPool(buffers, slotCapacity);
+        return this;
     }
 
     @Override

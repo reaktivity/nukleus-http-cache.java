@@ -49,8 +49,8 @@ public class Cache
     final Int2CacheHashMapWithLRUEviction cachedEntries;
     public final BufferPool cachedRequestBufferPool;
     public final BufferPool cachedResponseBufferPool;
-    public final BufferPool cachedRequest1BufferPool;
-    public final BufferPool cachedResponse1BufferPool;
+    final BufferPool cachedRequest1BufferPool;
+    final BufferPool cachedResponse1BufferPool;
 
     final BufferPool refreshBufferPool;
     final BufferPool requestBufferPool;
