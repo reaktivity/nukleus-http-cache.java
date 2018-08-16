@@ -653,13 +653,18 @@ public final class CacheEntry
         subscribers.clear();
     }
 
-
     public boolean isUpdatedBy(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
-        String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
-        return !status.equals(HttpStatus.NOT_MODIFIED_304) &&
-               !this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.responseBufferPool);
+        ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
+        String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+
+        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
+                status.equals(HttpStatus.OK_200) &&
+                (this.cachedRequest.etag().equals(etag) ||
+                 this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.responseBufferPool));
+
+        return !notModified;
     }
 
     public void refresh(AnswerableByCacheRequest request)
