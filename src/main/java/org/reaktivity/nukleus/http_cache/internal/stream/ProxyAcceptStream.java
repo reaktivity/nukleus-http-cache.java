@@ -233,7 +233,6 @@ final class ProxyAcceptStream
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
-            this.streamFactory.counters.responsesCached.getAsLong();
             this.request.purge();
         }
         else if (streamFactory.cache.hasPendingInitialRequests(requestURLHash))
@@ -321,6 +320,9 @@ final class ProxyAcceptStream
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
+
+        // count retry responses
+        streamFactory.counters.responsesRetry.getAsLong();
     }
 
     private void handleAllFramesByIgnoring(

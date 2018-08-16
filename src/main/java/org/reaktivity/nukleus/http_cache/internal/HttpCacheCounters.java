@@ -28,6 +28,7 @@ public class HttpCacheCounters
     public final LongSupplier requestsCacheable;
     public final LongSupplier requestsPreferWait;
     public final LongSupplier responses;
+    public final LongSupplier responsesRetry;
     public final LongSupplier responsesCached;
     public final LongSupplier responsesAbortedPurge;
     public final LongSupplier responsesAbortedVary;
@@ -48,6 +49,7 @@ public class HttpCacheCounters
         this.requestsCacheable = supplyCounter.apply("requests.cacheable");
         this.requestsPreferWait = supplyCounter.apply("requests.prefer.wait");
         this.responses = supplyCounter.apply("responses");
+        this.responsesRetry = supplyCounter.apply("responses.retry");
         this.responsesCached = supplyCounter.apply("responses.cached");
         this.responsesAbortedVary = supplyCounter.apply("responses.aborted.vary");
         this.responsesAbortedMiss = supplyCounter.apply("responses.aborted.miss");

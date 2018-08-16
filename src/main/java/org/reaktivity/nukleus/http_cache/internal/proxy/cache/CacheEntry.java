@@ -215,7 +215,7 @@ public final class CacheEntry
         request.setThrottle(serveFromCacheStream);
 
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-                .forEach(h -> x.item(y -> y.representation((byte) 0).name(h.name()).value(h.value())));
+                .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptReplyStreamId = request.acceptReplyStreamId();
@@ -238,9 +238,6 @@ public final class CacheEntry
                     cachedRequest.etag(),
                     request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader());
 
-            // count cached responses (cache hits)
-            cache.counters.responsesCached.getAsLong();
-
             this.cache.writer.doHttpPushPromise(
                     request,
                     cachedRequest,
@@ -257,7 +254,7 @@ public final class CacheEntry
             if (injectWarnings && isStale())
             {
                 headers = headers.andThen(
-                        x ->  x.item(h -> h.representation((byte) 0).name(WARNING).value(Cache.RESPONSE_IS_STALE))
+                        x ->  x.item(h -> h.name(WARNING).value(Cache.RESPONSE_IS_STALE))
                 );
             }
             this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
@@ -265,6 +262,9 @@ public final class CacheEntry
 
         // count all responses
         cache.counters.responses.getAsLong();
+
+        // count cached responses (cache hits)
+        cache.counters.responsesCached.getAsLong();
 
         if(this.state == CacheEntryState.CAN_REFRESH)
         {
@@ -648,13 +648,18 @@ public final class CacheEntry
         subscribers.clear();
     }
 
-
     public boolean isUpdatedBy(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeadersRO = request.getResponseHeaders(cache.responseHeadersRO);
-        String status = HttpHeadersUtil.getHeader(responseHeadersRO, HttpHeaders.STATUS);
-        return !status.equals(HttpStatus.NOT_MODIFIED_304) &&
-               !this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.cachedResponse1BufferPool);
+        ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
+        String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+
+        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
+                status.equals(HttpStatus.OK_200) &&
+                (this.cachedRequest.etag().equals(etag) ||
+                 this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.cachedResponse1BufferPool));
+
+        return !notModified;
     }
 
     public void refresh(AnswerableByCacheRequest request)
