@@ -95,10 +95,11 @@ public class InitialRequest extends CacheableRequest
     }
 
     @Override
-    public void cache(EndFW end, Cache cache)
+    public boolean cache(EndFW end, Cache cache)
     {
-        super.cache(end, cache);
+        boolean cached = super.cache(end, cache);
         cache.servePendingInitialRequests(requestURLHash());
+        return cached;
     }
 
 }

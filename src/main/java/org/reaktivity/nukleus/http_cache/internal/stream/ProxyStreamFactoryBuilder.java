@@ -30,6 +30,7 @@ import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HeapBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -47,7 +48,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private MutableDirectBuffer writeBuffer;
     private LongSupplier supplyStreamId;
     private LongSupplier supplyCorrelationId;
-    private Slab bufferPool;
+    private Slab cacheBufferPool;
+    private HeapBufferPool requestBufferPool;
     private Cache cache;
     private BudgetManager budgetManager;
     private Function<String, LongSupplier> supplyCounter;
@@ -145,14 +147,16 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             budgetManager = new BudgetManager();
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
-            this.bufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
+            this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
+            this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
 
             LongConsumer cacheEntries = supplyAccumulator.apply("cache.entries");
             this.cache = new Cache(
                     scheduler,
                     budgetManager,
                     writeBuffer,
-                    bufferPool,
+                    requestBufferPool,
+                    cacheBufferPool,
                     correlations,
                     supplyEtag,
                     counters,
@@ -163,7 +167,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 router,
                 budgetManager,
                 writeBuffer,
-                bufferPool,
+                requestBufferPool,
                 supplyStreamId,
                 supplyCorrelationId,
                 correlations,

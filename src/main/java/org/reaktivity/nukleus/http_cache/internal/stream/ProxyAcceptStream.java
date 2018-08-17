@@ -205,7 +205,7 @@ final class ProxyAcceptStream
         long authorization,
         short authScope)
     {
-        boolean stored = storeRequest(requestHeaders, streamFactory.streamBufferPool);
+        boolean stored = storeRequest(requestHeaders, streamFactory.requestBufferPool);
         if (!stored)
         {
             send503RetryAfter();
@@ -223,7 +223,7 @@ final class ProxyAcceptStream
                 streamFactory.supplyCorrelationId,
                 streamFactory.supplyStreamId,
                 requestURLHash,
-                streamFactory.streamBufferPool,
+                streamFactory.requestBufferPool,
                 requestSlot,
                 streamFactory.router,
                 authorizationHeader,
@@ -289,14 +289,9 @@ final class ProxyAcceptStream
         final BufferPool bufferPool)
     {
         this.requestSlot = bufferPool.acquire(acceptStreamId);
-        while (requestSlot == NO_SLOT)
+        if (requestSlot == NO_SLOT)
         {
-            boolean purged = this.streamFactory.cache.purgeOld();
-            if (!purged)
-            {
-                return false;
-            }
-            this.requestSlot = bufferPool.acquire(acceptStreamId);
+            return false;
         }
         MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestSlot);
         requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
