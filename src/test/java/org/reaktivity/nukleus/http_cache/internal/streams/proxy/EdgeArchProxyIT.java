@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_REQUESTS;
 
 import java.time.Instant;
 
@@ -197,7 +198,7 @@ public class EdgeArchProxyIT
         k3po.finish();
         Instant finish = Instant.now();
         Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertExpectedCacheEntries(1, 1);
+        counters.assertExpectedCacheEntries(1, 2);
     }
 
     @Test
@@ -209,7 +210,7 @@ public class EdgeArchProxyIT
     public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1);
+        counters.assertExpectedCacheEntries(1, 2);
     }
 
     @Test
@@ -221,7 +222,7 @@ public class EdgeArchProxyIT
     public void shouldAttachToNextCacheEntryIfPushPromiseArrivesBeforeResponseCompletes() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1);
+        counters.assertExpectedCacheEntries(1, 2);
     }
 
     @Test
@@ -319,7 +320,7 @@ public class EdgeArchProxyIT
     public void shouldMaintainPollingForMultipleAuthScopes() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(2, 0, 2);
+        counters.assertExpectedCacheEntries(2, 2, 2);
     }
 
 
@@ -332,7 +333,7 @@ public class EdgeArchProxyIT
     public void noAuthorizationSendsCacheControlPrivate() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 0);
+        counters.assertExpectedCacheEntries(1, 2, 0);
     }
 
     @Test
@@ -344,7 +345,7 @@ public class EdgeArchProxyIT
     public void noAuthorizationSendsCacheControlPrivateExceptWhenPublic() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 0);
+        counters.assertExpectedCacheEntries(1, 2, 0);
     }
 
     @Test
@@ -356,7 +357,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 0);
+        counters.assertExpectedCacheEntries(1, 2, 0);
     }
 
     @Test
@@ -368,7 +369,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderAsterisk() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 0);
+        counters.assertExpectedCacheEntries(1, 2, 0);
     }
 
     @Test
@@ -381,14 +382,14 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         Thread.sleep(100); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(1, 0, 0);
+        counters.assertExpectedCacheEntries(1, 1, 0);
     }
 
     // First response gets proxied (but doesn't get stored in cache
     // as there is no buffer slot for headers)
     // Second request gets 503 + retry-after
     @Test
-    @Configure(name="nukleus.http_cache.capacity", value="16384")       // 1 buffer slot
+    @Configure(name=HTTP_CACHE_MAXIMUM_REQUESTS, value="1")       // 1 buffer slot
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.sends.503.retry-after/accept/client",

@@ -49,20 +49,6 @@ public class HttpCacheCountersRule implements TestRule
         };
     }
 
-    public long slabAquires()
-    {
-        return controller().count("initial.request.acquires") +
-                controller().count("refresh.request.acquires") +
-                controller().count("response.acquires");
-    }
-
-    public long slabReleases()
-    {
-        return controller().count("initial.request.releases") +
-                controller().count("refresh.request.releases") +
-                controller().count("response.releases");
-    }
-
     public long requests()
     {
         return controller().count("requests");
@@ -103,6 +89,42 @@ public class HttpCacheCountersRule implements TestRule
         return controller().count("promises.canceled");
     }
 
+    public long cacheEntries()
+    {
+        return controller().count("cache.entries");
+    }
+
+    public long refreshRequests()
+    {
+        return controller().count("refresh.request.acquires");
+    }
+
+    public long cachedRequestAcquires()
+    {
+        return controller().count("cached.request.acquires");
+    }
+
+    public long cachedRequestReleases()
+    {
+        return controller().count("cached.request.releases");
+    }
+
+    public long cachedResponseAcquires()
+    {
+        return controller().count("cached.response.acquires");
+    }
+
+    public long cachedResponseReleases()
+    {
+        return controller().count("cached.response.releases");
+    }
+
+    public long cacheSlots()
+    {
+        return cachedRequestAcquires() + cachedResponseAcquires() - cachedRequestReleases() - cachedResponseReleases();
+    }
+
+
     private HttpCacheController controller()
     {
         return reaktor.controller(HttpCacheController.class);
@@ -111,14 +133,22 @@ public class HttpCacheCountersRule implements TestRule
     public void assertExpectedCacheEntries(
         int numberOfResponses)
     {
-        assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses, slabAquires() - slabReleases());
+        assertEquals(numberOfResponses, cacheEntries());
+        assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses, cacheSlots());
+    }
+
+    public void assertExpectedCacheRefreshes(
+        int cacheInitiatedRefreshes)
+    {
+        assertEquals(cacheInitiatedRefreshes, refreshRequests());
     }
 
     public void assertExpectedCacheEntries(
         int numberOfResponses,
         int cacheInitiatedRefreshes)
     {
-        assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses + cacheInitiatedRefreshes, slabAquires() - slabReleases());
+        assertExpectedCacheEntries(numberOfResponses);
+        assertExpectedCacheRefreshes(cacheInitiatedRefreshes);
     }
 
     public void assertExpectedCacheEntries(
@@ -126,9 +156,8 @@ public class HttpCacheCountersRule implements TestRule
         int cacheInitiatedRefreshes,
         int requestPendingCacheUpdate)
     {
-        assertEquals(
-            NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses + cacheInitiatedRefreshes + requestPendingCacheUpdate,
-            slabAquires() - slabReleases());
+        assertExpectedCacheEntries(numberOfResponses);
+        assertExpectedCacheRefreshes(cacheInitiatedRefreshes);
     }
 
     public void assertRequests(

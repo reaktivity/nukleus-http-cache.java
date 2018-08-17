@@ -74,7 +74,7 @@ public class ProxyExceptionsIT
     public void shouldHandleAbortSentOnCacheableRequest() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.slabAquires() - counters.slabReleases());
+        assertEquals(1, counters.requestsCachable());
         // We proceed with request out back anyways, TODO, consider adding to test response returning and getting cached
     }
 
@@ -123,6 +123,7 @@ public class ProxyExceptionsIT
     public void shouldAcceptReplySentResetCachebleResponse() throws Exception
     {
         k3po.finish();
+        Thread.sleep(100);
         counters.assertExpectedCacheEntries(1);
     }
 
