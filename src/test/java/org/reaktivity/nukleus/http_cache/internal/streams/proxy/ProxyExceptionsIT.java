@@ -123,6 +123,7 @@ public class ProxyExceptionsIT
     public void shouldAcceptReplySentResetCachebleResponse() throws Exception
     {
         k3po.finish();
+        Thread.sleep(100);
         counters.assertExpectedCacheEntries(1);
     }
 
