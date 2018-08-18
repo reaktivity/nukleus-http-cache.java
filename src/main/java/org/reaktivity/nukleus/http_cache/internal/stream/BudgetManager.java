@@ -19,7 +19,6 @@ import org.agrona.collections.Long2ObjectHashMap;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.function.IntUnaryOperator;
 
 import static java.util.Objects.requireNonNull;
@@ -27,7 +26,6 @@ import static java.util.Objects.requireNonNull;
 public class BudgetManager
 {
     private final Long2ObjectHashMap<GroupBudget> groups;             // group id -> GroupBudget
-    private final Random random;
 
     public enum StreamKind
     {
@@ -101,11 +99,7 @@ public class BudgetManager
             StreamBudget streamBudget = streamMap.remove(streamId);
             if (streamBudget != null)
             {
-                // replace the removed one with the last streamBudget
-                StreamBudget last = streamList.get(streamList.size() - 1);
-                last.index = streamBudget.index;
-                streamList.set(streamBudget.index, last);
-                streamList.remove(streamList.size() - 1);
+                streamList.remove(streamBudget.index);
             }
             assert streamMap.size() == streamList.size();
             return streamBudget;
@@ -119,11 +113,9 @@ public class BudgetManager
             if (!streamList.isEmpty())
             {
                 // Give budget to first stream. TODO fairness
-                int start, index;
-                start = index = 0;
-                do
+                for(int i = 0; i < streamList.size() && budget > 0; i++)
                 {
-                    StreamBudget stream = streamList.get(index);
+                    StreamBudget stream = streamList.get(i);
                     if (!stream.closing)
                     {
                         int slice = budget;
@@ -133,9 +125,7 @@ public class BudgetManager
                         budget += remaining;
                         stream.unackedBudget -= remaining;
                     }
-                    index = (index + 1) % streamList.size();
                 }
-                while (budget > 0 && index != start);
             }
         }
 
@@ -154,7 +144,6 @@ public class BudgetManager
     BudgetManager()
     {
         groups = new Long2ObjectHashMap<>();
-        random = new Random();
     }
 
     void closing(long groupId, long streamId, int credit)
