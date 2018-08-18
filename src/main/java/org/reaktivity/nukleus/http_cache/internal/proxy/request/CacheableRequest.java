@@ -52,6 +52,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyStreamId;
     CacheState state;
+    private int attempts;
 
     public enum CacheState
     {
@@ -393,6 +394,16 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         }
 
         return toSlot;
+    }
+
+    public void incAttempts()
+    {
+        attempts++;
+    }
+
+    public int attempts()
+    {
+        return attempts;
     }
 
 }
