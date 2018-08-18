@@ -17,9 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.collections.Long2ObjectHashMap;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
 import java.util.function.IntUnaryOperator;
 
 import static java.util.Objects.requireNonNull;
@@ -27,7 +24,6 @@ import static java.util.Objects.requireNonNull;
 public class BudgetManager
 {
     private final Long2ObjectHashMap<GroupBudget> groups;             // group id -> GroupBudget
-    private final Random random;
 
     public enum StreamKind
     {
@@ -64,7 +60,6 @@ public class BudgetManager
         final long groupId;
         final int initialBudget;
         final Long2ObjectHashMap<StreamBudget> streamMap;          // stream id -> BudgetEnty
-        final List<StreamBudget> streamList;
         int budget;
 
         GroupBudget(long groupId, int initialBudget)
@@ -72,13 +67,11 @@ public class BudgetManager
             this.groupId = groupId;
             this.initialBudget = initialBudget;
             this.streamMap = new Long2ObjectHashMap<>();
-            this.streamList = new ArrayList<>();
         }
 
         void add(long streamId, StreamBudget streamBudget)
         {
             streamMap.put(streamId, streamBudget);
-            streamList.add(streamBudget);
         }
 
         StreamBudget get(long streamId)
@@ -93,22 +86,12 @@ public class BudgetManager
 
         int size()
         {
-            return streamList.size();
+            return streamMap.size();
         }
 
         StreamBudget remove(long streamId)
         {
-            StreamBudget streamBudget = streamMap.remove(streamId);
-            if (streamBudget != null)
-            {
-                // replace the removed one with the last streamBudget
-                StreamBudget last = streamList.get(streamList.size() - 1);
-                last.index = streamBudget.index;
-                streamList.set(streamBudget.index, last);
-                streamList.remove(streamList.size() - 1);
-            }
-            assert streamMap.size() == streamList.size();
-            return streamBudget;
+            return streamMap.remove(streamId);
         }
 
         private void moreBudget(int credit)
@@ -116,35 +99,27 @@ public class BudgetManager
             budget += credit;
             assert budget <= initialBudget;
 
-            if (!streamList.isEmpty())
+            streamMap.forEach((k, stream) ->
             {
                 // Give budget to first stream. TODO fairness
-                int start, index;
-                start = index = 0;
-                do
+                if (!stream.closing && budget > 0)
                 {
-                    StreamBudget stream = streamList.get(index);
-                    if (!stream.closing)
-                    {
-                        int slice = budget;
-                        budget -= slice;
-                        stream.unackedBudget += slice;
-                        int remaining = stream.budgetAvailable.applyAsInt(slice);
-                        budget += remaining;
-                        stream.unackedBudget -= remaining;
-                    }
-                    index = (index + 1) % streamList.size();
+                    int slice = budget;
+                    budget -= slice;
+                    stream.unackedBudget += slice;
+                    int remaining = stream.budgetAvailable.applyAsInt(slice);
+                    budget += remaining;
+                    stream.unackedBudget -= remaining;
                 }
-                while (budget > 0 && index != start);
-            }
+            });
         }
 
         @Override
         public String toString()
         {
-            long proxyStreams = streamList.stream().filter(s -> s.streamKind == StreamKind.PROXY).count();
-            long cacheStreams = streamList.stream().filter(s -> s.streamKind == StreamKind.CACHE).count();
-            long unackedStreams = streamList.stream().filter(s -> s.unackedBudget > 0).count();
+            long proxyStreams = streamMap.values().stream().filter(s -> s.streamKind == StreamKind.PROXY).count();
+            long cacheStreams = streamMap.values().stream().filter(s -> s.streamKind == StreamKind.CACHE).count();
+            long unackedStreams = streamMap.values().stream().filter(s -> s.unackedBudget > 0).count();
 
             return String.format("(groupId=%d budget=%d proxyStreams=%d cacheStreams=%d unackedStreams=%d)",
                     groupId, budget, proxyStreams, cacheStreams, unackedStreams);
@@ -154,7 +129,6 @@ public class BudgetManager
     BudgetManager()
     {
         groups = new Long2ObjectHashMap<>();
-        random = new Random();
     }
 
     void closing(long groupId, long streamId, int credit)
