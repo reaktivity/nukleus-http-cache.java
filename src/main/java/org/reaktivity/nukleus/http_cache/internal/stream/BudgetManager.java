@@ -118,15 +118,15 @@ public class BudgetManager
 
             if (!streamList.isEmpty())
             {
-                // Give budget to streams in round-robin order (starting at a random index)
+                // Give budget to first stream. TODO fairness
                 int start, index;
-                start = index = random.nextInt(streamList.size());
+                start = index = 0;
                 do
                 {
                     StreamBudget stream = streamList.get(index);
                     if (!stream.closing)
                     {
-                        int slice = budget < 1024 ? budget : budget/2;
+                        int slice = budget;
                         budget -= slice;
                         stream.unackedBudget += slice;
                         int remaining = stream.budgetAvailable.applyAsInt(slice);
