@@ -53,6 +53,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     final LongSupplier supplyStreamId;
     CacheState state;
     private int attempts;
+    private String recentAuthorizationHeader;
 
     public enum CacheState
     {
@@ -404,6 +405,16 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     public int attempts()
     {
         return attempts;
+    }
+
+    public String recentAuthorizationHeader()
+    {
+        return recentAuthorizationHeader;
+    }
+
+    public void recentAuthorizationHeader(String recentAuthorizationHeader)
+    {
+        this.recentAuthorizationHeader = recentAuthorizationHeader;
     }
 
 }
