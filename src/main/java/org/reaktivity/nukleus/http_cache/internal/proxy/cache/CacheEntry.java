@@ -29,6 +29,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryS
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateFreshnessExtension;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -158,8 +159,24 @@ public final class CacheEntry
             cache.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
                     builder ->
                         {
-                            requestHeaders.forEach(
-                                    h ->  builder.item(item -> item.name(h.name()).value(h.value())));
+                            requestHeaders.forEach(h ->
+                            {
+                                switch (h.name().asString())
+                                {
+                                    case AUTHORIZATION:
+                                        String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
+if (recentAuthorizationHeader != null)
+{
+    System.out.printf("Using recent authorization header\n");
+}
+                                        String value = recentAuthorizationHeader != null
+                                                ? recentAuthorizationHeader : h.value().asString();
+                                        builder.item(item -> item.name(h.name()).value(value));
+                                        break;
+                                    default:
+                                        builder.item(item -> item.name(h.name()).value(h.value()));
+                                }
+                            });
                             builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                         });
             cache.writer.doHttpEnd(connect, connectStreamId);
@@ -300,6 +317,15 @@ public final class CacheEntry
                 });
                 subscribers.clear();
                 break;
+        }
+    }
+
+    void recentAuthorizationHeader(String authorizationHeader)
+    {
+        if (authorizationHeader != null)
+        {
+System.out.printf("UPDATING authorization header = %s", authorizationHeader);
+            cachedRequest.recentAuthorizationHeader(authorizationHeader);
         }
     }
 
