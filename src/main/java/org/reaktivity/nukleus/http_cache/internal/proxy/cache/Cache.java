@@ -42,6 +42,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+
 public class Cache
 {
     final Writer writer;
@@ -349,6 +351,9 @@ public class Cache
     {
         if (entry.canServeRequest(request, authScope))
         {
+            final String requestAuthorizationHeader = getHeader(request, "authorization");
+            entry.recentAuthorizationHeader(requestAuthorizationHeader);
+
             entry.serveClient(cacheableRequest);
             return true;
         }
