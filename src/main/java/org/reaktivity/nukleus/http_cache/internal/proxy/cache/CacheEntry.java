@@ -171,7 +171,7 @@ if (recentAuthorizationHeader != null)
 }
                                         String value = recentAuthorizationHeader != null
                                                 ? recentAuthorizationHeader : h.value().asString();
-                                        builder.item(item -> item.name(h.name()).value(h.value()));
+                                        builder.item(item -> item.name(h.name()).value(value));
                                         break;
                                     default:
                                         builder.item(item -> item.name(h.name()).value(h.value()));
