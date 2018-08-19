@@ -165,10 +165,6 @@ public final class CacheEntry
                                 {
                                     case AUTHORIZATION:
                                         String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
-if (recentAuthorizationHeader != null)
-{
-    System.out.printf("Using recent authorization header\n");
-}
                                         String value = recentAuthorizationHeader != null
                                                 ? recentAuthorizationHeader : h.value().asString();
                                         builder.item(item -> item.name(h.name()).value(value));
@@ -324,7 +320,6 @@ if (recentAuthorizationHeader != null)
     {
         if (authorizationHeader != null)
         {
-System.out.printf("UPDATING authorization header = %s", authorizationHeader);
             cachedRequest.recentAuthorizationHeader(authorizationHeader);
         }
     }
