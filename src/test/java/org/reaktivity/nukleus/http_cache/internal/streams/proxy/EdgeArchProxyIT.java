@@ -416,4 +416,15 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/cache.sends.304.for.matching.etag/accept/client",
+        "${streams}/cache.sends.304.for.matching.etag/connect/server",
+    })
+    public void sends304ForMatchingEtagRequest() throws Exception
+    {
+        k3po.finish();
+    }
 }

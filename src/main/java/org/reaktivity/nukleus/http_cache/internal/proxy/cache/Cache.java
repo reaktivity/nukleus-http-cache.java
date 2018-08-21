@@ -42,6 +42,9 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 public class Cache
@@ -351,13 +354,35 @@ public class Cache
     {
         if (entry.canServeRequest(request, authScope))
         {
-            final String requestAuthorizationHeader = getHeader(request, "authorization");
+            final String requestAuthorizationHeader = getHeader(request, AUTHORIZATION);
             entry.recentAuthorizationHeader(requestAuthorizationHeader);
 
-            entry.serveClient(cacheableRequest);
+            boolean etagMatched = CacheUtils.isMatchByEtag(request, entry.cachedRequest.etag());
+            if (etagMatched)
+            {
+                send304(entry, cacheableRequest);
+            }
+            else
+            {
+                entry.serveClient(cacheableRequest);
+            }
+
             return true;
         }
         return false;
+    }
+
+    private void send304(CacheEntry entry, AnswerableByCacheRequest request)
+    {
+        writer.doHttpResponse(request.acceptReply(), request.acceptReplyStreamId(), 0L, request.acceptCorrelationId(), e ->
+                e.item(h -> h.name(STATUS).value("304"))
+                 .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
+        writer.doHttpEnd(request.acceptReply(), request.acceptReplyStreamId());
+
+        request.purge();
+
+        // count all responses
+        counters.responses.getAsLong();
     }
 
     public void notifyUncommitted(InitialRequest request)
