@@ -15,11 +15,14 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.BiFunction;
 
 import org.agrona.collections.Long2ObjectHashMap;
+import org.agrona.collections.LongArrayList;
 import org.reaktivity.nukleus.Nukleus;
 
 public class DelayedTaskScheduler implements Nukleus
@@ -27,13 +30,32 @@ public class DelayedTaskScheduler implements Nukleus
     private final Long2ObjectHashMap<Runnable> taskLookup;
     private final SortedSet<Long> scheduledTimes;
 
+    private boolean schedulingDeferred;
+    private final LongArrayList deferredTimes;
+    private final ArrayList<Runnable> deferredTasks;
+
     public DelayedTaskScheduler()
     {
         this.taskLookup = new Long2ObjectHashMap<>();
         this.scheduledTimes = new TreeSet<>();
+        this.deferredTimes = new LongArrayList();
+        this.deferredTasks = new ArrayList<>();
     }
 
     public void schedule(long time, Runnable task)
+    {
+        if (schedulingDeferred)
+        {
+            deferredTimes.add(time);
+            deferredTasks.add(task);
+        }
+        else
+        {
+            scheduleTask(time, task);
+        }
+    }
+
+    private void scheduleTask(long time, Runnable task)
     {
         if (this.scheduledTimes.add(time))
         {
@@ -47,20 +69,34 @@ public class DelayedTaskScheduler implements Nukleus
 
     public int process()
     {
+        schedulingDeferred = true;
         if (!scheduledTimes.isEmpty())
         {
             long c = System.currentTimeMillis();
             SortedSet<Long> past = scheduledTimes.headSet(c);
-
-            past = new TreeSet<>(past);
-            scheduledTimes.removeAll(past);
-
-            for (Long time : past)
+            Iterator<Long> iter = past.iterator();
+            while(iter.hasNext())
             {
+                Long time = iter.next();
+                iter.remove();
                 taskLookup.remove(time).run();
             }
             return past.size();
         }
+        schedulingDeferred = false;
+
+        // Schedule all the tasks that were deferred during the execution of expired tasks
+        if (!deferredTimes.isEmpty())
+        {
+            Iterator<Runnable> taskIt = deferredTasks.iterator();
+            for (long time: deferredTimes)
+            {
+                scheduleTask(time, taskIt.next());
+            }
+            deferredTimes.clear();
+            deferredTasks.clear();
+        }
+
         return 0;
     }
 
