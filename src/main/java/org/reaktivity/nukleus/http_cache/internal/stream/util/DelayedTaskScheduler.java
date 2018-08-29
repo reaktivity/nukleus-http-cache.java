@@ -89,10 +89,10 @@ public class DelayedTaskScheduler implements Nukleus
         if (!deferredTimes.isEmpty())
         {
             Iterator<Runnable> taskIt = deferredTasks.iterator();
-            for (long time: deferredTimes)
+            deferredTimes.forEachOrderedLong(time ->
             {
                 scheduleTask(time, taskIt.next());
-            }
+            });
             deferredTimes.clear();
             deferredTasks.clear();
         }
