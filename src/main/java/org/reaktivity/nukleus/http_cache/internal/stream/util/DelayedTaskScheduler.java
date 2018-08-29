@@ -69,6 +69,7 @@ public class DelayedTaskScheduler implements Nukleus
 
     public int process()
     {
+        int work = 0;
         schedulingDeferred = true;
         if (!scheduledTimes.isEmpty())
         {
@@ -81,7 +82,7 @@ public class DelayedTaskScheduler implements Nukleus
                 iter.remove();
                 taskLookup.remove(time).run();
             }
-            return past.size();
+            work = past.size();
         }
         schedulingDeferred = false;
 
@@ -89,15 +90,12 @@ public class DelayedTaskScheduler implements Nukleus
         if (!deferredTimes.isEmpty())
         {
             Iterator<Runnable> taskIt = deferredTasks.iterator();
-            deferredTimes.forEachOrderedLong(time ->
-            {
-                scheduleTask(time, taskIt.next());
-            });
+            deferredTimes.forEachOrderedLong(time -> scheduleTask(time, taskIt.next()));
             deferredTimes.clear();
             deferredTasks.clear();
         }
 
-        return 0;
+        return work;
     }
 
     private static BiFunction<? super Runnable, ? super Runnable, ? extends Runnable> mergeTasks = (t1, t2) ->
