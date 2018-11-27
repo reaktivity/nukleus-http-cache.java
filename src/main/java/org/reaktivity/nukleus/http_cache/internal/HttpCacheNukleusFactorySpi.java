@@ -48,7 +48,8 @@ public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
                 scheduler::schedule);
         final ServerStreamFactoryBuilder serverFactoryBuilder = new ServerStreamFactoryBuilder();
 
-        return builder.streamFactory(PROXY, proxyFactoryBuilder)
+        return builder.configure(httpCacheConfig)
+                      .streamFactory(PROXY, proxyFactoryBuilder)
                       .streamFactory(SERVER, serverFactoryBuilder)
                       .build();
     }

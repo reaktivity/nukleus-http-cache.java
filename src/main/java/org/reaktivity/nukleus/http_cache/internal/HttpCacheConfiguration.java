@@ -19,34 +19,39 @@ import org.reaktivity.nukleus.Configuration;
 
 public class HttpCacheConfiguration extends Configuration
 {
-    public static final String HTTP_CACHE_CAPACITY = "nukleus.http_cache.capacity";
-    public static final String HTTP_CACHE_SLOT_CAPACITY = "nukleus.http_cache.slot.capacity";
+    public static final IntPropertyDef HTTP_CACHE_CAPACITY;
+    public static final IntPropertyDef HTTP_CACHE_SLOT_CAPACITY;
+    public static final IntPropertyDef HTTP_CACHE_MAXIMUM_REQUESTS;
 
-    public static final String HTTP_CACHE_MAXIMUM_REQUESTS = "nukleus.http_cache.maximum.requests";
+    private static final ConfigurationDef HTTP_CACHE_CONFIG;
 
-    private static final int HTTP_CACHE_CAPACITY_DEFAULT = 65536 * 64;
-    private static final int HTTP_CACHE_SLOT_CAPACITY_DEFAULT = 0x4000; // ALSO is max header size
-    private static final int HTTP_CACHE_MAXIMUM_REQUESTS_DEFAULT = 65536;
+    static
+    {
+        final ConfigurationDef config = new ConfigurationDef("nukleus.http_cache");
+        HTTP_CACHE_CAPACITY = config.property("capacity", 1024 * 64 * 64);
+        HTTP_CACHE_SLOT_CAPACITY = config.property("slot.capacity", 0x4000); // ALSO is max header size
+        HTTP_CACHE_MAXIMUM_REQUESTS = config.property("maximum.requests", 64 * 1024);
+        HTTP_CACHE_CONFIG = config;
+    }
 
     public HttpCacheConfiguration(
         Configuration config)
     {
-        super(config);
+        super(HTTP_CACHE_CONFIG, config);
     }
 
     public int cacheCapacity()
     {
-        return getInteger(HTTP_CACHE_CAPACITY, HTTP_CACHE_CAPACITY_DEFAULT);
+        return HTTP_CACHE_CAPACITY.getAsInt(this);
     }
 
     public int cacheSlotCapacity()
     {
-        return getInteger(HTTP_CACHE_SLOT_CAPACITY, HTTP_CACHE_SLOT_CAPACITY_DEFAULT);
+        return HTTP_CACHE_SLOT_CAPACITY.getAsInt(this);
     }
 
     public int maximumRequests()
     {
-        return getInteger(HTTP_CACHE_MAXIMUM_REQUESTS, HTTP_CACHE_MAXIMUM_REQUESTS_DEFAULT);
+        return HTTP_CACHE_MAXIMUM_REQUESTS.getAsInt(this);
     }
-
 }

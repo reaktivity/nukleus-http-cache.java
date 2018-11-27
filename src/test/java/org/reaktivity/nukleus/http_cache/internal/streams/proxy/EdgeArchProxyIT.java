@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_REQUESTS;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_REQUESTS_NAME;
 
 import java.time.Instant;
 
@@ -406,7 +406,7 @@ public class EdgeArchProxyIT
     // as there is no buffer slot for headers)
     // Second request gets 503 + retry-after
     @Test
-    @Configure(name=HTTP_CACHE_MAXIMUM_REQUESTS, value="1")       // 1 buffer slot
+    @Configure(name=HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value="1")       // 1 buffer slot
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.sends.503.retry-after/accept/client",

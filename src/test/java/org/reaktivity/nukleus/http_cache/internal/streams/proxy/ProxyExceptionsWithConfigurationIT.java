@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY;
 
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -44,7 +44,7 @@ public class ProxyExceptionsWithConfigurationIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(4096)
             .nukleus("http-cache"::equals)
-            .configure(BUFFER_SLOT_CAPACITY_PROPERTY, 0)
+            .configure(REAKTOR_BUFFER_SLOT_CAPACITY, 0)
             .clean();
 
     @Rule
