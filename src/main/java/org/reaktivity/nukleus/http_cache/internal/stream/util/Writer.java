@@ -92,14 +92,13 @@ public class Writer
     public void doHttpResponse(
         MessageConsumer target,
         long targetStreamId,
-        long targetRef,
         long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                .streamId(targetStreamId)
                                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                               .sourceRef(targetRef)
+                               .sourceRef(0L)
                                .correlationId(correlationId)
                                .extension(e -> e.set(visitHttpBeginEx(mutator)))
                                .build();
@@ -110,7 +109,6 @@ public class Writer
     public void doHttpResponseWithUpdatedCacheControl(
             MessageConsumer target,
             long targetStreamId,
-            long targetRef,
             long correlationId,
             CacheControl cacheControlFW,
             ListFW<HttpHeaderFW> responseHeaders,
@@ -124,7 +122,7 @@ public class Writer
         BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .streamId(targetStreamId)
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                .sourceRef(targetRef)
+                .sourceRef(0L)
                 .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
@@ -132,12 +130,12 @@ public class Writer
     }
 
     private void updateResponseHeaders(
-            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-            CacheControl cacheControlFW,
-            ListFW<HttpHeaderFW> responseHeadersRO,
-            int staleWhileRevalidate,
-            String etag,
-            boolean cacheControlPrivate)
+        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+        CacheControl cacheControlFW,
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        int staleWhileRevalidate,
+        String etag,
+        boolean cacheControlPrivate)
     {
         responseHeadersRO.forEach(h ->
         {
@@ -185,7 +183,7 @@ public class Writer
 
     public void doHttpData(
         MessageConsumer target,
-        long targetStreamId,
+        long streamId,
         long groupId,
         int padding,
         DirectBuffer payload,
@@ -194,7 +192,7 @@ public class Writer
     {
 
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                            .streamId(targetStreamId)
+                            .streamId(streamId)
                             .groupId(groupId)
                             .padding(padding)
                             .payload(p -> p.set(payload, offset, length))
@@ -205,38 +203,42 @@ public class Writer
 
     public void doHttpData(
         MessageConsumer target,
-        long targetStreamId,
+        long streamId,
         long groupId,
         int padding,
-        Consumer<OctetsFW.Builder> mutator)
+        Consumer<OctetsFW.Builder> payload)
     {
         DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .streamId(targetStreamId)
+            .streamId(streamId)
             .groupId(groupId)
             .padding(padding)
-            .payload(mutator)
+            .payload(payload)
             .build();
 
         target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void doHttpEnd(
-        MessageConsumer target,
-        long targetStreamId)
+        final MessageConsumer target,
+        final long streamId,
+        final long traceId)
     {
         EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                         .streamId(targetStreamId)
+                         .streamId(streamId)
+                         .trace(traceId)
                          .build();
 
         target.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     public void doAbort(
-            MessageConsumer target,
-            long targetStreamId)
+        final MessageConsumer target,
+        final long streamId,
+        final long traceId)
     {
         AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetStreamId)
+                .streamId(streamId)
+                .trace(traceId)
                 .build();
 
         target.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
@@ -244,13 +246,15 @@ public class Writer
 
     public void doWindow(
         final MessageConsumer throttle,
-        final long throttleStreamId,
+        final long streamId,
+        final long traceId,
         final int credit,
         final int padding,
         final long groupId)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(throttleStreamId)
+                .streamId(streamId)
+                .trace(traceId)
                 .credit(credit)
                 .padding(padding)
                 .groupId(groupId)
@@ -261,10 +265,12 @@ public class Writer
 
     public void doReset(
         final MessageConsumer throttle,
-        final long throttleStreamId)
+        final long streamId,
+        final long traceId)
     {
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .streamId(throttleStreamId)
+                                     .streamId(streamId)
+                                     .trace(traceId)
                                      .build();
 
         throttle.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
@@ -420,11 +426,11 @@ public class Writer
         long acceptReplyStreamId,
         long acceptCorrelationId)
     {
-        this.doHttpResponse(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
+        this.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, e ->
         e.item(h -> h.representation((byte) 0)
                 .name(STATUS)
                 .value("503")));
-        this.doAbort(acceptReply, acceptReplyStreamId);
+        this.doAbort(acceptReply, acceptReplyStreamId, 0L);
     }
 
 }

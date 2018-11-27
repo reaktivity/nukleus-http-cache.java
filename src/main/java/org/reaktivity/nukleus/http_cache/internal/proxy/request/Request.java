@@ -57,11 +57,6 @@ public abstract class Request
         return acceptReplyStreamId;
     }
 
-    public long acceptRef()
-    {
-        return 0L;
-    }
-
     public long acceptCorrelationId()
     {
         return acceptCorrelationId;
