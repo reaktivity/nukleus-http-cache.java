@@ -48,17 +48,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 public class Cache
 {
-    final Writer writer;
-    final BudgetManager budgetManager;
-    final Int2CacheHashMapWithLRUEviction cachedEntries;
-    public final BufferPool cachedRequestBufferPool;
-    public final BufferPool cachedResponseBufferPool;
-    final BufferPool cachedRequest1BufferPool;
-    final BufferPool cachedResponse1BufferPool;
-
-    final BufferPool refreshBufferPool;
-    final BufferPool requestBufferPool;
-    final BufferPool responseBufferPool;
+    static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
@@ -70,10 +60,22 @@ public class Cache
 
     final WindowFW windowRO = new WindowFW();
 
-    static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
-
     final CacheControl responseCacheControlFW = new CacheControl();
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
+
+    public final BufferPool cachedRequestBufferPool;
+    public final BufferPool cachedResponseBufferPool;
+
+    final Writer writer;
+    final BudgetManager budgetManager;
+    final Int2CacheHashMapWithLRUEviction cachedEntries;
+    final BufferPool cachedRequest1BufferPool;
+    final BufferPool cachedResponse1BufferPool;
+
+    final BufferPool refreshBufferPool;
+    final BufferPool requestBufferPool;
+    final BufferPool responseBufferPool;
+
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
@@ -195,10 +197,10 @@ public class Cache
     }
 
     public boolean handleInitialRequest(
-            int requestURLHash,
-            ListFW<HttpHeaderFW> request,
-            short authScope,
-            CacheableRequest cacheableRequest)
+        int requestURLHash,
+        ListFW<HttpHeaderFW> request,
+        short authScope,
+        CacheableRequest cacheableRequest)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
@@ -260,7 +262,7 @@ public class Cache
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
                 )
         );
-        writer.doHttpEnd(request.connect(), connectStreamId);
+        writer.doHttpEnd(request.connect(), connectStreamId, 0L);
     }
 
     public boolean hasPendingInitialRequests(
@@ -337,8 +339,8 @@ public class Cache
     }
 
     private boolean doesNotVary(
-            ListFW<HttpHeaderFW> requestHeaders,
-            InitialRequest request)
+        ListFW<HttpHeaderFW> requestHeaders,
+        InitialRequest request)
     {
         ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
         ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
@@ -346,10 +348,10 @@ public class Cache
     }
 
     private boolean serveRequest(
-            CacheEntry entry,
-            ListFW<HttpHeaderFW> request,
-            short authScope,
-            AnswerableByCacheRequest cacheableRequest)
+        CacheEntry entry,
+        ListFW<HttpHeaderFW> request,
+        short authScope,
+        AnswerableByCacheRequest cacheableRequest)
     {
         if (entry.canServeRequest(request, authScope))
         {
@@ -371,12 +373,14 @@ public class Cache
         return false;
     }
 
-    private void send304(CacheEntry entry, AnswerableByCacheRequest request)
+    private void send304(
+        CacheEntry entry,
+        AnswerableByCacheRequest request)
     {
-        writer.doHttpResponse(request.acceptReply(), request.acceptReplyStreamId(), 0L, request.acceptCorrelationId(), e ->
+        writer.doHttpResponse(request.acceptReply(), request.acceptReplyStreamId(), request.acceptCorrelationId(), e ->
                 e.item(h -> h.name(STATUS).value("304"))
                  .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptReplyStreamId());
+        writer.doHttpEnd(request.acceptReply(), request.acceptReplyStreamId(), 0L);
 
         request.purge();
 
@@ -384,12 +388,14 @@ public class Cache
         counters.responses.getAsLong();
     }
 
-    public void notifyUncommitted(InitialRequest request)
+    public void notifyUncommitted(
+        InitialRequest request)
     {
         this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
     }
 
-    public void removeUncommitted(InitialRequest request)
+    public void removeUncommitted(
+        InitialRequest request)
     {
         this.uncommittedRequests.computeIfPresent(request.requestURLHash(), (k, v) ->
         {
@@ -410,7 +416,8 @@ public class Cache
         });
     }
 
-    public void purge(CacheEntry entry)
+    public void purge(
+        CacheEntry entry)
     {
         this.cachedEntries.remove(entry.requestUrl());
         entry.purge();

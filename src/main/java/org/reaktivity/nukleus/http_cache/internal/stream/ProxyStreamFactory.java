@@ -37,24 +37,30 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class ProxyStreamFactory implements StreamFactory
 {
-    final BeginFW beginRO = new BeginFW();
-    final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    final DataFW dataRO = new DataFW();
-    final EndFW endRO = new EndFW();
     private final RouteFW routeRO = new RouteFW();
 
+    final BeginFW beginRO = new BeginFW();
+    final DataFW dataRO = new DataFW();
+    final EndFW endRO = new EndFW();
+    final AbortFW abortRO = new AbortFW();
+
     final WindowFW windowRO = new WindowFW();
+    final ResetFW resetRO = new ResetFW();
+
+    final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
+    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     final RouteManager router;
     final BudgetManager budgetManager;
@@ -134,40 +140,43 @@ public class ProxyStreamFactory implements StreamFactory
     }
 
     private MessageConsumer newAcceptStream(
-            final BeginFW begin,
-            final MessageConsumer networkThrottle)
+        final BeginFW begin,
+        final MessageConsumer source)
     {
-        final long networkRef = begin.sourceRef();
-        final String acceptName = begin.source().asString();
+        final long sourceRef = begin.sourceRef();
+        final String sourceName = begin.source().asString();
+        final long authorization = begin.authorization();
 
         final MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, l);
-            return networkRef == route.sourceRef() &&
-                    acceptName.equals(route.source().asString());
+            return sourceRef == route.sourceRef() &&
+                    sourceName.equals(route.source().asString());
         };
 
-        final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
+        final RouteFW route = router.resolve(authorization, filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
         if (route != null)
         {
-            final long networkId = begin.streamId();
+            final long sourceId = begin.streamId();
+            final String targetName = route.target().asString();
+            final long targetRef = route.targetRef();
 
-            newStream = new ProxyAcceptStream(this, networkThrottle, networkId)::handleStream;
+            newStream = new ProxyAcceptStream(this, source, sourceId, targetName, targetRef)::handleStream;
         }
 
         return newStream;
     }
 
     private MessageConsumer newConnectReplyStream(
-            final BeginFW begin,
-            final MessageConsumer throttle)
+        final BeginFW begin,
+        final MessageConsumer source)
     {
-        final long throttleId = begin.streamId();
+        final long sourceId = begin.streamId();
 
-        return new ProxyConnectReplyStream(this, throttle, throttleId)::handleStream;
+        return new ProxyConnectReplyStream(this, source, sourceId)::handleStream;
     }
 
 

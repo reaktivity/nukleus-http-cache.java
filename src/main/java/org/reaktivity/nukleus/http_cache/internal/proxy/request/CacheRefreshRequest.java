@@ -23,7 +23,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
-
     private final CacheEntry updatingEntry;
     private final Cache cache;
 
@@ -104,5 +103,4 @@ public class CacheRefreshRequest extends CacheableRequest
         }
         super.purge();
     }
-
 }

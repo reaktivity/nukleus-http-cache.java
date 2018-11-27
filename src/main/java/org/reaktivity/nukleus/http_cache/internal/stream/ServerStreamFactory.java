@@ -36,9 +36,12 @@ import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class ServerStreamFactory implements StreamFactory
 {
+    private final RouteFW routeRO = new RouteFW();
 
     private final BeginFW beginRO = new BeginFW();
-    private final RouteFW routeRO = new RouteFW();
+    private final DataFW dataRO = new DataFW();
+    private final EndFW endRO = new EndFW();
+    private final AbortFW abortRO = new AbortFW();
 
     private final WindowFW windowRO = new WindowFW();
     private final ResetFW resetRO = new ResetFW();
@@ -60,40 +63,49 @@ public class ServerStreamFactory implements StreamFactory
 
     @Override
     public MessageConsumer newStream(
-            int msgTypeId,
-            DirectBuffer buffer,
-            int index,
-            int length,
-            MessageConsumer throttle)
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length,
+        MessageConsumer throttle)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
+        final long sourceRef = begin.sourceRef();
 
-        return newAcceptStream(begin, throttle);
+        MessageConsumer newStream = null;
+
+        if (sourceRef != 0L)
+        {
+            newStream = newAcceptStream(begin, throttle);
+        }
+
+        return newStream;
     }
 
     private MessageConsumer newAcceptStream(
-            final BeginFW begin,
-            final MessageConsumer networkThrottle)
+        final BeginFW begin,
+        final MessageConsumer source)
     {
-        final long networkRef = begin.sourceRef();
-        final String acceptName = begin.source().asString();
+        final long sourceRef = begin.sourceRef();
+        final String sourceName = begin.source().asString();
+        final long authorization = begin.authorization();
 
         final MessagePredicate filter = (t, b, o, l) ->
         {
             final RouteFW route = routeRO.wrap(b, o, l);
-            return networkRef == route.sourceRef() &&
-                    acceptName.equals(route.source().asString());
+            return sourceRef == route.sourceRef() &&
+                    sourceName.equals(route.source().asString());
         };
 
-        final RouteFW route = router.resolve(begin.authorization(), filter, this::wrapRoute);
+        final RouteFW route = router.resolve(authorization, filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
         if (route != null)
         {
-            final long networkId = begin.streamId();
+            final long sourceId = begin.streamId();
 
-            newStream = new ServerAcceptStream(networkThrottle, networkId)::handleStream;
+            newStream = new ServerAcceptStream(source, sourceId)::onStreamMessage;
         }
 
         return newStream;
@@ -117,7 +129,7 @@ public class ServerStreamFactory implements StreamFactory
             this.streamState = this::beforeBegin;
         }
 
-        private void handleStream(
+        private void onStreamMessage(
             int msgTypeId,
             DirectBuffer buffer,
             int index,
@@ -135,38 +147,11 @@ public class ServerStreamFactory implements StreamFactory
             if (msgTypeId == BeginFW.TYPE_ID)
             {
                 final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-                handleBegin(begin);
+                onBegin(begin);
             }
             else
             {
-                writer.doReset(acceptThrottle, acceptStreamId);
-            }
-        }
-
-        private void handleBegin(
-            BeginFW begin)
-        {
-            final long acceptRef = beginRO.sourceRef();
-            final String acceptName = begin.source().asString();
-            final RouteFW connectRoute = resolveTarget(acceptRef, begin.authorization(), acceptName);
-
-            if (connectRoute == null)
-            {
-                writer.doReset(acceptThrottle, acceptStreamId);
-            }
-            else
-            {
-                this.acceptReply = router.supplyTarget(acceptName);
-                this.acceptReplyStreamId =  supplyStreamId.getAsLong();
-                final long acceptCorrelationId = begin.correlationId();
-
-                writer.doHttpResponse(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, hs ->
-                {
-                    hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
-                    hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
-                });
-                this.streamState = this::afterBegin;
-                router.setThrottle(acceptName, acceptReplyStreamId, this::handleThrottle);
+                writer.doReset(acceptThrottle, acceptStreamId, 0L);
             }
         }
 
@@ -178,20 +163,25 @@ public class ServerStreamFactory implements StreamFactory
         {
             switch (msgTypeId)
             {
-            case EndFW.TYPE_ID:
-                break;
-
-            case AbortFW.TYPE_ID:
-                writer.doAbort(acceptReply, acceptReplyStreamId);
-                break;
             case DataFW.TYPE_ID:
+                final DataFW data = dataRO.wrap(buffer, index, index + length);
+                onData(data);
+                break;
+            case EndFW.TYPE_ID:
+                final EndFW end = endRO.wrap(buffer, index, index + length);
+                onEnd(end);
+                break;
+            case AbortFW.TYPE_ID:
+                final AbortFW abort = abortRO.wrap(buffer, index, index + length);
+                onAbort(abort);
+                break;
             default:
-                writer.doReset(acceptThrottle, acceptStreamId);
+                writer.doReset(acceptThrottle, acceptStreamId, 0L);
                 break;
             }
         }
 
-        private void handleThrottle(
+        private void onThrottleMessage(
             int msgTypeId,
             DirectBuffer buffer,
             int index,
@@ -199,46 +189,70 @@ public class ServerStreamFactory implements StreamFactory
         {
             switch (msgTypeId)
             {
-                case WindowFW.TYPE_ID:
-                    final WindowFW window = windowRO.wrap(buffer, index, index + length);
-                    handleWindow(window);
-                    break;
-                case ResetFW.TYPE_ID:
-                    final ResetFW reset = resetRO.wrap(buffer, index, index + length);
-                    handleReset(reset);
-                    break;
-                default:
-                    // ignore
-                    break;
+            case WindowFW.TYPE_ID:
+                final WindowFW window = windowRO.wrap(buffer, index, index + length);
+                onWindow(window);
+                break;
+            case ResetFW.TYPE_ID:
+                final ResetFW reset = resetRO.wrap(buffer, index, index + length);
+                onReset(reset);
+                break;
+            default:
+                // ignore
+                break;
             }
         }
 
-        private void handleWindow(
+        private void onBegin(
+            BeginFW begin)
+        {
+            final String sourceName = begin.source().asString();
+
+            this.acceptReply = router.supplyTarget(sourceName);
+            this.acceptReplyStreamId =  supplyStreamId.getAsLong();
+            final long acceptCorrelationId = begin.correlationId();
+
+            writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, hs ->
+            {
+                hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
+                hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
+            });
+            this.streamState = this::afterBegin;
+            router.setThrottle(sourceName, acceptReplyStreamId, this::onThrottleMessage);
+        }
+
+        private void onData(
+            final DataFW data)
+        {
+            writer.doReset(acceptThrottle, acceptStreamId, 0L);
+        }
+
+        private void onEnd(
+            final EndFW end)
+        {
+            // ignore
+        }
+
+        private void onAbort(
+            final AbortFW abort)
+        {
+            final long traceId = abort.trace();
+            writer.doAbort(acceptReply, acceptReplyStreamId, traceId);
+        }
+
+        private void onWindow(
             WindowFW window)
         {
             // NOOP, this means we can send data,
             // but (for now) we don't want to...
         }
 
-        private void handleReset(
+        private void onReset(
             ResetFW reset)
         {
-            writer.doReset(acceptThrottle, acceptStreamId);
+            final long traceId = reset.trace();
+            writer.doReset(acceptThrottle, acceptStreamId, traceId);
         }
-    }
-
-    RouteFW resolveTarget(
-        long sourceRef,
-        long authorization,
-        String sourceName)
-    {
-        MessagePredicate filter = (t, b, o, l) ->
-        {
-            RouteFW route = routeRO.wrap(b, o, l);
-            return sourceRef == route.sourceRef() && sourceName.equals(route.source().asString());
-        };
-
-        return router.resolve(authorization, filter, this::wrapRoute);
     }
 
     private RouteFW wrapRoute(

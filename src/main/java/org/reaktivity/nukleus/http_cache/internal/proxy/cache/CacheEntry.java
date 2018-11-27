@@ -175,7 +175,7 @@ public final class CacheEntry
                             });
                             builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                         });
-            cache.writer.doHttpEnd(connect, connectStreamId);
+            cache.writer.doHttpEnd(connect, connectStreamId, 0L);
 
             // duplicate request into new slot (TODO optimize to single request)
 
@@ -201,7 +201,7 @@ public final class CacheEntry
     }
 
     public void serveClient(
-            AnswerableByCacheRequest streamCorrelation)
+        AnswerableByCacheRequest streamCorrelation)
     {
         switch (this.state)
         {
@@ -232,7 +232,6 @@ public final class CacheEntry
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptReplyStreamId = request.acceptReplyStreamId();
-        long acceptReplyRef = request.acceptRef();
         long acceptCorrelationId = request.acceptCorrelationId();
 
         // TODO should reduce freshness extension by how long it has aged
@@ -243,7 +242,6 @@ public final class CacheEntry
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
                     acceptReplyStreamId,
-                    acceptReplyRef,
                     acceptCorrelationId,
                     cacheControlFW,
                     responseHeaders,
@@ -270,7 +268,7 @@ public final class CacheEntry
                         x ->  x.item(h -> h.name(WARNING).value(Cache.RESPONSE_IS_STALE))
                 );
             }
-            this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptReplyRef, acceptCorrelationId, headers);
+            this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, headers);
         }
 
         // count all responses
@@ -367,7 +365,7 @@ public final class CacheEntry
                     {
                         final MessageConsumer acceptReply = request.acceptReply();
                         final long acceptReplyStreamId = request.acceptReplyStreamId();
-                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId);
+                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId, 0L);
                         this.onEnd.run();
                         cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
                     }
