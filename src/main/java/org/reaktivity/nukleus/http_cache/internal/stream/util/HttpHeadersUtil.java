@@ -73,7 +73,7 @@ public final class HttpHeadersUtil
                     break;
                 }
         });
-        return scheme.append(authority.toString()).append(path.toString()).toString();
+        return scheme.append("://").append(authority.toString()).append(path.toString()).toString();
     }
 
     public static String getHeader(ListFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
