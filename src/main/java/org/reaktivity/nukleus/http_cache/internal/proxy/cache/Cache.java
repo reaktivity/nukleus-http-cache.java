@@ -41,10 +41,13 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 public class Cache
 {
@@ -244,7 +247,12 @@ public class Cache
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
         {
-            pendingInitialRequests.removeSubscribers(this::sendPendingInitialRequest);
+            final PendingInitialRequests newPendingInitialRequests = pendingInitialRequests.withNextInitialRequest();
+            if (newPendingInitialRequests != null)
+            {
+                pendingInitialRequestsMap.put(requestURLHash, newPendingInitialRequests);
+                sendPendingInitialRequest(newPendingInitialRequests.initialRequest());
+            }
         }
     }
 
@@ -256,6 +264,12 @@ public class Cache
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
         correlations.put(connectCorrelationId, request);
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [sent pending request]\n",
+                    currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+        }
 
         writer.doHttpRequest(request.connect(), connectStreamId, request.connectRef(), connectCorrelationId,
                 builder -> requestHeaders.forEach(
@@ -377,6 +391,12 @@ public class Cache
         CacheEntry entry,
         AnswerableByCacheRequest request)
     {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
+                    currentTimeMillis(), request.acceptCorrelationId(), "304");
+        }
+
         writer.doHttpResponse(request.acceptReply(), request.acceptReplyStreamId(), request.acceptCorrelationId(), e ->
                 e.item(h -> h.name(STATUS).value("304"))
                  .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));

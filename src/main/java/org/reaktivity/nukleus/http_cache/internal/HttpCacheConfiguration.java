@@ -19,6 +19,8 @@ import org.reaktivity.nukleus.Configuration;
 
 public class HttpCacheConfiguration extends Configuration
 {
+    public static final boolean DEBUG = Boolean.getBoolean("nukleus.http_cache.debug");
+
     public static final IntPropertyDef HTTP_CACHE_CAPACITY;
     public static final IntPropertyDef HTTP_CACHE_SLOT_CAPACITY;
     public static final IntPropertyDef HTTP_CACHE_MAXIMUM_REQUESTS;
