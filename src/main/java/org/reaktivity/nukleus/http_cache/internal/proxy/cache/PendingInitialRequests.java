@@ -31,6 +31,11 @@ public class PendingInitialRequests
         this.request = request;
     }
 
+    public InitialRequest initialRequest()
+    {
+        return request;
+    }
+
     public String etag()
     {
         return request.etag();
@@ -47,4 +52,18 @@ public class PendingInitialRequests
         subscribers.clear();
     }
 
+    PendingInitialRequests withNextInitialRequest()
+    {
+        if (subscribers.isEmpty())
+        {
+            return null;
+        }
+
+        final InitialRequest newInitialRequest = subscribers.remove(0);
+        final PendingInitialRequests newPendingRequests = new PendingInitialRequests(newInitialRequest);
+        subscribers.forEach(newPendingRequests::subscribe);
+        subscribers.clear();
+
+        return newPendingRequests;
+    }
 }

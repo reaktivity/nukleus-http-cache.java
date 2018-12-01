@@ -15,7 +15,9 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -132,6 +134,12 @@ final class ProxyAcceptStream
         // count all requests
         streamFactory.counters.requests.getAsLong();
 
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
+                    currentTimeMillis(), acceptCorrelationId, getRequestURL(httpBeginFW.headers()));
+        }
+
         if (isPreferIfNoneMatch(requestHeaders))
         {
             streamFactory.counters.requestsPreferWait.getAsLong();
@@ -236,7 +244,15 @@ final class ProxyAcceptStream
         }
         else
         {
-            sendBeginToConnect(requestHeaders);
+            long connectCorrelationId = streamFactory.supplyCorrelationId.getAsLong();
+
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] CONNECT %016x %s [sent initial request]\n",
+                        currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+            }
+
+            sendBeginToConnect(requestHeaders, connectCorrelationId);
             streamFactory.writer.doHttpEnd(connect, connectStreamId, 0L); // TODO: traceId
             streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
@@ -254,15 +270,23 @@ final class ProxyAcceptStream
                 acceptCorrelationId,
                 streamFactory.router);
 
-        sendBeginToConnect(requestHeaders);
+        long connectCorrelationId = streamFactory.supplyCorrelationId.getAsLong();
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [sent proxy request]\n",
+                    currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+        }
+
+        sendBeginToConnect(requestHeaders, connectCorrelationId);
 
         this.streamState = this::onStreamMessageWhenProxying;
     }
 
     private void sendBeginToConnect(
-        final ListFW<HttpHeaderFW> requestHeaders)
+        final ListFW<HttpHeaderFW> requestHeaders,
+        long connectCorrelationId)
     {
-        long connectCorrelationId = streamFactory.supplyCorrelationId.getAsLong();
         streamFactory.correlations.put(connectCorrelationId, request);
 
         streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
@@ -290,6 +314,11 @@ final class ProxyAcceptStream
 
     private void send504()
     {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId, "504");
+        }
+
         streamFactory.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, e ->
                 e.item(h -> h.representation((byte) 0)
                         .name(STATUS)
@@ -303,6 +332,11 @@ final class ProxyAcceptStream
 
     private void send503RetryAfter()
     {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId, "503");
+        }
+
         streamFactory.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, e ->
                 e.item(h -> h.name(STATUS).value("503"))
                  .item(h -> h.name("retry-after").value("0")));

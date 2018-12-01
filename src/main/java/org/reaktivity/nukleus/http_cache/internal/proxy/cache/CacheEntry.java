@@ -18,7 +18,9 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
 import static java.lang.Math.min;
+import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
@@ -33,6 +35,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -48,6 +51,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
@@ -156,6 +160,13 @@ public final class CacheEntry
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             final String etag = this.cachedRequest.etag();
+
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] CONNECT %016x %s [sent refresh request]\n",
+                        currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+            }
+
             cache.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
                     builder ->
                         {
@@ -238,6 +249,12 @@ public final class CacheEntry
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         if (freshnessExtension > 0 && this.state == REFRESHING || this.state == CAN_REFRESH)
         {
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId,
+                        getHeader(responseHeaders, ":status"));
+            }
+
             expectSubscribers = true;
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
@@ -268,6 +285,13 @@ public final class CacheEntry
                         x ->  x.item(h -> h.name(WARNING).value(Cache.RESPONSE_IS_STALE))
                 );
             }
+
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId,
+                        getHeader(responseHeaders, ":status"));
+            }
+
             this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, headers);
         }
 
@@ -275,7 +299,11 @@ public final class CacheEntry
         cache.counters.responses.getAsLong();
 
         // count cached responses (cache hits)
-        cache.counters.responsesCached.getAsLong();
+        if (request instanceof InitialRequest)
+        {
+            // matching with requestsCacheable (which accounts only InitialRequest)
+            cache.counters.responsesCached.getAsLong();
+        }
 
         if(this.state == CacheEntryState.CAN_REFRESH)
         {

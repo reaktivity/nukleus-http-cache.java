@@ -15,7 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -105,6 +109,13 @@ final class ProxyConnectReplyStream
         if (streamCorrelation != null && extension.sizeof() > 0)
         {
             final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
+
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectCorrelationId,
+                        getHeader(httpBeginFW.headers(), ":status"));
+            }
+
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
             switch(streamCorrelation.getType())
@@ -236,6 +247,12 @@ final class ProxyConnectReplyStream
             final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
             final long correlationId = streamCorrelation.acceptCorrelationId();
 
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] ACCEPT %016x %s [sent cacheable response]\n", currentTimeMillis(), correlationId,
+                        getHeader(responseHeaders, ":status"));
+            }
+
             streamCorrelation.setThrottle(this::onThrottleMessageWhenProxying);
             streamFactory.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
@@ -278,6 +295,13 @@ final class ProxyConnectReplyStream
         streamFactory.correlations.put(connectCorrelationId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
         final String etag = request.etag();
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [retry cacheable request]\n",
+                    currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+        }
+
         streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
                 builder ->
                 {
@@ -342,6 +366,12 @@ final class ProxyConnectReplyStream
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
         final long correlationId = streamCorrelation.acceptCorrelationId();
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), correlationId,
+                    getHeader(responseHeaders, ":status"));
+        }
 
         streamCorrelation.setThrottle(this::onThrottleMessageWhenProxying);
         streamFactory.writer.doHttpResponse(
