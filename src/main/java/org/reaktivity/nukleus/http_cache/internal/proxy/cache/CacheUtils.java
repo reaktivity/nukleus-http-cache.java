@@ -32,7 +32,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -171,12 +172,50 @@ public final class CacheUtils
             return true;
         }
 
-        return stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
+        boolean result = stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
         {
-            String pendingHeaderValue = getHeader(request, v);
-            String myHeaderValue = getHeader(cachedRequest, v);
-            return !Objects.equals(pendingHeaderValue, myHeaderValue);
+            String requestHeaderValue = getHeader(request, v);
+            String cachedRequestHeaderValue = getHeader(cachedRequest, v);
+            return !doesNotVary(requestHeaderValue, cachedRequestHeaderValue);
         });
+
+if (!result)
+{
+    System.out.println("Vary mismatch\nrequest");
+    request.forEach(h -> System.out.printf("%s:%s\n", h.name(), h.value()));
+    System.out.println("\ncachedRequest");
+    cachedRequest.forEach(h -> System.out.printf("%s:%s\n", h.name(), h.value()));
+    System.out.println("\ncachedResponse");
+    cachedResponse.forEach(h -> System.out.printf("%s:%s\n", h.name(), h.value()));
+    System.out.println("\n==============");
+}
+
+        return result;
+    }
+
+    // takes care of multi header values during match
+    // for e.g requestHeader = "gzip", cachedRequest = "gzip, deflate, br"
+    private static boolean doesNotVary(String requestHeader, String cachedRequest)
+    {
+        if (requestHeader == cachedRequest)
+        {
+            return true;
+        }
+        else if (requestHeader == null || cachedRequest == null)
+        {
+            return false;
+        }
+        else if (requestHeader.contains(",") || cachedRequest.contains(","))
+        {
+            Set<String> requestHeaders = stream(requestHeader.split("\\s*,\\s*")).collect(Collectors.toSet());
+            Set<String> cacheRequestHeaders = stream(cachedRequest.split("\\s*,\\s*")).collect(Collectors.toSet());
+            requestHeaders.retainAll(cacheRequestHeaders);
+            return !requestHeaders.isEmpty();
+        }
+        else
+        {
+            return requestHeader.equals(cachedRequest);
+        }
     }
 
     public static boolean isVaryHeader(
