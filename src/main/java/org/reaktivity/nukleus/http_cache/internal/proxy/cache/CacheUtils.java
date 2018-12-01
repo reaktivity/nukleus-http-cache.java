@@ -172,25 +172,12 @@ public final class CacheUtils
             return true;
         }
 
-        boolean result = stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
+        return stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
         {
             String requestHeaderValue = getHeader(request, v);
             String cachedRequestHeaderValue = getHeader(cachedRequest, v);
             return !doesNotVary(requestHeaderValue, cachedRequestHeaderValue);
         });
-
-if (!result)
-{
-    System.out.println("Vary mismatch\nrequest");
-    request.forEach(h -> System.out.printf("%s:%s\n", h.name(), h.value()));
-    System.out.println("\ncachedRequest");
-    cachedRequest.forEach(h -> System.out.printf("%s:%s\n", h.name(), h.value()));
-    System.out.println("\ncachedResponse");
-    cachedResponse.forEach(h -> System.out.printf("%s:%s\n", h.name(), h.value()));
-    System.out.println("\n==============");
-}
-
-        return result;
     }
 
     // takes care of multi header values during match
