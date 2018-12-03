@@ -155,7 +155,7 @@ public final class CacheEntry
         else
         {
             MessageConsumer connect = cachedRequest.connect();
-            long connectStreamId = cachedRequest.supplyStreamId().getAsLong();
+            long connectStreamId = cachedRequest.supplyInitialId().getAsLong();
             long connectRef = cachedRequest.connectRef();
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();

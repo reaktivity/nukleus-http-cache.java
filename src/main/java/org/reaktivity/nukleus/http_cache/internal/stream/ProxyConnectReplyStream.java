@@ -288,7 +288,7 @@ final class ProxyConnectReplyStream
         request.incAttempts();
 
         MessageConsumer connect = request.connect();
-        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectStreamId = request.supplyInitialId().getAsLong();
         long connectRef = request.connectRef();
         long connectCorrelationId = request.supplyCorrelationId().getAsLong();
 

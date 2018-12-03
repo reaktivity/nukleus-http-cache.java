@@ -259,7 +259,7 @@ public class Cache
     private void sendPendingInitialRequest(
         final InitialRequest request)
     {
-        long connectStreamId = request.supplyStreamId().getAsLong();
+        long connectStreamId = request.supplyInitialId().getAsLong();
         long connectCorrelationId = request.supplyCorrelationId().getAsLong();
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
