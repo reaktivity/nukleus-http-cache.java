@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
@@ -30,7 +31,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 {
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
-    private LongSupplier supplyStreamId;
+    private LongUnaryOperator supplyReplyId;
 
     @Override
     public ServerStreamFactoryBuilder setRouteManager(
@@ -49,10 +50,17 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setStreamIdSupplier(
-        LongSupplier supplyStreamId)
+    public ServerStreamFactoryBuilder setInitialIdSupplier(
+        LongSupplier supplyInitialId)
     {
-        this.supplyStreamId = supplyStreamId;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setReplyIdSupplier(
+        LongUnaryOperator supplyReplyId)
+    {
+        this.supplyReplyId = supplyReplyId;
         return this;
     }
 
@@ -87,7 +95,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     @Override
     public StreamFactory build()
     {
-        return new ServerStreamFactory(router, writeBuffer, supplyStreamId);
+        return new ServerStreamFactory(router, writeBuffer, supplyReplyId);
     }
 
 }

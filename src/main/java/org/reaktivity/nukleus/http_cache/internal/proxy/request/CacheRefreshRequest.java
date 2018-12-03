@@ -42,7 +42,7 @@ public class CacheRefreshRequest extends CacheableRequest
               req.connect,
               req.connectRef,
               req.supplyCorrelationId,
-              req.supplyStreamId,
+              req.supplyInitialId,
               req.requestURLHash(),
               bufferPool,
               requestSlot,

@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -48,16 +48,16 @@ public class ServerStreamFactory implements StreamFactory
 
     private final RouteManager router;
 
-    private final LongSupplier supplyStreamId;
+    private final LongUnaryOperator supplyReplyId;
     private final Writer writer;
 
     public ServerStreamFactory(
         RouteManager router,
         MutableDirectBuffer writeBuffer,
-        LongSupplier supplyStreamId)
+        LongUnaryOperator supplyReplyId)
     {
         this.router = requireNonNull(router);
-        this.supplyStreamId = requireNonNull(supplyStreamId);
+        this.supplyReplyId = requireNonNull(supplyReplyId);
         this.writer = new Writer(writeBuffer);
     }
 
@@ -206,10 +206,11 @@ public class ServerStreamFactory implements StreamFactory
         private void onBegin(
             BeginFW begin)
         {
+            final long sourceId = begin.streamId();
             final String sourceName = begin.source().asString();
 
             this.acceptReply = router.supplyTarget(sourceName);
-            this.acceptReplyStreamId =  supplyStreamId.getAsLong();
+            this.acceptReplyStreamId =  supplyReplyId.applyAsLong(sourceId);
             final long acceptCorrelationId = begin.correlationId();
 
             writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, hs ->

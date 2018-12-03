@@ -50,7 +50,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     final MessageConsumer connect;
     final long connectRef;
     final LongSupplier supplyCorrelationId;
-    final LongSupplier supplyStreamId;
+    final LongSupplier supplyInitialId;
     CacheState state;
     private int attempts;
     private String recentAuthorizationHeader;
@@ -90,7 +90,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               etag);
         this.state = CacheState.COMMITING;
         this.supplyCorrelationId = supplyCorrelationId;
-        this.supplyStreamId = supplyStreamId;
+        this.supplyInitialId = supplyStreamId;
         this.requestPool = bufferPool;
         this.requestSlot = requestSlot;
 
@@ -185,9 +185,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return supplyCorrelationId;
     }
 
-    public LongSupplier supplyStreamId()
+    public LongSupplier supplyInitialId()
     {
-        return supplyStreamId;
+        return supplyInitialId;
     }
 
     public final int requestSlot()

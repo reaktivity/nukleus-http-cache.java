@@ -111,14 +111,15 @@ final class ProxyAcceptStream
     private void onBegin(
         BeginFW begin)
     {
+        final long acceptId = begin.streamId();
         final long authorization = begin.authorization();
         final short authorizationScope = authorizationScope(authorization);
 
         this.connect = streamFactory.router.supplyTarget(connectName);
-        this.connectStreamId = streamFactory.supplyStreamId.getAsLong();
+        this.connectStreamId = streamFactory.supplyInitialId.getAsLong();
 
         this.acceptReply = streamFactory.router.supplyTarget(acceptName);
-        this.acceptReplyStreamId = streamFactory.supplyStreamId.getAsLong();
+        this.acceptReplyStreamId = streamFactory.supplyReplyId.applyAsLong(acceptId);
         this.acceptCorrelationId = begin.correlationId();
 
         final OctetsFW extension = streamFactory.beginRO.extension();
@@ -219,7 +220,7 @@ final class ProxyAcceptStream
                 connect,
                 connectRef,
                 streamFactory.supplyCorrelationId,
-                streamFactory.supplyStreamId,
+                streamFactory.supplyInitialId,
                 requestURLHash,
                 streamFactory.requestBufferPool,
                 requestSlot,

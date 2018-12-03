@@ -19,6 +19,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Random;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
@@ -65,7 +66,8 @@ public class ProxyStreamFactory implements StreamFactory
     final RouteManager router;
     final BudgetManager budgetManager;
 
-    final LongSupplier supplyStreamId;
+    final LongSupplier supplyInitialId;
+    final LongUnaryOperator supplyReplyId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
@@ -84,7 +86,8 @@ public class ProxyStreamFactory implements StreamFactory
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
-        LongSupplier supplyStreamId,
+        LongSupplier supplyInitialId,
+        LongUnaryOperator supplyReplyId,
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
         LongObjectBiConsumer<Runnable> scheduler,
@@ -95,7 +98,8 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
-        this.supplyStreamId = requireNonNull(supplyStreamId);
+        this.supplyInitialId = requireNonNull(supplyInitialId);
+        this.supplyReplyId = requireNonNull(supplyReplyId);
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
                 counters.supplyCounter.apply("initial.request.acquires"),
