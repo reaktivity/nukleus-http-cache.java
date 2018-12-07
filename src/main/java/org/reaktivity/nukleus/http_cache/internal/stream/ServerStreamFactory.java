@@ -92,7 +92,7 @@ public class ServerStreamFactory implements StreamFactory
 
         final MessagePredicate filter = (t, b, o, l) ->
         {
-            final RouteFW route = routeRO.wrap(b, o, l);
+            final RouteFW route = routeRO.wrap(b, o, o + l);
             return sourceRef == route.sourceRef() &&
                     sourceName.equals(route.source().asString());
         };
