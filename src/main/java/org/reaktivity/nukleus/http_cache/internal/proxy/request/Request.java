@@ -27,6 +27,7 @@ public abstract class Request
 
     final String acceptName;
     final MessageConsumer acceptReply;
+    final long acceptRouteId;
     final long acceptReplyStreamId;
     final long acceptCorrelationId;
     final RouteManager router;
@@ -34,12 +35,14 @@ public abstract class Request
     public Request(
         String acceptName,
         MessageConsumer acceptReply,
+        long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         RouteManager router)
     {
         this.acceptName = acceptName;
         this.acceptReply = acceptReply;
+        this.acceptRouteId = acceptRouteId;
         this.acceptReplyStreamId = acceptReplyStreamId;
         this.acceptCorrelationId = acceptCorrelationId;
         this.router = router;
@@ -50,6 +53,11 @@ public abstract class Request
     public MessageConsumer acceptReply()
     {
         return acceptReply;
+    }
+
+    public long acceptRouteId()
+    {
+        return acceptRouteId;
     }
 
     public long acceptReplyStreamId()
@@ -68,5 +76,4 @@ public abstract class Request
     }
 
     public abstract void purge();
-
 }

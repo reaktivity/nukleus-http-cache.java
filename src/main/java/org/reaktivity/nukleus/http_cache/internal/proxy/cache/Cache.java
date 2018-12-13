@@ -161,9 +161,10 @@ public class Cache
                     oldCacheEntry.subscribers(subscriber ->
                     {
                         final MessageConsumer acceptReply = subscriber.acceptReply();
+                        final long acceptRouteId = subscriber.acceptRouteId();
                         final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                         final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                        this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                        this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -259,6 +260,7 @@ public class Cache
     private void sendPendingInitialRequest(
         final InitialRequest request)
     {
+        long connectRouteId = request.connectRouteId();
         long connectStreamId = request.supplyInitialId().getAsLong();
         long connectCorrelationId = request.supplyCorrelationId().getAsLong();
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
@@ -271,12 +273,12 @@ public class Cache
                     currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(request.connect(), connectStreamId, request.connectRef(), connectCorrelationId,
+        writer.doHttpRequest(request.connect(), connectRouteId, connectStreamId, request.connectRef(), connectCorrelationId,
                 builder -> requestHeaders.forEach(
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
                 )
         );
-        writer.doHttpEnd(request.connect(), connectStreamId, 0L);
+        writer.doHttpEnd(request.connect(), connectRouteId, connectStreamId, 0L);
     }
 
     public boolean hasPendingInitialRequests(
@@ -317,9 +319,10 @@ public class Cache
         else if (cacheEntry == null)
         {
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
+            final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
             final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
-            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
@@ -339,10 +342,11 @@ public class Cache
         else
         {
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
+            final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
             final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
 
-            writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
 
             // count all responses
             counters.responses.getAsLong();
@@ -397,10 +401,11 @@ public class Cache
                     currentTimeMillis(), request.acceptCorrelationId(), "304");
         }
 
-        writer.doHttpResponse(request.acceptReply(), request.acceptReplyStreamId(), request.acceptCorrelationId(), e ->
-                e.item(h -> h.name(STATUS).value("304"))
-                 .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptReplyStreamId(), 0L);
+        writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
+                request.acceptReplyStreamId(), request.acceptCorrelationId(),
+                e -> e.item(h -> h.name(STATUS).value("304"))
+                      .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
+        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyStreamId(), 0L);
 
         request.purge();
 
@@ -422,9 +427,10 @@ public class Cache
             v.removeSubscribers(subscriber ->
             {
                 final MessageConsumer acceptReply = subscriber.acceptReply();
+                final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                 final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                this.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
 
                 // count all responses
                 counters.responses.getAsLong();

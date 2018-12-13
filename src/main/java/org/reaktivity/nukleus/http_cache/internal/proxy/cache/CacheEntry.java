@@ -155,6 +155,7 @@ public final class CacheEntry
         else
         {
             MessageConsumer connect = cachedRequest.connect();
+            long connectRouteId = cachedRequest.connectRouteId();
             long connectStreamId = cachedRequest.supplyInitialId().getAsLong();
             long connectRef = cachedRequest.connectRef();
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
@@ -167,7 +168,7 @@ public final class CacheEntry
                         currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
             }
 
-            cache.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
+            cache.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectRef, connectCorrelationId,
                     builder ->
                         {
                             requestHeaders.forEach(h ->
@@ -186,7 +187,7 @@ public final class CacheEntry
                             });
                             builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                         });
-            cache.writer.doHttpEnd(connect, connectStreamId, 0L);
+            cache.writer.doHttpEnd(connect, connectRouteId, connectStreamId, 0L);
 
             // duplicate request into new slot (TODO optimize to single request)
 
@@ -242,6 +243,7 @@ public final class CacheEntry
                 .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
         final MessageConsumer acceptReply = request.acceptReply();
+        long acceptRouteId = request.acceptRouteId();
         long acceptReplyStreamId = request.acceptReplyStreamId();
         long acceptCorrelationId = request.acceptCorrelationId();
 
@@ -258,6 +260,7 @@ public final class CacheEntry
             expectSubscribers = true;
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
+                    acceptRouteId,
                     acceptReplyStreamId,
                     acceptCorrelationId,
                     cacheControlFW,
@@ -292,7 +295,7 @@ public final class CacheEntry
                         getHeader(responseHeaders, ":status"));
             }
 
-            this.cache.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, headers);
+            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, headers);
         }
 
         // count all responses
@@ -326,9 +329,10 @@ public final class CacheEntry
                 subscribers.stream().forEach(s ->
                 {
                     MessageConsumer acceptReply = s.acceptReply();
+                    final long acceptRouteId = s.acceptRouteId();
                     long acceptReplyStreamId = s.acceptReplyStreamId();
                     long acceptCorrelationId = s.acceptCorrelationId();
-                    cache.writer.do503AndAbort(acceptReply, acceptReplyStreamId, acceptCorrelationId);
+                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
                     s.purge();
 
                     // count all responses
@@ -392,8 +396,9 @@ public final class CacheEntry
                     if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
                     {
                         final MessageConsumer acceptReply = request.acceptReply();
+                        final long acceptRouteId = request.acceptRouteId();
                         final long acceptReplyStreamId = request.acceptReplyStreamId();
-                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptReplyStreamId, 0L);
+                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
                         this.onEnd.run();
                         cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
                     }
@@ -409,6 +414,7 @@ public final class CacheEntry
         private int writePayload(int budget)
         {
             final MessageConsumer acceptReply = request.acceptReply();
+            final long acceptRouteId = request.acceptRouteId();
             final long acceptReplyStreamId = request.acceptReplyStreamId();
 
             final int minBudget = min(budget, acceptReplyBudget);
@@ -417,6 +423,7 @@ public final class CacheEntry
             {
                 cache.writer.doHttpData(
                         acceptReply,
+                        acceptRouteId,
                         acceptReplyStreamId,
                         0L,
                         padding,

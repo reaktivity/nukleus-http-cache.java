@@ -42,7 +42,7 @@ public class ProxyExceptionsWithConfigurationIT
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(4096)
+            .counterValuesBufferCapacity(8192)
             .nukleus("http-cache"::equals)
             .configure(REAKTOR_BUFFER_SLOT_CAPACITY, 0)
             .clean();

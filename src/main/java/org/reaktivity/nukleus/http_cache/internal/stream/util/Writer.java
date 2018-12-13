@@ -72,61 +72,67 @@ public class Writer
     }
 
     public void doHttpRequest(
-        MessageConsumer target,
-        long targetStreamId,
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
         long targetRef,
         long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
-        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                               .streamId(targetStreamId)
-                               .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                               .sourceRef(targetRef)
-                               .correlationId(correlationId)
-                               .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                               .build();
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
+                .sourceRef(targetRef)
+                .correlationId(correlationId)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .build();
 
-        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
     public void doHttpResponse(
-        MessageConsumer target,
-        long targetStreamId,
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
         long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
-        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                               .streamId(targetStreamId)
-                               .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                               .sourceRef(0L)
-                               .correlationId(correlationId)
-                               .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                               .build();
-
-        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
-    }
-
-    public void doHttpResponseWithUpdatedCacheControl(
-            MessageConsumer target,
-            long targetStreamId,
-            long correlationId,
-            CacheControl cacheControlFW,
-            ListFW<HttpHeaderFW> responseHeaders,
-            int staleWhileRevalidate,
-            String etag,
-            boolean cacheControlPrivate)
-    {
-        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
-                        etag, cacheControlPrivate);
-        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetStreamId)
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
                 .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
                 .sourceRef(0L)
                 .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
-        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+    }
+
+    public void doHttpResponseWithUpdatedCacheControl(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long correlationId,
+        CacheControl cacheControlFW,
+        ListFW<HttpHeaderFW> responseHeaders,
+        int staleWhileRevalidate,
+        String etag,
+        boolean cacheControlPrivate)
+    {
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
+                        etag, cacheControlPrivate);
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
+                .sourceRef(0L)
+                .correlationId(correlationId)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .build();
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
     private void updateResponseHeaders(
@@ -182,7 +188,8 @@ public class Writer
     }
 
     public void doHttpData(
-        MessageConsumer target,
+        MessageConsumer receiver,
+        long routeId,
         long streamId,
         long groupId,
         int padding,
@@ -191,61 +198,69 @@ public class Writer
         int length)
     {
 
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                            .streamId(streamId)
-                            .groupId(groupId)
-                            .padding(padding)
-                            .payload(p -> p.set(payload, offset, length))
-                            .build();
+        final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .groupId(groupId)
+                .padding(padding)
+                .payload(p -> p.set(payload, offset, length))
+                .build();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+        receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void doHttpData(
-        MessageConsumer target,
+        MessageConsumer receiver,
+        long routeId,
         long streamId,
         long groupId,
         int padding,
         Consumer<OctetsFW.Builder> payload)
     {
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .streamId(streamId)
-            .groupId(groupId)
-            .padding(padding)
-            .payload(payload)
-            .build();
+        final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .groupId(groupId)
+                .padding(padding)
+                .payload(payload)
+                .build();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+        receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void doHttpEnd(
-        final MessageConsumer target,
+        final MessageConsumer receiver,
+        final long routeId,
         final long streamId,
         final long traceId)
     {
-        EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                         .streamId(streamId)
-                         .trace(traceId)
-                         .build();
-
-        target.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
-    }
-
-    public void doAbort(
-        final MessageConsumer target,
-        final long streamId,
-        final long traceId)
-    {
-        AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
                 .streamId(streamId)
                 .trace(traceId)
                 .build();
 
-        target.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
+        receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+    }
+
+    public void doAbort(
+        final MessageConsumer receiver,
+        final long routeId,
+        final long streamId,
+        final long traceId)
+    {
+        final AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
+                .build();
+
+        receiver.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
     }
 
     public void doWindow(
-        final MessageConsumer throttle,
+        final MessageConsumer sender,
+        final long routeId,
         final long streamId,
         final long traceId,
         final int credit,
@@ -253,6 +268,7 @@ public class Writer
         final long groupId)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
                 .streamId(streamId)
                 .trace(traceId)
                 .credit(credit)
@@ -260,20 +276,22 @@ public class Writer
                 .groupId(groupId)
                 .build();
 
-        throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
+        sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
     public void doReset(
-        final MessageConsumer throttle,
+        final MessageConsumer sender,
+        final long routeId,
         final long streamId,
         final long traceId)
     {
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .streamId(streamId)
-                                     .trace(traceId)
-                                     .build();
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
+                .build();
 
-        throttle.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
+        sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
     private Flyweight.Builder.Visitor visitHttpBeginEx(
@@ -295,20 +313,21 @@ public class Writer
     {
         final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply();
-        final long acceptReplyStreamId = request.acceptReplyStreamId();
+        final long routeId = request.acceptRouteId();
+        final long streamId = request.acceptReplyStreamId();
         final long authorization = request.authorization();
 
         doH2PushPromise(
             acceptReply,
-            acceptReplyStreamId, authorization, 0L, 0,
+            routeId, streamId, authorization, 0L, 0,
             setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-            ListFW<HttpHeaderFW> requestHeadersRO,
-            ListFW<HttpHeaderFW> responseHeadersRO,
-            int freshnessExtension,
-            String etag)
+        ListFW<HttpHeaderFW> requestHeadersRO,
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        int freshnessExtension,
+        String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
                 builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
@@ -317,11 +336,11 @@ public class Writer
     }
 
     private void updateRequestHeaders(
-            ListFW<HttpHeaderFW> requestHeadersFW,
-            ListFW<HttpHeaderFW> responseHeadersFW,
-            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-            int freshnessExtension,
-            String etag)
+        ListFW<HttpHeaderFW> requestHeadersFW,
+        ListFW<HttpHeaderFW> responseHeadersFW,
+        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+        int freshnessExtension,
+        String etag)
     {
         requestHeadersFW
            .forEach(h ->
@@ -402,35 +421,35 @@ public class Writer
     }
 
     private void doH2PushPromise(
-        MessageConsumer target,
-        long targetId,
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
         long authorization,
         long groupId,
         int padding,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .streamId(targetId)
-            .authorization(authorization)
-            .groupId(groupId)
-            .padding(padding)
-            .payload((OctetsFW) null)
-            .extension(e -> e.set(visitHttpBeginEx(mutator)))
-            .build();
+        final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .authorization(authorization)
+                .groupId(groupId)
+                .padding(padding)
+                .payload((OctetsFW) null)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .build();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+        receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void do503AndAbort(
-        MessageConsumer acceptReply,
-        long acceptReplyStreamId,
-        long acceptCorrelationId)
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long correlationId)
     {
-        this.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, e ->
-        e.item(h -> h.representation((byte) 0)
-                .name(STATUS)
-                .value("503")));
-        this.doAbort(acceptReply, acceptReplyStreamId, 0L);
+        this.doHttpResponse(receiver, routeId, streamId, correlationId, e -> e.item(h -> h.name(STATUS).value("503")));
+        this.doAbort(receiver, routeId, streamId, 0L);
     }
 
 }

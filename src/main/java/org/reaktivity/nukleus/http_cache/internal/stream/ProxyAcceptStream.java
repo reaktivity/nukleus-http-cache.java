@@ -47,6 +47,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 final class ProxyAcceptStream
 {
     private final ProxyStreamFactory streamFactory;
+    private final long acceptRouteId;
     private final long acceptStreamId;
     private final MessageConsumer acceptThrottle;
 
@@ -58,6 +59,7 @@ final class ProxyAcceptStream
     private MessageConsumer connect;
     private String connectName;
     private long connectRef;
+    private long connectRouteId;
     private long connectStreamId;
 
     private MessageConsumer streamState;
@@ -69,14 +71,18 @@ final class ProxyAcceptStream
     ProxyAcceptStream(
         ProxyStreamFactory streamFactory,
         MessageConsumer acceptThrottle,
+        long acceptRouteId,
         long acceptStreamId,
         String connectName,
+        long connectRouteId,
         long connectRef)
     {
         this.streamFactory = streamFactory;
         this.acceptThrottle = acceptThrottle;
+        this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
         this.connectName = connectName;
+        this.connectRouteId = connectRouteId;
         this.connectRef = connectRef;
         this.streamState = this::beforeBegin;
     }
@@ -104,7 +110,7 @@ final class ProxyAcceptStream
         }
         else
         {
-            streamFactory.writer.doReset(acceptThrottle, acceptStreamId, 0L);
+            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
         }
     }
 
@@ -178,6 +184,7 @@ final class ProxyAcceptStream
         final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
             acceptName,
             acceptReply,
+            acceptRouteId,
             acceptReplyStreamId,
             acceptCorrelationId,
             streamFactory.router,
@@ -215,9 +222,11 @@ final class ProxyAcceptStream
                 streamFactory.cache,
                 acceptName,
                 acceptReply,
+                acceptRouteId,
                 acceptReplyStreamId,
                 acceptCorrelationId,
                 connect,
+                connectRouteId,
                 connectRef,
                 streamFactory.supplyCorrelationId,
                 streamFactory.supplyInitialId,
@@ -254,7 +263,7 @@ final class ProxyAcceptStream
             }
 
             sendBeginToConnect(requestHeaders, connectCorrelationId);
-            streamFactory.writer.doHttpEnd(connect, connectStreamId, 0L); // TODO: traceId
+            streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId, 0L); // TODO: traceId
             streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
 
@@ -267,6 +276,7 @@ final class ProxyAcceptStream
         this.request = new ProxyRequest(
                 acceptName,
                 acceptReply,
+                acceptRouteId,
                 acceptReplyStreamId,
                 acceptCorrelationId,
                 streamFactory.router);
@@ -290,7 +300,7 @@ final class ProxyAcceptStream
     {
         streamFactory.correlations.put(connectCorrelationId, request);
 
-        streamFactory.writer.doHttpRequest(connect, connectStreamId, connectRef, connectCorrelationId,
+        streamFactory.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectRef, connectCorrelationId,
                 builder -> requestHeaders.forEach(
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
             )
@@ -320,11 +330,11 @@ final class ProxyAcceptStream
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId, "504");
         }
 
-        streamFactory.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, e ->
+        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, e ->
                 e.item(h -> h.representation((byte) 0)
                         .name(STATUS)
                         .value("504")));
-        streamFactory.writer.doAbort(acceptReply, acceptReplyStreamId, 0L);
+        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
         request.purge();
 
         // count all responses
@@ -338,10 +348,10 @@ final class ProxyAcceptStream
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId, "503");
         }
 
-        streamFactory.writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, e ->
+        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, e ->
                 e.item(h -> h.name(STATUS).value("503"))
                  .item(h -> h.name("retry-after").value("0")));
-        streamFactory.writer.doHttpEnd(acceptReply, acceptReplyStreamId, 0L);
+        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
@@ -383,7 +393,7 @@ final class ProxyAcceptStream
             onAbortWhenProxying(abort);
             break;
         default:
-            streamFactory.writer.doReset(acceptThrottle, acceptStreamId, 0L);
+            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
             break;
         }
     }
@@ -395,7 +405,7 @@ final class ProxyAcceptStream
         final int padding = data.padding();
         final OctetsFW payload = data.payload();
 
-        streamFactory.writer.doHttpData(connect, connectStreamId, groupId, padding,
+        streamFactory.writer.doHttpData(connect, connectRouteId, connectStreamId, groupId, padding,
                                         payload.buffer(), payload.offset(), payload.sizeof());
     }
 
@@ -403,14 +413,14 @@ final class ProxyAcceptStream
         final EndFW end)
     {
         final long traceId = end.trace();
-        streamFactory.writer.doHttpEnd(connect, connectStreamId, traceId);
+        streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId, traceId);
     }
 
     private void onAbortWhenProxying(
         final AbortFW abort)
     {
         final long traceId = abort.trace();
-        streamFactory.writer.doAbort(connect, connectStreamId, traceId);
+        streamFactory.writer.doAbort(connect, connectRouteId, connectStreamId, traceId);
         request.purge();
     }
 
@@ -429,7 +439,7 @@ final class ProxyAcceptStream
         case ResetFW.TYPE_ID:
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
             final long traceId = reset.trace();
-            streamFactory.writer.doReset(acceptThrottle, acceptStreamId, traceId);
+            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, traceId);
             break;
         default:
             break;
@@ -443,7 +453,6 @@ final class ProxyAcceptStream
         final int padding = window.padding();
         final long groupId = window.groupId();
         final long traceId = window.trace();
-        streamFactory.writer.doWindow(acceptThrottle, acceptStreamId, traceId, credit, padding, groupId);
+        streamFactory.writer.doWindow(acceptThrottle, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
     }
-
 }

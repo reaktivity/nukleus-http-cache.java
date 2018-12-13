@@ -44,7 +44,7 @@ public class ProxyExceptionsIT
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(4096)
+            .counterValuesBufferCapacity(8192)
             .nukleus("http-cache"::equals)
             .clean();
 

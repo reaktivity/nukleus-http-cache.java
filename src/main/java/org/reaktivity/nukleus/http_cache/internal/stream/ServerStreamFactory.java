@@ -103,9 +103,10 @@ public class ServerStreamFactory implements StreamFactory
 
         if (route != null)
         {
+            final long sourceRouteId = begin.routeId();
             final long sourceId = begin.streamId();
 
-            newStream = new ServerAcceptStream(source, sourceId)::onStreamMessage;
+            newStream = new ServerAcceptStream(source, sourceRouteId, sourceId)::onStreamMessage;
         }
 
         return newStream;
@@ -114,6 +115,7 @@ public class ServerStreamFactory implements StreamFactory
     private final class ServerAcceptStream
     {
         private final MessageConsumer acceptThrottle;
+        private final long acceptRouteId;
         private final long acceptStreamId;
 
         private MessageConsumer streamState;
@@ -122,9 +124,11 @@ public class ServerStreamFactory implements StreamFactory
 
         private ServerAcceptStream(
             MessageConsumer acceptThrottle,
+            long acceptRouteId,
             long acceptStreamId)
         {
             this.acceptThrottle = acceptThrottle;
+            this.acceptRouteId = acceptRouteId;
             this.acceptStreamId = acceptStreamId;
             this.streamState = this::beforeBegin;
         }
@@ -151,7 +155,7 @@ public class ServerStreamFactory implements StreamFactory
             }
             else
             {
-                writer.doReset(acceptThrottle, acceptStreamId, 0L);
+                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
             }
         }
 
@@ -176,7 +180,7 @@ public class ServerStreamFactory implements StreamFactory
                 onAbort(abort);
                 break;
             default:
-                writer.doReset(acceptThrottle, acceptStreamId, 0L);
+                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
                 break;
             }
         }
@@ -213,7 +217,7 @@ public class ServerStreamFactory implements StreamFactory
             this.acceptReplyStreamId =  supplyReplyId.applyAsLong(sourceId);
             final long acceptCorrelationId = begin.correlationId();
 
-            writer.doHttpResponse(acceptReply, acceptReplyStreamId, acceptCorrelationId, hs ->
+            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, hs ->
             {
                 hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                 hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
@@ -225,7 +229,7 @@ public class ServerStreamFactory implements StreamFactory
         private void onData(
             final DataFW data)
         {
-            writer.doReset(acceptThrottle, acceptStreamId, 0L);
+            writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
         }
 
         private void onEnd(
@@ -238,7 +242,7 @@ public class ServerStreamFactory implements StreamFactory
             final AbortFW abort)
         {
             final long traceId = abort.trace();
-            writer.doAbort(acceptReply, acceptReplyStreamId, traceId);
+            writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
         }
 
         private void onWindow(
@@ -252,7 +256,7 @@ public class ServerStreamFactory implements StreamFactory
             ResetFW reset)
         {
             final long traceId = reset.trace();
-            writer.doReset(acceptThrottle, acceptStreamId, traceId);
+            writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, traceId);
         }
     }
 
