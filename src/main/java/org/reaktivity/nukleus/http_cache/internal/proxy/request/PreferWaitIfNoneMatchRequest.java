@@ -23,6 +23,7 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
     public PreferWaitIfNoneMatchRequest(
         String acceptName,
         MessageConsumer acceptReply,
+        long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         RouteManager router,
@@ -35,6 +36,7 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
         super(
             acceptName,
             acceptReply,
+            acceptRouteId,
             acceptReplyStreamId,
             acceptCorrelationId,
             router,

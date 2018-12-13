@@ -164,11 +164,15 @@ public class ProxyStreamFactory implements StreamFactory
 
         if (route != null)
         {
+            final long sourceRouteId = begin.routeId();
             final long sourceId = begin.streamId();
+
             final String targetName = route.target().asString();
+            final long targetRouteId = route.correlationId();
             final long targetRef = route.targetRef();
 
-            newStream = new ProxyAcceptStream(this, source, sourceId, targetName, targetRef)::handleStream;
+            newStream = new ProxyAcceptStream(this, source, sourceRouteId, sourceId,
+                                              targetName, targetRouteId, targetRef)::handleStream;
         }
 
         return newStream;
@@ -178,9 +182,10 @@ public class ProxyStreamFactory implements StreamFactory
         final BeginFW begin,
         final MessageConsumer source)
     {
+        final long sourceRouteId = begin.routeId();
         final long sourceId = begin.streamId();
 
-        return new ProxyConnectReplyStream(this, source, sourceId)::handleStream;
+        return new ProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
     }
 
 

@@ -48,6 +48,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     private int responseSize = 0;
 
     final MessageConsumer connect;
+    final long connectRouteId;
     final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyInitialId;
@@ -63,9 +64,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     public CacheableRequest(
         String acceptName,
         MessageConsumer acceptReply,
+        long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         MessageConsumer connect,
+        long connectRouteId,
         long connectRef,
         LongSupplier supplyCorrelationId,
         LongSupplier supplyStreamId,
@@ -80,6 +83,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         super(acceptName,
               acceptReply,
+              acceptRouteId,
               acceptReplyStreamId,
               acceptCorrelationId,
               router,
@@ -88,6 +92,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               authorization,
               authScope,
               etag);
+        this.connectRouteId = connectRouteId;
         this.state = CacheState.COMMITING;
         this.supplyCorrelationId = supplyCorrelationId;
         this.supplyInitialId = supplyStreamId;
@@ -97,6 +102,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.connect = connect;
         this.connectRef = connectRef;
     }
+    public long connectRouteId()
+    {
+        return connectRouteId;
+    }
+
 
     // TODO remove need for duplication
     public void copyRequestTo(
@@ -416,5 +426,4 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         this.recentAuthorizationHeader = recentAuthorizationHeader;
     }
-
 }

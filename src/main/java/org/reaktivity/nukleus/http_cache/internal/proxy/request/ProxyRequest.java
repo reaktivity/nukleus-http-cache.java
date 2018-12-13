@@ -23,11 +23,12 @@ public class ProxyRequest extends Request
     public ProxyRequest(
         String acceptName,
         MessageConsumer acceptReply,
+        long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         RouteManager router)
     {
-        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
+        super(acceptName, acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
     }
 
     @Override
