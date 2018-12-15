@@ -427,4 +427,17 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 2 buffer slots
+    @Configure(name="nukleus.http_cache.slot.capacity", value="4096")
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/push.promise.after.cache.full/accept/client",
+        "${streams}/push.promise.after.cache.full/connect/server",
+    })
+    public void pushPromiseAfterCacheFull() throws Exception
+    {
+        k3po.finish();
+    }
 }
