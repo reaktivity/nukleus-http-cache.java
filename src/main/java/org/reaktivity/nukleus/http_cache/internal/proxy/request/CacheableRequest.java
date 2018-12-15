@@ -165,6 +165,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             {
                 cache.put(requestURLHash(), this);
             }
+            else
+            {
+                purge();
+            }
             return copied;
         }
         return false;
@@ -356,8 +360,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             {
                 return false;
             }
-
             requestPool.release(requestSlot);
+            requestSlot = NO_SLOT;
         }
 
         IntArrayList cachedResponseSlots = null;
@@ -384,6 +388,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             }
 
             this.responseSlots.forEach(i -> responsePool.release(i));
+            this.responseSlots = null;
         }
 
         this.requestSlot = cachedRequestSlot;
