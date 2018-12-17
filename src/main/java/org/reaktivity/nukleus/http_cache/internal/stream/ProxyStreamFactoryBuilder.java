@@ -48,6 +48,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
     private LongSupplier supplyInitialId;
+    private LongSupplier supplyTrace;
     private LongUnaryOperator supplyReplyId;
     private LongSupplier supplyCorrelationId;
     private Slab cacheBufferPool;
@@ -99,6 +100,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         LongUnaryOperator supplyReplyId)
     {
         this.supplyReplyId = supplyReplyId;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setTraceSupplier(
+            LongSupplier supplyTrace)
+    {
+        this.supplyTrace = supplyTrace;
         return this;
     }
 
@@ -185,6 +194,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 scheduler,
                 cache,
                 supplyEtag,
-                counters);
+                counters,
+                supplyTrace);
     }
 }
