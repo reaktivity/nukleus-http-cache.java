@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
@@ -42,6 +43,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 import static java.lang.System.currentTimeMillis;
+import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
@@ -82,6 +84,7 @@ public class Cache
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final Supplier<String> etagSupplier;
+    final LongSupplier supplyTrace;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
@@ -95,7 +98,8 @@ public class Cache
         Long2ObjectHashMap<Request> correlations,
         Supplier<String> etagSupplier,
         HttpCacheCounters counters,
-        LongConsumer entryCount)
+        LongConsumer entryCount,
+        LongSupplier supplyTrace)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
@@ -120,6 +124,7 @@ public class Cache
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.etagSupplier = etagSupplier;
         this.counters = counters;
+        this.supplyTrace = requireNonNull(supplyTrace);
     }
 
     public void put(
@@ -132,7 +137,8 @@ public class Cache
             CacheEntry cacheEntry = new CacheEntry(
                     this,
                     request,
-                    true);
+                    true,
+                    supplyTrace);
             updateCache(requestUrlHash, cacheEntry);
         }
         else
@@ -141,7 +147,8 @@ public class Cache
             CacheEntry cacheEntry = new CacheEntry(
                     this,
                     request,
-                    expectSubscribers);
+                    expectSubscribers,
+                    supplyTrace);
 
             if (cacheEntry.isIntendedForSingleUser())
             {
@@ -164,7 +171,8 @@ public class Cache
                         final long acceptRouteId = subscriber.acceptRouteId();
                         final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                         final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                        this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
+                        this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                                supplyTrace.getAsLong());
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -322,7 +330,8 @@ public class Cache
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
             final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                    supplyTrace.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -346,7 +355,8 @@ public class Cache
             final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
             final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                    supplyTrace.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -430,7 +440,8 @@ public class Cache
                 final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
                 final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                        supplyTrace.getAsLong());
 
                 // count all responses
                 counters.responses.getAsLong();

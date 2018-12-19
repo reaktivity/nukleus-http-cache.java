@@ -110,7 +110,8 @@ final class ProxyAcceptStream
         }
         else
         {
-            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
+            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId,
+                    streamFactory.supplyTrace.getAsLong());
         }
     }
 
@@ -263,7 +264,8 @@ final class ProxyAcceptStream
             }
 
             sendBeginToConnect(requestHeaders, connectCorrelationId);
-            streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId, 0L); // TODO: traceId
+            streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId,
+                    streamFactory.supplyTrace.getAsLong()); // TODO: traceId
             streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
 
@@ -334,7 +336,8 @@ final class ProxyAcceptStream
                 e.item(h -> h.representation((byte) 0)
                         .name(STATUS)
                         .value("504")));
-        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
+        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId,
+                streamFactory.supplyTrace.getAsLong());
         request.purge();
 
         // count all responses
@@ -351,7 +354,8 @@ final class ProxyAcceptStream
         streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, e ->
                 e.item(h -> h.name(STATUS).value("503"))
                  .item(h -> h.name("retry-after").value("0")));
-        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
+        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId,
+                streamFactory.supplyTrace.getAsLong());
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
@@ -393,7 +397,8 @@ final class ProxyAcceptStream
             onAbortWhenProxying(abort);
             break;
         default:
-            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
+            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId,
+                    streamFactory.supplyTrace.getAsLong());
             break;
         }
     }

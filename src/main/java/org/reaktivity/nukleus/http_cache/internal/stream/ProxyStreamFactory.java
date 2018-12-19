@@ -67,6 +67,7 @@ public class ProxyStreamFactory implements StreamFactory
     final BudgetManager budgetManager;
 
     final LongSupplier supplyInitialId;
+    final LongSupplier supplyTrace;
     final LongUnaryOperator supplyReplyId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
@@ -93,12 +94,14 @@ public class ProxyStreamFactory implements StreamFactory
         LongObjectBiConsumer<Runnable> scheduler,
         Cache cache,
         Supplier<String> supplyEtag,
-        HttpCacheCounters counters)
+        HttpCacheCounters counters,
+        LongSupplier supplyTrace)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
+        this.supplyTrace = requireNonNull(supplyTrace);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,

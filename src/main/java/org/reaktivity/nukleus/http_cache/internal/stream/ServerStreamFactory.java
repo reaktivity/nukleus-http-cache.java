@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 
 import org.agrona.DirectBuffer;
@@ -49,13 +50,16 @@ public class ServerStreamFactory implements StreamFactory
     private final RouteManager router;
 
     private final LongUnaryOperator supplyReplyId;
+    private final LongSupplier supplyTrace;
     private final Writer writer;
 
     public ServerStreamFactory(
         RouteManager router,
         MutableDirectBuffer writeBuffer,
-        LongUnaryOperator supplyReplyId)
+        LongUnaryOperator supplyReplyId,
+        LongSupplier supplyTrace)
     {
+        this.supplyTrace = requireNonNull(supplyTrace);
         this.router = requireNonNull(router);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.writer = new Writer(writeBuffer);
@@ -155,7 +159,7 @@ public class ServerStreamFactory implements StreamFactory
             }
             else
             {
-                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
+                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, supplyTrace.getAsLong());
             }
         }
 
@@ -180,7 +184,7 @@ public class ServerStreamFactory implements StreamFactory
                 onAbort(abort);
                 break;
             default:
-                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
+                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, supplyTrace.getAsLong());
                 break;
             }
         }
@@ -229,7 +233,7 @@ public class ServerStreamFactory implements StreamFactory
         private void onData(
             final DataFW data)
         {
-            writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, 0L);
+            writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, supplyTrace.getAsLong());
         }
 
         private void onEnd(

@@ -41,6 +41,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
+
 final class ProxyConnectReplyStream
 {
     private final ProxyStreamFactory streamFactory;
@@ -95,7 +96,8 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            this.streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+            this.streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                    streamFactory.supplyTrace.getAsLong());
         }
     }
 
@@ -156,13 +158,15 @@ final class ProxyConnectReplyStream
         if (request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
             this.streamState = this::handleCacheRefresh;
-            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L, 32767, 0, 0L);
+            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L,
+                    32767, 0, 0L);
         }
         else
         {
             request.purge();
             this.streamState = this::reset;
-            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                    streamFactory.supplyTrace.getAsLong());
         }
     }
 
@@ -192,11 +196,13 @@ final class ProxyConnectReplyStream
                 {
                     request.purge();
                     this.streamState = this::reset;
-                    streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+                    streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                            streamFactory.supplyTrace.getAsLong());
                 }
                 else
                 {
-                    streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L, length, 0, 0L);
+                    streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                            0L, length, 0, 0L);
                 }
                 break;
             case EndFW.TYPE_ID:
@@ -317,7 +323,7 @@ final class ProxyConnectReplyStream
                         builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                     }
                 });
-        streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId, 0L);
+        streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
     }
 
@@ -416,7 +422,8 @@ final class ProxyConnectReplyStream
             onAbortWhenProxying(abort);
             break;
         default:
-            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                    streamFactory.supplyTrace.getAsLong());
             break;
         }
     }
@@ -453,7 +460,8 @@ final class ProxyConnectReplyStream
         connectReplyBudget -= data.length() + data.padding();
         if (connectReplyBudget < 0)
         {
-            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                    streamFactory.supplyTrace.getAsLong());
         }
         else
         {
@@ -529,7 +537,8 @@ final class ProxyConnectReplyStream
     {
         final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
         streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
-        streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+        streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                streamFactory.supplyTrace.getAsLong());
         // if cached, do not purge the buffer slots as it may be used by other clients
         if (!cached)
         {
