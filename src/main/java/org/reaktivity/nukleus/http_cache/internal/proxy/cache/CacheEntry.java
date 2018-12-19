@@ -19,6 +19,7 @@ import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
+import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
@@ -43,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -85,16 +87,19 @@ public final class CacheEntry
     private CacheEntryState state;
 
     private long pollAt = -1;
+    private final LongSupplier supplyTrace;
 
     public CacheEntry(
         Cache cache,
         CacheableRequest request,
-        boolean expectSubscribers)
+        boolean expectSubscribers,
+        LongSupplier supplyTrace)
     {
         this.cache = cache;
         this.cachedRequest = request;
         this.expectSubscribers = expectSubscribers;
         this.state = CacheEntryState.INITIALIZED;
+        this.supplyTrace = requireNonNull(supplyTrace);
     }
 
     public void commit()
@@ -332,7 +337,8 @@ public final class CacheEntry
                     final long acceptRouteId = s.acceptRouteId();
                     long acceptReplyStreamId = s.acceptReplyStreamId();
                     long acceptCorrelationId = s.acceptCorrelationId();
-                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId);
+                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                            supplyTrace.getAsLong());
                     s.purge();
 
                     // count all responses

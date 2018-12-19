@@ -179,7 +179,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     correlations,
                     supplyEtag,
                     counters,
-                    cacheEntries);
+                    cacheEntries,
+                    supplyTrace);
         }
 
         return new ProxyStreamFactory(
