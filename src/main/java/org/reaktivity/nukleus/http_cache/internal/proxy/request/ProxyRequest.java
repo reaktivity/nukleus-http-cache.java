@@ -21,14 +21,13 @@ import org.reaktivity.nukleus.route.RouteManager;
 public class ProxyRequest extends Request
 {
     public ProxyRequest(
-        String acceptName,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         RouteManager router)
     {
-        super(acceptName, acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
     }
 
     @Override

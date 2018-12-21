@@ -162,7 +162,6 @@ public final class CacheEntry
             MessageConsumer connect = cachedRequest.connect();
             long connectRouteId = cachedRequest.connectRouteId();
             long connectStreamId = cachedRequest.supplyInitialId().getAsLong();
-            long connectRef = cachedRequest.connectRef();
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             final String etag = this.cachedRequest.etag();
@@ -173,7 +172,7 @@ public final class CacheEntry
                         currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
             }
 
-            cache.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectRef, connectCorrelationId,
+            cache.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectCorrelationId,
                     builder ->
                         {
                             requestHeaders.forEach(h ->

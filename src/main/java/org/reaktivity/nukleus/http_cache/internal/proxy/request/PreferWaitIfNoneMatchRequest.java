@@ -21,7 +21,6 @@ import org.reaktivity.nukleus.route.RouteManager;
 public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
 {
     public PreferWaitIfNoneMatchRequest(
-        String acceptName,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
@@ -34,7 +33,6 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
         String etag)
     {
         super(
-            acceptName,
             acceptReply,
             acceptRouteId,
             acceptReplyStreamId,

@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -26,7 +25,6 @@ import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
@@ -51,8 +49,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public class Writer
 {
-    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer("http-cache".getBytes(UTF_8));
-
     private final BeginFW.Builder beginRW = new BeginFW.Builder();
     private final DataFW.Builder dataRW = new DataFW.Builder();
     private final EndFW.Builder endRW = new EndFW.Builder();
@@ -75,15 +71,12 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long targetRef,
         long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                .sourceRef(targetRef)
                 .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
@@ -101,8 +94,6 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                .sourceRef(0L)
                 .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
@@ -127,8 +118,6 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                .sourceRef(0L)
                 .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();

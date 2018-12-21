@@ -18,8 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
-import java.util.Random;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -56,12 +54,10 @@ public class ControllerIT
     })
     public void shouldRouteServer() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
         reaktor.controller(HttpCacheController.class)
-               .routeServer("source", 0L, "target", targetRef)
+               .routeServer("http-cache#0", "target#0")
                .get();
 
         k3po.finish();
@@ -73,12 +69,10 @@ public class ControllerIT
     })
     public void shouldRouteProxy() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
         reaktor.controller(HttpCacheController.class)
-               .routeProxy("source", 0L, "target", targetRef)
+               .routeProxy("http-cache#0", "target#0")
                .get();
 
         k3po.finish();
@@ -91,18 +85,16 @@ public class ControllerIT
     })
     public void shouldUnrouteServer() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
-        long sourceRef = reaktor.controller(HttpCacheController.class)
-               .routeServer("source", 0L, "target", targetRef)
+        long routeId = reaktor.controller(HttpCacheController.class)
+               .routeServer("http-cache#0", "target#0")
                .get();
 
         k3po.notifyBarrier("ROUTED_SERVER");
 
         reaktor.controller(HttpCacheController.class)
-               .unrouteServer("source", sourceRef, "target", targetRef)
+               .unroute(routeId)
                .get();
 
         k3po.finish();
@@ -113,20 +105,18 @@ public class ControllerIT
         "${route}/proxy/nukleus",
         "${unroute}/proxy/nukleus"
     })
-    public void shouldUnrouteOutputNew() throws Exception
+    public void shouldUnrouteProxy() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
-        long sourceRef = reaktor.controller(HttpCacheController.class)
-            .routeProxy("source", 0L, "target", targetRef)
+        long routeId = reaktor.controller(HttpCacheController.class)
+            .routeProxy("http-cache#0", "target#0")
             .get();
 
         k3po.notifyBarrier("ROUTED_PROXY");
 
         reaktor.controller(HttpCacheController.class)
-               .unrouteProxy("source", sourceRef, "target", targetRef)
+               .unroute(routeId)
                .get();
 
         k3po.finish();

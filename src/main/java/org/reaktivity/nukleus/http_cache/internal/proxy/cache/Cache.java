@@ -281,7 +281,7 @@ public class Cache
                     currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(request.connect(), connectRouteId, connectStreamId, request.connectRef(), connectCorrelationId,
+        writer.doHttpRequest(request.connect(), connectRouteId, connectStreamId, connectCorrelationId,
                 builder -> requestHeaders.forEach(
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
                 )
