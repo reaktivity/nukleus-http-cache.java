@@ -51,14 +51,11 @@ final class ProxyAcceptStream
     private final long acceptStreamId;
     private final MessageConsumer acceptThrottle;
 
-    private String acceptName;
     private MessageConsumer acceptReply;
     private long acceptReplyStreamId;
     private long acceptCorrelationId;
 
     private MessageConsumer connect;
-    private String connectName;
-    private long connectRef;
     private long connectRouteId;
     private long connectStreamId;
 
@@ -73,17 +70,13 @@ final class ProxyAcceptStream
         MessageConsumer acceptThrottle,
         long acceptRouteId,
         long acceptStreamId,
-        String connectName,
-        long connectRouteId,
-        long connectRef)
+        long connectRouteId)
     {
         this.streamFactory = streamFactory;
         this.acceptThrottle = acceptThrottle;
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
-        this.connectName = connectName;
         this.connectRouteId = connectRouteId;
-        this.connectRef = connectRef;
         this.streamState = this::beforeBegin;
     }
 
@@ -105,7 +98,6 @@ final class ProxyAcceptStream
         if (msgTypeId == BeginFW.TYPE_ID)
         {
             final BeginFW begin = streamFactory.beginRO.wrap(buffer, index, index + length);
-            this.acceptName = begin.source().asString();
             onBegin(begin);
         }
         else
@@ -122,10 +114,10 @@ final class ProxyAcceptStream
         final long authorization = begin.authorization();
         final short authorizationScope = authorizationScope(authorization);
 
-        this.connect = streamFactory.router.supplyTarget(connectName);
+        this.connect = streamFactory.router.supplyReceiver(connectRouteId);
         this.connectStreamId = streamFactory.supplyInitialId.getAsLong();
 
-        this.acceptReply = streamFactory.router.supplyTarget(acceptName);
+        this.acceptReply = streamFactory.router.supplySender(acceptRouteId);
         this.acceptReplyStreamId = streamFactory.supplyReplyId.applyAsLong(acceptId);
         this.acceptCorrelationId = begin.correlationId();
 
@@ -183,7 +175,6 @@ final class ProxyAcceptStream
         final String etag = streamFactory.supplyEtag.get();
 
         final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
-            acceptName,
             acceptReply,
             acceptRouteId,
             acceptReplyStreamId,
@@ -221,14 +212,12 @@ final class ProxyAcceptStream
         InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
-                acceptName,
                 acceptReply,
                 acceptRouteId,
                 acceptReplyStreamId,
                 acceptCorrelationId,
                 connect,
                 connectRouteId,
-                connectRef,
                 streamFactory.supplyCorrelationId,
                 streamFactory.supplyInitialId,
                 requestURLHash,
@@ -276,7 +265,6 @@ final class ProxyAcceptStream
         final ListFW<HttpHeaderFW> requestHeaders)
     {
         this.request = new ProxyRequest(
-                acceptName,
                 acceptReply,
                 acceptRouteId,
                 acceptReplyStreamId,
@@ -302,13 +290,13 @@ final class ProxyAcceptStream
     {
         streamFactory.correlations.put(connectCorrelationId, request);
 
-        streamFactory.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectRef, connectCorrelationId,
+        streamFactory.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectCorrelationId,
                 builder -> requestHeaders.forEach(
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
             )
         );
 
-        streamFactory.router.setThrottle(connectName, connectStreamId, this::onThrottleMessage);
+        streamFactory.router.setThrottle(connectStreamId, this::onThrottleMessage);
     }
 
     private boolean storeRequest(

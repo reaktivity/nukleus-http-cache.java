@@ -49,7 +49,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
 
     final MessageConsumer connect;
     final long connectRouteId;
-    final long connectRef;
     final LongSupplier supplyCorrelationId;
     final LongSupplier supplyInitialId;
     CacheState state;
@@ -62,14 +61,12 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     }
 
     public CacheableRequest(
-        String acceptName,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         MessageConsumer connect,
         long connectRouteId,
-        long connectRef,
         LongSupplier supplyCorrelationId,
         LongSupplier supplyStreamId,
         int requestURLHash,
@@ -81,8 +78,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         short authScope,
         String etag)
     {
-        super(acceptName,
-              acceptReply,
+        super(acceptReply,
               acceptRouteId,
               acceptReplyStreamId,
               acceptCorrelationId,
@@ -100,7 +96,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.requestSlot = requestSlot;
 
         this.connect = connect;
-        this.connectRef = connectRef;
     }
     public long connectRouteId()
     {
@@ -187,11 +182,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             this.responseSlots = null;
             this.state = CacheState.PURGED;
         }
-    }
-
-    public long connectRef()
-    {
-        return connectRef;
     }
 
     public LongSupplier supplyCorrelationId()

@@ -25,7 +25,6 @@ public abstract class Request
         PREFER_WAIT, PROXY, INITIAL_REQUEST, CACHE_REFRESH
     }
 
-    final String acceptName;
     final MessageConsumer acceptReply;
     final long acceptRouteId;
     final long acceptReplyStreamId;
@@ -33,14 +32,12 @@ public abstract class Request
     final RouteManager router;
 
     public Request(
-        String acceptName,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
         RouteManager router)
     {
-        this.acceptName = acceptName;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyStreamId = acceptReplyStreamId;
@@ -72,7 +69,7 @@ public abstract class Request
 
     public void setThrottle(MessageConsumer throttle)
     {
-        this.router.setThrottle(acceptName, acceptReplyStreamId, throttle);
+        this.router.setThrottle(acceptReplyStreamId, throttle);
     }
 
     public abstract void purge();

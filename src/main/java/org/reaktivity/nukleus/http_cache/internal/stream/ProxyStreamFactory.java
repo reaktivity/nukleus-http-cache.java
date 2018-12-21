@@ -130,17 +130,17 @@ public class ProxyStreamFactory implements StreamFactory
             MessageConsumer throttle)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-        final long sourceRef = begin.sourceRef();
+        final long streamId = begin.streamId();
 
         MessageConsumer newStream;
 
-        if (sourceRef == 0L)
+        if ((streamId & 0x8000_0000_0000_0000L) == 0L)
         {
-            newStream = newConnectReplyStream(begin, throttle);
+            newStream = newAcceptStream(begin, throttle);
         }
         else
         {
-            newStream = newAcceptStream(begin, throttle);
+            newStream = newConnectReplyStream(begin, throttle);
         }
 
         return newStream;
@@ -150,18 +150,11 @@ public class ProxyStreamFactory implements StreamFactory
         final BeginFW begin,
         final MessageConsumer source)
     {
-        final long sourceRef = begin.sourceRef();
-        final String sourceName = begin.source().asString();
+        final long routeId = begin.routeId();
         final long authorization = begin.authorization();
 
-        final MessagePredicate filter = (t, b, o, l) ->
-        {
-            final RouteFW route = routeRO.wrap(b, o, o + l);
-            return sourceRef == route.sourceRef() &&
-                    sourceName.equals(route.source().asString());
-        };
-
-        final RouteFW route = router.resolve(authorization, filter, this::wrapRoute);
+        final MessagePredicate filter = (t, b, o, l) -> true;
+        final RouteFW route = router.resolve(routeId, authorization, filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
@@ -170,12 +163,10 @@ public class ProxyStreamFactory implements StreamFactory
             final long sourceRouteId = begin.routeId();
             final long sourceId = begin.streamId();
 
-            final String targetName = route.target().asString();
             final long targetRouteId = route.correlationId();
-            final long targetRef = route.targetRef();
 
             newStream = new ProxyAcceptStream(this, source, sourceRouteId, sourceId,
-                                              targetName, targetRouteId, targetRef)::handleStream;
+                                              targetRouteId)::handleStream;
         }
 
         return newStream;
@@ -191,21 +182,6 @@ public class ProxyStreamFactory implements StreamFactory
         return new ProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
     }
 
-
-    RouteFW resolveTarget(
-            long sourceRef,
-            long authorization,
-            String sourceName)
-    {
-        MessagePredicate filter = (t, b, o, l) ->
-        {
-            RouteFW route = routeRO.wrap(b, o, o + l);
-            return sourceRef == route.sourceRef() && sourceName.equals(route.source().asString());
-        };
-
-        return router.resolve(authorization, filter, this::wrapRoute);
-    }
-
     private RouteFW wrapRoute(
             int msgTypeId,
             DirectBuffer buffer,
@@ -214,5 +190,4 @@ public class ProxyStreamFactory implements StreamFactory
     {
         return routeRO.wrap(buffer, index, index + length);
     }
-
 }

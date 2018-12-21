@@ -76,13 +76,6 @@ public final class HttpCacheController implements Controller
         return "http-cache";
     }
 
-    public <T> T supplySource(
-        String source,
-        BiFunction<MessagePredicate, ToIntFunction<MessageConsumer>, T> factory)
-    {
-        return controllerSpi.doSupplySource(source, factory);
-    }
-
     public <T> T supplyTarget(
         String target,
         BiFunction<ToIntFunction<MessageConsumer>, MessagePredicate, T> factory)
@@ -91,81 +84,49 @@ public final class HttpCacheController implements Controller
     }
 
     public CompletableFuture<Long> routeServer(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+        String localAddress,
+        String remoteAddress)
     {
 
         long correlationId = controllerSpi.nextCorrelationId();
 
         RouteFW route = routeRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .correlationId(correlationId)
+                .nukleus(name())
                 .role(b -> b.set(Role.SERVER))
-                .source(source)
-                .sourceRef(sourceRef)
-                .target(target)
-                .targetRef(targetRef)
+                .localAddress(localAddress)
+                .remoteAddress(remoteAddress)
                 .build();
 
         return controllerSpi.doRoute(route.typeId(), route.buffer(), route.offset(), route.sizeof());
-    }
-
-    public CompletableFuture<Void> unrouteServer(
-            String source,
-            long sourceRef,
-            String target,
-            long targetRef)
-    {
-        long correlationId = controllerSpi.nextCorrelationId();
-
-        UnrouteFW unroute = unrouteRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .correlationId(correlationId)
-                                     .role(b -> b.set(Role.SERVER))
-                                     .source(source)
-                                     .sourceRef(sourceRef)
-                                     .target(target)
-                                     .targetRef(targetRef)
-                                     .build();
-
-        return controllerSpi.doUnroute(unroute.typeId(), unroute.buffer(), unroute.offset(), unroute.sizeof());
     }
 
     public CompletableFuture<Long> routeProxy(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+        String localAddress,
+        String remoteAddress)
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
         RouteFW route = routeRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .correlationId(correlationId)
+                .nukleus(name())
                 .role(b -> b.set(Role.PROXY))
-                .source(source)
-                .sourceRef(sourceRef)
-                .target(target)
-                .targetRef(targetRef)
+                .localAddress(localAddress)
+                .remoteAddress(remoteAddress)
                 .build();
 
         return controllerSpi.doRoute(route.typeId(), route.buffer(), route.offset(), route.sizeof());
     }
 
-    public CompletableFuture<Void> unrouteProxy(
-        String source,
-        long sourceRef,
-        String target,
-        long targetRef)
+    public CompletableFuture<Void> unroute(
+        long routeId)
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
         UnrouteFW unroute = unrouteRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                      .correlationId(correlationId)
-                                     .role(b -> b.set(Role.PROXY))
-                                     .source(source)
-                                     .sourceRef(sourceRef)
-                                     .target(target)
-                                     .targetRef(targetRef)
+                                     .nukleus(name())
+                                     .routeId(routeId)
                                      .build();
 
         return controllerSpi.doUnroute(unroute.typeId(), unroute.buffer(), unroute.offset(), unroute.sizeof());
@@ -177,12 +138,14 @@ public final class HttpCacheController implements Controller
 
         FreezeFW freeze = freezeRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                   .correlationId(correlationId)
+                                  .nukleus(name())
                                   .build();
 
         return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
     }
 
-    public long count(String name)
+    public long count(
+        String name)
     {
         return controllerSpi.doCount(name);
     }

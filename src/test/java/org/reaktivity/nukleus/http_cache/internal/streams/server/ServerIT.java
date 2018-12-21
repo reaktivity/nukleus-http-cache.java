@@ -31,9 +31,7 @@ public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server")
-        .scriptProperty("routeTarget \"http-cache\"")
-        .scriptProperty("newServerConnectRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -56,5 +54,4 @@ public class ServerIT
     {
         k3po.finish();
     }
-
 }

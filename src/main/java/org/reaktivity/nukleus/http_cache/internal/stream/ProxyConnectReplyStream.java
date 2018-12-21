@@ -104,11 +104,9 @@ final class ProxyConnectReplyStream
     private void handleBegin(
         BeginFW begin)
     {
-        final long connectReplyRef = begin.sourceRef();
         final long connectCorrelationId = begin.correlationId();
 
-        this.streamCorrelation = connectReplyRef == 0L ?
-            this.streamFactory.correlations.remove(connectCorrelationId) : null;
+        this.streamCorrelation = this.streamFactory.correlations.remove(connectCorrelationId);
         final OctetsFW extension = streamFactory.beginRO.extension();
 
         if (streamCorrelation != null && extension.sizeof() > 0)
@@ -300,7 +298,6 @@ final class ProxyConnectReplyStream
 
         MessageConsumer connect = request.connect();
         long connectStreamId = request.supplyInitialId().getAsLong();
-        long connectRef = request.connectRef();
         long connectCorrelationId = request.supplyCorrelationId().getAsLong();
 
         streamFactory.correlations.put(connectCorrelationId, request);
@@ -313,7 +310,7 @@ final class ProxyConnectReplyStream
                     currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectRef, connectCorrelationId,
+        streamFactory.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectCorrelationId,
                 builder ->
                 {
                     requestHeaders.forEach(

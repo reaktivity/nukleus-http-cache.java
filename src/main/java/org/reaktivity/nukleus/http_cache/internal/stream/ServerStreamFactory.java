@@ -74,11 +74,11 @@ public class ServerStreamFactory implements StreamFactory
         MessageConsumer throttle)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
-        final long sourceRef = begin.sourceRef();
+        final long streamId = begin.streamId();
 
         MessageConsumer newStream = null;
 
-        if (sourceRef != 0L)
+        if ((streamId & 0x8000_0000_0000_0000L) == 0L)
         {
             newStream = newAcceptStream(begin, throttle);
         }
@@ -90,18 +90,11 @@ public class ServerStreamFactory implements StreamFactory
         final BeginFW begin,
         final MessageConsumer source)
     {
-        final long sourceRef = begin.sourceRef();
-        final String sourceName = begin.source().asString();
+        final long routeId = begin.routeId();
         final long authorization = begin.authorization();
 
-        final MessagePredicate filter = (t, b, o, l) ->
-        {
-            final RouteFW route = routeRO.wrap(b, o, o + l);
-            return sourceRef == route.sourceRef() &&
-                    sourceName.equals(route.source().asString());
-        };
-
-        final RouteFW route = router.resolve(authorization, filter, this::wrapRoute);
+        final MessagePredicate filter = (t, b, o, l) -> true;
+        final RouteFW route = router.resolve(routeId, authorization, filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
@@ -214,11 +207,10 @@ public class ServerStreamFactory implements StreamFactory
         private void onBegin(
             BeginFW begin)
         {
-            final long sourceId = begin.streamId();
-            final String sourceName = begin.source().asString();
+            final long initialId = begin.streamId();
 
-            this.acceptReply = router.supplyTarget(sourceName);
-            this.acceptReplyStreamId =  supplyReplyId.applyAsLong(sourceId);
+            this.acceptReply = router.supplySender(acceptRouteId);
+            this.acceptReplyStreamId =  supplyReplyId.applyAsLong(initialId);
             final long acceptCorrelationId = begin.correlationId();
 
             writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, hs ->
@@ -227,7 +219,7 @@ public class ServerStreamFactory implements StreamFactory
                 hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
             });
             this.streamState = this::afterBegin;
-            router.setThrottle(sourceName, acceptReplyStreamId, this::onThrottleMessage);
+            router.setThrottle(acceptReplyStreamId, this::onThrottleMessage);
         }
 
         private void onData(

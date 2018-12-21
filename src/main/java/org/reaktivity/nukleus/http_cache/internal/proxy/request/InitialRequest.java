@@ -31,14 +31,12 @@ public class InitialRequest extends CacheableRequest
 
     public InitialRequest(
             Cache cache,
-            String acceptName,
             MessageConsumer acceptReply,
             long acceptRouteId,
             long acceptReplyStreamId,
             long acceptCorrelationId,
             MessageConsumer connect,
             long connectRouteId,
-            long connectRef,
             LongSupplier supplyCorrelationId,
             LongSupplier supplyInitialId,
             int requestURLHash,
@@ -50,14 +48,12 @@ public class InitialRequest extends CacheableRequest
             short authScope,
             String etag)
     {
-        super(acceptName,
-              acceptReply,
+        super(acceptReply,
               acceptRouteId,
               acceptReplyStreamId,
               acceptCorrelationId,
               connect,
               connectRouteId,
-              connectRef,
               supplyCorrelationId,
               supplyInitialId,
               requestURLHash,
