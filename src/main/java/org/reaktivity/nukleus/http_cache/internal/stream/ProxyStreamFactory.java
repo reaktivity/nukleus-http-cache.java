@@ -33,7 +33,6 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -72,7 +71,6 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
-    final LongObjectBiConsumer<Runnable> scheduler;
     final LongSupplier supplyCorrelationId;
     final Supplier<String> supplyEtag;
 
@@ -91,7 +89,6 @@ public class ProxyStreamFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
-        LongObjectBiConsumer<Runnable> scheduler,
         Cache cache,
         Supplier<String> supplyEtag,
         HttpCacheCounters counters,
@@ -112,7 +109,6 @@ public class ProxyStreamFactory implements StreamFactory
                 counters.supplyCounter.apply("response.acquires"),
                 counters.supplyCounter.apply("response.releases"));
         this.correlations = requireNonNull(correlations);
-        this.scheduler = scheduler;
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.cache = cache;
 
