@@ -15,21 +15,28 @@
  */
 package org.reaktivity.nukleus.http_cache.internal;
 
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.NukleusFactorySpi;
+import org.agrona.concurrent.Agent;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.DelayedTaskScheduler;
 
-public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
+final class HttpCacheAgent implements Agent
 {
-    @Override
-    public String name()
+    private final DelayedTaskScheduler scheduler;
+
+    HttpCacheAgent(
+        DelayedTaskScheduler scheduler)
     {
-        return HttpCacheNukleus.NAME;
+        this.scheduler = scheduler;
     }
 
     @Override
-    public HttpCacheNukleus create(
-        Configuration config)
+    public int doWork() throws Exception
     {
-        return new HttpCacheNukleus(new HttpCacheConfiguration(config));
+        return scheduler.process();
+    }
+
+    @Override
+    public String roleName()
+    {
+        return String.format("%s.agent", HttpCacheNukleus.NAME);
     }
 }

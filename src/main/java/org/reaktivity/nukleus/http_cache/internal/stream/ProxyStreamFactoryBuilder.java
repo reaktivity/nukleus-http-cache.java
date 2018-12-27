@@ -192,7 +192,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyReplyId,
                 supplyCorrelationId,
                 correlations,
-                scheduler,
                 cache,
                 supplyEtag,
                 counters,
