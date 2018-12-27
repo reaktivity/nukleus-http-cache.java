@@ -15,11 +15,20 @@
  */
 package org.reaktivity.nukleus.http_cache.internal;
 
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.NukleusFactorySpi;
+import org.reaktivity.nukleus.Nukleus;
 
-public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
+final class HttpCacheNukleus implements Nukleus
 {
+    static final String NAME = "http-cache";
+
+    private final HttpCacheConfiguration config;
+
+    HttpCacheNukleus(
+        HttpCacheConfiguration config)
+    {
+        this.config = config;
+    }
+
     @Override
     public String name()
     {
@@ -27,9 +36,14 @@ public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
     }
 
     @Override
-    public HttpCacheNukleus create(
-        Configuration config)
+    public HttpCacheConfiguration config()
     {
-        return new HttpCacheNukleus(new HttpCacheConfiguration(config));
+        return config;
+    }
+
+    @Override
+    public HttpCacheElektron supplyElektron()
+    {
+        return new HttpCacheElektron(config);
     }
 }
