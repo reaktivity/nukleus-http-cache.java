@@ -88,22 +88,21 @@ public class ServerStreamFactory implements StreamFactory
 
     private MessageConsumer newAcceptStream(
         final BeginFW begin,
-        final MessageConsumer source)
+        final MessageConsumer acceptReply)
     {
-        final long routeId = begin.routeId();
+        final long acceptRouteId = begin.routeId();
         final long authorization = begin.authorization();
 
         final MessagePredicate filter = (t, b, o, l) -> true;
-        final RouteFW route = router.resolve(routeId, authorization, filter, this::wrapRoute);
+        final RouteFW route = router.resolve(acceptRouteId, authorization, filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
         if (route != null)
         {
-            final long sourceRouteId = begin.routeId();
-            final long sourceId = begin.streamId();
+            final long acceptInitialId = begin.streamId();
 
-            newStream = new ServerAcceptStream(source, sourceRouteId, sourceId)::onStreamMessage;
+            newStream = new ServerAcceptStream(acceptReply, acceptRouteId, acceptInitialId)::onStreamMessage;
         }
 
         return newStream;
@@ -111,22 +110,21 @@ public class ServerStreamFactory implements StreamFactory
 
     private final class ServerAcceptStream
     {
-        private final MessageConsumer acceptThrottle;
+        private final MessageConsumer acceptReply;
         private final long acceptRouteId;
-        private final long acceptStreamId;
+        private final long acceptInitialId;
 
         private MessageConsumer streamState;
-        private MessageConsumer acceptReply;
         private long acceptReplyStreamId;
 
         private ServerAcceptStream(
-            MessageConsumer acceptThrottle,
+            MessageConsumer acceptReply,
             long acceptRouteId,
-            long acceptStreamId)
+            long acceptInitialId)
         {
-            this.acceptThrottle = acceptThrottle;
+            this.acceptReply = acceptReply;
             this.acceptRouteId = acceptRouteId;
-            this.acceptStreamId = acceptStreamId;
+            this.acceptInitialId = acceptInitialId;
             this.streamState = this::beforeBegin;
         }
 
@@ -152,7 +150,7 @@ public class ServerStreamFactory implements StreamFactory
             }
             else
             {
-                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, supplyTrace.getAsLong());
+                writer.doReset(acceptReply, acceptRouteId, acceptInitialId, supplyTrace.getAsLong());
             }
         }
 
@@ -177,7 +175,7 @@ public class ServerStreamFactory implements StreamFactory
                 onAbort(abort);
                 break;
             default:
-                writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, supplyTrace.getAsLong());
+                writer.doReset(acceptReply, acceptRouteId, acceptInitialId, supplyTrace.getAsLong());
                 break;
             }
         }
@@ -209,7 +207,6 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long initialId = begin.streamId();
 
-            this.acceptReply = router.supplySender(acceptRouteId);
             this.acceptReplyStreamId =  supplyReplyId.applyAsLong(initialId);
             final long acceptCorrelationId = begin.correlationId();
 
@@ -225,7 +222,7 @@ public class ServerStreamFactory implements StreamFactory
         private void onData(
             final DataFW data)
         {
-            writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, supplyTrace.getAsLong());
+            writer.doReset(acceptReply, acceptRouteId, acceptInitialId, supplyTrace.getAsLong());
         }
 
         private void onEnd(
@@ -252,7 +249,7 @@ public class ServerStreamFactory implements StreamFactory
             ResetFW reset)
         {
             final long traceId = reset.trace();
-            writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, traceId);
+            writer.doReset(acceptReply, acceptRouteId, acceptInitialId, traceId);
         }
     }
 

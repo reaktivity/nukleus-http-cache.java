@@ -144,25 +144,23 @@ public class ProxyStreamFactory implements StreamFactory
 
     private MessageConsumer newAcceptStream(
         final BeginFW begin,
-        final MessageConsumer source)
+        final MessageConsumer acceptReply)
     {
-        final long routeId = begin.routeId();
+        final long acceptRouteId = begin.routeId();
         final long authorization = begin.authorization();
 
         final MessagePredicate filter = (t, b, o, l) -> true;
-        final RouteFW route = router.resolve(routeId, authorization, filter, this::wrapRoute);
+        final RouteFW route = router.resolve(acceptRouteId, authorization, filter, this::wrapRoute);
 
         MessageConsumer newStream = null;
 
         if (route != null)
         {
-            final long sourceRouteId = begin.routeId();
-            final long sourceId = begin.streamId();
+            final long acceptInitialId = begin.streamId();
+            final long connectRouteId = route.correlationId();
 
-            final long targetRouteId = route.correlationId();
-
-            newStream = new ProxyAcceptStream(this, source, sourceRouteId, sourceId,
-                                              targetRouteId)::handleStream;
+            newStream = new ProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
+                                              connectRouteId)::handleStream;
         }
 
         return newStream;

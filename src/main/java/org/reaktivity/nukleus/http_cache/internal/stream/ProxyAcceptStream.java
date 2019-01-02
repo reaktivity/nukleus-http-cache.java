@@ -49,9 +49,8 @@ final class ProxyAcceptStream
     private final ProxyStreamFactory streamFactory;
     private final long acceptRouteId;
     private final long acceptStreamId;
-    private final MessageConsumer acceptThrottle;
+    private final MessageConsumer acceptReply;
 
-    private MessageConsumer acceptReply;
     private long acceptReplyStreamId;
     private long acceptCorrelationId;
 
@@ -67,13 +66,13 @@ final class ProxyAcceptStream
 
     ProxyAcceptStream(
         ProxyStreamFactory streamFactory,
-        MessageConsumer acceptThrottle,
+        MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,
         long connectRouteId)
     {
         this.streamFactory = streamFactory;
-        this.acceptThrottle = acceptThrottle;
+        this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
         this.connectRouteId = connectRouteId;
@@ -102,7 +101,7 @@ final class ProxyAcceptStream
         }
         else
         {
-            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId,
+            streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId,
                     streamFactory.supplyTrace.getAsLong());
         }
     }
@@ -117,7 +116,6 @@ final class ProxyAcceptStream
         this.connect = streamFactory.router.supplyReceiver(connectRouteId);
         this.connectStreamId = streamFactory.supplyInitialId.getAsLong();
 
-        this.acceptReply = streamFactory.router.supplySender(acceptRouteId);
         this.acceptReplyStreamId = streamFactory.supplyReplyId.applyAsLong(acceptId);
         this.acceptCorrelationId = begin.correlationId();
 
@@ -385,7 +383,7 @@ final class ProxyAcceptStream
             onAbortWhenProxying(abort);
             break;
         default:
-            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId,
+            streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId,
                     streamFactory.supplyTrace.getAsLong());
             break;
         }
@@ -432,7 +430,7 @@ final class ProxyAcceptStream
         case ResetFW.TYPE_ID:
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
             final long traceId = reset.trace();
-            streamFactory.writer.doReset(acceptThrottle, acceptRouteId, acceptStreamId, traceId);
+            streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
             break;
         default:
             break;
@@ -446,6 +444,6 @@ final class ProxyAcceptStream
         final int padding = window.padding();
         final long groupId = window.groupId();
         final long traceId = window.trace();
-        streamFactory.writer.doWindow(acceptThrottle, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+        streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
     }
 }
