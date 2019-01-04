@@ -13,32 +13,37 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal;
 
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.route.RouteManager;
+import org.reaktivity.nukleus.Nukleus;
 
-public class ProxyRequest extends Request
+final class HttpCacheNukleus implements Nukleus
 {
-    public ProxyRequest(
-        MessageConsumer acceptReply,
-        long acceptRouteId,
-        long acceptReplyStreamId,
-        long acceptCorrelationId,
-        RouteManager router)
+    static final String NAME = "http-cache";
+
+    private final HttpCacheConfiguration config;
+
+    HttpCacheNukleus(
+        HttpCacheConfiguration config)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
+        this.config = config;
     }
 
     @Override
-    public Type getType()
+    public String name()
     {
-        return Type.PROXY;
+        return HttpCacheNukleus.NAME;
     }
 
     @Override
-    public void purge()
+    public HttpCacheConfiguration config()
     {
-        // NOOP, can't purge non cache-able request, TODO clean up interfaces?
+        return config;
+    }
+
+    @Override
+    public HttpCacheElektron supplyElektron()
+    {
+        return new HttpCacheElektron(config);
     }
 }

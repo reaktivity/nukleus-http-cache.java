@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,7 +33,7 @@ public class CacheControl
 
     private static final Pattern CACHE_DIRECTIVES = Pattern.compile(REGEX);
 
-    private HashMap<String, String> values = new HashMap<>();
+    private final HashMap<String, String> values = new LinkedHashMap<>();
 
     public CacheControl()
     {

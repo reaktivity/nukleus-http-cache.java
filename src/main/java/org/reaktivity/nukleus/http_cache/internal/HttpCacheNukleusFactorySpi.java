@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,42 +15,21 @@
  */
 package org.reaktivity.nukleus.http_cache.internal;
 
-import static org.reaktivity.nukleus.route.RouteKind.PROXY;
-import static org.reaktivity.nukleus.route.RouteKind.SERVER;
-
 import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.Nukleus;
-import org.reaktivity.nukleus.NukleusBuilder;
 import org.reaktivity.nukleus.NukleusFactorySpi;
-import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactoryBuilder;
-import org.reaktivity.nukleus.http_cache.internal.stream.ServerStreamFactoryBuilder;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.DelayedTaskScheduler;
 
 public final class HttpCacheNukleusFactorySpi implements NukleusFactorySpi
 {
-
     @Override
     public String name()
     {
-        return "http-cache";
+        return HttpCacheNukleus.NAME;
     }
 
     @Override
-    public Nukleus create(
-        Configuration config,
-        NukleusBuilder builder)
+    public HttpCacheNukleus create(
+        Configuration config)
     {
-        DelayedTaskScheduler scheduler = new DelayedTaskScheduler();
-        builder.inject(scheduler);
-        HttpCacheConfiguration httpCacheConfig = new HttpCacheConfiguration(config);
-        final ProxyStreamFactoryBuilder proxyFactoryBuilder = new ProxyStreamFactoryBuilder(
-                httpCacheConfig,
-                scheduler::schedule);
-        final ServerStreamFactoryBuilder serverFactoryBuilder = new ServerStreamFactoryBuilder();
-
-        return builder.streamFactory(PROXY, proxyFactoryBuilder)
-                      .streamFactory(SERVER, serverFactoryBuilder)
-                      .build();
+        return new HttpCacheNukleus(new HttpCacheConfiguration(config));
     }
-
 }

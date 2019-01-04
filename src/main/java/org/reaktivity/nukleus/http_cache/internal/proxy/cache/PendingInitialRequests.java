@@ -16,20 +16,24 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class PendingCacheEntries
+public class PendingInitialRequests
 {
-    final InitialRequest request;
-    private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>();
+    private final InitialRequest request;
+    private final List<InitialRequest> subscribers = new ArrayList<>();
 
-    PendingCacheEntries(InitialRequest request)
+    PendingInitialRequests(InitialRequest request)
     {
         this.request = request;
+    }
+
+    public InitialRequest initialRequest()
+    {
+        return request;
     }
 
     public String etag()
@@ -37,18 +41,29 @@ public class PendingCacheEntries
         return request.etag();
     }
 
-    void subscribe(PreferWaitIfNoneMatchRequest preferWaitRequest)
+    void subscribe(InitialRequest request)
     {
-        this.subscribers.add(preferWaitRequest);
+        this.subscribers.add(request);
     }
 
-    void addSubscribers(CacheEntry cacheEntry)
-    {
-        subscribers.forEach(cacheEntry::subscribeWhenNoneMatch);
-    }
-
-    void removeSubscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
+    void removeSubscribers(Consumer<InitialRequest> consumer)
     {
         subscribers.forEach(consumer);
+        subscribers.clear();
+    }
+
+    PendingInitialRequests withNextInitialRequest()
+    {
+        if (subscribers.isEmpty())
+        {
+            return null;
+        }
+
+        final InitialRequest newInitialRequest = subscribers.remove(0);
+        final PendingInitialRequests newPendingRequests = new PendingInitialRequests(newInitialRequest);
+        subscribers.forEach(newPendingRequests::subscribe);
+        subscribers.clear();
+
+        return newPendingRequests;
     }
 }

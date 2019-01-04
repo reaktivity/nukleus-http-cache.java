@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -23,6 +23,7 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
@@ -31,7 +32,8 @@ public class ControlIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/http_cache/control/unroute");
+        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/http_cache/control/unroute")
+        .addScriptRoot("freeze", "org/reaktivity/specification/nukleus/control/freeze");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -39,7 +41,7 @@ public class ControlIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
+        .counterValuesBufferCapacity(4096)
         .nukleus("http-cache"::equals);
 
     @Rule
@@ -79,6 +81,16 @@ public class ControlIT
         "${unroute}/proxy/controller"
     })
     public void shouldUnrouteProxy() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${freeze}/controller",
+    })
+    @ScriptProperty("nameF00C \"http-cache\"")
+    public void shouldFreeze() throws Exception
     {
         k3po.finish();
     }

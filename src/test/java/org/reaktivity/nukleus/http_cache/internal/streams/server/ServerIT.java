@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -31,9 +31,7 @@ public class ServerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server")
-        .scriptProperty("routeTarget \"http-cache\"")
-        .scriptProperty("newServerConnectRef [0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00]");
+        .addScriptRoot("streams", "org/reaktivity/specification/nukleus/http_cache/streams/server");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -41,7 +39,7 @@ public class ServerIT
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(1024)
+            .counterValuesBufferCapacity(4096)
             .nukleus("http-cache"::equals)
             .clean();
 
@@ -56,5 +54,4 @@ public class ServerIT
     {
         k3po.finish();
     }
-
 }

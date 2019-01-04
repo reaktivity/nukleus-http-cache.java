@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -18,30 +18,29 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class OnUpdateRequest extends AnswerableByCacheRequest
+public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
 {
-
-    public OnUpdateRequest(
-        String acceptName,
+    public PreferWaitIfNoneMatchRequest(
         MessageConsumer acceptReply,
+        long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
-        int requestSlot,
-        int requestSize,
         RouteManager router,
         int requestURLHash,
+        boolean authorizationHeader,
+        long authorization,
         short authScope,
         String etag)
     {
         super(
-            acceptName,
             acceptReply,
+            acceptRouteId,
             acceptReplyStreamId,
             acceptCorrelationId,
             router,
-            requestSlot,
-            requestSize,
             requestURLHash,
+            authorizationHeader,
+            authorization,
             authScope,
             etag);
     }
@@ -49,7 +48,12 @@ public class OnUpdateRequest extends AnswerableByCacheRequest
     @Override
     public Type getType()
     {
-        return Type.ON_UPDATE;
+        return Type.PREFER_WAIT;
     }
 
+    @Override
+    public void purge()
+    {
+        // no-op
+    }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -32,7 +32,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -131,6 +132,8 @@ public final class CacheUtils
         ListFW<HttpHeaderFW> cachedRequest,
         CacheControl cachedResponse)
     {
+        assert request.buffer() != cachedRequest.buffer();
+
         if (cachedResponse.contains(CacheDirectives.PUBLIC))
         {
             return true;
@@ -159,6 +162,10 @@ public final class CacheUtils
         ListFW<HttpHeaderFW> cachedResponse,
         ListFW<HttpHeaderFW> cachedRequest)
     {
+        assert request != cachedRequest;
+        assert request.buffer() != cachedRequest.buffer();
+        assert request.buffer() != cachedResponse.buffer();
+
         final String cachedVaryHeader = getHeader(cachedResponse, "vary");
         if (cachedVaryHeader == null)
         {
@@ -167,10 +174,48 @@ public final class CacheUtils
 
         return stream(cachedVaryHeader.split("\\s*,\\s*")).noneMatch(v ->
         {
-            String pendingHeaderValue = getHeader(request, v);
-            String myHeaderValue = getHeader(cachedRequest, v);
-            return !Objects.equals(pendingHeaderValue, myHeaderValue);
+            String requestHeaderValue = getHeader(request, v);
+            String cachedRequestHeaderValue = getHeader(cachedRequest, v);
+            return !doesNotVary(requestHeaderValue, cachedRequestHeaderValue);
         });
+    }
+
+    // takes care of multi header values during match
+    // for e.g requestHeader = "gzip", cachedRequest = "gzip, deflate, br"
+    private static boolean doesNotVary(String requestHeader, String cachedRequest)
+    {
+        if (requestHeader == cachedRequest)
+        {
+            return true;
+        }
+        else if (requestHeader == null || cachedRequest == null)
+        {
+            return false;
+        }
+        else if (requestHeader.contains(",") || cachedRequest.contains(","))
+        {
+            Set<String> requestHeaders = stream(requestHeader.split("\\s*,\\s*")).collect(Collectors.toSet());
+            Set<String> cacheRequestHeaders = stream(cachedRequest.split("\\s*,\\s*")).collect(Collectors.toSet());
+            requestHeaders.retainAll(cacheRequestHeaders);
+            return !requestHeaders.isEmpty();
+        }
+        else
+        {
+            return requestHeader.equals(cachedRequest);
+        }
+    }
+
+    public static boolean isVaryHeader(
+            String header,
+            ListFW<HttpHeaderFW> cachedResponse)
+    {
+        final String cachedVaryHeader = getHeader(cachedResponse, "vary");
+        if (cachedVaryHeader == null)
+        {
+            return false;
+        }
+
+        return stream(cachedVaryHeader.split("\\s*,\\s*")).anyMatch(h -> h.equalsIgnoreCase(header));
     }
 
     public static boolean isMatchByEtag(

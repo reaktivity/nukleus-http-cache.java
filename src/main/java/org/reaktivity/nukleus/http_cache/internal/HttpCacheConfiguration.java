@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -19,26 +19,41 @@ import org.reaktivity.nukleus.Configuration;
 
 public class HttpCacheConfiguration extends Configuration
 {
-    public static final String HTTP_CACHE_CAPACITY = "nukleus.http_cache.capacity";
-    public static final String HTTP_CACHE_SLOT_CAPACITY = "nukleus.http_cache.slot.capacity";
+    public static final boolean DEBUG = Boolean.getBoolean("nukleus.http_cache.debug");
 
-    private static final int HTTP_CACHE_CAPACITY_DEFAULT = 65536 * 64;
-    private static final int HTTP_CACHE_SLOT_CAPACITY_DEFAULT = 0x4000; // ALSO is max header size
+    public static final IntPropertyDef HTTP_CACHE_CAPACITY;
+    public static final IntPropertyDef HTTP_CACHE_SLOT_CAPACITY;
+    public static final IntPropertyDef HTTP_CACHE_MAXIMUM_REQUESTS;
+
+    private static final ConfigurationDef HTTP_CACHE_CONFIG;
+
+    static
+    {
+        final ConfigurationDef config = new ConfigurationDef("nukleus.http_cache");
+        HTTP_CACHE_CAPACITY = config.property("capacity", 1024 * 64 * 64);
+        HTTP_CACHE_SLOT_CAPACITY = config.property("slot.capacity", 0x4000); // ALSO is max header size
+        HTTP_CACHE_MAXIMUM_REQUESTS = config.property("maximum.requests", 64 * 1024);
+        HTTP_CACHE_CONFIG = config;
+    }
 
     public HttpCacheConfiguration(
         Configuration config)
     {
-        super(config);
+        super(HTTP_CACHE_CONFIG, config);
     }
 
-    public int httpCacheCapacity()
+    public int cacheCapacity()
     {
-        return getInteger(HTTP_CACHE_CAPACITY, HTTP_CACHE_CAPACITY_DEFAULT);
+        return HTTP_CACHE_CAPACITY.getAsInt(this);
     }
 
-    public int httpCacheSlotCapacity()
+    public int cacheSlotCapacity()
     {
-        return getInteger(HTTP_CACHE_SLOT_CAPACITY, HTTP_CACHE_SLOT_CAPACITY_DEFAULT);
+        return HTTP_CACHE_SLOT_CAPACITY.getAsInt(this);
     }
 
+    public int maximumRequests()
+    {
+        return HTTP_CACHE_MAXIMUM_REQUESTS.getAsInt(this);
+    }
 }

@@ -13,32 +13,30 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal;
 
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.route.RouteManager;
+import org.agrona.concurrent.Agent;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.DelayedTaskScheduler;
 
-public class ProxyRequest extends Request
+final class HttpCacheAgent implements Agent
 {
-    public ProxyRequest(
-        MessageConsumer acceptReply,
-        long acceptRouteId,
-        long acceptReplyStreamId,
-        long acceptCorrelationId,
-        RouteManager router)
+    private final DelayedTaskScheduler scheduler;
+
+    HttpCacheAgent(
+        DelayedTaskScheduler scheduler)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
+        this.scheduler = scheduler;
     }
 
     @Override
-    public Type getType()
+    public int doWork() throws Exception
     {
-        return Type.PROXY;
+        return scheduler.process();
     }
 
     @Override
-    public void purge()
+    public String roleName()
     {
-        // NOOP, can't purge non cache-able request, TODO clean up interfaces?
+        return String.format("%s.agent", HttpCacheNukleus.NAME);
     }
 }

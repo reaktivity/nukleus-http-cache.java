@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -23,30 +23,32 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
-
-    private CacheEntry updatingEntry;
-    private Cache cache;
+    private final CacheEntry updatingEntry;
+    private final Cache cache;
 
     public CacheRefreshRequest(
             CacheableRequest req,
+            BufferPool bufferPool,
             int requestSlot,
             String etag,
             CacheEntry cacheEntry,
             Cache cache)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
-        super(req.acceptName,
-              req.acceptReply,
+        super(req.acceptReply,
+              req.acceptRouteId,
               req.acceptReplyStreamId,
               req.acceptCorrelationId,
               req.connect,
-              req.connectRef,
+              req.connectRouteId,
               req.supplyCorrelationId,
-              req.supplyStreamId,
+              req.supplyInitialId,
               req.requestURLHash(),
+              bufferPool,
               requestSlot,
-              req.requestSize(),
               req.router,
+              req.authorizationHeader(),
+              req.authorization(),
               req.authScope(),
               etag);
         this.updatingEntry = cacheEntry;
@@ -54,7 +56,7 @@ public class CacheRefreshRequest extends CacheableRequest
     }
 
     @Override
-    public boolean cache(
+    public boolean storeResponseHeaders(
         ListFW<HttpHeaderFW> responseHeaders,
         Cache cache,
         BufferPool bufferPool)
@@ -63,10 +65,10 @@ public class CacheRefreshRequest extends CacheableRequest
             ":status".equals(h.name().asString()) &&
             h.value().asString().startsWith("2")))
         {
-            boolean noError = super.cache(responseHeaders, cache, bufferPool);
+            boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
             {
-                this.purge(bufferPool);
+                this.purge();
             }
             return noError;
         }
@@ -76,12 +78,12 @@ public class CacheRefreshRequest extends CacheableRequest
         {
             updatingEntry.refresh(this);
             this.state = CacheState.COMMITTED;
-            this.purge(bufferPool);
+            this.purge();
             return true;
         }
         else
         {
-            this.purge(bufferPool);
+            this.purge();
             return false;
         }
 }
@@ -93,13 +95,12 @@ public class CacheRefreshRequest extends CacheableRequest
     }
 
     @Override
-    public void purge(BufferPool cacheBufferPool)
+    public void purge()
     {
         if (this.state != CacheState.COMMITTED)
         {
             this.cache.purge(updatingEntry);
         }
-        super.purge(cacheBufferPool);
+        super.purge();
     }
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,48 +17,89 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import java.util.function.LongSupplier;
 
+import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public class InitialRequest extends CacheableRequest
 {
+    private final Cache cache;
 
     public InitialRequest(
-            String acceptName,
+            Cache cache,
             MessageConsumer acceptReply,
+            long acceptRouteId,
             long acceptReplyStreamId,
             long acceptCorrelationId,
             MessageConsumer connect,
-            long connectRef,
+            long connectRouteId,
             LongSupplier supplyCorrelationId,
-            LongSupplier supplyStreamId,
+            LongSupplier supplyInitialId,
             int requestURLHash,
+            BufferPool bufferPool,
             int requestSlot,
-            int requestSize,
             RouteManager router,
+            boolean authorizationHeader,
+            long authorization,
             short authScope,
             String etag)
     {
-        super(acceptName,
-              acceptReply,
+        super(acceptReply,
+              acceptRouteId,
               acceptReplyStreamId,
               acceptCorrelationId,
               connect,
-              connectRef,
+              connectRouteId,
               supplyCorrelationId,
-              supplyStreamId,
+              supplyInitialId,
               requestURLHash,
+              bufferPool,
               requestSlot,
-              requestSize,
               router,
+              authorizationHeader,
+              authorization,
               authScope,
               etag);
+        this.cache = cache;
     }
 
     @Override
     public Type getType()
     {
         return Type.INITIAL_REQUEST;
+    }
+
+    @Override
+    public boolean storeResponseHeaders(
+            ListFW<HttpHeaderFW> responseHeaders,
+            Cache cache,
+            BufferPool bp)
+    {
+        boolean stored = super.storeResponseHeaders(responseHeaders, cache, bp);
+        if (stored)
+        {
+            cache.notifyUncommitted(this);
+        }
+        return stored;
+    }
+
+    public void purge()
+    {
+        super.purge();
+        cache.removeUncommitted(this);
+        cache.sendPendingInitialRequests(requestURLHash());
+    }
+
+    @Override
+    public boolean cache(EndFW end, Cache cache)
+    {
+        boolean cached = super.cache(end, cache);
+        cache.servePendingInitialRequests(requestURLHash());
+        return cached;
     }
 
 }

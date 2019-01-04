@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.internal.ReaktorConfiguration.BUFFER_SLOT_CAPACITY_PROPERTY;
+import static org.reaktivity.reaktor.internal.ReaktorConfiguration.REAKTOR_BUFFER_SLOT_CAPACITY;
 
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -42,13 +42,13 @@ public class ProxyExceptionsWithConfigurationIT
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(1024)
+            .counterValuesBufferCapacity(8192)
             .nukleus("http-cache"::equals)
-            .configure(BUFFER_SLOT_CAPACITY_PROPERTY, 0)
+            .configure(REAKTOR_BUFFER_SLOT_CAPACITY, 0)
             .clean();
 
     @Rule
-    public final TestRule chain = outerRule(k3po).around(reaktor).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout);
 
     @Ignore("ABORT vs RESET read order not yet guaranteed to match write order")
     @Test

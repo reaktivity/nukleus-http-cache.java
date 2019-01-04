@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,5 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 public final class HttpStatus
 {
+    public static final String OK_200 = "200";
     public static final String NOT_MODIFIED_304 = "304";
 }

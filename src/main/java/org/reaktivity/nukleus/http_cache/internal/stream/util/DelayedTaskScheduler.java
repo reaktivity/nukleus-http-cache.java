@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,26 +15,46 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.BiFunction;
 
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.Nukleus;
+import org.agrona.collections.LongArrayList;
 
-public class DelayedTaskScheduler implements Nukleus
+public class DelayedTaskScheduler
 {
     private final Long2ObjectHashMap<Runnable> taskLookup;
     private final SortedSet<Long> scheduledTimes;
+
+    private boolean schedulingDeferred;
+    private final LongArrayList deferredTimes;
+    private final ArrayList<Runnable> deferredTasks;
 
     public DelayedTaskScheduler()
     {
         this.taskLookup = new Long2ObjectHashMap<>();
         this.scheduledTimes = new TreeSet<>();
+        this.deferredTimes = new LongArrayList();
+        this.deferredTasks = new ArrayList<>();
     }
 
     public void schedule(long time, Runnable task)
+    {
+        if (schedulingDeferred)
+        {
+            deferredTimes.add(time);
+            deferredTasks.add(task);
+        }
+        else
+        {
+            scheduleTask(time, task);
+        }
+    }
+
+    private void scheduleTask(long time, Runnable task)
     {
         if (this.scheduledTimes.add(time))
         {
@@ -48,6 +68,8 @@ public class DelayedTaskScheduler implements Nukleus
 
     public int process()
     {
+        int work = 0;
+        schedulingDeferred = true;
         if (!scheduledTimes.isEmpty())
         {
             long c = System.currentTimeMillis();
@@ -59,9 +81,20 @@ public class DelayedTaskScheduler implements Nukleus
                 iter.remove();
                 taskLookup.remove(time).run();
             }
-            return past.size();
+            work = past.size();
         }
-        return 0;
+        schedulingDeferred = false;
+
+        // Schedule all the tasks that were deferred during the execution of expired tasks
+        if (!deferredTimes.isEmpty())
+        {
+            Iterator<Runnable> taskIt = deferredTasks.iterator();
+            deferredTimes.forEachOrderedLong(time -> scheduleTask(time, taskIt.next()));
+            deferredTimes.clear();
+            deferredTasks.clear();
+        }
+
+        return work;
     }
 
     private static BiFunction<? super Runnable, ? super Runnable, ? extends Runnable> mergeTasks = (t1, t2) ->

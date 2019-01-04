@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -18,13 +18,12 @@ package org.reaktivity.nukleus.http_cache.internal.control;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 
-import java.util.Random;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheController;
@@ -34,7 +33,8 @@ public class ControllerIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
-        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/http_cache/control/unroute");
+        .addScriptRoot("unroute", "org/reaktivity/specification/nukleus/http_cache/control/unroute")
+        .addScriptRoot("freeze", "org/reaktivity/specification/nukleus/control/freeze");
 
     private final TestRule timeout = new DisableOnDebug(new Timeout(5, SECONDS));
 
@@ -42,8 +42,8 @@ public class ControllerIT
         .directory("target/nukleus-itests")
         .commandBufferCapacity(1024)
         .responseBufferCapacity(1024)
-        .counterValuesBufferCapacity(1024)
-        .controller(HttpCacheController.class::equals);
+        .counterValuesBufferCapacity(4096)
+        .controller("http-cache"::equals);
 
     @Rule
     public final TestRule chain = outerRule(k3po).around(timeout).around(reaktor);
@@ -54,12 +54,10 @@ public class ControllerIT
     })
     public void shouldRouteServer() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
         reaktor.controller(HttpCacheController.class)
-               .routeServer("source", 0L, "target", targetRef)
+               .routeServer("http-cache#0", "target#0")
                .get();
 
         k3po.finish();
@@ -71,13 +69,11 @@ public class ControllerIT
     })
     public void shouldRouteProxy() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
         reaktor.controller(HttpCacheController.class)
-           .routeProxy("source", 0L, "target", targetRef)
-        .get();
+               .routeProxy("http-cache#0", "target#0")
+               .get();
 
         k3po.finish();
     }
@@ -89,18 +85,16 @@ public class ControllerIT
     })
     public void shouldUnrouteServer() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
-        long sourceRef = reaktor.controller(HttpCacheController.class)
-               .routeServer("source", 0L, "target", targetRef)
+        long routeId = reaktor.controller(HttpCacheController.class)
+               .routeServer("http-cache#0", "target#0")
                .get();
 
         k3po.notifyBarrier("ROUTED_SERVER");
 
         reaktor.controller(HttpCacheController.class)
-               .unrouteServer("source", sourceRef, "target", targetRef)
+               .unroute(routeId)
                .get();
 
         k3po.finish();
@@ -111,21 +105,35 @@ public class ControllerIT
         "${route}/proxy/nukleus",
         "${unroute}/proxy/nukleus"
     })
-    public void shouldUnrouteOutputNew() throws Exception
+    public void shouldUnrouteProxy() throws Exception
     {
-        long targetRef = new Random().nextLong();
-
         k3po.start();
 
-        long sourceRef = reaktor.controller(HttpCacheController.class)
-            .routeProxy("source", 0L, "target", targetRef)
+        long routeId = reaktor.controller(HttpCacheController.class)
+            .routeProxy("http-cache#0", "target#0")
             .get();
 
         k3po.notifyBarrier("ROUTED_PROXY");
 
         reaktor.controller(HttpCacheController.class)
-               .unrouteProxy("source", sourceRef, "target", targetRef)
-                  .get();
+               .unroute(routeId)
+               .get();
+
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${freeze}/nukleus"
+    })
+    @ScriptProperty("nameF00N \"http-cache\"")
+    public void shouldFreeze() throws Exception
+    {
+        k3po.start();
+
+        reaktor.controller(HttpCacheController.class)
+               .freeze()
+               .get();
 
         k3po.finish();
     }

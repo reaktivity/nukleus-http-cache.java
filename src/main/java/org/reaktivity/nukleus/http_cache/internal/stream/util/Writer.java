@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -26,13 +25,13 @@ import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
-import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -50,9 +49,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public class Writer
 {
-
-    private static final DirectBuffer SOURCE_NAME_BUFFER = new UnsafeBuffer("http-cache".getBytes(UTF_8));
-
     private final BeginFW.Builder beginRW = new BeginFW.Builder();
     private final DataFW.Builder dataRW = new DataFW.Builder();
     private final EndFW.Builder endRW = new EndFW.Builder();
@@ -64,63 +60,77 @@ public class Writer
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     private final MutableDirectBuffer writeBuffer;
-    private final BufferPool bufferPool;
 
     public Writer(
-            MutableDirectBuffer writeBuffer,
-            BufferPool bufferPool)
+        MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
-        this.bufferPool = bufferPool;
     }
 
-    public void doHttpBegin(
-        MessageConsumer target,
-        long targetStreamId,
-        long targetRef,
+    public void doHttpRequest(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
         long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
-        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                               .streamId(targetStreamId)
-                               .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                               .sourceRef(targetRef)
-                               .correlationId(correlationId)
-                               .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                               .build();
-
-        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
-
-    }
-
-    public void doHttpResponseWithUpdatedCacheControl(
-            MessageConsumer target,
-            long targetStreamId,
-            long targetRef,
-            long correlationId,
-            CacheControl cacheControlFW,
-            ListFW<HttpHeaderFW> responseHeaders,
-            int staleWhileRevalidate,
-            String etag)
-    {
-        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate, etag);
-        BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetStreamId)
-                .source(SOURCE_NAME_BUFFER, 0, SOURCE_NAME_BUFFER.capacity())
-                .sourceRef(targetRef)
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
                 .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
-        target.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+    }
+
+    public void doHttpResponse(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long correlationId,
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+    {
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .correlationId(correlationId)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .build();
+
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+    }
+
+    public void doHttpResponseWithUpdatedCacheControl(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long correlationId,
+        CacheControl cacheControlFW,
+        ListFW<HttpHeaderFW> responseHeaders,
+        int staleWhileRevalidate,
+        String etag,
+        boolean cacheControlPrivate)
+    {
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
+                        etag, cacheControlPrivate);
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .correlationId(correlationId)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .build();
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
     private void updateResponseHeaders(
-            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-            CacheControl cacheControlFW,
-            ListFW<HttpHeaderFW> responseHeadersRO,
-            int staleWhileRevalidate,
-            String etag)
+        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+        CacheControl cacheControlFW,
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        int staleWhileRevalidate,
+        String etag,
+        boolean cacheControlPrivate)
     {
         responseHeadersRO.forEach(h ->
         {
@@ -133,47 +143,32 @@ public class Writer
             {
                 case HttpHeaders.CACHE_CONTROL:
                     cacheControlFW.parse(value);
-                    if (cacheControlFW.contains("stale-while-revalidate"))
+                    cacheControlFW.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
+                    if (cacheControlPrivate && !(cacheControlFW.contains("private") || cacheControlFW.contains("public")))
                     {
-                        StringBuilder cacheControlDirectives = new StringBuilder();
-                        cacheControlFW.getValues().entrySet().stream().forEach(e ->
+                        cacheControlFW.getValues().put("private", null);
+                    }
+                    StringBuilder cacheControlDirectives = new StringBuilder();
+                    cacheControlFW.getValues().forEach((k, v) ->
+                    {
+                        cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
+                        cacheControlDirectives.append(k);
+                        if (v != null)
                         {
-                            String directive = e.getKey();
-                            String optionalValue = e.getValue();
-                            if (cacheControlDirectives.length() > 0)
-                            {
-                                cacheControlDirectives.append(", ");
-                            }
-                            if ("stale-while-revalidate".equals(directive))
-                            {
-                                cacheControlDirectives.append("stale-while-revalidate=" + staleWhileRevalidate);
-                            }
-                            else
-                            {
-                                if (optionalValue == null)
-                                {
-                                    cacheControlDirectives.append(directive);
-                                }
-                                else
-                                {
-                                    cacheControlDirectives.append(directive + "=" + optionalValue);
-                                }
-                            }
-                        });
-                        builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
-                    }
-                    else
-                    {
-                        builder.item(header ->
-                            header.name(nameFW).value(valueFW.asString() + ", stale-while-revalidate=" + staleWhileRevalidate));
-                    }
+                            cacheControlDirectives.append('=').append(v);
+                        }
+                    });
+                    builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
                     break;
                 default: builder.item(header -> header.name(nameFW).value(valueFW));
             }
         });
         if (!responseHeadersRO.anyMatch(HAS_CACHE_CONTROL))
         {
-            builder.item(header -> header.name("cache-control").value("stale-while-revalidate=" + staleWhileRevalidate));
+            final String value = cacheControlPrivate
+                    ? "private, stale-while-revalidate=" + staleWhileRevalidate
+                    : "stale-while-revalidate=" + staleWhileRevalidate;
+            builder.item(header -> header.name("cache-control").value(value));
         }
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
         {
@@ -182,85 +177,110 @@ public class Writer
     }
 
     public void doHttpData(
-        MessageConsumer target,
-        long targetStreamId,
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long groupId,
+        int padding,
         DirectBuffer payload,
         int offset,
         int length)
     {
 
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                            .streamId(targetStreamId)
-                            .groupId(0)
-                            .padding(0)
-                            .payload(p -> p.set(payload, offset, length))
-                            .build();
+        final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .groupId(groupId)
+                .padding(padding)
+                .payload(p -> p.set(payload, offset, length))
+                .build();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+        receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void doHttpData(
-        MessageConsumer target,
-        long targetStreamId,
-        Consumer<OctetsFW.Builder> mutator)
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long groupId,
+        int padding,
+        Consumer<OctetsFW.Builder> payload)
     {
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .streamId(targetStreamId)
-            .groupId(0)
-            .padding(0)
-            .payload(mutator)
-            .build();
+        final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .groupId(groupId)
+                .padding(padding)
+                .payload(payload)
+                .build();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+        receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void doHttpEnd(
-        MessageConsumer target,
-        long targetStreamId)
+        final MessageConsumer receiver,
+        final long routeId,
+        final long streamId,
+        final long traceId)
     {
-        EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                         .streamId(targetStreamId)
-                         .build();
+        final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
+                .build();
 
-        target.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+        receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     public void doAbort(
-            MessageConsumer target,
-            long targetStreamId)
+        final MessageConsumer receiver,
+        final long routeId,
+        final long streamId,
+        final long traceId)
     {
-        AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(targetStreamId)
+        final AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
                 .build();
 
-        target.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
+        receiver.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
     }
 
     public void doWindow(
-        final MessageConsumer throttle,
-        final long throttleStreamId,
+        final MessageConsumer sender,
+        final long routeId,
+        final long streamId,
+        final long traceId,
         final int credit,
-        final int padding)
+        final int padding,
+        final long groupId)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .streamId(throttleStreamId)
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
                 .credit(credit)
                 .padding(padding)
-                .groupId(0)
+                .groupId(groupId)
                 .build();
 
-        throttle.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
+        sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
     }
 
     public void doReset(
-        final MessageConsumer throttle,
-        final long throttleStreamId)
+        final MessageConsumer sender,
+        final long routeId,
+        final long streamId,
+        final long traceId)
     {
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .streamId(throttleStreamId)
-                                     .build();
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
+                .build();
 
-        throttle.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
+        sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
     private Flyweight.Builder.Visitor visitHttpBeginEx(
@@ -275,25 +295,28 @@ public class Writer
 
     public void doHttpPushPromise(
         AnswerableByCacheRequest request,
+        CacheableRequest cachedRequest,
         ListFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
-        final ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO, bufferPool);
+        final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply();
-        final long acceptReplyStreamId = request.acceptReplyStreamId();
+        final long routeId = request.acceptRouteId();
+        final long streamId = request.acceptReplyStreamId();
+        final long authorization = request.authorization();
 
         doH2PushPromise(
             acceptReply,
-            acceptReplyStreamId,
+            routeId, streamId, authorization, 0L, 0,
             setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-            ListFW<HttpHeaderFW> requestHeadersRO,
-            ListFW<HttpHeaderFW> responseHeadersRO,
-            int freshnessExtension,
-            String etag)
+        ListFW<HttpHeaderFW> requestHeadersRO,
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        int freshnessExtension,
+        String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
                 builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
@@ -302,11 +325,11 @@ public class Writer
     }
 
     private void updateRequestHeaders(
-            ListFW<HttpHeaderFW> requestHeadersFW,
-            ListFW<HttpHeaderFW> responseHeadersFW,
-            Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-            int freshnessExtension,
-            String etag)
+        ListFW<HttpHeaderFW> requestHeadersFW,
+        ListFW<HttpHeaderFW> responseHeadersFW,
+        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+        int freshnessExtension,
+        String etag)
     {
         requestHeadersFW
            .forEach(h ->
@@ -318,6 +341,12 @@ public class Writer
 
                switch(name)
                {
+                   case HttpHeaders.METHOD:
+                   case HttpHeaders.AUTHORITY:
+                   case HttpHeaders.SCHEME:
+                   case HttpHeaders.PATH:
+                       builder.item(header -> header.name(nameFW).value(valueFW));
+                       break;
                    case HttpHeaders.CACHE_CONTROL:
                        if (value.contains(CacheDirectives.NO_CACHE))
                        {
@@ -330,7 +359,7 @@ public class Writer
                                                         .value(value + ", no-cache"));
                        }
                        break;
-                    case HttpHeaders.IF_MODIFIED_SINCE:
+                   case HttpHeaders.IF_MODIFIED_SINCE:
                        if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
                        {
                            final String newValue = getHeader(responseHeadersFW, "last-modified");
@@ -338,7 +367,7 @@ public class Writer
                                                         .value(newValue));
                        }
                        break;
-                    case HttpHeaders.IF_NONE_MATCH:
+                   case HttpHeaders.IF_NONE_MATCH:
                        String result = etag;
                        if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
                        {
@@ -356,18 +385,21 @@ public class Writer
                        builder.item(header -> header.name(nameFW)
                                .value(finalEtag));
                        break;
-                    case HttpHeaders.IF_MATCH:
-                    case HttpHeaders.IF_UNMODIFIED_SINCE:
+                   case HttpHeaders.IF_MATCH:
+                   case HttpHeaders.IF_UNMODIFIED_SINCE:
                         break;
-                   default: builder.item(header -> header.name(nameFW)
-                                                         .value(valueFW));
+                   default:
+                       if (CacheUtils.isVaryHeader(name, responseHeadersFW))
+                       {
+                           builder.item(header -> header.name(nameFW).value(valueFW));
+                       }
                }
            });
            if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
            {
                builder.item(header -> header.name("cache-control").value("no-cache"));
            }
-           if (!requestHeadersFW.anyMatch(PreferHeader.HAS_HEADER))
+           if (!requestHeadersFW.anyMatch(PreferHeader.PREFER_HEADER_NAME))
            {
                builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
            }
@@ -378,31 +410,36 @@ public class Writer
     }
 
     private void doH2PushPromise(
-        MessageConsumer target,
-        long targetId,
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long authorization,
+        long groupId,
+        int padding,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
-        DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .streamId(targetId)
-            .groupId(0)
-            .padding(0)
-            .payload(e -> {})
-            .extension(e -> e.set(visitHttpBeginEx(mutator)))
-            .build();
+        final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .authorization(authorization)
+                .groupId(groupId)
+                .padding(padding)
+                .payload((OctetsFW) null)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .build();
 
-        target.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+        receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
     }
 
     public void do503AndAbort(
-        MessageConsumer acceptReply,
-        long acceptReplyStreamId,
-        long acceptCorrelationId)
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long correlationId,
+        long traceId)
     {
-        this.doHttpBegin(acceptReply, acceptReplyStreamId, 0L, acceptCorrelationId, e ->
-        e.item(h -> h.representation((byte) 0)
-                .name(STATUS)
-                .value("503")));
-        this.doAbort(acceptReply, acceptReplyStreamId);
+        this.doHttpResponse(receiver, routeId, streamId, correlationId, e -> e.item(h -> h.name(STATUS).value("503")));
+        this.doAbort(receiver, routeId, streamId, traceId);
     }
 
 }

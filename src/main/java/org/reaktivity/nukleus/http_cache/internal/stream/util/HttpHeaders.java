@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 public final class HttpHeaders
 {
+    public static final String AUTHORIZATION = "authorization";
+    public static final String VARY = "vary";
     public static final String STATUS = ":status";
     public static final String CACHE_CONTROL = "cache-control";
     public static final String IF_MATCH = "if-match";
@@ -35,5 +37,5 @@ public final class HttpHeaders
     public static final String ETAG = "etag";
     public static final String DATE = "date";
     public static final String LAST_MODIFIED = "last-modified";
-
+    public static final String RETRY_AFTER = "retry-after";
 }

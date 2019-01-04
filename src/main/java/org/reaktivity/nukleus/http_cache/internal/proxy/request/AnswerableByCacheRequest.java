@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,49 +15,45 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
-import org.agrona.MutableDirectBuffer;
-import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
-import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class AnswerableByCacheRequest extends Request
 {
-
-    private int requestSlot;
-    private final int requestSize;
     private final int requestURLHash;
+    private final long authorization;
     private final short authScope;
+    private final boolean authorizationHeader;
     private String etag;
 
     public AnswerableByCacheRequest(
-            String acceptName,
-            MessageConsumer acceptReply,
-            long acceptReplyStreamId,
-            long acceptCorrelationId,
-            RouteManager router,
-            int requestSlot,
-            int requestSize,
-            int requestURLHash,
-            short authScope,
-            String etag)
+        MessageConsumer acceptReply,
+        long acceptRouteId,
+        long acceptReplyStreamId,
+        long acceptCorrelationId,
+        RouteManager router,
+        int requestURLHash,
+        boolean authorizationHeader,
+        long authorization,
+        short authScope,
+        String etag)
     {
-        super(acceptName, acceptReply, acceptReplyStreamId, acceptCorrelationId, router);
-        this.requestSlot = requestSlot;
-        this.requestSize = requestSize;
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
         this.requestURLHash = requestURLHash;
+        this.authorizationHeader = authorizationHeader;
+        this.authorization = authorization;
         this.authScope = authScope;
         this.etag = etag;
     }
 
-    public final ListFW<HttpHeaderFW> getRequestHeaders(
-            ListFW<HttpHeaderFW> requestHeadersRO,
-            BufferPool pool)
+    public final boolean authorizationHeader()
     {
-        final MutableDirectBuffer buffer = pool.buffer(requestSlot);
-        return requestHeadersRO.wrap(buffer, 0, requestSize);
+        return authorizationHeader;
+    }
+
+    public final long authorization()
+    {
+        return authorization;
     }
 
     public final short authScope()
@@ -75,28 +71,8 @@ public abstract class AnswerableByCacheRequest extends Request
         return requestURLHash;
     }
 
-    public final int requestSize()
-    {
-        return requestSize;
-    }
-
-    public final int requestSlot()
-    {
-        return requestSlot;
-    }
-
-    public void purge(BufferPool bufferPool)
-    {
-        if (requestSlot != Slab.NO_SLOT)
-        {
-            bufferPool.release(requestSlot);
-            this.requestSlot = Slab.NO_SLOT;
-        }
-    }
-
     protected void etag(String etag)
     {
         this.etag = etag;
     }
-
 }

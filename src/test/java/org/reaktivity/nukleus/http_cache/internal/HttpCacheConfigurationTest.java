@@ -15,31 +15,19 @@
  */
 package org.reaktivity.nukleus.http_cache.internal;
 
-import org.reaktivity.nukleus.Configuration;
-import org.reaktivity.nukleus.ControllerBuilder;
-import org.reaktivity.nukleus.ControllerFactorySpi;
+import static org.junit.Assert.assertEquals;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_REQUESTS;
 
-public final class HttpCacheControllerFactorySpi implements ControllerFactorySpi<HttpCacheController>
+import org.junit.Test;
+
+public class HttpCacheConfigurationTest
 {
-    @Override
-    public String name()
-    {
-        return "http-cache";
-    }
+    // needed by test annotations
+    public static final String HTTP_CACHE_MAXIMUM_REQUESTS_NAME = "nukleus.http_cache.maximum.requests";
 
-    @Override
-    public Class<HttpCacheController> kind()
+    @Test
+    public void shouldVerifyConstants() throws Exception
     {
-        return HttpCacheController.class;
-    }
-
-    @Override
-    public HttpCacheController create(
-        Configuration config,
-        ControllerBuilder<HttpCacheController> builder)
-    {
-        return builder.setName(name())
-                      .setFactory(HttpCacheController::new)
-                      .build();
+        assertEquals(HTTP_CACHE_MAXIMUM_REQUESTS.name(), HTTP_CACHE_MAXIMUM_REQUESTS_NAME);
     }
 }

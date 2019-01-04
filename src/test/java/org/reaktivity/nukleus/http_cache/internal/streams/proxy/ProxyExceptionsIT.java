@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 The Reaktivity Project
+ * Copyright 2016-2018 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -19,6 +19,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -26,7 +27,6 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
-import org.reaktivity.nukleus.http_cache.internal.HttpCacheController;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
@@ -40,18 +40,18 @@ public class ProxyExceptionsIT
 
     private final ReaktorRule reaktor = new ReaktorRule()
             .nukleus("http-cache"::equals)
-            .controller(HttpCacheController.class::isAssignableFrom)
+            .controller("http-cache"::equals)
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(1024)
+            .counterValuesBufferCapacity(8192)
             .nukleus("http-cache"::equals)
             .clean();
 
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
 
     @Rule
-    public final TestRule chain = outerRule(k3po).around(reaktor).around(counters).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(counters).around(timeout);
 
     @Test
     @Specification({
@@ -74,7 +74,7 @@ public class ProxyExceptionsIT
     public void shouldHandleAbortSentOnCacheableRequest() throws Exception
     {
         k3po.finish();
-        assertEquals(1, counters.slabAquires() - counters.slabReleases());
+        assertEquals(1, counters.requestsCachable());
         // We proceed with request out back anyways, TODO, consider adding to test response returning and getting cached
     }
 
@@ -117,9 +117,23 @@ public class ProxyExceptionsIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/accept.reply.sent.reset.cacheble.response/accept/client",
+        "${streams}/accept.reply.sent.reset.cacheble.response/connect/server",
+    })
+    public void shouldAcceptReplySentResetCachebleResponse() throws Exception
+    {
+        k3po.finish();
+        Thread.sleep(100);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Ignore("https://github.com/reaktivity/nukleus-http-cache.java/issues/72")
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/client.sent.abort.on.scheduled.poll/accept/client"
     })
-    public void shouldClientSentAbortOnScheduledPoll() throws Exception
+    public void shouldAcceptAbortOnScheduledPoll() throws Exception
     {
         k3po.finish();
 //        counters.assertExpectedCacheEntries(0); // TODO, fix. Sporadically failing today,
