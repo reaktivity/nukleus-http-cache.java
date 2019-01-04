@@ -154,10 +154,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         if (state == CacheState.COMMITING)
         {
-            state = CacheState.COMMITTED;
             boolean copied = moveDataToCachePools(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
             if (copied)
             {
+                state = CacheState.COMMITTED;
                 cache.put(requestURLHash(), this);
             }
             else

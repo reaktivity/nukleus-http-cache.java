@@ -440,4 +440,22 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 4 buffer slots
+    @Configure(name="nukleus.http_cache.slot.capacity", value="2048")
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/polling.updates.after.cache.full/accept/client",
+        "${streams}/polling.updates.after.cache.full/connect/server",
+    })
+    public void pollingAfterCacheFull() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(1000);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);    }
 }
