@@ -54,7 +54,7 @@ public class EdgeArchProxyIT
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
 
     @Rule
-    public final TestRule chain = outerRule(reaktor).around(k3po).around(counters).around(timeout);
+    public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout).around(counters);
 
     @Test
     @Specification({
@@ -300,6 +300,18 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/update.cache.when.304.response.has.different.etag/accept/client",
+        "${streams}/update.cache.when.304.response.has.different.etag/connect/server",
+    })
+    public void shouldCacheWhen304ResponseHasDifferentEtag() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(2);
     }
 
     @Test

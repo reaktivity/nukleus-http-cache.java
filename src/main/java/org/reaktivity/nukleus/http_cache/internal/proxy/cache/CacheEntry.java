@@ -713,10 +713,10 @@ public final class CacheEntry
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
         String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
 
-        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
-                status.equals(HttpStatus.OK_200) &&
-                (this.cachedRequest.etag().equals(etag) ||
-                 this.cachedRequest.payloadEquals(request, cache.cachedResponseBufferPool, cache.cachedResponse1BufferPool));
+        assert status != null;
+        boolean notModified = (status.equals(HttpStatus.NOT_MODIFIED_304) ||
+                status.equals(HttpStatus.OK_200)) &&
+                this.cachedRequest.etag().equals(etag);
 
         return !notModified;
     }

@@ -76,9 +76,11 @@ public class CacheRefreshRequest extends CacheableRequest
             ":status".equals(h.name().asString()) &&
             "304".equals(h.value().asString())))
         {
-            updatingEntry.refresh(this);
-            this.state = CacheState.COMMITTED;
-            this.purge();
+            boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
+            if (!noError)
+            {
+                this.purge();
+            }
             return true;
         }
         else
