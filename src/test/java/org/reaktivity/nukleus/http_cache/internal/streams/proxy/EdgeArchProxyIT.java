@@ -311,7 +311,7 @@ public class EdgeArchProxyIT
     public void shouldCacheWhen304ResponseHasDifferentEtag() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(2);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test

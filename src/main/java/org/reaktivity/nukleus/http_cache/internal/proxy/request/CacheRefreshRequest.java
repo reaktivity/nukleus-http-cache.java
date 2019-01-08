@@ -63,7 +63,7 @@ public class CacheRefreshRequest extends CacheableRequest
     {
         if (responseHeaders.anyMatch(h ->
             ":status".equals(h.name().asString()) &&
-            h.value().asString().startsWith("2")))
+            h.value().asString().startsWith("2")) ||"304".equals(h.value().asString()))
         {
             boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
@@ -71,17 +71,6 @@ public class CacheRefreshRequest extends CacheableRequest
                 this.purge();
             }
             return noError;
-        }
-        else if (responseHeaders.anyMatch(h ->
-            ":status".equals(h.name().asString()) &&
-            "304".equals(h.value().asString())))
-        {
-            boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
-            if (!noError)
-            {
-                this.purge();
-            }
-            return true;
         }
         else
         {
