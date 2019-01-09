@@ -181,8 +181,13 @@ public class Cache
                         counters.responsesAbortedVary.getAsLong();
                     });
                 }
-
                 oldCacheEntry.purge();
+            }
+            else if (oldCacheEntry.isSelectedForUpdate(request))
+            {
+                oldCacheEntry.cachedRequest.updateResponseHeader(request.getResponseHeaders(responseHeadersRO,
+                        cachedResponse1BufferPool));
+                cacheEntry.purge();
             }
             else
             {

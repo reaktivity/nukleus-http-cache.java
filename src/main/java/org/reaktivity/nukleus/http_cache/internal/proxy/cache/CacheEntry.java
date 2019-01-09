@@ -244,7 +244,7 @@ public final class CacheEntry
         request.setThrottle(serveFromCacheStream);
 
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-                .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
+            .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptRouteId = request.acceptRouteId();
@@ -714,11 +714,22 @@ public final class CacheEntry
         String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
 
         assert status != null;
-        boolean notModified = (status.equals(HttpStatus.NOT_MODIFIED_304) ||
-                status.equals(HttpStatus.OK_200)) &&
-                this.cachedRequest.etag().equals(etag);
+        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
+                status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
 
         return !notModified;
+    }
+
+    public boolean isSelectedForUpdate(CacheableRequest request)
+    {
+        ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
+        String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+
+        assert status != null;
+
+        return status.equals(HttpStatus.NOT_MODIFIED_304) &&
+                this.cachedRequest.etag().equals(etag);
     }
 
     public void refresh(AnswerableByCacheRequest request)

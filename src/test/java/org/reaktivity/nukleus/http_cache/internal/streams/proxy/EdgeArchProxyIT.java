@@ -305,10 +305,27 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/update.cache.when.304.response.has.different.etag/accept/client",
-        "${streams}/update.cache.when.304.response.has.different.etag/connect/server",
+        "${streams}/update.cache.when.304.response.has.matching.etag/accept/client",
+        "${streams}/update.cache.when.304.response.has.matching.etag/connect/server",
     })
-    public void shouldCacheWhen304ResponseHasDifferentEtag() throws Exception
+    public void shouldCacheWhen304ResponseHasMatchingEtag() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/update.cache.when.200.response.has.different.etag/accept/client",
+        "${streams}/update.cache.when.200.response.has.different.etag/connect/server",
+    })
+    public void shouldCacheWhen200ResponseHasDifferentEtag() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
