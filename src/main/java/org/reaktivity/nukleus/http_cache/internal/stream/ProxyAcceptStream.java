@@ -252,7 +252,7 @@ final class ProxyAcceptStream
 
             sendBeginToConnect(requestHeaders, connectCorrelationId);
             streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId,
-                    streamFactory.supplyTrace.getAsLong()); // TODO: traceId
+                    streamFactory.supplyTrace.getAsLong());
             streamFactory.cache.createPendingInitialRequests(cacheableRequest);
         }
 

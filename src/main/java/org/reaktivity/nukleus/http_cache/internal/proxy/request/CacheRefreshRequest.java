@@ -21,6 +21,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
+import java.util.Objects;
+
 public class CacheRefreshRequest extends CacheableRequest
 {
     private final CacheEntry updatingEntry;
@@ -62,8 +64,9 @@ public class CacheRefreshRequest extends CacheableRequest
         BufferPool bufferPool)
     {
         if (responseHeaders.anyMatch(h ->
-            ":status".equals(h.name().asString()) &&
-            h.value().asString().startsWith("2")))
+                (":status".equals(h.name().asString()) &&
+                        Objects.requireNonNull(h.value().asString()).startsWith("2")) ||
+                        Objects.requireNonNull(h.value().asString()).equals("304")))
         {
             boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
@@ -71,15 +74,6 @@ public class CacheRefreshRequest extends CacheableRequest
                 this.purge();
             }
             return noError;
-        }
-        else if (responseHeaders.anyMatch(h ->
-            ":status".equals(h.name().asString()) &&
-            "304".equals(h.value().asString())))
-        {
-            updatingEntry.refresh(this);
-            this.state = CacheState.COMMITTED;
-            this.purge();
-            return true;
         }
         else
         {

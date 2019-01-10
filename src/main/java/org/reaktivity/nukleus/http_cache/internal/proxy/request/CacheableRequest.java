@@ -35,6 +35,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class CacheableRequest extends AnswerableByCacheRequest
@@ -231,6 +232,33 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     public MessageConsumer connect()
     {
         return connect;
+    }
+
+    public void updateResponseHeader(ListFW<HttpHeaderFW> newHeaders)
+    {
+        final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
+        ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
+
+        HttpHeaderFW status = oldHeaders.matchFirst(h -> h.name().asString().toLowerCase().equals(":status"));
+
+        Integer firstResponseSlot = responseSlots.get(0);
+        MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
+
+        final ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
+                new ListFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
+
+        this.responseHeadersSize = newHeaders.sizeof();
+        headersRW.wrap(responseBuffer, 0, responseHeadersSize);
+        headersRW.item(y -> y.name(status.name()).value(status.value()));
+        newHeaders.forEach(h ->
+        {
+            if(!h.name().toString().toLowerCase().contains(":status"))
+            {
+                headersRW.item(y -> y.name(h.name()).value(h.value()));
+            }
+        });
+
+        headersRW.build();
     }
 
     private boolean storeResponseData(
