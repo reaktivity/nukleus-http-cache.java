@@ -265,7 +265,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             headersRW.item(y -> y.name(entry.getKey()).value(entry.getValue()));
         }
 
-        headersRW.build().forEach(h -> System.out.println(h.name() + "=" + h.value()));
+        headersRW.build();
     }
 
     private boolean storeResponseData(
