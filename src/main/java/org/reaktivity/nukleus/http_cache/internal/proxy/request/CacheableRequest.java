@@ -19,6 +19,9 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
@@ -238,8 +241,15 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     {
         final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
         ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
+        String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
+                .toLowerCase().equals(":status"))).value().asString();
 
-        HttpHeaderFW status = oldHeaders.matchFirst(h -> h.name().asString().toLowerCase().equals(":status"));
+        final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
+        oldHeaders.forEach(h ->
+                newHeadersMap.put(h.name().asString(), h.value().asString()));
+        newHeaders.forEach(h ->
+                newHeadersMap.put(h.name().asString(), h.value().asString()));
+        newHeadersMap.put(":status", statusCode);
 
         Integer firstResponseSlot = responseSlots.get(0);
         MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
@@ -247,16 +257,13 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         final ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
                 new ListFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
 
-        this.responseHeadersSize = newHeaders.sizeof();
+        this.responseHeadersSize = responseBuffer.capacity();
         headersRW.wrap(responseBuffer, 0, responseHeadersSize);
-        headersRW.item(y -> y.name(status.name()).value(status.value()));
-        newHeaders.forEach(h ->
+
+        for(Map.Entry<String, String> entry : newHeadersMap.entrySet())
         {
-            if(!h.name().toString().toLowerCase().contains(":status"))
-            {
-                headersRW.item(y -> y.name(h.name()).value(h.value()));
-            }
-        });
+            headersRW.item(y -> y.name(entry.getKey()).value(entry.getValue()));
+        }
 
         headersRW.build();
     }
