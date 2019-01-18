@@ -65,8 +65,8 @@ public class CacheRefreshRequest extends CacheableRequest
     {
         if (responseHeaders.anyMatch(h ->
                 (":status".equals(h.name().asString()) &&
-                        Objects.requireNonNull(h.value().asString()).startsWith("2")) ||
-                        Objects.requireNonNull(h.value().asString()).equals("304")))
+                        (Objects.requireNonNull(h.value().asString()).startsWith("2")) ||
+                        Objects.requireNonNull(h.value().asString()).equals("304"))))
         {
             boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
