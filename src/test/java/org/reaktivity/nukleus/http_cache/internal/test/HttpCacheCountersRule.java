@@ -20,114 +20,101 @@ import static org.junit.Assert.assertEquals;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
-import org.reaktivity.nukleus.http_cache.internal.HttpCacheController;
 import org.reaktivity.reaktor.test.ReaktorRule;
 
 public class HttpCacheCountersRule implements TestRule
 {
     private static final int NUM_OF_SLOTS_PER_CACHE_ENTRY = 3;
+
     private final ReaktorRule reaktor;
 
-    public HttpCacheCountersRule(ReaktorRule reaktor)
+    public HttpCacheCountersRule(
+        ReaktorRule reaktor)
     {
         this.reaktor = reaktor;
     }
 
     @Override
-    public Statement apply(Statement base, Description description)
+    public Statement apply(
+        Statement base,
+        Description description)
     {
-        return new Statement()
-        {
-
-            @Override
-            public void evaluate() throws Throwable
-            {
-                HttpCacheController controller = controller();
-                base.evaluate();
-            }
-
-        };
+        return base;
     }
 
     public long requests()
     {
-        return controller().count("requests");
+        return reaktor.counter("http-cache.requests");
     }
 
     public long requestsCachable()
     {
-        return controller().count("requests.cacheable");
+        return reaktor.counter("http-cache.requests.cacheable");
     }
 
     public long requestsPreferWait()
     {
-        return controller().count("requests.prefer.wait");
+        return reaktor.counter("http-cache.requests.prefer.wait");
     }
 
     public long responses()
     {
-        return controller().count("responses");
+        return reaktor.counter("http-cache.responses");
     }
 
     public long responsesCached()
     {
-        return controller().count("responses.cached");
+        return reaktor.counter("http-cache.responses.cached");
     }
 
     public long responsesAborted()
     {
-        return controller().count("responses.aborted");
+        return reaktor.counter("http-cache.responses.aborted");
     }
 
     public long promises()
     {
-        return controller().count("promises");
+        return reaktor.counter("http-cache.promises");
     }
 
     public long promisesCanceled()
     {
-        return controller().count("promises.canceled");
+        return reaktor.counter("http-cache.promises.canceled");
     }
 
     public long cacheEntries()
     {
-        return controller().count("cache.entries");
+        return reaktor.counter("http-cache.cache.entries");
     }
 
     public long refreshRequests()
     {
-        return controller().count("refresh.request.acquires");
+        return reaktor.counter("http-cache.refresh.request.acquires");
     }
 
     public long cachedRequestAcquires()
     {
-        return controller().count("cached.request.acquires");
+        return reaktor.counter("http-cache.cached.request.acquires");
     }
 
     public long cachedRequestReleases()
     {
-        return controller().count("cached.request.releases");
+        return reaktor.counter("http-cache.cached.request.releases");
     }
 
     public long cachedResponseAcquires()
     {
-        return controller().count("cached.response.acquires");
+        return reaktor.counter("http-cache.cached.response.acquires");
     }
 
     public long cachedResponseReleases()
     {
-        return controller().count("cached.response.releases");
+        return reaktor.counter("http-cache.cached.response.releases");
     }
 
     public long cacheSlots()
     {
         return cachedRequestAcquires() + cachedResponseAcquires() - cachedRequestReleases() - cachedResponseReleases();
-    }
-
-
-    private HttpCacheController controller()
-    {
-        return reaktor.controller(HttpCacheController.class);
     }
 
     public void assertExpectedCacheEntries(

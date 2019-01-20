@@ -15,7 +15,9 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -35,10 +37,10 @@ public class InitialRequest extends CacheableRequest
             long acceptRouteId,
             long acceptReplyStreamId,
             long acceptCorrelationId,
-            MessageConsumer connect,
             long connectRouteId,
             LongSupplier supplyCorrelationId,
-            LongSupplier supplyInitialId,
+            LongUnaryOperator supplyInitialId,
+            LongFunction<MessageConsumer> supplyReceiver,
             int requestURLHash,
             BufferPool bufferPool,
             int requestSlot,
@@ -52,10 +54,10 @@ public class InitialRequest extends CacheableRequest
               acceptRouteId,
               acceptReplyStreamId,
               acceptCorrelationId,
-              connect,
               connectRouteId,
               supplyCorrelationId,
               supplyInitialId,
+              supplyReceiver,
               requestURLHash,
               bufferPool,
               requestSlot,

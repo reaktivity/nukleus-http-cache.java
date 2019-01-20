@@ -159,9 +159,9 @@ public final class CacheEntry
         }
         else
         {
-            MessageConsumer connect = cachedRequest.connect();
             long connectRouteId = cachedRequest.connectRouteId();
-            long connectStreamId = cachedRequest.supplyInitialId().getAsLong();
+            long connectInitialId = cachedRequest.supplyInitialId().applyAsLong(connectRouteId);
+            MessageConsumer connectInitial = cachedRequest.supplyReceiver().apply(connectInitialId);
             long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             final String etag = this.cachedRequest.etag();
@@ -172,7 +172,7 @@ public final class CacheEntry
                         currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
             }
 
-            cache.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectCorrelationId,
+            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, connectCorrelationId,
                     builder ->
                         {
                             requestHeaders.forEach(h ->
@@ -191,7 +191,7 @@ public final class CacheEntry
                             });
                             builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                         });
-            cache.writer.doHttpEnd(connect, connectRouteId, connectStreamId, 0L);
+            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
 
             // duplicate request into new slot (TODO optimize to single request)
 

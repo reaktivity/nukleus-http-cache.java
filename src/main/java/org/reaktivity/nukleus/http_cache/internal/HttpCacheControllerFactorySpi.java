@@ -38,8 +38,7 @@ public final class HttpCacheControllerFactorySpi implements ControllerFactorySpi
         Configuration config,
         ControllerBuilder<HttpCacheController> builder)
     {
-        return builder.setName(name())
-                      .setFactory(HttpCacheController::new)
+        return builder.setFactory(HttpCacheController::new)
                       .build();
     }
 }
