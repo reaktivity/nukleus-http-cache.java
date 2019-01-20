@@ -22,7 +22,9 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
+import java.util.function.LongUnaryOperator;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -51,10 +53,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     private int responseHeadersSize = 0;
     private int responseSize = 0;
 
-    final MessageConsumer connect;
     final long connectRouteId;
     final LongSupplier supplyCorrelationId;
-    final LongSupplier supplyInitialId;
+    final LongUnaryOperator supplyInitialId;
+    final LongFunction<MessageConsumer> supplyReceiver;
     CacheState state;
     private int attempts;
     private String recentAuthorizationHeader;
@@ -69,10 +71,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         long acceptRouteId,
         long acceptReplyStreamId,
         long acceptCorrelationId,
-        MessageConsumer connect,
         long connectRouteId,
         LongSupplier supplyCorrelationId,
-        LongSupplier supplyStreamId,
+        LongUnaryOperator supplyInitialId,
+        LongFunction<MessageConsumer> supplyReceiver,
         int requestURLHash,
         BufferPool bufferPool,
         int requestSlot,
@@ -95,11 +97,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.connectRouteId = connectRouteId;
         this.state = CacheState.COMMITING;
         this.supplyCorrelationId = supplyCorrelationId;
-        this.supplyInitialId = supplyStreamId;
+        this.supplyInitialId = supplyInitialId;
+        this.supplyReceiver = supplyReceiver;
         this.requestPool = bufferPool;
         this.requestSlot = requestSlot;
-
-        this.connect = connect;
     }
     public long connectRouteId()
     {
@@ -193,9 +194,14 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return supplyCorrelationId;
     }
 
-    public LongSupplier supplyInitialId()
+    public LongUnaryOperator supplyInitialId()
     {
         return supplyInitialId;
+    }
+
+    public LongFunction<MessageConsumer> supplyReceiver()
+    {
+        return supplyReceiver;
     }
 
     public final int requestSlot()
@@ -230,11 +236,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         Integer firstResponseSlot = responseSlots.get(0);
         MutableDirectBuffer responseBuffer = bp.buffer(firstResponseSlot);
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
-    }
-
-    public MessageConsumer connect()
-    {
-        return connect;
     }
 
     public void updateResponseHeader(ListFW<HttpHeaderFW> newHeaders)

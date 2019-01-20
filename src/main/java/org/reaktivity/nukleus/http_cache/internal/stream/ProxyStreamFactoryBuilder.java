@@ -47,7 +47,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
-    private LongSupplier supplyInitialId;
+    private LongUnaryOperator supplyInitialId;
     private LongSupplier supplyTrace;
     private LongUnaryOperator supplyReplyId;
     private LongSupplier supplyCorrelationId;
@@ -89,7 +89,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public ProxyStreamFactoryBuilder setInitialIdSupplier(
-        LongSupplier supplyInitialId)
+        LongUnaryOperator supplyInitialId)
     {
         this.supplyInitialId = supplyInitialId;
         return this;
@@ -105,7 +105,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public StreamFactoryBuilder setTraceSupplier(
-            LongSupplier supplyTrace)
+        LongSupplier supplyTrace)
     {
         this.supplyTrace = supplyTrace;
         return this;
@@ -169,7 +169,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
             this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
 
-            LongConsumer cacheEntries = supplyAccumulator.apply("cache.entries");
+            LongConsumer cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
             this.cache = new Cache(
                     scheduler,
                     budgetManager,

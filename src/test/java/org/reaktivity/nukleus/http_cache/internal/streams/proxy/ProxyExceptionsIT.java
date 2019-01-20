@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -46,6 +47,7 @@ public class ProxyExceptionsIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(8192)
             .nukleus("http-cache"::equals)
+            .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
             .clean();
 
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
