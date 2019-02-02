@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import java.util.Random;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
@@ -59,8 +58,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongConsumer> supplyAccumulator;
 
     private int etagCnt = 0;
-    private final int etagPrefix = new Random().nextInt(99999);
-    private final Supplier<String> supplyEtag = () -> "\"" + etagPrefix + "a" + etagCnt++ + "\"";
+    private final Supplier<String> supplyEtag = this::getEtagSupply;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -196,5 +194,10 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyEtag,
                 counters,
                 supplyTrace);
+    }
+
+    private String getEtagSupply()
+    {
+        return "\"" + config.cacheEtagPrefix() + "a" + etagCnt++ + "\"";
     }
 }
