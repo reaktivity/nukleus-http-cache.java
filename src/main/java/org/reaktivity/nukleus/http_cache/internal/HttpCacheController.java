@@ -19,15 +19,11 @@ import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
-import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Controller;
 import org.reaktivity.nukleus.ControllerSpi;
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.types.control.FreezeFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.Role;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
@@ -74,13 +70,6 @@ public final class HttpCacheController implements Controller
     public String name()
     {
         return "http-cache";
-    }
-
-    public <T> T supplyTarget(
-        String target,
-        BiFunction<ToIntFunction<MessageConsumer>, MessagePredicate, T> factory)
-    {
-        return controllerSpi.doSupplyTarget(target, factory);
     }
 
     public CompletableFuture<Long> routeServer(
@@ -142,11 +131,5 @@ public final class HttpCacheController implements Controller
                                   .build();
 
         return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
-    }
-
-    public long count(
-        String name)
-    {
-        return controllerSpi.doCount(name);
     }
 }

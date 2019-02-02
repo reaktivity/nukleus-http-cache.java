@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_REQUESTS_NAME;
+import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import java.time.Instant;
 
@@ -49,6 +50,7 @@ public class EdgeArchProxyIT
             .responseBufferCapacity(1024)
             .counterValuesBufferCapacity(8192)
             .nukleus("http-cache"::equals)
+            .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
             .clean();
 
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);

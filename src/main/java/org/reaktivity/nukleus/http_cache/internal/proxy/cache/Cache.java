@@ -107,16 +107,16 @@ public class Cache
         this.writer = new Writer(writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
                 requestBufferPool.duplicate(),
-                counters.supplyCounter.apply("refresh.request.acquires"),
-                counters.supplyCounter.apply("refresh.request.releases"));
+                counters.supplyCounter.apply("http-cache.refresh.request.acquires"),
+                counters.supplyCounter.apply("http-cache.refresh.request.releases"));
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
-                counters.supplyCounter.apply("cached.request.acquires"),
-                counters.supplyCounter.apply("cached.request.releases"));
+                counters.supplyCounter.apply("http-cache.cached.request.acquires"),
+                counters.supplyCounter.apply("http-cache.cached.request.releases"));
         this.cachedResponseBufferPool = new CountingBufferPool(
                 cacheBufferPool.duplicate(),
-                counters.supplyCounter.apply("cached.response.acquires"),
-                counters.supplyCounter.apply("cached.response.releases"));
+                counters.supplyCounter.apply("http-cache.cached.response.acquires"),
+                counters.supplyCounter.apply("http-cache.cached.response.releases"));
         this.cachedRequest1BufferPool = cacheBufferPool.duplicate();
         this.cachedResponse1BufferPool = cacheBufferPool.duplicate();
         this.requestBufferPool = requestBufferPool.duplicate();
@@ -273,7 +273,8 @@ public class Cache
         final InitialRequest request)
     {
         long connectRouteId = request.connectRouteId();
-        long connectStreamId = request.supplyInitialId().getAsLong();
+        long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
+        MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
         long connectCorrelationId = request.supplyCorrelationId().getAsLong();
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
@@ -285,12 +286,12 @@ public class Cache
                     currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(request.connect(), connectRouteId, connectStreamId, connectCorrelationId,
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, connectCorrelationId,
                 builder -> requestHeaders.forEach(
                         h ->  builder.item(item -> item.name(h.name()).value(h.value()))
                 )
         );
-        writer.doHttpEnd(request.connect(), connectRouteId, connectStreamId, 0L);
+        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
     }
 
     public boolean hasPendingInitialRequests(

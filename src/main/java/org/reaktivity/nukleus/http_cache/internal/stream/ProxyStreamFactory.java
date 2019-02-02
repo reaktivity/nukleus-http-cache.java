@@ -65,9 +65,9 @@ public class ProxyStreamFactory implements StreamFactory
     final RouteManager router;
     final BudgetManager budgetManager;
 
-    final LongSupplier supplyInitialId;
-    final LongSupplier supplyTrace;
+    final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
+    final LongSupplier supplyTrace;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
@@ -85,7 +85,7 @@ public class ProxyStreamFactory implements StreamFactory
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
-        LongSupplier supplyInitialId,
+        LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
@@ -102,12 +102,12 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("initial.request.acquires"),
-                counters.supplyCounter.apply("initial.request.releases"));
+                counters.supplyCounter.apply("http-cache.initial.request.acquires"),
+                counters.supplyCounter.apply("http-cache.initial.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("response.acquires"),
-                counters.supplyCounter.apply("response.releases"));
+                counters.supplyCounter.apply("http-cache.response.acquires"),
+                counters.supplyCounter.apply("http-cache.response.releases"));
         this.correlations = requireNonNull(correlations);
         this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.cache = cache;

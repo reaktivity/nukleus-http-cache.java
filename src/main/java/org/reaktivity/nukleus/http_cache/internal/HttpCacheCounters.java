@@ -46,19 +46,19 @@ public class HttpCacheCounters
         this.supplyCounter = supplyCounter;
         this.supplyAccumulator = supplyAccumulator;
 
-        this.requests = supplyCounter.apply("requests");
-        this.requestsCacheable = supplyCounter.apply("requests.cacheable");
-        this.requestsPreferWait = supplyCounter.apply("requests.prefer.wait");
-        this.requestsRetry = supplyCounter.apply("requests.retry");
-        this.responses = supplyCounter.apply("responses");
-        this.responsesRetry = supplyCounter.apply("responses.retry");
-        this.responsesCached = supplyCounter.apply("responses.cached");
-        this.responsesAbortedVary = supplyCounter.apply("responses.aborted.vary");
-        this.responsesAbortedMiss = supplyCounter.apply("responses.aborted.miss");
-        this.responsesAbortedEvicted = supplyCounter.apply("responses.aborted.evicted");
-        this.responsesAbortedUncommited = supplyCounter.apply("responses.aborted.uncommited");
-        this.responsesAbortedPurge = supplyCounter.apply("responses.aborted.purge");
-        this.promises = supplyCounter.apply("promises");
-        this.promisesCanceled = supplyCounter.apply("promises.canceled");
+        this.requests = supplyCounter.apply("http-cache.requests");
+        this.requestsCacheable = supplyCounter.apply("http-cache.requests.cacheable");
+        this.requestsPreferWait = supplyCounter.apply("http-cache.requests.prefer.wait");
+        this.requestsRetry = supplyCounter.apply("http-cache.requests.retry");
+        this.responses = supplyCounter.apply("http-cache.responses");
+        this.responsesRetry = supplyCounter.apply("http-cache.responses.retry");
+        this.responsesCached = supplyCounter.apply("http-cache.responses.cached");
+        this.responsesAbortedVary = supplyCounter.apply("http-cache.responses.aborted.vary");
+        this.responsesAbortedMiss = supplyCounter.apply("http-cache.responses.aborted.miss");
+        this.responsesAbortedEvicted = supplyCounter.apply("http-cache.responses.aborted.evicted");
+        this.responsesAbortedUncommited = supplyCounter.apply("http-cache.responses.aborted.uncommited");
+        this.responsesAbortedPurge = supplyCounter.apply("http-cache.responses.aborted.purge");
+        this.promises = supplyCounter.apply("http-cache.promises");
+        this.promisesCanceled = supplyCounter.apply("http-cache.promises.canceled");
     }
 }

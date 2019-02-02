@@ -75,10 +75,10 @@ final class ProxyConnectReplyStream
     }
 
     void handleStream(
-            int msgTypeId,
-            DirectBuffer buffer,
-            int index,
-            int length)
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
     {
         streamState.accept(msgTypeId, buffer, index, length);
     }
@@ -296,8 +296,8 @@ final class ProxyConnectReplyStream
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         request.incAttempts();
 
-        MessageConsumer connect = request.connect();
-        long connectStreamId = request.supplyInitialId().getAsLong();
+        long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
+        MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
         long connectCorrelationId = request.supplyCorrelationId().getAsLong();
 
         streamFactory.correlations.put(connectCorrelationId, request);
@@ -310,7 +310,7 @@ final class ProxyConnectReplyStream
                     currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connect, connectRouteId, connectStreamId, connectCorrelationId,
+        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, connectCorrelationId,
                 builder ->
                 {
                     requestHeaders.forEach(
@@ -320,7 +320,7 @@ final class ProxyConnectReplyStream
                         builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                     }
                 });
-        streamFactory.writer.doHttpEnd(connect, connectRouteId, connectStreamId, streamFactory.supplyTrace.getAsLong());
+        streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
     }
 

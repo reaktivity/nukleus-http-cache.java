@@ -52,7 +52,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public ServerStreamFactoryBuilder setInitialIdSupplier(
-        LongSupplier supplyInitialId)
+        LongUnaryOperator supplyInitialId)
     {
         return this;
     }
@@ -67,7 +67,7 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
 
     @Override
     public StreamFactoryBuilder setTraceSupplier(
-            LongSupplier supplyTrace)
+        LongSupplier supplyTrace)
     {
         this.supplyTrace = supplyTrace;
         return this;
