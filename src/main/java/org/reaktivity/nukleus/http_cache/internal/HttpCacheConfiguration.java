@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal;
 
 import org.reaktivity.nukleus.Configuration;
 
+import java.util.Random;
+
 public class HttpCacheConfiguration extends Configuration
 {
     public static final boolean DEBUG = Boolean.getBoolean("nukleus.http_cache.debug");
@@ -24,6 +26,7 @@ public class HttpCacheConfiguration extends Configuration
     public static final IntPropertyDef HTTP_CACHE_CAPACITY;
     public static final IntPropertyDef HTTP_CACHE_SLOT_CAPACITY;
     public static final IntPropertyDef HTTP_CACHE_MAXIMUM_REQUESTS;
+    public static final IntPropertyDef HTTP_CACHE_ETAG_PREFIX;
 
     private static final ConfigurationDef HTTP_CACHE_CONFIG;
 
@@ -33,6 +36,7 @@ public class HttpCacheConfiguration extends Configuration
         HTTP_CACHE_CAPACITY = config.property("capacity", 1024 * 64 * 64);
         HTTP_CACHE_SLOT_CAPACITY = config.property("slot.capacity", 0x4000); // ALSO is max header size
         HTTP_CACHE_MAXIMUM_REQUESTS = config.property("maximum.requests", 64 * 1024);
+        HTTP_CACHE_ETAG_PREFIX = config.property("etag.prefix", new Random().nextInt(99999));
         HTTP_CACHE_CONFIG = config;
     }
 
@@ -55,5 +59,10 @@ public class HttpCacheConfiguration extends Configuration
     public int maximumRequests()
     {
         return HTTP_CACHE_MAXIMUM_REQUESTS.getAsInt(this);
+    }
+
+    public int cacheEtagPrefix()
+    {
+        return HTTP_CACHE_ETAG_PREFIX.getAsInt(this);
     }
 }
