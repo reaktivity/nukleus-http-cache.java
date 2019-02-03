@@ -470,4 +470,9 @@ public class Cache
         return this.cachedEntries.purgeLRU();
     }
 
+    public Supplier<String> getEtagSupplier()
+    {
+        return etagSupplier;
+    }
+
 }
