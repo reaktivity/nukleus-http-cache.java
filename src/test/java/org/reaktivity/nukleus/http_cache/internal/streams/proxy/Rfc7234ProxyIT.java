@@ -269,7 +269,7 @@ public class Rfc7234ProxyIT
         "${route}/proxy/controller",
         "${streams}/cache.max-stale.with.max-age/accept/client",
         "${streams}/cache.max-stale.with.max-age/connect/server",
-})
+    })
     public void shouldCacheMaxStaleWithMaxAge() throws Exception
     {
         k3po.start();

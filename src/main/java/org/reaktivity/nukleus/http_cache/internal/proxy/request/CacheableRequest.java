@@ -162,6 +162,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             boolean copied = moveDataToCachePools(cache.cachedRequestBufferPool, cache.cachedResponseBufferPool);
             if (copied)
             {
+                System.out.println("putting the response into cache");
                 state = CacheState.COMMITTED;
                 cache.put(requestURLHash(), this);
             }

@@ -27,7 +27,6 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.CAN_REFRESH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.PURGED;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.REFRESHING;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
@@ -88,6 +87,7 @@ public final class CacheEntry
 
     private long pollAt = -1;
     private final LongSupplier supplyTrace;
+    private boolean sendRequestRefreshCompleted = true;
 
     public CacheEntry(
         Cache cache,
@@ -105,9 +105,9 @@ public final class CacheEntry
     public void commit()
     {
         final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
-        if (freshnessExtension > 0)
+        if (freshnessExtension > 0 && this.state != CacheEntryState.REFRESHING)
         {
-            this.state = CacheEntryState.REFRESHING;
+            this.state = CacheEntryState.CAN_REFRESH;
             pollBackend();
         }
         else
@@ -118,8 +118,13 @@ public final class CacheEntry
 
     private void pollBackend()
     {
-        if (expectSubscribers || !subscribers.isEmpty())
+        if (this.state != CacheEntryState.PURGED)
         {
+            if (this.state != CacheEntryState.CAN_REFRESH && sendRequestRefreshCompleted)
+            {
+                sendRefreshRequest();
+            }
+
             this.state = CacheEntryState.REFRESHING;
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
             if (this.pollAt == -1)
@@ -130,24 +135,29 @@ public final class CacheEntry
             {
                 this.pollAt += surrogateMaxAge * 1000;
             }
-            cache.scheduler.accept(pollAt, this::sendRefreshRequest);
-            expectSubscribers = false;
-        }
-        else
-        {
-            this.state = CacheEntryState.CAN_REFRESH;
+            cache.scheduler.accept(pollAt, this::pollBackend);
         }
     }
 
     private void sendRefreshRequest()
     {
+        sendRequestRefreshCompleted = false;
         if (this.state == CacheEntryState.PURGED)
         {
+            sendRequestRefreshCompleted = true;
+            return;
+        }
+        else if (!expectSubscribers())
+        {
+            sendRequestRefreshCompleted = true;
+            this.state = CacheEntryState.CAN_REFRESH;
+            pollBackend();
             return;
         }
         int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
         if (newSlot == NO_SLOT)
         {
+            sendRequestRefreshCompleted = true;
             pollBackend();
             return;
         }
@@ -207,7 +217,10 @@ public final class CacheEntry
                     this.cache);
             this.pollingRequest = refreshRequest;
             cache.correlations.put(connectCorrelationId, refreshRequest);
+            expectSubscribers = false;
+            this.state = CacheEntryState.CAN_REFRESH;
         }
+        sendRequestRefreshCompleted = true;
     }
 
 
@@ -282,6 +295,7 @@ public final class CacheEntry
 
             // count all promises (prefer wait, if-none-match)
             cache.counters.promises.getAsLong();
+            this.expectSubscribers = true;
         }
         else
         {
@@ -310,11 +324,6 @@ public final class CacheEntry
         {
             // matching with requestsCacheable (which accounts only InitialRequest)
             cache.counters.responsesCached.getAsLong();
-        }
-
-        if(this.state == CacheEntryState.CAN_REFRESH)
-        {
-            pollBackend();
         }
     }
 
@@ -639,7 +648,7 @@ public final class CacheEntry
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
-                || this.state == REFRESHING;
+                || (expectSubscribers() && this.state == REFRESHING);
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
                 doesNotVaryBy &&
@@ -693,10 +702,6 @@ public final class CacheEntry
         {
             this.subscribers.add(preferWaitRequest);
         }
-        if (this.state == CacheEntryState.CAN_REFRESH)
-        {
-            pollBackend();
-        }
         return polling;
     }
 
@@ -730,14 +735,6 @@ public final class CacheEntry
 
         return status.equals(HttpStatus.NOT_MODIFIED_304) &&
                 this.cachedRequest.etag().equals(etag);
-    }
-
-    public void refresh(AnswerableByCacheRequest request)
-    {
-        if (request == pollingRequest && state != PURGED)
-        {
-            pollBackend();
-        }
     }
 
     public boolean expectSubscribers()
