@@ -79,9 +79,7 @@ public final class CacheEntry
 
     private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
 
-    boolean expectSubscribers;
-
-    private CacheRefreshRequest pollingRequest;
+    private boolean expectSubscribers;
 
     private CacheEntryState state;
 
@@ -105,10 +103,13 @@ public final class CacheEntry
     public void commit()
     {
         final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
-        if (freshnessExtension > 0 && this.state != CacheEntryState.REFRESHING)
+        if (freshnessExtension > 0)
         {
-            this.state = CacheEntryState.CAN_REFRESH;
-            pollBackend();
+            if(this.state != REFRESHING && this.state != CAN_REFRESH)
+            {
+                this.state = CAN_REFRESH;
+                pollBackend();
+            }
         }
         else
         {
@@ -120,12 +121,15 @@ public final class CacheEntry
     {
         if (this.state != CacheEntryState.PURGED)
         {
-            if (this.state != CacheEntryState.CAN_REFRESH && sendRequestRefreshCompleted)
+            if (this.state == REFRESHING && sendRequestRefreshCompleted)
             {
-                sendRefreshRequest();
+                if(!sendRefreshRequest())
+                {
+                    return;
+                }
             }
-
             this.state = CacheEntryState.REFRESHING;
+
             int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
             if (this.pollAt == -1)
             {
@@ -139,27 +143,25 @@ public final class CacheEntry
         }
     }
 
-    private void sendRefreshRequest()
+    private boolean sendRefreshRequest()
     {
         sendRequestRefreshCompleted = false;
         if (this.state == CacheEntryState.PURGED)
         {
             sendRequestRefreshCompleted = true;
-            return;
+            return false;
         }
         else if (!expectSubscribers())
         {
+            this.state = CAN_REFRESH;
             sendRequestRefreshCompleted = true;
-            this.state = CacheEntryState.CAN_REFRESH;
-            pollBackend();
-            return;
+            return true;
         }
         int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
         if (newSlot == NO_SLOT)
         {
             sendRequestRefreshCompleted = true;
-            pollBackend();
-            return;
+            return true;
         }
 
         // may have purged this
@@ -215,12 +217,12 @@ public final class CacheEntry
                     etag,
                     this,
                     this.cache);
-            this.pollingRequest = refreshRequest;
             cache.correlations.put(connectCorrelationId, refreshRequest);
+            this.state = CAN_REFRESH;
             expectSubscribers = false;
-            this.state = CacheEntryState.CAN_REFRESH;
         }
         sendRequestRefreshCompleted = true;
+        return true;
     }
 
 
