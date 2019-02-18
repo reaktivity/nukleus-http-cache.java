@@ -356,8 +356,7 @@ final class ProxyConnectReplyStream
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-            request.cache(end, streamFactory.cache);
-            cached = true;
+            cached = request.cache(end, streamFactory.cache);
             break;
         case AbortFW.TYPE_ID:
         default:

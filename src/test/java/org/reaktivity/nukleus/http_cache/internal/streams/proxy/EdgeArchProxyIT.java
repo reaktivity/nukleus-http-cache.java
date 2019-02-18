@@ -501,5 +501,24 @@ public class EdgeArchProxyIT
         k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
         k3po.finish();
         Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);    }
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/does.not.serve.from.cache.if.no.subscribers/accept/client",
+        "${streams}/does.not.serve.from.cache.if.no.subscribers/connect/server",
+    })
+    public void shouldBypassCacheIfEntryIsStaleAndNotRefreshing() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(5000);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
 }
