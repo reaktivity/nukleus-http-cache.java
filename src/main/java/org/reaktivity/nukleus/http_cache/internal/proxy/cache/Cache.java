@@ -143,7 +143,7 @@ public class Cache
         }
         else
         {
-            boolean expectSubscribers = request.getType() == Type.INITIAL_REQUEST ? true: oldCacheEntry.expectSubscribers();
+            boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
             CacheEntry cacheEntry = new CacheEntry(
                     this,
                     request,
@@ -191,10 +191,6 @@ public class Cache
                             cachedResponse1BufferPool));
                 }
                 cacheEntry.purge();
-                if (request.getType() == Request.Type.CACHE_REFRESH)
-                {
-                    oldCacheEntry.refresh(request);
-                }
             }
         }
     }
