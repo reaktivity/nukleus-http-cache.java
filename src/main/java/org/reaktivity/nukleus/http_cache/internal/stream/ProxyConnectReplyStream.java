@@ -264,8 +264,8 @@ final class ProxyConnectReplyStream
                     streamFactory.cacheControlParser,
                     responseHeaders,
                     freshnessExtension,
-                    false
-                    );
+                    request.etag(),
+                    false);
 
             // count all responses
             streamFactory.counters.responses.getAsLong();

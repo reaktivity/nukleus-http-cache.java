@@ -15,8 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.*;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -108,11 +107,12 @@ public class Writer
         CacheControl cacheControlFW,
         ListFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
+        String etag,
         boolean cacheControlPrivate)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
                 builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
-                        cacheControlPrivate);
+                        etag, cacheControlPrivate);
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
@@ -127,6 +127,7 @@ public class Writer
         CacheControl cacheControlFW,
         ListFW<HttpHeaderFW> responseHeadersRO,
         int staleWhileRevalidate,
+        String etag,
         boolean cacheControlPrivate)
     {
         responseHeadersRO.forEach(h ->
@@ -166,6 +167,10 @@ public class Writer
                     ? "private, stale-while-revalidate=" + staleWhileRevalidate
                     : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
+        }
+        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag !=null)
+        {
+            builder.item(header -> header.name(ETAG).value(etag));
         }
     }
 
