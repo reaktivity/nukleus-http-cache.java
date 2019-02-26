@@ -328,6 +328,18 @@ public final class CacheEntry
         }
     }
 
+    public void sendHttpPushPromise(
+            AnswerableByCacheRequest request)
+    {
+        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        this.cache.writer.doHttpPushPromise(
+                request,
+                cachedRequest,
+                responseHeaders,
+                freshnessExtension,
+                cachedRequest.etag());
+    }
     public void purge()
     {
         switch (this.state)

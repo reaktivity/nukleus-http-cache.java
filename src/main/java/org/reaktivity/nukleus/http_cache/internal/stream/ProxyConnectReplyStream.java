@@ -33,13 +33,7 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.*;
 
 
 final class ProxyConnectReplyStream
@@ -355,10 +349,14 @@ final class ProxyConnectReplyStream
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-            OctetsFW extension = end.extension();
+            final OctetsFW extension = end.extension();
             if (extension.sizeof() != 0)
             {
-                
+                final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
+                ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+                String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
+                assert etag !=null && !etag.isEmpty();
+                request.etag(etag);
             }
             cached = request.cache(end, streamFactory.cache);
             break;

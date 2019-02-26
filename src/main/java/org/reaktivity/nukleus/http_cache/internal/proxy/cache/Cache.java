@@ -140,6 +140,7 @@ public class Cache
                     true,
                     supplyTrace);
             updateCache(requestUrlHash, cacheEntry);
+            cacheEntry.sendHttpPushPromise(request);
         }
         else
         {

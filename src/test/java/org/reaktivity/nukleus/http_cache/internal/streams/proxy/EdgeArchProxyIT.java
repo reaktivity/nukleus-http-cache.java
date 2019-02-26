@@ -516,7 +516,12 @@ public class EdgeArchProxyIT
     })
     public void shouldUseEtagFromTrailerOn200Response() throws Exception
     {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
         k3po.finish();
+        Thread.sleep(1000);
         counters.assertExpectedCacheEntries(1);
     }
 }

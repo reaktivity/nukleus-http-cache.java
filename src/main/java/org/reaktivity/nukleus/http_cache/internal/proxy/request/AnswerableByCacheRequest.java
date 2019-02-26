@@ -71,7 +71,7 @@ public abstract class AnswerableByCacheRequest extends Request
         return requestURLHash;
     }
 
-    protected void etag(String etag)
+    public void etag(String etag)
     {
         this.etag = etag;
     }

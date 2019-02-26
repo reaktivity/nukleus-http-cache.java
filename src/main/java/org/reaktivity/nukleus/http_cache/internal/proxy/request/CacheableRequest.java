@@ -16,8 +16,6 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -122,8 +120,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             BufferPool bp)
     {
         responsePool = bp;
-        etag(getHeaderOrDefault(responseHeaders, ETAG, etag()));
-
         final int slotCapacity = bp.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
         {
