@@ -199,7 +199,17 @@ final class ProxyConnectReplyStream
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-                request.cache(end, streamFactory.cache);
+                final OctetsFW extension = end.extension();
+                if (extension.sizeof() != 0)
+                {
+                    final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
+                    ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+                    String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
+                    assert etag !=null && !etag.isEmpty();
+                    request.etag(etag);
+                    request.setEtagInjected(true);
+                }
+                cached = request.cache(end, streamFactory.cache);
                 break;
             case AbortFW.TYPE_ID:
             default:
@@ -357,6 +367,7 @@ final class ProxyConnectReplyStream
                 String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
                 assert etag !=null && !etag.isEmpty();
                 request.etag(etag);
+                request.setEtagInjected(true);
             }
             cached = request.cache(end, streamFactory.cache);
             break;
