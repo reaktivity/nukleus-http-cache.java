@@ -524,4 +524,38 @@ public class EdgeArchProxyIT
         Thread.sleep(1000);
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.and.update.subscriber/accept/client",
+        "${streams}/use.etag.from.trailer.and.update.subscriber/connect/server",
+    })
+    public void shouldUseEtagFromTrailerAndUpdateSubscriber() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/do.not.send.cache.update.if.trailer.etag.is.matching/accept/client",
+        "${streams}/do.not.send.cache.update.if.trailer.etag.is.matching/connect/server",
+    })
+    public void shouldNotSendCacheUpdateIfTrailerEtagIsMatching() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
 }

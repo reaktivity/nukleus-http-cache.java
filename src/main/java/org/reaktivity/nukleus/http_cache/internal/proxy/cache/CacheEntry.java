@@ -261,9 +261,6 @@ public final class CacheEntry
                 this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
 
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-            .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
-
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptRouteId = request.acceptRouteId();
         long acceptReplyStreamId = request.acceptReplyStreamId();
@@ -304,6 +301,9 @@ public final class CacheEntry
         }
         else
         {
+            Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
+                    .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
+
             // TODO inject stale on above if (freshnessExtension > 0)?
             if (injectWarnings && isStale())
             {
