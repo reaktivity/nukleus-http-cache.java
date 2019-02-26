@@ -199,16 +199,7 @@ final class ProxyConnectReplyStream
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-                final OctetsFW extension = end.extension();
-                if (extension.sizeof() != 0)
-                {
-                    final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
-                    ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
-                    String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
-                    assert etag !=null && !etag.isEmpty();
-                    request.etag(etag);
-                    request.setEtagInjected(true);
-                }
+                checEtag(end, request);
                 cached = request.cache(end, streamFactory.cache);
                 break;
             case AbortFW.TYPE_ID:
@@ -279,8 +270,6 @@ final class ProxyConnectReplyStream
 
             // count all responses
             streamFactory.counters.responses.getAsLong();
-
-           // streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());
 
             // count all promises (prefer wait, if-none-match)
             streamFactory.counters.promises.getAsLong();
@@ -359,16 +348,7 @@ final class ProxyConnectReplyStream
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-            final OctetsFW extension = end.extension();
-            if (extension.sizeof() != 0)
-            {
-                final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
-                ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
-                String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
-                assert etag !=null && !etag.isEmpty();
-                request.etag(etag);
-                request.setEtagInjected(true);
-            }
+            checEtag(end, request);
             cached = request.cache(end, streamFactory.cache);
             break;
         case AbortFW.TYPE_ID:
@@ -568,6 +548,20 @@ final class ProxyConnectReplyStream
             streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
                                           connectReplyStreamId, 0L, credit, padding, groupId);
             return 0;
+        }
+    }
+
+    private void checEtag(EndFW end, CacheableRequest request)
+    {
+        final OctetsFW extension = end.extension();
+        if (extension.sizeof() != 0)
+        {
+            final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
+            ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+            String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
+            assert etag !=null && !etag.isEmpty();
+            request.etag(etag);
+            request.setEtagInjected(true);
         }
     }
 }
