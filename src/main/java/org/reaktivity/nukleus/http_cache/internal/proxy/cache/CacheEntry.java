@@ -285,7 +285,6 @@ public final class CacheEntry
                     cacheControlFW,
                     responseHeaders,
                     freshnessExtension,
-                    cachedRequest.etag(),
                     request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader());
 
             this.cache.writer.doHttpPushPromise(

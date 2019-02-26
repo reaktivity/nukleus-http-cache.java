@@ -270,14 +270,13 @@ final class ProxyConnectReplyStream
                     streamFactory.cacheControlParser,
                     responseHeaders,
                     freshnessExtension,
-                    request.etag(),
                     false
                     );
 
             // count all responses
             streamFactory.counters.responses.getAsLong();
 
-            streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());
+           // streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());
 
             // count all promises (prefer wait, if-none-match)
             streamFactory.counters.promises.getAsLong();
@@ -356,6 +355,11 @@ final class ProxyConnectReplyStream
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+            OctetsFW extension = end.extension();
+            if (extension.sizeof() != 0)
+            {
+                
+            }
             cached = request.cache(end, streamFactory.cache);
             break;
         case AbortFW.TYPE_ID:
@@ -493,7 +497,7 @@ final class ProxyConnectReplyStream
             final long traceId = end.trace();
 
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
-            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
+            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
         }
     }
 

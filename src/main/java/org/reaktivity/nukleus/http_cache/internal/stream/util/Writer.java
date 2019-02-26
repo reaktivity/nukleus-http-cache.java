@@ -109,12 +109,11 @@ public class Writer
         CacheControl cacheControlFW,
         ListFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
-        String etag,
         boolean cacheControlPrivate)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
                 builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
-                        etag, cacheControlPrivate);
+                        cacheControlPrivate);
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
@@ -129,7 +128,6 @@ public class Writer
         CacheControl cacheControlFW,
         ListFW<HttpHeaderFW> responseHeadersRO,
         int staleWhileRevalidate,
-        String etag,
         boolean cacheControlPrivate)
     {
         responseHeadersRO.forEach(h ->
@@ -169,10 +167,6 @@ public class Writer
                     ? "private, stale-while-revalidate=" + staleWhileRevalidate
                     : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
-        }
-        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
-        {
-            builder.item(header -> header.name(ETAG).value(etag));
         }
     }
 
@@ -215,6 +209,23 @@ public class Writer
                 .build();
 
         receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+    }
+
+    public void doHttpEnd(
+            final MessageConsumer receiver,
+            final long routeId,
+            final long streamId,
+            final long traceId,
+            OctetsFW extension)
+    {
+        final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
+                .extension(extension)
+                .build();
+
+        receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     public void doHttpEnd(

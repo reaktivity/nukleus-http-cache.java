@@ -334,19 +334,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Configure(name="nukleus.http_cache.etag.prefix", value="99999")
-    @Specification({
-            "${route}/proxy/controller",
-            "${streams}/update.cache.when.200.response.doesnot.have.etag/accept/client",
-            "${streams}/update.cache.when.200.response.doesnot.have.etag/connect/server",
-    })
-    public void shouldCacheWhen200ResponseDoesnotHaveEtag() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
     @Specification({
         "${route}/proxy/controller",
         "${streams}/polling.stops.if.no.subscribers/accept/client",
@@ -521,4 +508,15 @@ public class EdgeArchProxyIT
         counters.assertExpectedCacheEntries(1);
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.on.200.response/accept/client",
+        "${streams}/use.etag.from.trailer.on.200.response/connect/server",
+    })
+    public void shouldUseEtagFromTrailerOn200Response() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
 }
