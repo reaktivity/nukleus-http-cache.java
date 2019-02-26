@@ -170,8 +170,6 @@ final class ProxyAcceptStream
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        final String etag = streamFactory.supplyEtag.get();
-
         final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
             acceptReply,
             acceptRouteId,
@@ -182,7 +180,7 @@ final class ProxyAcceptStream
             authorizationHeader,
             authorization,
             authScope,
-            etag);
+            null);
 
         this.request = preferWaitRequest;
 
@@ -225,7 +223,7 @@ final class ProxyAcceptStream
                 authorizationHeader,
                 authorization,
                 authScope,
-                streamFactory.supplyEtag.get());
+                null);
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {

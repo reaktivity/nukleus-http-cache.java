@@ -20,7 +20,6 @@ import static java.util.Objects.requireNonNull;
 import java.util.Random;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
-import java.util.function.Supplier;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -74,7 +73,6 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyCorrelationId;
-    final Supplier<String> supplyEtag;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -92,11 +90,9 @@ public class ProxyStreamFactory implements StreamFactory
         LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
         Cache cache,
-        Supplier<String> supplyEtag,
         HttpCacheCounters counters,
         LongSupplier supplyTrace)
     {
-        this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);

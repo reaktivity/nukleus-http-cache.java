@@ -83,7 +83,6 @@ public class Cache
 
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
-    final Supplier<String> etagSupplier;
     final LongSupplier supplyTrace;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
@@ -96,7 +95,6 @@ public class Cache
         BufferPool requestBufferPool,
         BufferPool cacheBufferPool,
         Long2ObjectHashMap<Request> correlations,
-        Supplier<String> etagSupplier,
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace)
@@ -122,7 +120,6 @@ public class Cache
         this.requestBufferPool = requestBufferPool.duplicate();
         this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
-        this.etagSupplier = etagSupplier;
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
     }
@@ -465,11 +462,6 @@ public class Cache
     public boolean purgeOld()
     {
         return this.cachedEntries.purgeLRU();
-    }
-
-    public Supplier<String> getEtagSupplier()
-    {
-        return etagSupplier;
     }
 
 }
