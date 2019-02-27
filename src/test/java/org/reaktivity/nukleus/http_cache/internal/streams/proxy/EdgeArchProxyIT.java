@@ -112,7 +112,6 @@ public class EdgeArchProxyIT
         "${streams}/does.not.share.with.different.protected.scope/accept/client",
         "${streams}/does.not.share.with.different.protected.scope/connect/server",
     })
-
     public void doesNotShareWithDifferentProtectedScope() throws Exception
     {
         k3po.finish();
@@ -410,9 +409,9 @@ public class EdgeArchProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/polling.vary.header.asterisk/accept/client",
-            "${streams}/polling.vary.header.asterisk/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/polling.vary.header.asterisk/accept/client",
+        "${streams}/polling.vary.header.asterisk/connect/server",
     })
     public void pollingVaryHeaderAsterisk() throws Exception
     {

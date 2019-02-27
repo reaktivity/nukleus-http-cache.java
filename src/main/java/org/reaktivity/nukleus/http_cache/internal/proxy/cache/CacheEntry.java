@@ -337,12 +337,15 @@ public final class CacheEntry
     {
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
-        this.cache.writer.doHttpPushPromise(
-                request,
-                cachedRequest,
-                responseHeaders,
-                freshnessExtension,
-                cachedRequest.etag());
+        if (freshnessExtension > 0)
+        {
+            this.cache.writer.doHttpPushPromise(
+                    request,
+                    cachedRequest,
+                    responseHeaders,
+                    freshnessExtension,
+                    cachedRequest.etag());
+        }
     }
     public void purge()
     {

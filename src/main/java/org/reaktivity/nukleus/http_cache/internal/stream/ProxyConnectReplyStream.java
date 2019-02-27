@@ -206,7 +206,7 @@ final class ProxyConnectReplyStream
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-                checEtag(end, request);
+                checkEtag(end, request);
                 cached = request.cache(end, streamFactory.cache);
                 break;
             case AbortFW.TYPE_ID:
@@ -355,7 +355,7 @@ final class ProxyConnectReplyStream
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-            checEtag(end, request);
+            checkEtag(end, request);
             cached = request.cache(end, streamFactory.cache);
             break;
         case AbortFW.TYPE_ID:
@@ -558,7 +558,7 @@ final class ProxyConnectReplyStream
         }
     }
 
-    private void checEtag(EndFW end, CacheableRequest request)
+    private void checkEtag(EndFW end, CacheableRequest request)
     {
         final OctetsFW extension = end.extension();
         if (extension.sizeof() != 0)
