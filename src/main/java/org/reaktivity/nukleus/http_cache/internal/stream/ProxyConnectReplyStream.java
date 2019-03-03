@@ -61,6 +61,7 @@ final class ProxyConnectReplyStream
     private int padding;
     private boolean endDeferred;
     private boolean cached;
+    private OctetsFW extension;
 
     ProxyConnectReplyStream(
         ProxyStreamFactory proxyStreamFactory,
@@ -190,7 +191,7 @@ final class ProxyConnectReplyStream
         {
             case DataFW.TYPE_ID:
                 final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-                boolean stored = request.storeResponseData(this.streamFactory.cache, data, streamFactory.responseBufferPool);
+                boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
                 if (!stored)
                 {
                     request.purge();
@@ -347,7 +348,7 @@ final class ProxyConnectReplyStream
         {
         case DataFW.TYPE_ID:
             final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-            boolean stored = request.storeResponseData(streamFactory.cache, data, streamFactory.responseBufferPool);
+            boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
             if (!stored)
             {
                 request.purge();
@@ -491,7 +492,6 @@ final class ProxyConnectReplyStream
         else
         {
             final long traceId = end.trace();
-
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
             streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
         }
@@ -524,7 +524,14 @@ final class ProxyConnectReplyStream
             final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
-            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
+            if (this.extension !=null && this.extension.sizeof() > 0)
+            {
+                streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L, this.extension);
+            }
+            else
+            {
+                streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
+            }
         }
     }
 
@@ -569,6 +576,7 @@ final class ProxyConnectReplyStream
             assert etag !=null && !etag.isEmpty();
             request.etag(etag);
             request.setEtagInjected(true);
+            this.extension = extension;
         }
     }
 }

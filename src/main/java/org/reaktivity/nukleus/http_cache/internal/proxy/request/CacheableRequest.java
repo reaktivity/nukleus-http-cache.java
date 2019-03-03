@@ -143,13 +143,12 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     }
 
     public boolean storeResponseData(
-        Cache cache,
-        DataFW data,
-        BufferPool cacheBufferPool)
+            DataFW data,
+            BufferPool cacheBufferPool)
     {
         if (state == CacheState.COMMITING)
         {
-            return storeResponseData(cache, cacheBufferPool, data.payload());
+            return storeResponseData(cacheBufferPool, data.payload());
         }
         return false;
     }
@@ -269,18 +268,16 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     }
 
     private boolean storeResponseData(
-        Cache cache,
-        BufferPool bp,
-        Flyweight data)
+            BufferPool bp,
+            Flyweight data)
     {
-        return this.storeResponseData(cache, bp, data, 0);
+        return this.storeResponseData(bp, data, 0);
     }
 
     private boolean storeResponseData(
-        Cache cache,
-        BufferPool bp,
-        Flyweight data,
-        int written)
+            BufferPool bp,
+            Flyweight data,
+            int written)
     {
         responsePool = bp;
         if (data.sizeof() - written == 0)
@@ -309,7 +306,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         buffer.putBytes(slotCapacity - slotSpaceRemaining, data.buffer(), data.offset() + written, toWrite);
         written += toWrite;
         responseSize += toWrite;
-        return storeResponseData(cache, bp, data, written);
+        return storeResponseData(bp, data, written);
     }
 
     public boolean payloadEquals(
@@ -375,12 +372,11 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
 
     private boolean moveDataToCachePools(BufferPool cachedRequestBufferPool, BufferPool cachedResponseBufferPool)
     {
-        int id = etag().hashCode();
         int cachedRequestSlot = NO_SLOT;
 
         if (requestSlot != NO_SLOT)
         {
-            cachedRequestSlot = copy(id, requestSlot, requestPool, cachedRequestBufferPool);
+            cachedRequestSlot = copy(requestSlot, requestPool, cachedRequestBufferPool);
             if (cachedRequestSlot == NO_SLOT)
             {
                 return false;
@@ -395,7 +391,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             cachedResponseSlots = new IntArrayList();
             for (int slot : responseSlots)
             {
-                int cachedResponseSlot = copy(id, slot, responsePool, cachedResponseBufferPool);
+                int cachedResponseSlot = copy(slot, responsePool, cachedResponseBufferPool);
                 if (cachedResponseSlot == NO_SLOT)
                 {
                     cachedRequestBufferPool.release(cachedRequestSlot);
@@ -423,7 +419,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return true;
     }
 
-    private static int copy(int id, int fromSlot, BufferPool fromBP, BufferPool toBP)
+    private static int copy(int fromSlot, BufferPool fromBP, BufferPool toBP)
     {
         int toSlot = toBP.acquire(0);
         // should we purge old cache entries ?

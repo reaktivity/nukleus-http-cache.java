@@ -736,7 +736,7 @@ public final class CacheEntry
     {
         ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+        String etag = request.etag();
 
         assert status != null;
         boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||

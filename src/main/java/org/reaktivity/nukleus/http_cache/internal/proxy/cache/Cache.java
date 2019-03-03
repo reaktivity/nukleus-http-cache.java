@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
-import java.util.function.Supplier;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
