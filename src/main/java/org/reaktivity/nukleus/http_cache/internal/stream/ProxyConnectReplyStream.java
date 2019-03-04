@@ -61,7 +61,7 @@ final class ProxyConnectReplyStream
     private int padding;
     private boolean endDeferred;
     private boolean cached;
-    private OctetsFW extension;
+    private OctetsFW endExtension;
 
     ProxyConnectReplyStream(
         ProxyStreamFactory proxyStreamFactory,
@@ -524,9 +524,9 @@ final class ProxyConnectReplyStream
             final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
-            if (this.extension !=null && this.extension.sizeof() > 0)
+            if (this.endExtension !=null && this.endExtension.sizeof() > 0)
             {
-                streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L, this.extension);
+                streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L, this.endExtension);
             }
             else
             {
@@ -576,7 +576,7 @@ final class ProxyConnectReplyStream
             assert etag !=null && !etag.isEmpty();
             request.etag(etag);
             request.setEtagInjected(true);
-            this.extension = extension;
+            this.endExtension = extension;
         }
     }
 }
