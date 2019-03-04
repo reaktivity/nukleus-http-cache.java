@@ -25,7 +25,6 @@ public abstract class AnswerableByCacheRequest extends Request
     private final short authScope;
     private final boolean authorizationHeader;
     private String etag;
-    private boolean etagInjected = false;
 
     public AnswerableByCacheRequest(
         MessageConsumer acceptReply,
@@ -75,15 +74,5 @@ public abstract class AnswerableByCacheRequest extends Request
     public void etag(String etag)
     {
         this.etag = etag;
-    }
-
-    public boolean isEtagInjected()
-    {
-        return etagInjected;
-    }
-
-    public void setEtagInjected(boolean etagInjected)
-    {
-        this.etagInjected = etagInjected;
     }
 }

@@ -575,7 +575,6 @@ final class ProxyConnectReplyStream
             String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
             assert etag !=null && !etag.isEmpty();
             request.etag(etag);
-            request.setEtagInjected(true);
             this.endExtension = extension;
         }
     }
