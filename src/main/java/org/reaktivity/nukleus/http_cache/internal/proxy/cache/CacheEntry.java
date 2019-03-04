@@ -201,10 +201,8 @@ public final class CacheEntry
                                         builder.item(item -> item.name(h.name()).value(h.value()));
                                 }
                             });
-                            if (!this.cachedRequest.isEtagInjected())
-                            {
-                                builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-                            }
+                            assert etag != null;
+                            builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                         });
             cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
 

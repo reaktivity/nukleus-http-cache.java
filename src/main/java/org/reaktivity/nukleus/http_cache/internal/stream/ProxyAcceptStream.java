@@ -170,7 +170,12 @@ final class ProxyAcceptStream
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        String etag = requestHeaders.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
+        String etag = null;
+        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> "etag".equals(h.name().asString()));
+        if (etagHeader != null)
+        {
+            etag = etagHeader.value().asString();
+        }
         final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
             acceptReply,
             acceptRouteId,
@@ -206,7 +211,12 @@ final class ProxyAcceptStream
             send503RetryAfter();
             return;
         }
-        String etag = requestHeaders.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
+        String etag = null;
+        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> "etag".equals(h.name().asString()));
+        if (etagHeader != null)
+        {
+            etag = etagHeader.value().asString();
+        }
         InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
