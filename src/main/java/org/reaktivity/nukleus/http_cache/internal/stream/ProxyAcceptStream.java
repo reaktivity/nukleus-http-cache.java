@@ -206,6 +206,7 @@ final class ProxyAcceptStream
             send503RetryAfter();
             return;
         }
+        String etag = requestHeaders.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
         InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
@@ -224,7 +225,7 @@ final class ProxyAcceptStream
                 authorizationHeader,
                 authorization,
                 authScope,
-                null);
+                etag);
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
