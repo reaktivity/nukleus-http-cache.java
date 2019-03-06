@@ -557,4 +557,23 @@ public class EdgeArchProxyIT
         Thread.sleep(1000);
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 4 buffer slots
+    @Configure(name="nukleus.http_cache.slot.capacity", value="2048")
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/accept/client",
+        "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/connect/server",
+    })
+    public void shouldUseEtagFromTrailerOn200ResponseAfterCacheFull() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(1000);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
 }
