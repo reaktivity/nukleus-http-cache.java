@@ -170,7 +170,7 @@ public class Writer
                     : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
         }
-        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag !=null)
+        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));
         }

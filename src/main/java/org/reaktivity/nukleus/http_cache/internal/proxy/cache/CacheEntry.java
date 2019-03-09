@@ -201,8 +201,10 @@ public final class CacheEntry
                                         builder.item(item -> item.name(h.name()).value(h.value()));
                                 }
                             });
-                            assert etag != null;
-                            builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                            if (etag != null)
+                            {
+                                builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                            }
                         });
             cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
 
@@ -225,7 +227,6 @@ public final class CacheEntry
         sendRequestRefreshCompleted = true;
         return true;
     }
-
 
     private void handleEndOfStream()
     {
@@ -735,10 +736,14 @@ public final class CacheEntry
         ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
         String etag = request.etag();
+        boolean etagMatches = false;
+        if (etag != null && this.cachedRequest.etag() !=  null)
+        {
+            etagMatches = status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
+        }
 
         assert status != null;
-        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
-                status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
+        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
 
         return !notModified;
     }
