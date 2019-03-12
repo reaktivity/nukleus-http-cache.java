@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal;
 
 import static java.nio.ByteBuffer.allocateDirect;
 import static java.nio.ByteOrder.nativeOrder;
+import static org.reaktivity.nukleus.route.RouteKind.PROXY;
+import static org.reaktivity.nukleus.route.RouteKind.SERVER;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -24,10 +26,13 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.Controller;
 import org.reaktivity.nukleus.ControllerSpi;
+import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
+import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.FreezeFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.Role;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.UnrouteFW;
+import org.reaktivity.nukleus.route.RouteKind;
 
 public final class HttpCacheController implements Controller
 {
@@ -38,14 +43,16 @@ public final class HttpCacheController implements Controller
     private final UnrouteFW.Builder unrouteRW = new UnrouteFW.Builder();
     private final FreezeFW.Builder freezeRW = new FreezeFW.Builder();
 
+    private final OctetsFW extensionRO = new OctetsFW().wrap(new UnsafeBuffer(new byte[0]), 0, 0);
+
     private final ControllerSpi controllerSpi;
-    private final MutableDirectBuffer writeBuffer;
+    private final MutableDirectBuffer commandBuffer;
 
     public HttpCacheController(
         ControllerSpi controllerSpi)
     {
         this.controllerSpi = controllerSpi;
-        this.writeBuffer = new UnsafeBuffer(allocateDirect(MAX_SEND_LENGTH).order(nativeOrder()));
+        this.commandBuffer = new UnsafeBuffer(allocateDirect(MAX_SEND_LENGTH).order(nativeOrder()));
     }
 
     @Override
@@ -69,42 +76,31 @@ public final class HttpCacheController implements Controller
     @Override
     public String name()
     {
-        return "http-cache";
+        return HttpCacheNukleus.NAME;
     }
 
+    @Deprecated
     public CompletableFuture<Long> routeServer(
         String localAddress,
         String remoteAddress)
     {
-
-        long correlationId = controllerSpi.nextCorrelationId();
-
-        RouteFW route = routeRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .correlationId(correlationId)
-                .nukleus(name())
-                .role(b -> b.set(Role.SERVER))
-                .localAddress(localAddress)
-                .remoteAddress(remoteAddress)
-                .build();
-
-        return controllerSpi.doRoute(route.typeId(), route.buffer(), route.offset(), route.sizeof());
+        return doRoute(SERVER, localAddress, remoteAddress, extensionRO);
     }
 
+    @Deprecated
     public CompletableFuture<Long> routeProxy(
         String localAddress,
         String remoteAddress)
     {
-        long correlationId = controllerSpi.nextCorrelationId();
+        return doRoute(PROXY, localAddress, remoteAddress, extensionRO);
+    }
 
-        RouteFW route = routeRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .correlationId(correlationId)
-                .nukleus(name())
-                .role(b -> b.set(Role.PROXY))
-                .localAddress(localAddress)
-                .remoteAddress(remoteAddress)
-                .build();
-
-        return controllerSpi.doRoute(route.typeId(), route.buffer(), route.offset(), route.sizeof());
+    public CompletableFuture<Long> route(
+        RouteKind kind,
+        String localAddress,
+        String remoteAddress)
+    {
+        return doRoute(kind, localAddress, remoteAddress, extensionRO);
     }
 
     public CompletableFuture<Void> unroute(
@@ -112,7 +108,7 @@ public final class HttpCacheController implements Controller
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
-        UnrouteFW unroute = unrouteRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        UnrouteFW unroute = unrouteRW.wrap(commandBuffer, 0, commandBuffer.capacity())
                                      .correlationId(correlationId)
                                      .nukleus(name())
                                      .routeId(routeId)
@@ -125,11 +121,32 @@ public final class HttpCacheController implements Controller
     {
         long correlationId = controllerSpi.nextCorrelationId();
 
-        FreezeFW freeze = freezeRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+        FreezeFW freeze = freezeRW.wrap(commandBuffer, 0, commandBuffer.capacity())
                                   .correlationId(correlationId)
                                   .nukleus(name())
                                   .build();
 
         return controllerSpi.doFreeze(freeze.typeId(), freeze.buffer(), freeze.offset(), freeze.sizeof());
+    }
+
+    private CompletableFuture<Long> doRoute(
+        RouteKind kind,
+        String localAddress,
+        String remoteAddress,
+        Flyweight extension)
+    {
+        final long correlationId = controllerSpi.nextCorrelationId();
+        final Role role = Role.valueOf(kind.ordinal());
+
+        final RouteFW route = routeRW.wrap(commandBuffer, 0, commandBuffer.capacity())
+                .correlationId(correlationId)
+                .nukleus(name())
+                .role(b -> b.set(role))
+                .localAddress(localAddress)
+                .remoteAddress(remoteAddress)
+                .extension(extension.buffer(), extension.offset(), extension.sizeof())
+                .build();
+
+        return controllerSpi.doRoute(route.typeId(), route.buffer(), route.offset(), route.sizeof());
     }
 }
