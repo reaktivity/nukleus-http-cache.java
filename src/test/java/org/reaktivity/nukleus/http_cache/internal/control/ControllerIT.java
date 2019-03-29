@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal.control;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.route.RouteKind.PROXY;
+import static org.reaktivity.nukleus.route.RouteKind.SERVER;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,7 +59,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(HttpCacheController.class)
-               .routeServer("http-cache#0", "target#0")
+               .route(SERVER, "http-cache#0", "target#0")
                .get();
 
         k3po.finish();
@@ -72,7 +74,7 @@ public class ControllerIT
         k3po.start();
 
         reaktor.controller(HttpCacheController.class)
-               .routeProxy("http-cache#0", "target#0")
+               .route(PROXY, "http-cache#0", "target#0")
                .get();
 
         k3po.finish();
@@ -88,7 +90,7 @@ public class ControllerIT
         k3po.start();
 
         long routeId = reaktor.controller(HttpCacheController.class)
-               .routeServer("http-cache#0", "target#0")
+               .route(SERVER, "http-cache#0", "target#0")
                .get();
 
         k3po.notifyBarrier("ROUTED_SERVER");
@@ -110,7 +112,7 @@ public class ControllerIT
         k3po.start();
 
         long routeId = reaktor.controller(HttpCacheController.class)
-            .routeProxy("http-cache#0", "target#0")
+            .route(PROXY, "http-cache#0", "target#0")
             .get();
 
         k3po.notifyBarrier("ROUTED_PROXY");

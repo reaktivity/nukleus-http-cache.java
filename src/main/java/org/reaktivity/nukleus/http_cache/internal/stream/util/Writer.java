@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -71,13 +71,11 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
@@ -88,13 +86,11 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long correlationId,
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
@@ -105,7 +101,6 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long correlationId,
         CacheControl cacheControlFW,
         ListFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
@@ -118,7 +113,6 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .correlationId(correlationId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -320,7 +314,7 @@ public class Writer
         final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply();
         final long routeId = request.acceptRouteId();
-        final long streamId = request.acceptReplyStreamId();
+        final long streamId = request.acceptReplyId();
         final long authorization = request.authorization();
 
         doH2PushPromise(
@@ -455,7 +449,7 @@ public class Writer
         long correlationId,
         long traceId)
     {
-        this.doHttpResponse(receiver, routeId, streamId, correlationId, e -> e.item(h -> h.name(STATUS).value("503")));
+        this.doHttpResponse(receiver, routeId, streamId, e -> e.item(h -> h.name(STATUS).value("503")));
         this.doAbort(receiver, routeId, streamId, traceId);
     }
 

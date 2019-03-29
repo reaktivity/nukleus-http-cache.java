@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -166,9 +166,8 @@ public class Cache
                     {
                         final MessageConsumer acceptReply = subscriber.acceptReply();
                         final long acceptRouteId = subscriber.acceptRouteId();
-                        final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
-                        final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                        this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                        final long acceptReplyId = subscriber.acceptReplyId();
+                        this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
                                 supplyTrace.getAsLong());
 
                         // count all responses
@@ -268,21 +267,20 @@ public class Cache
         long connectRouteId = request.connectRouteId();
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
         MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
-        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+        long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
-        correlations.put(connectCorrelationId, request);
+        correlations.put(connectReplyId, request);
 
         if (DEBUG)
         {
             System.out.printf("[%016x] CONNECT %016x %s [sent pending request]\n",
-                    currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, connectCorrelationId,
-                builder -> requestHeaders.forEach(
-                        h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-                )
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder -> requestHeaders.forEach(
+                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+        )
         );
         writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
     }
@@ -326,9 +324,8 @@ public class Cache
         {
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
-            final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+            final long acceptReplyId = preferWaitRequest.acceptReplyId();
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
                     supplyTrace.getAsLong());
 
             // count all responses
@@ -350,10 +347,9 @@ public class Cache
         {
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
-            final long acceptReplyStreamId = preferWaitRequest.acceptReplyStreamId();
-            final long acceptCorrelationId = preferWaitRequest.acceptCorrelationId();
+            final long acceptReplyId = preferWaitRequest.acceptReplyId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
                     supplyTrace.getAsLong());
 
             // count all responses
@@ -406,14 +402,13 @@ public class Cache
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                    currentTimeMillis(), request.acceptCorrelationId(), "304");
+                    currentTimeMillis(), request.acceptReplyId(), "304");
         }
 
         writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
-                request.acceptReplyStreamId(), request.acceptCorrelationId(),
-                e -> e.item(h -> h.name(STATUS).value("304"))
+                request.acceptReplyId(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyStreamId(), 0L);
+        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), 0L);
 
         request.purge();
 
@@ -436,9 +431,8 @@ public class Cache
             {
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptRouteId = subscriber.acceptRouteId();
-                final long acceptReplyStreamId = subscriber.acceptReplyStreamId();
-                final long acceptCorrelationId = subscriber.acceptCorrelationId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                final long acceptReplyId = subscriber.acceptReplyId();
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
                         supplyTrace.getAsLong());
 
                 // count all responses

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -24,7 +24,6 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        long acceptCorrelationId,
         RouteManager router,
         int requestURLHash,
         boolean authorizationHeader,
@@ -36,7 +35,6 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
             acceptReply,
             acceptRouteId,
             acceptReplyStreamId,
-            acceptCorrelationId,
             router,
             requestURLHash,
             authorizationHeader,
