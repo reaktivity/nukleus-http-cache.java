@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -30,7 +30,6 @@ public abstract class AnswerableByCacheRequest extends Request
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        long acceptCorrelationId,
         RouteManager router,
         int requestURLHash,
         boolean authorizationHeader,
@@ -38,7 +37,7 @@ public abstract class AnswerableByCacheRequest extends Request
         short authScope,
         String etag)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, router);
         this.requestURLHash = requestURLHash;
         this.authorizationHeader = authorizationHeader;
         this.authorization = authorization;

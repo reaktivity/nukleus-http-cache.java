@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -173,36 +173,35 @@ public final class CacheEntry
         {
             long connectRouteId = cachedRequest.connectRouteId();
             long connectInitialId = cachedRequest.supplyInitialId().applyAsLong(connectRouteId);
+            long connectReplyId = cachedRequest.supplyReplyId().applyAsLong(connectInitialId);
             MessageConsumer connectInitial = cachedRequest.supplyReceiver().apply(connectInitialId);
-            long connectCorrelationId = cachedRequest.supplyCorrelationId().getAsLong();
             ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             final String etag = this.cachedRequest.etag();
 
             if (DEBUG)
             {
                 System.out.printf("[%016x] CONNECT %016x %s [sent refresh request]\n",
-                        currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+                        currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
             }
 
-            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, connectCorrelationId,
-                    builder ->
+            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder ->
+                {
+                    requestHeaders.forEach(h ->
+                    {
+                        switch (h.name().asString())
                         {
-                            requestHeaders.forEach(h ->
-                            {
-                                switch (h.name().asString())
-                                {
-                                    case AUTHORIZATION:
-                                        String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
-                                        String value = recentAuthorizationHeader != null
-                                                ? recentAuthorizationHeader : h.value().asString();
-                                        builder.item(item -> item.name(h.name()).value(value));
-                                        break;
-                                    default:
-                                        builder.item(item -> item.name(h.name()).value(h.value()));
-                                }
-                            });
-                            builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-                        });
+                            case AUTHORIZATION:
+                                String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
+                                String value = recentAuthorizationHeader != null
+                                        ? recentAuthorizationHeader : h.value().asString();
+                                builder.item(item -> item.name(h.name()).value(value));
+                                break;
+                            default:
+                                builder.item(item -> item.name(h.name()).value(h.value()));
+                        }
+                    });
+                    builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                });
             cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
 
             // duplicate request into new slot (TODO optimize to single request)
@@ -217,7 +216,7 @@ public final class CacheEntry
                     etag,
                     this,
                     this.cache);
-            cache.correlations.put(connectCorrelationId, refreshRequest);
+            cache.correlations.put(connectReplyId, refreshRequest);
             this.state = CAN_REFRESH;
             expectSubscribers = false;
         }
@@ -263,8 +262,7 @@ public final class CacheEntry
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptRouteId = request.acceptRouteId();
-        long acceptReplyStreamId = request.acceptReplyStreamId();
-        long acceptCorrelationId = request.acceptCorrelationId();
+        long acceptReplyId = request.acceptReplyId();
 
         // TODO should reduce freshness extension by how long it has aged
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
@@ -272,7 +270,7 @@ public final class CacheEntry
         {
             if (DEBUG)
             {
-                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId,
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
                         getHeader(responseHeaders, ":status"));
             }
 
@@ -280,8 +278,7 @@ public final class CacheEntry
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
                     acceptRouteId,
-                    acceptReplyStreamId,
-                    acceptCorrelationId,
+                    acceptReplyId,
                     cacheControlFW,
                     responseHeaders,
                     freshnessExtension,
@@ -311,11 +308,11 @@ public final class CacheEntry
 
             if (DEBUG)
             {
-                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptCorrelationId,
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
                         getHeader(responseHeaders, ":status"));
             }
 
-            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, headers);
+            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, headers);
         }
 
         // count all responses
@@ -345,9 +342,8 @@ public final class CacheEntry
                 {
                     MessageConsumer acceptReply = s.acceptReply();
                     final long acceptRouteId = s.acceptRouteId();
-                    long acceptReplyStreamId = s.acceptReplyStreamId();
-                    long acceptCorrelationId = s.acceptCorrelationId();
-                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId,
+                    long acceptReplyId = s.acceptReplyId();
+                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
                             supplyTrace.getAsLong());
                     s.purge();
 
@@ -413,7 +409,7 @@ public final class CacheEntry
                     {
                         final MessageConsumer acceptReply = request.acceptReply();
                         final long acceptRouteId = request.acceptRouteId();
-                        final long acceptReplyStreamId = request.acceptReplyStreamId();
+                        final long acceptReplyStreamId = request.acceptReplyId();
                         CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
                         this.onEnd.run();
                         cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
@@ -421,7 +417,7 @@ public final class CacheEntry
                     break;
                 case ResetFW.TYPE_ID:
                 default:
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyStreamId());
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId());
                     this.onEnd.run();
                     break;
             }
@@ -431,7 +427,7 @@ public final class CacheEntry
         {
             final MessageConsumer acceptReply = request.acceptReply();
             final long acceptRouteId = request.acceptRouteId();
-            final long acceptReplyStreamId = request.acceptReplyStreamId();
+            final long acceptReplyStreamId = request.acceptReplyId();
 
             final int minBudget = min(budget, acceptReplyBudget);
             final int toWrite = min(minBudget - padding, this.cachedRequest.responseSize() - payloadWritten);

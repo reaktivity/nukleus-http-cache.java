@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -104,9 +104,9 @@ final class ProxyConnectReplyStream
     private void handleBegin(
         BeginFW begin)
     {
-        final long connectCorrelationId = begin.correlationId();
+        final long connectReplyId = begin.streamId();
 
-        this.streamCorrelation = this.streamFactory.correlations.remove(connectCorrelationId);
+        this.streamCorrelation = this.streamFactory.correlations.remove(connectReplyId);
         final OctetsFW extension = streamFactory.beginRO.extension();
 
         if (streamCorrelation != null && extension.sizeof() > 0)
@@ -115,7 +115,7 @@ final class ProxyConnectReplyStream
 
             if (DEBUG)
             {
-                System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectCorrelationId,
+                System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
                         getHeader(httpBeginFW.headers(), ":status"));
             }
 
@@ -252,12 +252,11 @@ final class ProxyConnectReplyStream
         {
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             final long acceptRouteId = streamCorrelation.acceptRouteId();
-            final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
-            final long correlationId = streamCorrelation.acceptCorrelationId();
+            final long acceptReplyId = streamCorrelation.acceptReplyId();
 
             if (DEBUG)
             {
-                System.out.printf("[%016x] ACCEPT %016x %s [sent cacheable response]\n", currentTimeMillis(), correlationId,
+                System.out.printf("[%016x] ACCEPT %016x %s [sent cacheable response]\n", currentTimeMillis(), acceptReplyId,
                         getHeader(responseHeaders, ":status"));
             }
 
@@ -265,8 +264,7 @@ final class ProxyConnectReplyStream
             streamFactory.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
                     acceptRouteId,
-                    acceptReplyStreamId,
-                    correlationId,
+                    acceptReplyId,
                     streamFactory.cacheControlParser,
                     responseHeaders,
                     freshnessExtension,
@@ -298,28 +296,27 @@ final class ProxyConnectReplyStream
 
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
         MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
-        long connectCorrelationId = request.supplyCorrelationId().getAsLong();
+        long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
 
-        streamFactory.correlations.put(connectCorrelationId, request);
+        streamFactory.correlations.put(connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
         final String etag = request.etag();
 
         if (DEBUG)
         {
             System.out.printf("[%016x] CONNECT %016x %s [retry cacheable request]\n",
-                    currentTimeMillis(), connectCorrelationId, getRequestURL(requestHeaders));
+                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, connectCorrelationId,
-                builder ->
-                {
-                    requestHeaders.forEach(
-                            h ->  builder.item(item -> item.name(h.name()).value(h.value())));
-                    if (request instanceof CacheRefreshRequest)
-                    {
-                        builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-                    }
-                });
+        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder ->
+        {
+            requestHeaders.forEach(
+                    h ->  builder.item(item -> item.name(h.name()).value(h.value())));
+            if (request instanceof CacheRefreshRequest)
+            {
+                builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+            }
+        });
         streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
     }
@@ -372,12 +369,11 @@ final class ProxyConnectReplyStream
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
-        final long correlationId = streamCorrelation.acceptCorrelationId();
+        final long acceptReplyId = streamCorrelation.acceptReplyId();
 
         if (DEBUG)
         {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), correlationId,
+            System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), acceptReplyId,
                     getHeader(responseHeaders, ":status"));
         }
 
@@ -385,8 +381,7 @@ final class ProxyConnectReplyStream
         streamFactory.writer.doHttpResponse(
                 acceptReply,
                 acceptRouteId,
-                acceptReplyStreamId,
-                correlationId,
+                acceptReplyId,
                 builder -> responseHeaders.forEach(
                         h -> builder.item(item -> item.name(h.name()).value(h.value()))
             ));
@@ -451,7 +446,7 @@ final class ProxyConnectReplyStream
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
         connectReplyBudget -= data.length() + data.padding();
         if (connectReplyBudget < 0)
@@ -481,7 +476,7 @@ final class ProxyConnectReplyStream
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
         streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget);
         if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
@@ -503,7 +498,7 @@ final class ProxyConnectReplyStream
         final long traceId = abort.trace();
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
         streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
@@ -521,7 +516,7 @@ final class ProxyConnectReplyStream
         if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
         {
             final long acceptRouteId = streamCorrelation.acceptRouteId();
-            final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+            final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
             streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
@@ -531,7 +526,7 @@ final class ProxyConnectReplyStream
     private void onResetWhenProxying(
         final ResetFW reset)
     {
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyStreamId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
         streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId);
         streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
                 streamFactory.supplyTrace.getAsLong());

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2018 The Reaktivity Project
+ * Copyright 2016-2019 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -115,7 +115,7 @@ public class ServerStreamFactory implements StreamFactory
         private final long acceptInitialId;
 
         private MessageConsumer streamState;
-        private long acceptReplyStreamId;
+        private long acceptReplyId;
 
         private ServerAcceptStream(
             MessageConsumer acceptReply,
@@ -207,16 +207,15 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long initialId = begin.streamId();
 
-            this.acceptReplyStreamId =  supplyReplyId.applyAsLong(initialId);
-            final long acceptCorrelationId = begin.correlationId();
+            this.acceptReplyId =  supplyReplyId.applyAsLong(initialId);
 
-            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, hs ->
+            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, hs ->
             {
                 hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                 hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
             });
             this.streamState = this::afterBegin;
-            router.setThrottle(acceptReplyStreamId, this::onThrottleMessage);
+            router.setThrottle(acceptReplyId, this::onThrottleMessage);
         }
 
         private void onData(
@@ -235,7 +234,7 @@ public class ServerStreamFactory implements StreamFactory
             final AbortFW abort)
         {
             final long traceId = abort.trace();
-            writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
+            writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, traceId);
         }
 
         private void onWindow(
