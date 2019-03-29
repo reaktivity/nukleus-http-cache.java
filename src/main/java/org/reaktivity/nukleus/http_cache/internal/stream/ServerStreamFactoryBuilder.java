@@ -88,13 +88,6 @@ public class ServerStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ServerStreamFactoryBuilder setTargetCorrelationIdSupplier(
-        LongSupplier supplyCorrelationId)
-    {
-        return this;
-    }
-
-    @Override
     public StreamFactoryBuilder setBufferPoolSupplier(
         Supplier<BufferPool> supplyBufferPool)
     {

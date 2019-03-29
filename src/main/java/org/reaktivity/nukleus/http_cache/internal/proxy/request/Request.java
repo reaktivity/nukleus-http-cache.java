@@ -28,20 +28,17 @@ public abstract class Request
     final MessageConsumer acceptReply;
     final long acceptRouteId;
     final long acceptReplyStreamId;
-    final long acceptCorrelationId;
     final RouteManager router;
 
     public Request(
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        long acceptCorrelationId,
         RouteManager router)
     {
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyStreamId = acceptReplyStreamId;
-        this.acceptCorrelationId = acceptCorrelationId;
         this.router = router;
     }
 
@@ -57,14 +54,9 @@ public abstract class Request
         return acceptRouteId;
     }
 
-    public long acceptReplyStreamId()
+    public long acceptReplyId()
     {
         return acceptReplyStreamId;
-    }
-
-    public long acceptCorrelationId()
-    {
-        return acceptCorrelationId;
     }
 
     public void setThrottle(MessageConsumer throttle)

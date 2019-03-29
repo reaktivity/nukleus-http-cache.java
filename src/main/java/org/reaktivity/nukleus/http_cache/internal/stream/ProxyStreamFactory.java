@@ -71,7 +71,6 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
-    final LongSupplier supplyCorrelationId;
     final Supplier<String> supplyEtag;
 
     final Writer writer;
@@ -87,7 +86,6 @@ public class ProxyStreamFactory implements StreamFactory
         BufferPool requestBufferPool,
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
-        LongSupplier supplyCorrelationId,
         Long2ObjectHashMap<Request> correlations,
         Cache cache,
         Supplier<String> supplyEtag,
@@ -109,7 +107,6 @@ public class ProxyStreamFactory implements StreamFactory
                 counters.supplyCounter.apply("http-cache.response.acquires"),
                 counters.supplyCounter.apply("http-cache.response.releases"));
         this.correlations = requireNonNull(correlations);
-        this.supplyCorrelationId = requireNonNull(supplyCorrelationId);
         this.cache = cache;
 
         this.writer = new Writer(writeBuffer);

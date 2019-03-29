@@ -24,10 +24,9 @@ public class ProxyRequest extends Request
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        long acceptCorrelationId,
         RouteManager router)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, router);
     }
 
     @Override

@@ -23,7 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.LongFunction;
-import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 
 import org.agrona.DirectBuffer;
@@ -54,7 +53,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     private int responseSize = 0;
 
     final long connectRouteId;
-    final LongSupplier supplyCorrelationId;
+    final LongUnaryOperator supplyReplyId;
     final LongUnaryOperator supplyInitialId;
     final LongFunction<MessageConsumer> supplyReceiver;
     CacheState state;
@@ -70,10 +69,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        long acceptCorrelationId,
         long connectRouteId,
-        LongSupplier supplyCorrelationId,
         LongUnaryOperator supplyInitialId,
+        LongUnaryOperator supplyReplyId,
         LongFunction<MessageConsumer> supplyReceiver,
         int requestURLHash,
         BufferPool bufferPool,
@@ -87,7 +85,6 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         super(acceptReply,
               acceptRouteId,
               acceptReplyStreamId,
-              acceptCorrelationId,
               router,
               requestURLHash,
               authorizationHeader,
@@ -96,7 +93,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               etag);
         this.connectRouteId = connectRouteId;
         this.state = CacheState.COMMITING;
-        this.supplyCorrelationId = supplyCorrelationId;
+        this.supplyReplyId = supplyReplyId;
         this.supplyInitialId = supplyInitialId;
         this.supplyReceiver = supplyReceiver;
         this.requestPool = bufferPool;
@@ -189,9 +186,9 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         }
     }
 
-    public LongSupplier supplyCorrelationId()
+    public LongUnaryOperator supplyReplyId()
     {
-        return supplyCorrelationId;
+        return supplyReplyId;
     }
 
     public LongUnaryOperator supplyInitialId()

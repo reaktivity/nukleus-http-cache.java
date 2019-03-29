@@ -30,7 +30,6 @@ public abstract class AnswerableByCacheRequest extends Request
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        long acceptCorrelationId,
         RouteManager router,
         int requestURLHash,
         boolean authorizationHeader,
@@ -38,7 +37,7 @@ public abstract class AnswerableByCacheRequest extends Request
         short authScope,
         String etag)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, acceptCorrelationId, router);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, router);
         this.requestURLHash = requestURLHash;
         this.authorizationHeader = authorizationHeader;
         this.authorization = authorization;

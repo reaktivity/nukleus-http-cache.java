@@ -49,7 +49,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongUnaryOperator supplyInitialId;
     private LongSupplier supplyTrace;
     private LongUnaryOperator supplyReplyId;
-    private LongSupplier supplyCorrelationId;
     private Slab cacheBufferPool;
     private HeapBufferPool requestBufferPool;
     private Cache cache;
@@ -124,14 +123,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setTargetCorrelationIdSupplier(
-        LongSupplier supplyCorrelationId)
-    {
-        this.supplyCorrelationId = supplyCorrelationId;
-        return this;
-    }
-
-    @Override
     public StreamFactoryBuilder setBufferPoolSupplier(
         Supplier<BufferPool> supplyBufferPool)
     {
@@ -188,7 +179,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 requestBufferPool,
                 supplyInitialId,
                 supplyReplyId,
-                supplyCorrelationId,
                 correlations,
                 cache,
                 supplyEtag,
