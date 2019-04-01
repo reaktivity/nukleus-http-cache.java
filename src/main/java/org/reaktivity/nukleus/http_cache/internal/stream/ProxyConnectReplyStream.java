@@ -563,13 +563,15 @@ final class ProxyConnectReplyStream
     private void checkEtag(EndFW end, CacheableRequest request)
     {
         final OctetsFW extension = end.extension();
-        if (extension.sizeof() != 0)
+        if (extension.sizeof() > 0)
         {
             final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
             ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
-            String etag = trailers.matchFirst(h -> "etag".equals(h.name().asString())).value().asString();
-            assert etag !=null && !etag.isEmpty();
-            request.etag(etag);
+            HttpHeaderFW etag = trailers.matchFirst(h -> "etag".equals(h.name().asString()));
+            if (etag != null)
+            {
+                request.etag(etag.value().asString());
+            }
             this.endExtension = extension;
         }
     }
