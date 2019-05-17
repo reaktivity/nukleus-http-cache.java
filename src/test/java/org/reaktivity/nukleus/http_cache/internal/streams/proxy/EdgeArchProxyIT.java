@@ -48,7 +48,7 @@ public class EdgeArchProxyIT
             .directory("target/nukleus-itests")
             .commandBufferCapacity(1024)
             .responseBufferCapacity(1024)
-            .counterValuesBufferCapacity(8192)
+            .counterValuesBufferCapacity(16384)
             .nukleus("http-cache"::equals)
             .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
             .clean();
