@@ -16,8 +16,8 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.collections.Long2ObjectHashMap;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CheckingBudgetAvailability;
 
-import java.util.function.IntUnaryOperator;
 
 import static java.util.Objects.requireNonNull;
 
@@ -37,10 +37,10 @@ public class BudgetManager
         final StreamKind streamKind;
         int unackedBudget;
         int index;
-        IntUnaryOperator budgetAvailable;
+        CheckingBudgetAvailability budgetAvailable;
         boolean closing;
 
-        StreamBudget(long streamId, StreamKind kind, IntUnaryOperator budgetAvailable, int index)
+        StreamBudget(long streamId, StreamKind kind, CheckingBudgetAvailability budgetAvailable, int index)
         {
             this.streamId = streamId;
             this.streamKind = requireNonNull(kind);
@@ -94,7 +94,7 @@ public class BudgetManager
             return streamMap.remove(streamId);
         }
 
-        private void moreBudget(int credit)
+        private void moreBudget(int credit, long trace)
         {
             budget += credit;
             assert budget <= initialBudget;
@@ -107,7 +107,7 @@ public class BudgetManager
                     int slice = budget;
                     budget -= slice;
                     stream.unackedBudget += slice;
-                    int remaining = stream.budgetAvailable.applyAsInt(slice);
+                    int remaining = stream.budgetAvailable.checkBudget(slice, trace);
                     budget += remaining;
                     stream.unackedBudget -= remaining;
                 }
@@ -131,7 +131,7 @@ public class BudgetManager
         groups = new Long2ObjectHashMap<>();
     }
 
-    void closing(long groupId, long streamId, int credit)
+    void closing(long groupId, long streamId, int credit, long trace)
     {
         if (groupId != 0)
         {
@@ -141,12 +141,12 @@ public class BudgetManager
             streamBudget.closing = true;
             if (credit > 0)
             {
-                groupBudget.moreBudget(credit);
+                groupBudget.moreBudget(credit, trace);
             }
         }
     }
 
-    public void closed(StreamKind streamKind, long groupId, long streamId)
+    public void closed(StreamKind streamKind, long groupId, long streamId, long trace)
     {
         if (groupId != 0)
         {
@@ -160,17 +160,18 @@ public class BudgetManager
                 }
                 else if (streamBudget != null && streamBudget.unackedBudget > 0)
                 {
-                    groupBudget.moreBudget(streamBudget.unackedBudget);
+                    groupBudget.moreBudget(streamBudget.unackedBudget, trace);
                 }
             }
         }
     }
 
-    public void window(StreamKind streamKind, long groupId, long streamId, int credit, IntUnaryOperator budgetAvailable)
+    public void window(StreamKind streamKind, long groupId, long streamId, int credit,
+                       CheckingBudgetAvailability budgetAvailable, long trace)
     {
         if (groupId == 0)
         {
-            budgetAvailable.applyAsInt(credit);
+            budgetAvailable.checkBudget(credit, trace);
         }
         else
         {
@@ -199,8 +200,9 @@ public class BudgetManager
 
             if (gotBudget && credit > 0)
             {
-                groupBudget.moreBudget(credit);
+                groupBudget.moreBudget(credit, trace);
             }
+
         }
     }
 
