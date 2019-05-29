@@ -198,14 +198,6 @@ public class BudgetManager
                 gotBudget = true;
             }
 
-            System.out.printf("streamId=0x%016x,  groupId=0x%016x, trace=0x%016x, credit=%d, [streamBudget=%s]," +
-                    " [groupBudget=%s] \n",
-                              streamId,
-                              groupId,
-                              trace,
-                              credit,
-                              streamBudget,
-                              groupBudget);
             if (gotBudget && credit > 0)
             {
                 groupBudget.moreBudget(credit, trace);

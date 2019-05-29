@@ -419,7 +419,8 @@ public final class CacheEntry
                     break;
                 case ResetFW.TYPE_ID:
                 default:
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(), 0L);
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
+                                                supplyTrace.getAsLong());
                     this.onEnd.run();
                     break;
             }
