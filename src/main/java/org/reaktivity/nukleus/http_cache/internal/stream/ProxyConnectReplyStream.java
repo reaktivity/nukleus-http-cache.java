@@ -523,7 +523,6 @@ final class ProxyConnectReplyStream
         acceptReplyBudget += credit;
         padding = window.padding();
         groupId = window.groupId();
-        System.out.printf("%s [windows.trace=%016x] \n", this.toString(), window.trace());
         streamFactory.budgetManager.window(StreamKind.PROXY, groupId, streamId, credit,
             this::budgetAvailableWhenProxying, window.trace());
         if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
