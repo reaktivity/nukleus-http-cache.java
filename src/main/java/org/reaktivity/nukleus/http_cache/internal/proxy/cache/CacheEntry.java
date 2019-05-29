@@ -283,7 +283,8 @@ public final class CacheEntry
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag(),
-                    request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader());
+                    request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader(),
+                    supplyTrace.getAsLong());
 
             this.cache.writer.doHttpPushPromise(
                     request,
@@ -402,7 +403,8 @@ public final class CacheEntry
                     long streamId = window.streamId();
                     int credit = window.credit();
                     acceptReplyBudget += credit;
-                    cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit, this::writePayload);
+                    cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
+                        this::writePayload, window.trace());
 
                     boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
                     if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
@@ -412,18 +414,18 @@ public final class CacheEntry
                         final long acceptReplyStreamId = request.acceptReplyId();
                         CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
                         this.onEnd.run();
-                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
+                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
                     }
                     break;
                 case ResetFW.TYPE_ID:
                 default:
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId());
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(), 0L);
                     this.onEnd.run();
                     break;
             }
         }
 
-        private int writePayload(int budget)
+        private int writePayload(int budget, long trace)
         {
             final MessageConsumer acceptReply = request.acceptReply();
             final long acceptRouteId = request.acceptRouteId();
@@ -439,6 +441,7 @@ public final class CacheEntry
                         acceptReplyStreamId,
                         0L,
                         padding,
+                        trace,
                         p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
