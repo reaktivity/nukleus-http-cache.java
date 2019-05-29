@@ -105,7 +105,8 @@ public class Writer
         ListFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
-        boolean cacheControlPrivate)
+        boolean cacheControlPrivate,
+        long traceId)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
                 builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
@@ -113,6 +114,7 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -198,6 +200,7 @@ public class Writer
         long streamId,
         long groupId,
         int padding,
+        long trace,
         Consumer<OctetsFW.Builder> payload)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
