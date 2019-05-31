@@ -489,15 +489,14 @@ final class ProxyConnectReplyStream
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-
-        streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget, end.trace());
+        final long traceId = end.trace();
+        streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget, traceId);
         if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
         {
             endDeferred = true;
         }
         else
         {
-            final long traceId = end.trace();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, traceId);
             streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
         }
@@ -523,7 +522,6 @@ final class ProxyConnectReplyStream
         acceptReplyBudget += credit;
         padding = window.padding();
         groupId = window.groupId();
-        System.out.printf("%s [windows.trace=%016x] \n", this.toString(), window.trace());
         streamFactory.budgetManager.window(StreamKind.PROXY, groupId, streamId, credit,
             this::budgetAvailableWhenProxying, window.trace());
         if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
