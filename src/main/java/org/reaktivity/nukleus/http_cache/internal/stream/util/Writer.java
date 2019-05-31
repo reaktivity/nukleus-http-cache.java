@@ -71,14 +71,13 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
-        long traceId)
+        long traceId, Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .trace(traceId)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -88,14 +87,13 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
-        long traceId)
+        long traceId, Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .trace(traceId)
+                .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -180,16 +178,18 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long groupId,
+        long traceId,
         int padding,
         DirectBuffer payload,
         int offset,
-        int length)
+        int length,
+        long groupId)
     {
 
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .groupId(groupId)
                 .padding(padding)
                 .payload(p -> p.set(payload, offset, length))
@@ -202,18 +202,16 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long groupId,
-        int padding,
-        long traceId,
+        long traceId, int padding, long groupId,
         Consumer<OctetsFW.Builder> payload)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .groupId(groupId)
                 .padding(padding)
                 .payload(payload)
-                .trace(traceId)
                 .build();
 
         receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
@@ -437,10 +435,10 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long correlationId,
-        long traceId)
+        long traceId,
+        long correlationId)
     {
-        this.doHttpResponse(receiver, routeId, streamId, e -> e.item(h -> h.name(STATUS).value("503")), traceId);
+        this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value("503")));
         this.doAbort(receiver, routeId, streamId, traceId);
     }
 

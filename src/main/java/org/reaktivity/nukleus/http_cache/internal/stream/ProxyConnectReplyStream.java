@@ -321,7 +321,7 @@ final class ProxyConnectReplyStream
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder ->
+        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, builder ->
         {
             requestHeaders.forEach(
                     h ->  builder.item(item -> item.name(h.name()).value(h.value())));
@@ -329,7 +329,7 @@ final class ProxyConnectReplyStream
             {
                 builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
             }
-        }, traceId);
+        });
         streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
     }
@@ -397,9 +397,9 @@ final class ProxyConnectReplyStream
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                builder -> responseHeaders.forEach(
+            traceId, builder -> responseHeaders.forEach(
                         h -> builder.item(item -> item.name(h.name()).value(h.value()))
-            ), traceId);
+            ));
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
@@ -478,11 +478,11 @@ final class ProxyConnectReplyStream
                     acceptReply,
                     acceptRouteId,
                     acceptReplyStreamId,
-                    data.groupId(),
+                    data.trace(),
                     data.padding(),
                     payload.buffer(),
                     payload.offset(),
-                    payload.sizeof());
+                    payload.sizeof(), data.groupId());
         }
     }
 
