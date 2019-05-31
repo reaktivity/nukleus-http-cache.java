@@ -476,7 +476,11 @@ final class ProxyConnectReplyStream
                     acceptRouteId,
                     acceptReplyStreamId,
                     data.trace(),
-                data.groupId(), payload.buffer(), payload.offset(), payload.sizeof(), data.padding()
+                    data.groupId(),
+                    payload.buffer(),
+                    payload.offset(),
+                    payload.sizeof(),
+                    data.padding()
             );
         }
     }
