@@ -213,7 +213,7 @@ public class ServerStreamFactory implements StreamFactory
             {
                 hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                 hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
-            });
+            }, begin.trace());
             this.streamState = this::afterBegin;
             router.setThrottle(acceptReplyId, this::onThrottleMessage);
         }

@@ -201,8 +201,8 @@ public final class CacheEntry
                         }
                     });
                     builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-                });
-            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
+                }, supplyTrace.getAsLong());
+            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
 
             // duplicate request into new slot (TODO optimize to single request)
 
@@ -313,7 +313,7 @@ public final class CacheEntry
                         getHeader(responseHeaders, ":status"));
             }
 
-            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, headers);
+            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, headers, supplyTrace.getAsLong());
         }
 
         // count all responses

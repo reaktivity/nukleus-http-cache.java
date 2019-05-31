@@ -282,10 +282,8 @@ public class Cache
         }
 
         writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder -> requestHeaders.forEach(
-                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-        )
-        );
-        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
+                h ->  builder.item(item -> item.name(h.name()).value(h.value()))), supplyTrace.getAsLong());
+        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
     }
 
     public boolean hasPendingInitialRequests(
@@ -410,8 +408,8 @@ public class Cache
 
         writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
                 request.acceptReplyId(), e -> e.item(h -> h.name(STATUS).value("304"))
-                      .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), 0L);
+                      .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())), supplyTrace.getAsLong());
+        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTrace.getAsLong());
 
         request.purge();
 

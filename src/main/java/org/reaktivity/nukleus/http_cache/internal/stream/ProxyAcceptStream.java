@@ -285,8 +285,7 @@ final class ProxyAcceptStream
 
         streamFactory.writer.doHttpRequest(connect, connectRouteId, connectInitialId, builder -> requestHeaders.forEach(
                 h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-         )
-        );
+         ), streamFactory.supplyTrace.getAsLong());
 
         streamFactory.router.setThrottle(connectInitialId, this::onThrottleMessage);
     }
@@ -315,7 +314,7 @@ final class ProxyAcceptStream
         streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, e ->
                 e.item(h -> h.representation((byte) 0)
                         .name(STATUS)
-                        .value("504")));
+                        .value("504")), streamFactory.supplyTrace.getAsLong());
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId,
                 streamFactory.supplyTrace.getAsLong());
         request.purge();
@@ -333,7 +332,7 @@ final class ProxyAcceptStream
 
         streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, e ->
                 e.item(h -> h.name(STATUS).value("503"))
-                 .item(h -> h.name("retry-after").value("0")));
+                 .item(h -> h.name("retry-after").value("0")), streamFactory.supplyTrace.getAsLong());
         streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId,
                 streamFactory.supplyTrace.getAsLong());
 

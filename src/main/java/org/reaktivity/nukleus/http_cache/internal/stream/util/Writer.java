@@ -71,12 +71,14 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
+        long traceId)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .trace(traceId)
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -86,12 +88,14 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
+        long traceId)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                .trace(traceId)
                 .build();
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -200,7 +204,7 @@ public class Writer
         long streamId,
         long groupId,
         int padding,
-        long trace,
+        long traceId,
         Consumer<OctetsFW.Builder> payload)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
@@ -209,6 +213,7 @@ public class Writer
                 .groupId(groupId)
                 .padding(padding)
                 .payload(payload)
+                .trace(traceId)
                 .build();
 
         receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
@@ -435,7 +440,7 @@ public class Writer
         long correlationId,
         long traceId)
     {
-        this.doHttpResponse(receiver, routeId, streamId, e -> e.item(h -> h.name(STATUS).value("503")));
+        this.doHttpResponse(receiver, routeId, streamId, e -> e.item(h -> h.name(STATUS).value("503")), traceId);
         this.doAbort(receiver, routeId, streamId, traceId);
     }
 
