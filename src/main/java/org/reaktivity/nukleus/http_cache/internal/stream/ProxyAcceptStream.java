@@ -394,8 +394,8 @@ final class ProxyAcceptStream
         final int padding = data.padding();
         final OctetsFW payload = data.payload();
 
-        streamFactory.writer.doHttpData(connect, connectRouteId, connectInitialId, data.trace(), padding,
-                                        payload.buffer(), payload.offset(), payload.sizeof(), groupId);
+        streamFactory.writer.doHttpData(connect, connectRouteId, connectInitialId, data.trace(), groupId, payload.buffer(), payload.offset(), payload.sizeof(), padding
+        );
     }
 
     private void onEndWhenProxying(

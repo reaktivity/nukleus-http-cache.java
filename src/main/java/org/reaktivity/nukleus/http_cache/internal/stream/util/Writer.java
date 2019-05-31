@@ -181,11 +181,11 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        int padding,
+        long groupId,
         DirectBuffer payload,
         int offset,
         int length,
-        long groupId)
+        int padding)
     {
 
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
