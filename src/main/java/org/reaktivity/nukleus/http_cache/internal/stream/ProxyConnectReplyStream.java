@@ -397,8 +397,8 @@ final class ProxyConnectReplyStream
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-            traceId, builder -> responseHeaders.forEach(
-                        h -> builder.item(item -> item.name(h.name()).value(h.value()))
+                traceId,
+                builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))
             ));
 
         // count all responses

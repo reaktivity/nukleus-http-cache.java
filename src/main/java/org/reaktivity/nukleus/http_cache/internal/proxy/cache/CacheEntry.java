@@ -344,8 +344,11 @@ public final class CacheEntry
                     MessageConsumer acceptReply = s.acceptReply();
                     final long acceptRouteId = s.acceptRouteId();
                     long acceptReplyId = s.acceptReplyId();
-                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId
-                    );
+                    cache.writer.do503AndAbort(acceptReply,
+                                            acceptRouteId,
+                                            acceptReplyId,
+                                            supplyTrace.getAsLong(),
+                                            acceptReplyId);
                     s.purge();
 
                     // count all responses
