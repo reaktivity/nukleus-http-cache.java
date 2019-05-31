@@ -204,7 +204,9 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long traceId, int padding, long groupId,
+        long traceId,
+        long groupId,
+        int padding,
         Consumer<OctetsFW.Builder> payload)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())

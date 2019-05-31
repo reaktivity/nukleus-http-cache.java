@@ -443,7 +443,9 @@ public final class CacheEntry
                         acceptReply,
                         acceptRouteId,
                         acceptReplyStreamId,
-                    trace, padding, 0L,
+                        trace,
+                        0L,
+                        padding,
                     p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
