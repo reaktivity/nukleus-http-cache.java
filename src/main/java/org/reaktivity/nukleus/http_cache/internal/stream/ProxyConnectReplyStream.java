@@ -133,13 +133,13 @@ final class ProxyConnectReplyStream
             switch(streamCorrelation.getType())
             {
                 case PROXY:
-                    doProxyBegin(responseHeaders);
+                    doProxyBegin(traceId, responseHeaders);
                     break;
                 case INITIAL_REQUEST:
-                    handleInitialRequest(responseHeaders, traceId);
+                    handleInitialRequest(traceId, responseHeaders);
                     break;
                 case CACHE_REFRESH:
-                    handleCacheRefresh(responseHeaders);
+                    handleCacheRefresh(traceId, responseHeaders);
                     break;
                 default:
                     throw new RuntimeException("Not implemented");
@@ -153,12 +153,12 @@ final class ProxyConnectReplyStream
 
     ///////////// CACHE REFRESH
     private void handleCacheRefresh(
-        ListFW<HttpHeaderFW> responseHeaders)
+        long traceId, ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
         if (retry && ((CacheableRequest)streamCorrelation).attempts() < 3)
         {
-            retryCacheableRequest();
+            retryCacheableRequest(traceId);
             return;
         }
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
@@ -225,13 +225,12 @@ final class ProxyConnectReplyStream
 
     ///////////// INITIAL_REQUEST REQUEST
     private void handleInitialRequest(
-        ListFW<HttpHeaderFW> responseHeaders,
-        Long traceId)
+        Long traceId, ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
         if (retry && ((CacheableRequest)streamCorrelation).attempts() < 3)
         {
-            retryCacheableRequest();
+            retryCacheableRequest(traceId);
             return;
         }
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
@@ -243,12 +242,12 @@ final class ProxyConnectReplyStream
         }
         else if(isCacheableResponse)
         {
-            handleCacheableResponse(responseHeaders);
+            handleCacheableResponse(responseHeaders, traceId);
         }
         else
         {
             streamCorrelation.purge();
-            doProxyBegin(responseHeaders);
+            doProxyBegin(traceId, responseHeaders);
         }
     }
 
@@ -297,11 +296,11 @@ final class ProxyConnectReplyStream
         else
         {
             request.purge();
-            doProxyBegin(responseHeaders);
+            doProxyBegin(traceId, responseHeaders);
         }
     }
 
-    private void retryCacheableRequest()
+    private void retryCacheableRequest(long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         request.incAttempts();
@@ -320,7 +319,7 @@ final class ProxyConnectReplyStream
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder ->
+        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, builder ->
         {
             requestHeaders.forEach(
                     h ->  builder.item(item -> item.name(h.name()).value(h.value())));
@@ -334,14 +333,15 @@ final class ProxyConnectReplyStream
     }
 
     private void handleCacheableResponse(
-        ListFW<HttpHeaderFW> responseHeaders)
+        ListFW<HttpHeaderFW> responseHeaders,
+        long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         if (!request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
         {
             request.purge();
         }
-        doProxyBegin(responseHeaders);
+        doProxyBegin(traceId, responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
     }
 
@@ -377,7 +377,7 @@ final class ProxyConnectReplyStream
 
     ///////////// PROXY
     private void doProxyBegin(
-        ListFW<HttpHeaderFW> responseHeaders)
+        long traceId, ListFW<HttpHeaderFW> responseHeaders)
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
@@ -394,8 +394,8 @@ final class ProxyConnectReplyStream
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                builder -> responseHeaders.forEach(
-                        h -> builder.item(item -> item.name(h.name()).value(h.value()))
+                traceId,
+                builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))
             ));
 
         // count all responses
@@ -475,11 +475,13 @@ final class ProxyConnectReplyStream
                     acceptReply,
                     acceptRouteId,
                     acceptReplyStreamId,
+                    data.trace(),
                     data.groupId(),
-                    data.padding(),
                     payload.buffer(),
                     payload.offset(),
-                    payload.sizeof());
+                    payload.sizeof(),
+                    data.padding()
+            );
         }
     }
 
@@ -489,15 +491,14 @@ final class ProxyConnectReplyStream
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-
-        streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget, end.trace());
+        final long traceId = end.trace();
+        streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget, traceId);
         if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
         {
             endDeferred = true;
         }
         else
         {
-            final long traceId = end.trace();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, traceId);
             streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
         }
@@ -540,8 +541,7 @@ final class ProxyConnectReplyStream
     {
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
         streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, reset.trace());
-        streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                streamFactory.supplyTrace.getAsLong());
+        streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
         // if cached, do not purge the buffer slots as it may be used by other clients
         if (!cached)
         {

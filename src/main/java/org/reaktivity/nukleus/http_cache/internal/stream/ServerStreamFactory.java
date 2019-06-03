@@ -209,7 +209,7 @@ public class ServerStreamFactory implements StreamFactory
 
             this.acceptReplyId =  supplyReplyId.applyAsLong(initialId);
 
-            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, hs ->
+            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, begin.trace(), hs ->
             {
                 hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                 hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
