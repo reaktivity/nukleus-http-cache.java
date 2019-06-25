@@ -21,6 +21,7 @@ import java.util.Random;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -90,7 +91,8 @@ public class ProxyStreamFactory implements StreamFactory
         Cache cache,
         Supplier<String> supplyEtag,
         HttpCacheCounters counters,
-        LongSupplier supplyTrace)
+        LongSupplier supplyTrace,
+        ToIntFunction<String> supplyTypeId)
     {
         this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
@@ -109,7 +111,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.correlations = requireNonNull(correlations);
         this.cache = cache;
 
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
         this.random = new Random();
         this.counters = counters;
     }
