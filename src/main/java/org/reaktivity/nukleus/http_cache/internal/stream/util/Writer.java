@@ -22,6 +22,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Consumer;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -60,11 +61,14 @@ public class Writer
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     private final MutableDirectBuffer writeBuffer;
+    private final int httpTypeId;
 
     public Writer(
+        ToIntFunction<String> supplyTypeId,
         MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
+        this.httpTypeId = supplyTypeId.applyAsInt("http");
     }
 
     public void doHttpRequest(
@@ -294,6 +298,7 @@ public class Writer
     {
         return (buffer, offset, limit) ->
                 httpBeginExRW.wrap(buffer, offset, limit)
+                             .typeId(httpTypeId)
                              .headers(headers)
                              .build()
                              .sizeof();

@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
@@ -99,12 +100,13 @@ public class Cache
         Supplier<String> etagSupplier,
         HttpCacheCounters counters,
         LongConsumer entryCount,
-        LongSupplier supplyTrace)
+        LongSupplier supplyTrace,
+        ToIntFunction<String> supplyTypeId)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
         this.correlations = correlations;
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
                 requestBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.refresh.request.acquires"),
