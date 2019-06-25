@@ -123,7 +123,7 @@
         <artifactId>nukleus-maven-plugin</artifactId>
         <version>${nukleus.plugin.version}</version>
         <configuration>
-          <scopeNames>core http http2</scopeNames>
+          <scopeNames>core http</scopeNames>
           <packageName>org.reaktivity.nukleus.http_cache.internal.types</packageName>
         </configuration>
         <executions>
