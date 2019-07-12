@@ -22,6 +22,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Consumer;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -60,22 +61,28 @@ public class Writer
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     private final MutableDirectBuffer writeBuffer;
+    private final int httpTypeId;
 
     public Writer(
+        ToIntFunction<String> supplyTypeId,
         MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
+        this.httpTypeId = supplyTypeId.applyAsInt("http");
     }
 
     public void doHttpRequest(
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        long traceId,
+        Consumer<Builder<HttpHeaderFW.Builder,
+        HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
@@ -86,11 +93,14 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        long traceId,
+        Consumer<Builder<HttpHeaderFW.Builder,
+        HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
@@ -105,7 +115,8 @@ public class Writer
         ListFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
-        boolean cacheControlPrivate)
+        boolean cacheControlPrivate,
+        long traceId)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
                 builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
@@ -113,6 +124,7 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -174,16 +186,18 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long traceId,
         long groupId,
-        int padding,
         DirectBuffer payload,
         int offset,
-        int length)
+        int length,
+        int padding)
     {
 
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .groupId(groupId)
                 .padding(padding)
                 .payload(p -> p.set(payload, offset, length))
@@ -196,6 +210,7 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long traceId,
         long groupId,
         int padding,
         Consumer<OctetsFW.Builder> payload)
@@ -203,6 +218,7 @@ public class Writer
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .trace(traceId)
                 .groupId(groupId)
                 .padding(padding)
                 .payload(payload)
@@ -299,6 +315,7 @@ public class Writer
     {
         return (buffer, offset, limit) ->
                 httpBeginExRW.wrap(buffer, offset, limit)
+                             .typeId(httpTypeId)
                              .headers(headers)
                              .build()
                              .sizeof();
@@ -446,10 +463,10 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long correlationId,
-        long traceId)
+        long traceId,
+        long correlationId)
     {
-        this.doHttpResponse(receiver, routeId, streamId, e -> e.item(h -> h.name(STATUS).value("503")));
+        this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value("503")));
         this.doAbort(receiver, routeId, streamId, traceId);
     }
 

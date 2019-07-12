@@ -18,6 +18,8 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
+import java.util.function.ToIntFunction;
+
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -96,12 +98,13 @@ public class Cache
         Long2ObjectHashMap<Request> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
-        LongSupplier supplyTrace)
+        LongSupplier supplyTrace,
+        ToIntFunction<String> supplyTypeId)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
         this.correlations = correlations;
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
                 requestBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.refresh.request.acquires"),
@@ -167,8 +170,11 @@ public class Cache
                         final MessageConsumer acceptReply = subscriber.acceptReply();
                         final long acceptRouteId = subscriber.acceptRouteId();
                         final long acceptReplyId = subscriber.acceptReplyId();
-                        this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
-                                supplyTrace.getAsLong());
+                        this.writer.do503AndAbort(acceptReply,
+                                                acceptRouteId,
+                                                acceptReplyId,
+                                                supplyTrace.getAsLong(),
+                                                acceptReplyId);
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -278,11 +284,9 @@ public class Cache
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder -> requestHeaders.forEach(
-                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-        )
-        );
-        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
+                builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
+        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
     }
 
     public boolean hasPendingInitialRequests(
@@ -325,8 +329,7 @@ public class Cache
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
-                    supplyTrace.getAsLong());
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
 
             // count all responses
             counters.responses.getAsLong();
@@ -349,8 +352,7 @@ public class Cache
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
-                    supplyTrace.getAsLong());
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
 
             // count all responses
             counters.responses.getAsLong();
@@ -406,9 +408,9 @@ public class Cache
         }
 
         writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
-                request.acceptReplyId(), e -> e.item(h -> h.name(STATUS).value("304"))
+                request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), 0L);
+        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTrace.getAsLong());
 
         request.purge();
 
@@ -432,8 +434,7 @@ public class Cache
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyId = subscriber.acceptReplyId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
-                        supplyTrace.getAsLong());
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
 
                 // count all responses
                 counters.responses.getAsLong();

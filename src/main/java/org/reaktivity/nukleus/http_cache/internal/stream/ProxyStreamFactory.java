@@ -21,6 +21,8 @@ import java.util.Random;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 
+import java.util.function.ToIntFunction;
+
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -89,7 +91,8 @@ public class ProxyStreamFactory implements StreamFactory
         Long2ObjectHashMap<Request> correlations,
         Cache cache,
         HttpCacheCounters counters,
-        LongSupplier supplyTrace)
+        LongSupplier supplyTrace,
+        ToIntFunction<String> supplyTypeId)
     {
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
@@ -107,7 +110,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.correlations = requireNonNull(correlations);
         this.cache = cache;
 
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
         this.random = new Random();
         this.counters = counters;
     }

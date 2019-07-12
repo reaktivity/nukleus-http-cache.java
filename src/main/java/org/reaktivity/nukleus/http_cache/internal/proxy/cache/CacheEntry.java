@@ -184,7 +184,7 @@ public final class CacheEntry
                         currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
             }
 
-            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, builder ->
+            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(), builder ->
             {
                 requestHeaders.forEach(h ->
                 {
@@ -205,7 +205,7 @@ public final class CacheEntry
                     builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
                 }
             });
-            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, 0L);
+            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
 
             // duplicate request into new slot (TODO optimize to single request)
 
@@ -282,7 +282,8 @@ public final class CacheEntry
                     responseHeaders,
                     freshnessExtension,
                     cachedRequest.etag(),
-                    request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader());
+                    request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader(),
+                    supplyTrace.getAsLong());
 
             this.cache.writer.doHttpPushPromise(
                     request,
@@ -314,7 +315,7 @@ public final class CacheEntry
                         getHeader(responseHeaders, ":status"));
             }
 
-            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, headers);
+            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), headers);
         }
 
         // count all responses
@@ -360,8 +361,11 @@ public final class CacheEntry
                     MessageConsumer acceptReply = s.acceptReply();
                     final long acceptRouteId = s.acceptRouteId();
                     long acceptReplyId = s.acceptReplyId();
-                    cache.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, acceptReplyId,
-                            supplyTrace.getAsLong());
+                    cache.writer.do503AndAbort(acceptReply,
+                                            acceptRouteId,
+                                            acceptReplyId,
+                                            supplyTrace.getAsLong(),
+                                            acceptReplyId);
                     s.purge();
 
                     // count all responses
@@ -419,7 +423,8 @@ public final class CacheEntry
                     long streamId = window.streamId();
                     int credit = window.credit();
                     acceptReplyBudget += credit;
-                    cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit, this::writePayload);
+                    cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
+                        this::writePayload, window.trace());
 
                     boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
                     if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
@@ -427,20 +432,21 @@ public final class CacheEntry
                         final MessageConsumer acceptReply = request.acceptReply();
                         final long acceptRouteId = request.acceptRouteId();
                         final long acceptReplyStreamId = request.acceptReplyId();
-                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, 0L);
+                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
                         this.onEnd.run();
-                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId);
+                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
                     }
                     break;
                 case ResetFW.TYPE_ID:
                 default:
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId());
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
+                                                supplyTrace.getAsLong());
                     this.onEnd.run();
                     break;
             }
         }
 
-        private int writePayload(int budget)
+        private int writePayload(int budget, long trace)
         {
             final MessageConsumer acceptReply = request.acceptReply();
             final long acceptRouteId = request.acceptRouteId();
@@ -454,9 +460,10 @@ public final class CacheEntry
                         acceptReply,
                         acceptRouteId,
                         acceptReplyStreamId,
+                        trace,
                         0L,
                         padding,
-                        p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
+                    p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
                 budget -= (toWrite + padding);

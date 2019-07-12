@@ -22,6 +22,7 @@ import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -48,6 +49,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private MutableDirectBuffer writeBuffer;
     private LongUnaryOperator supplyInitialId;
     private LongSupplier supplyTrace;
+    private ToIntFunction<String> supplyTypeId;
     private LongUnaryOperator supplyReplyId;
     private Slab cacheBufferPool;
     private HeapBufferPool requestBufferPool;
@@ -104,6 +106,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         LongSupplier supplyTrace)
     {
         this.supplyTrace = supplyTrace;
+        return this;
+    }
+
+    @Override
+    public StreamFactoryBuilder setTypeIdSupplier(
+        ToIntFunction<String> supplyTypeId)
+    {
+        this.supplyTypeId = supplyTypeId;
         return this;
     }
 
@@ -167,7 +177,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     correlations,
                     counters,
                     cacheEntries,
-                    supplyTrace);
+                    supplyTrace,
+                    supplyTypeId);
         }
 
         return new ProxyStreamFactory(
@@ -180,7 +191,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 correlations,
                 cache,
                 counters,
-                supplyTrace);
+                supplyTrace,
+                supplyTypeId);
     }
 
     private String getEtagSupply()

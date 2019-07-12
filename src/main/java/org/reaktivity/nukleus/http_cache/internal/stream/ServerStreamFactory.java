@@ -19,6 +19,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
+import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -57,12 +58,13 @@ public class ServerStreamFactory implements StreamFactory
         RouteManager router,
         MutableDirectBuffer writeBuffer,
         LongUnaryOperator supplyReplyId,
-        LongSupplier supplyTrace)
+        LongSupplier supplyTrace,
+        ToIntFunction<String> supplyTypeId)
     {
         this.supplyTrace = requireNonNull(supplyTrace);
         this.router = requireNonNull(router);
         this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.writer = new Writer(writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
     }
 
     @Override
@@ -102,7 +104,7 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long acceptInitialId = begin.streamId();
 
-            newStream = new ServerAcceptStream(acceptReply, acceptRouteId, acceptInitialId)::onStreamMessage;
+            newStream = new ServerAcceptStream(acceptReply, acceptRouteId, acceptInitialId, supplyTrace)::onStreamMessage;
         }
 
         return newStream;
@@ -113,6 +115,7 @@ public class ServerStreamFactory implements StreamFactory
         private final MessageConsumer acceptReply;
         private final long acceptRouteId;
         private final long acceptInitialId;
+        private final LongSupplier supplyTrace;
 
         private MessageConsumer streamState;
         private long acceptReplyId;
@@ -120,11 +123,13 @@ public class ServerStreamFactory implements StreamFactory
         private ServerAcceptStream(
             MessageConsumer acceptReply,
             long acceptRouteId,
-            long acceptInitialId)
+            long acceptInitialId,
+            LongSupplier supplyTrace)
         {
             this.acceptReply = acceptReply;
             this.acceptRouteId = acceptRouteId;
             this.acceptInitialId = acceptInitialId;
+            this.supplyTrace = supplyTrace;
             this.streamState = this::beforeBegin;
         }
 
@@ -208,8 +213,14 @@ public class ServerStreamFactory implements StreamFactory
             final long initialId = begin.streamId();
 
             this.acceptReplyId =  supplyReplyId.applyAsLong(initialId);
-
-            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, hs ->
+            writer.doWindow(acceptReply,
+                            acceptRouteId,
+                            begin.streamId(),
+                            this.supplyTrace.getAsLong(),
+                            0,
+                            0,
+                            0L);
+            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, begin.trace(), hs ->
             {
                 hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
                 hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
