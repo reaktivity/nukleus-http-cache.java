@@ -356,6 +356,7 @@ public class Writer
                    case HttpHeaders.AUTHORITY:
                    case HttpHeaders.SCHEME:
                    case HttpHeaders.PATH:
+                   case HttpHeaders.AUTHORIZATION:
                        builder.item(header -> header.name(nameFW).value(valueFW));
                        break;
                    case HttpHeaders.CACHE_CONTROL:

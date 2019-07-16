@@ -274,7 +274,6 @@ public final class CacheEntry
                         getHeader(responseHeaders, ":status"));
             }
 
-            expectSubscribers = true;
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                     acceptReply,
                     acceptRouteId,
