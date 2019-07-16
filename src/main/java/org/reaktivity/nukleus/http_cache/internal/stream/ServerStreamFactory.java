@@ -222,8 +222,8 @@ public class ServerStreamFactory implements StreamFactory
                             0L);
             writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, begin.trace(), hs ->
             {
-                hs.item(h -> h.representation((byte) 0).name(":status").value("200"));
-                hs.item(h -> h.representation((byte) 0).name("content-type").value("text/event-stream"));
+                hs.item(h -> h.name(":status").value("200"));
+                hs.item(h -> h.name("content-type").value("text/event-stream"));
             });
             this.streamState = this::afterBegin;
             router.setThrottle(acceptReplyId, this::onThrottleMessage);
