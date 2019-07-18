@@ -32,7 +32,7 @@ public final class PreferHeader
         ListFW<HttpHeaderFW> headers)
     {
         return HttpHeadersUtil.getHeader(headers, IF_NONE_MATCH) != null &&
-               headers.anyMatch(PREFER_HEADER_NAME) && headers.anyMatch(X_PROTOCOL_STACK);
+               headers.anyMatch(PREFER_HEADER_NAME);
     }
 
     public static final Predicate<? super HttpHeaderFW> PREFER_HEADER_NAME = h ->
