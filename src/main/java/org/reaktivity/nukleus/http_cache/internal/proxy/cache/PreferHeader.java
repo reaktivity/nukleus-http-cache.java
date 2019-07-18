@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.X_PROTOCOL_STACK;
 
 import java.util.function.Predicate;
 
