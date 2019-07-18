@@ -38,4 +38,5 @@ public final class HttpHeaders
     public static final String DATE = "date";
     public static final String LAST_MODIFIED = "last-modified";
     public static final String RETRY_AFTER = "retry-after";
+    public static final String X_PROTOCOL_STACK = "x-protocol-stack";
 }

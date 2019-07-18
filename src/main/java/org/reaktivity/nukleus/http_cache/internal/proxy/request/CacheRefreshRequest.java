@@ -36,7 +36,7 @@ public class CacheRefreshRequest extends CacheableRequest
             BufferPool bufferPool,
             int requestSlot,
             String etag,
-            CacheEntry cacheEntry,
+            CacheEntry emulatedCacheEntry,
             Cache cache)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
@@ -52,10 +52,11 @@ public class CacheRefreshRequest extends CacheableRequest
               requestSlot,
               req.router,
               req.authorizationHeader(),
+              req.protocolStackHeader(),
               req.authorization(),
               req.authScope(),
               etag);
-        this.updatingEntry = cacheEntry;
+        this.updatingEntry = emulatedCacheEntry;
         this.cache = cache;
     }
 

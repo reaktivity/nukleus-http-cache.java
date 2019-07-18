@@ -44,6 +44,7 @@ public class InitialRequest extends CacheableRequest
             int requestSlot,
             RouteManager router,
             boolean authorizationHeader,
+            boolean protocolStackHeader,
             long authorization,
             short authScope,
             String etag)
@@ -60,6 +61,7 @@ public class InitialRequest extends CacheableRequest
               requestSlot,
               router,
               authorizationHeader,
+              protocolStackHeader,
               authorization,
               authScope,
               etag);

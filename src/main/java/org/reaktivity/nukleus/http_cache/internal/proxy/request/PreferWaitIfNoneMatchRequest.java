@@ -27,6 +27,7 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
         RouteManager router,
         int requestURLHash,
         boolean authorizationHeader,
+        boolean protocolStackHeader,
         long authorization,
         short authScope,
         String etag)
@@ -38,6 +39,7 @@ public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
             router,
             requestURLHash,
             authorizationHeader,
+            protocolStackHeader,
             authorization,
             authScope,
             etag);

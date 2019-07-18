@@ -236,7 +236,8 @@ final class ProxyConnectReplyStream
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
-        if (freshnessExtension > 0 && isCacheableResponse)
+        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        if (freshnessExtension > 0 && isCacheableResponse && request.protocolStackHeader())
         {
             handleEdgeArchSync(responseHeaders, freshnessExtension, traceId);
         }
