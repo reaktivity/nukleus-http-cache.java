@@ -20,7 +20,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import java.util.function.Predicate;
 
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -38,11 +37,5 @@ public final class PreferHeader
     {
         final String name = h.name().asString();
         return PREFER.equals(name);
-    };
-
-    public static final Predicate<? super HttpHeaderFW> X_PROTOCOL_STACK = h ->
-    {
-        final String name = h.name().asString();
-        return HttpHeaders.X_PROTOCOL_STACK.equals(name);
     };
 }
