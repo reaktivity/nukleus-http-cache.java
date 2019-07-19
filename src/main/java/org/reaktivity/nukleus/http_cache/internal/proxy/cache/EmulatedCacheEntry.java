@@ -63,7 +63,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-public final class EmulatedCacheEntry extends CacheEntry
+public final class EmulatedCacheEntry extends Entry
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
@@ -509,7 +509,7 @@ public final class EmulatedCacheEntry extends CacheEntry
     }
 
     // Checks this entry's vary header with the given entry's vary header
-    public boolean doesNotVaryBy(CacheEntry entry)
+    public boolean doesNotVaryBy(Entry entry)
     {
         final ListFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
         final ListFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(

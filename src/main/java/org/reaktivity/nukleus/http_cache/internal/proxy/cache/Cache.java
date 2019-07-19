@@ -133,52 +133,17 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
-        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        Entry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
         {
-            final CacheEntry cachedEntry;
-
-            if (request.protocolStackHeader())
-            {
-                cachedEntry = new EmulatedCacheEntry(
-                    this,
-                    request,
-                    true,
-                    supplyTrace);
-            }
-            else
-            {
-                cachedEntry = new NativeCacheEntry(
-                    this,
-                    request,
-                    true,
-                    supplyTrace);
-            }
-
-
+            final Entry cachedEntry = getCacheEntry(request, true, supplyTrace);
             updateCache(requestUrlHash, cachedEntry);
         }
         else
         {
             boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
 
-            final CacheEntry cachedEntry;
-            if (request.protocolStackHeader())
-            {
-                cachedEntry = new EmulatedCacheEntry(
-                    this,
-                    request,
-                    expectSubscribers,
-                    supplyTrace);
-            }
-            else
-            {
-                cachedEntry = new NativeCacheEntry(
-                    this,
-                    request,
-                    expectSubscribers,
-                    supplyTrace);
-            }
+            final Entry cachedEntry = getCacheEntry(request, expectSubscribers, supplyTrace);
             if (cachedEntry.isIntendedForSingleUser())
             {
                 cachedEntry.purge();
@@ -226,9 +191,28 @@ public class Cache
         }
     }
 
+    private Entry getCacheEntry(CacheableRequest request, boolean expectSubscribers, LongSupplier supplyTrace)
+    {
+        if (request.protocolStackEmulated())
+        {
+            return new EmulatedCacheEntry(
+                this,
+                request,
+                expectSubscribers,
+                supplyTrace);
+        }
+        else
+        {
+            return new CacheEntry(
+                this,
+                request,
+                supplyTrace);
+        }
+    }
+
     private void updateCache(
             int requestUrlHash,
-            CacheEntry cacheEntry)
+            Entry cacheEntry)
     {
         cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
@@ -245,7 +229,7 @@ public class Cache
         short authScope,
         CacheableRequest cacheableRequest)
     {
-        final CacheEntry emulatedCacheEntry = cachedEntries.get(requestURLHash);
+        final Entry emulatedCacheEntry = cachedEntries.get(requestURLHash);
         if (emulatedCacheEntry != null)
         {
             return serveRequest(emulatedCacheEntry, request, authScope, cacheableRequest);
@@ -259,7 +243,7 @@ public class Cache
     public void servePendingInitialRequests(
         int requestURLHash)
     {
-        final CacheEntry emulatedCacheEntry = cachedEntries.get(requestURLHash);
+        final Entry emulatedCacheEntry = cachedEntries.get(requestURLHash);
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
         {
@@ -343,7 +327,7 @@ public class Cache
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
-        final CacheEntry emulatedCacheEntry = cachedEntries.get(requestURLHash);
+        final Entry emulatedCacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
@@ -401,7 +385,7 @@ public class Cache
     }
 
     private boolean serveRequest(
-        CacheEntry entry,
+        Entry entry,
         ListFW<HttpHeaderFW> request,
         short authScope,
         AnswerableByCacheRequest cacheableRequest)
@@ -427,7 +411,7 @@ public class Cache
     }
 
     private void send304(
-        CacheEntry entry,
+        Entry entry,
         AnswerableByCacheRequest request)
     {
         if (DEBUG)
@@ -476,7 +460,7 @@ public class Cache
     }
 
     public void purge(
-        CacheEntry entry)
+        Entry entry)
     {
         this.cachedEntries.remove(entry.requestUrl());
         entry.purge();

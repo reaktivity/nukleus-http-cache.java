@@ -63,15 +63,33 @@ public class Rfc7240ProxyIT
     public void shouldAcknowledgePreferWaitHeaderInResponse() throws Exception
     {
         k3po.start();
-//        k3po.awaitBarrier("FIRST_REQUEST_RECEIVED");
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_ONE_COMPLETED");
-//        k3po.awaitBarrier("SECOND_REQUEST_RECEIVED");
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_TWO_COMPLETED");
-//        k3po.awaitBarrier("THIRD_REQUEST_RECEIVED");
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_THREE_COMPLETED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/missing.preference.applied.header.on.prefer.wait/accept/client",
+        "${streams}/missing.preference.applied.header.on.prefer.wait/connect/server",
+    })
+    public void shouldHandleMissingPreferenceAppliedHeaderOnPreferWait() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("FIRST_REQUEST_WAIT");
+        sleep(4000);
+        k3po.notifyBarrier("FIRST_REQUEST_RECEIVED");
+        k3po.awaitBarrier("SECOND_REQUEST_WAIT");
+        sleep(4000);
+        k3po.notifyBarrier("SECOND_REQUEST_RECEIVED");
+        k3po.awaitBarrier("THIRD_REQUEST_WAIT");
+        sleep(4000);
+        k3po.notifyBarrier("THIRD_REQUEST_RECEIVED");
         k3po.finish();
     }
 }

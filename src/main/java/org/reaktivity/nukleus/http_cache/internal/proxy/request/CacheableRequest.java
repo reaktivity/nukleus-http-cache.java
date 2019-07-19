@@ -78,7 +78,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         int requestSlot,
         RouteManager router,
         boolean authorizationHeader,
-        boolean protocolStackHeader,
+        boolean protocolStackEmulated,
         long authorization,
         short authScope,
         String etag)
@@ -89,7 +89,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               router,
               requestURLHash,
               authorizationHeader,
-              protocolStackHeader,
+              protocolStackEmulated,
               authorization,
               authScope,
               etag);

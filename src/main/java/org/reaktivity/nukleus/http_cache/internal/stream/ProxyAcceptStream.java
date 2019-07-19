@@ -19,11 +19,10 @@ import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.X_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.ProtcolStackHeader.isProtocolStackEmulated;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_X_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import org.agrona.DirectBuffer;
@@ -123,7 +122,7 @@ final class ProxyAcceptStream
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
         final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
         final boolean authorizationHeader = requestHeaders.anyMatch(HAS_AUTHORIZATION);
-        final boolean protocolStackHeader = requestHeaders.anyMatch(X_PROTOCOL_STACK);
+        final boolean protocolStackEmulated = requestHeaders.anyMatch(HAS_X_PROTOCOL_STACK);
 
         // Should already be canonicalized in http / http2 nuklei
         final String requestURL = getRequestURL(requestHeaders);
@@ -139,12 +138,12 @@ final class ProxyAcceptStream
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-        if (isPreferIfNoneMatch(requestHeaders) && isProtocolStackEmulated(requestHeaders))
+        if (isPreferIfNoneMatch(requestHeaders) &&  protocolStackEmulated)
         {
             streamFactory.counters.requestsPreferWait.getAsLong();
             handlePreferWaitIfNoneMatchRequest(
                     authorizationHeader,
-                    protocolStackHeader,
+                    protocolStackEmulated,
                     authorization,
                     authorizationScope,
                     requestHeaders);
@@ -155,7 +154,7 @@ final class ProxyAcceptStream
             handleCacheableRequest(requestHeaders,
                                     requestURL,
                                     authorizationHeader,
-                                    protocolStackHeader,
+                                    protocolStackEmulated,
                                     authorization,
                                     authorizationScope);
         }

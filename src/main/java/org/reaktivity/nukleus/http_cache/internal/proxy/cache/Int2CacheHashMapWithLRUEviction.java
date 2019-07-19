@@ -25,7 +25,7 @@ public class Int2CacheHashMapWithLRUEviction
 {
 
     private static final int PURGE_SIZE = 1;
-    private final Int2ObjectHashMap<CacheEntry> cachedEntries;
+    private final Int2ObjectHashMap<Entry> cachedEntries;
     private final IntArrayList lruEntryList;
     private final LongConsumer entryCount;
 
@@ -38,9 +38,9 @@ public class Int2CacheHashMapWithLRUEviction
 
     public void put(
         int requestUrlHash,
-        CacheEntry emulatedCacheEntry)
+        Entry emulatedCacheEntry)
     {
-        CacheEntry old = cachedEntries.put(requestUrlHash, emulatedCacheEntry);
+        Entry old = cachedEntries.put(requestUrlHash, emulatedCacheEntry);
         if (old == null)
         {
             entryCount.accept(1);
@@ -51,9 +51,9 @@ public class Int2CacheHashMapWithLRUEviction
         assert cachedEntries.size() == lruEntryList.size();
     }
 
-    public CacheEntry get(int requestUrlHash)
+    public Entry get(int requestUrlHash)
     {
-        final CacheEntry result = cachedEntries.get(requestUrlHash);
+        final Entry result = cachedEntries.get(requestUrlHash);
         if (result != null)
         {
             lruEntryList.removeInt(requestUrlHash);
@@ -62,9 +62,9 @@ public class Int2CacheHashMapWithLRUEviction
         return result;
     }
 
-    public CacheEntry remove(int requestUrlHash)
+    public Entry remove(int requestUrlHash)
     {
-        final CacheEntry result = cachedEntries.remove(requestUrlHash);
+        final Entry result = cachedEntries.remove(requestUrlHash);
         if (result != null)
         {
             lruEntryList.removeInt(requestUrlHash);
@@ -90,7 +90,7 @@ public class Int2CacheHashMapWithLRUEviction
         final List<Integer> subList = lruEntryList.subList(0, PURGE_SIZE);
         subList.forEach(i ->
         {
-            CacheEntry rm = cachedEntries.remove(i);
+            Entry rm = cachedEntries.remove(i);
             assert rm != null;
             rm.purge();
         });

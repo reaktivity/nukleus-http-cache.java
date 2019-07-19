@@ -24,7 +24,7 @@ public abstract class AnswerableByCacheRequest extends Request
     private final long authorization;
     private final short authScope;
     private final boolean authorizationHeader;
-    private final boolean protocolStackHeader;
+    private final boolean protocolStackEmulated;
     private String etag;
 
     public AnswerableByCacheRequest(
@@ -34,7 +34,7 @@ public abstract class AnswerableByCacheRequest extends Request
         RouteManager router,
         int requestURLHash,
         boolean authorizationHeader,
-        boolean protocolStackHeader,
+        boolean protocolStackEmulated,
         long authorization,
         short authScope,
         String etag)
@@ -42,7 +42,7 @@ public abstract class AnswerableByCacheRequest extends Request
         super(acceptReply, acceptRouteId, acceptReplyStreamId, router);
         this.requestURLHash = requestURLHash;
         this.authorizationHeader = authorizationHeader;
-        this.protocolStackHeader = protocolStackHeader;
+        this.protocolStackEmulated = protocolStackEmulated;
         this.authorization = authorization;
         this.authScope = authScope;
         this.etag = etag;
@@ -53,9 +53,9 @@ public abstract class AnswerableByCacheRequest extends Request
         return authorizationHeader;
     }
 
-    public final boolean protocolStackHeader()
+    public final boolean protocolStackEmulated()
     {
-        return protocolStackHeader;
+        return protocolStackEmulated;
     }
 
     public final long authorization()

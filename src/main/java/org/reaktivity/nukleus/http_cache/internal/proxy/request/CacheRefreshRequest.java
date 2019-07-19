@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Entry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -28,7 +28,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 public class CacheRefreshRequest extends CacheableRequest
 {
-    private final CacheEntry updatingEntry;
+    private final Entry updatingEntry;
     private final Cache cache;
 
     public CacheRefreshRequest(
@@ -36,7 +36,7 @@ public class CacheRefreshRequest extends CacheableRequest
             BufferPool bufferPool,
             int requestSlot,
             String etag,
-            CacheEntry emulatedCacheEntry,
+            Entry emulatedCacheEntry,
             Cache cache)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
@@ -52,7 +52,7 @@ public class CacheRefreshRequest extends CacheableRequest
               requestSlot,
               req.router,
               req.authorizationHeader(),
-              req.protocolStackHeader(),
+              req.protocolStackEmulated(),
               req.authorization(),
               req.authScope(),
               etag);
