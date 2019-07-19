@@ -15,10 +15,42 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import static java.lang.Integer.MAX_VALUE;
+import static java.lang.Integer.parseInt;
+import static java.lang.Math.min;
+import static java.lang.System.currentTimeMillis;
+import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.CAN_REFRESH;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.REFRESHING;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateFreshnessExtension;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.LongSupplier;
+
 import org.agrona.DirectBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
@@ -30,29 +62,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-
-import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.util.Date;
-import java.util.function.Consumer;
-import java.util.function.LongSupplier;
-
-import static java.lang.Integer.MAX_VALUE;
-import static java.lang.Integer.parseInt;
-import static java.lang.Math.min;
-import static java.lang.System.currentTimeMillis;
-import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.CAN_REFRESH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.REFRESHING;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 public final class DefaultCacheEntry extends CacheEntry
 {
@@ -66,11 +75,17 @@ public final class DefaultCacheEntry extends CacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
+    final CacheableRequest cachedRequest;
 
+    private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
+
+    private boolean expectSubscribers;
 
     private CacheEntryState state;
 
+    private long pollAt = -1;
     private final LongSupplier supplyTrace;
+    private boolean sendRequestRefreshCompleted = true;
 
     public DefaultCacheEntry(
         Cache cache,
@@ -79,13 +94,137 @@ public final class DefaultCacheEntry extends CacheEntry
     {
         super(request);
         this.cache = cache;
+        this.cachedRequest = request;
+        this.expectSubscribers = expectSubscribers;
         this.state = CacheEntryState.INITIALIZED;
         this.supplyTrace = requireNonNull(supplyTrace);
     }
 
     public void commit()
     {
-        //TODO:Method to be removed after RA 2.0 migration
+        final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
+        if (freshnessExtension > 0)
+        {
+            if(this.state != REFRESHING && this.state != CAN_REFRESH)
+            {
+                this.state = CAN_REFRESH;
+                pollBackend();
+            }
+        }
+        else
+        {
+            this.state = CacheEntryState.CANT_REFRESH;
+        }
+    }
+
+    private void pollBackend()
+    {
+        if (this.state != CacheEntryState.PURGED)
+        {
+            if (this.state == REFRESHING && sendRequestRefreshCompleted)
+            {
+                if(!sendRefreshRequest())
+                {
+                    return;
+                }
+            }
+            this.state = CacheEntryState.REFRESHING;
+
+            int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
+            if (this.pollAt == -1)
+            {
+                this.pollAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
+            }
+            else
+            {
+                this.pollAt += surrogateMaxAge * 1000;
+            }
+            cache.scheduler.accept(pollAt, this::pollBackend);
+        }
+    }
+
+    private boolean sendRefreshRequest()
+    {
+        sendRequestRefreshCompleted = false;
+        if (this.state == CacheEntryState.PURGED)
+        {
+            sendRequestRefreshCompleted = true;
+            return false;
+        }
+        else if (!expectSubscribers())
+        {
+            this.state = CAN_REFRESH;
+            sendRequestRefreshCompleted = true;
+            return true;
+        }
+        int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
+        if (newSlot == NO_SLOT)
+        {
+            sendRequestRefreshCompleted = true;
+            return true;
+        }
+
+        // may have purged this
+        if (this.state == CacheEntryState.PURGED)
+        {
+            cache.refreshBufferPool.release(newSlot);
+        }
+        else
+        {
+            long connectRouteId = cachedRequest.connectRouteId();
+            long connectInitialId = cachedRequest.supplyInitialId().applyAsLong(connectRouteId);
+            long connectReplyId = cachedRequest.supplyReplyId().applyAsLong(connectInitialId);
+            MessageConsumer connectInitial = cachedRequest.supplyReceiver().apply(connectInitialId);
+            ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
+            final String etag = this.cachedRequest.etag();
+
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] CONNECT %016x %s [sent refresh request]\n",
+                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+            }
+
+            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(), builder ->
+            {
+                requestHeaders.forEach(h ->
+                {
+                    switch (h.name().asString())
+                    {
+                        case AUTHORIZATION:
+                            String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
+                            String value = recentAuthorizationHeader != null
+                                ? recentAuthorizationHeader : h.value().asString();
+                            builder.item(item -> item.name(h.name()).value(value));
+                            break;
+                        default:
+                            builder.item(item -> item.name(h.name()).value(h.value()));
+                    }
+                });
+                if (etag != null)
+                {
+                    builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                }
+            });
+            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
+
+            // duplicate request into new slot (TODO optimize to single request)
+
+            MutableDirectBuffer newBuffer = cache.refreshBufferPool.buffer(newSlot);
+            this.cachedRequest.copyRequestTo(newBuffer);
+
+            final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
+                cachedRequest,
+                cache.refreshBufferPool,
+                newSlot,
+                etag,
+                this,
+                this.cache);
+            cache.correlations.put(connectReplyId, refreshRequest);
+            this.state = CAN_REFRESH;
+            expectSubscribers = false;
+        }
+        sendRequestRefreshCompleted = true;
+        return true;
     }
 
     private void handleEndOfStream()
@@ -120,9 +259,6 @@ public final class DefaultCacheEntry extends CacheEntry
             this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
 
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-            .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
-
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptRouteId = request.acceptRouteId();
         long acceptReplyId = request.acceptReplyId();
@@ -137,6 +273,7 @@ public final class DefaultCacheEntry extends CacheEntry
                     getHeader(responseHeaders, ":status"));
             }
 
+            expectSubscribers = true;
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                 acceptReply,
                 acceptRouteId,
@@ -147,9 +284,23 @@ public final class DefaultCacheEntry extends CacheEntry
                 cachedRequest.etag(),
                 request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader(),
                 supplyTrace.getAsLong());
+
+            this.cache.writer.doHttpPushPromise(
+                request,
+                cachedRequest,
+                responseHeaders,
+                freshnessExtension,
+                cachedRequest.etag());
+
+            // count all promises (prefer wait, if-none-match)
+            cache.counters.promises.getAsLong();
+            this.expectSubscribers = true;
         }
         else
         {
+            Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
+                .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
+
             // TODO inject stale on above if (freshnessExtension > 0)?
             if (injectWarnings && isStale())
             {
@@ -178,6 +329,21 @@ public final class DefaultCacheEntry extends CacheEntry
         }
     }
 
+    public void sendHttpPushPromise(
+        AnswerableByCacheRequest request)
+    {
+        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        if (freshnessExtension > 0)
+        {
+            this.cache.writer.doHttpPushPromise(
+                request,
+                cachedRequest,
+                responseHeaders,
+                freshnessExtension,
+                cachedRequest.etag());
+        }
+    }
     public void purge()
     {
         switch (this.state)
@@ -190,6 +356,25 @@ public final class DefaultCacheEntry extends CacheEntry
                 {
                     cachedRequest.purge();
                 }
+                subscribers.stream().forEach(s ->
+                {
+                    MessageConsumer acceptReply = s.acceptReply();
+                    final long acceptRouteId = s.acceptRouteId();
+                    long acceptReplyId = s.acceptReplyId();
+                    cache.writer.do503AndAbort(acceptReply,
+                        acceptRouteId,
+                        acceptReplyId,
+                        supplyTrace.getAsLong(),
+                        acceptReplyId);
+                    s.purge();
+
+                    // count all responses
+                    cache.counters.responses.getAsLong();
+
+                    // count ABORTed responses
+                    cache.counters.responsesAbortedPurge.getAsLong();
+                });
+                subscribers.clear();
                 break;
         }
     }
@@ -212,7 +397,7 @@ public final class DefaultCacheEntry extends CacheEntry
         private int padding;
         private int acceptReplyBudget;
 
-         ServeFromCacheStream(
+        ServeFromCacheStream(
             Request request,
             CacheableRequest cachedRequest,
             Runnable onEnd)
@@ -224,10 +409,10 @@ public final class DefaultCacheEntry extends CacheEntry
         }
 
         public void accept(
-                int msgTypeId,
-                DirectBuffer buffer,
-                int index,
-                int length)
+            int msgTypeId,
+            DirectBuffer buffer,
+            int index,
+            int length)
         {
             switch(msgTypeId)
             {
@@ -248,7 +433,7 @@ public final class DefaultCacheEntry extends CacheEntry
                         final long acceptRouteId = request.acceptRouteId();
                         final long acceptReplyStreamId = request.acceptReplyId();
                         DefaultCacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId,
-                                                                       window.trace());
+                            window.trace());
                         this.onEnd.run();
                         cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
                     }
@@ -256,7 +441,7 @@ public final class DefaultCacheEntry extends CacheEntry
                 case ResetFW.TYPE_ID:
                 default:
                     cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
-                                                supplyTrace.getAsLong());
+                        supplyTrace.getAsLong());
                     this.onEnd.run();
                     break;
             }
@@ -273,13 +458,13 @@ public final class DefaultCacheEntry extends CacheEntry
             if (toWrite > 0)
             {
                 cache.writer.doHttpData(
-                        acceptReply,
-                        acceptRouteId,
-                        acceptReplyStreamId,
-                        trace,
-                        0L,
-                        padding,
-                        p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
+                    acceptReply,
+                    acceptRouteId,
+                    acceptReplyStreamId,
+                    trace,
+                    0L,
+                    padding,
+                    p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
                 budget -= (toWrite + padding);
@@ -342,12 +527,12 @@ public final class DefaultCacheEntry extends CacheEntry
         return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
-    // Checks this cacheEntry's vary header with the given cacheEntry's vary header
-    public boolean doesNotVaryBy(CacheEntry cacheEntry)
+    // Checks this entry's vary header with the given entry's vary header
+    public boolean doesNotVaryBy(CacheEntry entry)
     {
         final ListFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
-        final ListFW<HttpHeaderFW> entryHeaders = cacheEntry.getCachedResponseHeaders(
-                cache.cachedResponse1HeadersRO, cache.cachedResponse1BufferPool);
+        final ListFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(
+            cache.cachedResponse1HeadersRO, cache.cachedResponse1BufferPool);
         assert thisHeaders.buffer() != entryHeaders.buffer();
 
         String thisVary = HttpHeadersUtil.getHeader(thisHeaders, HttpHeaders.VARY);
@@ -355,8 +540,8 @@ public final class DefaultCacheEntry extends CacheEntry
         boolean varyMatches = (thisVary == entryVary) || (thisVary != null && thisVary.equalsIgnoreCase(entryVary));
         if (varyMatches)
         {
-            final ListFW<HttpHeaderFW> requestHeaders = cacheEntry.cachedRequest.getRequestHeaders(
-                    cache.cachedRequest1HeadersRO, cache.cachedRequest1BufferPool);
+            final ListFW<HttpHeaderFW> requestHeaders = entry.cachedRequest.getRequestHeaders(
+                cache.cachedRequest1HeadersRO, cache.cachedRequest1BufferPool);
             return doesNotVaryBy(requestHeaders);
         }
         return false;
@@ -364,8 +549,8 @@ public final class DefaultCacheEntry extends CacheEntry
 
 
     private boolean satisfiesFreshnessRequirementsOf(
-            ListFW<HttpHeaderFW> request,
-            Instant now)
+        ListFW<HttpHeaderFW> request,
+        Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
         final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeaderValue);
@@ -383,11 +568,11 @@ public final class DefaultCacheEntry extends CacheEntry
     }
 
     private boolean satisfiesStalenessRequirementsOf(
-            ListFW<HttpHeaderFW> request,
-            Instant now)
+        ListFW<HttpHeaderFW> request,
+        Instant now)
     {
-        final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeaderValue);
+        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeacerValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MAX_STALE))
@@ -395,7 +580,10 @@ public final class DefaultCacheEntry extends CacheEntry
             final String maxStale = requestCacheControl.getValue(MAX_STALE);
             final int maxStaleSec = (maxStale != null) ? parseInt(maxStale): MAX_VALUE;
             final Instant acceptable = staleAt.plusSeconds(maxStaleSec);
-            return !now.isAfter(acceptable);
+            if (now.isAfter(acceptable))
+            {
+                return false;
+            }
         }
         else if (now.isAfter(staleAt))
         {
@@ -416,7 +604,10 @@ public final class DefaultCacheEntry extends CacheEntry
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
             Instant receivedAt = responseReceivedAt();
-            return !receivedAt.plusSeconds(requestMaxAge).isBefore(now);
+            if (receivedAt.plusSeconds(requestMaxAge).isBefore(now))
+            {
+                return false;
+            }
         }
         return true;
     }
@@ -430,6 +621,8 @@ public final class DefaultCacheEntry extends CacheEntry
             int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
                 parseInt(cacheControl.getValue(S_MAXAGE))
                 : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
+            int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
+            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
             lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
         return lazyInitiatedResponseStaleAt;
@@ -441,7 +634,7 @@ public final class DefaultCacheEntry extends CacheEntry
         {
             final ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
             final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
-                    getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
+                getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
             try
             {
                 Date receivedDate = DATE_FORMAT.parse(dateHeaderValue);
@@ -477,17 +670,18 @@ public final class DefaultCacheEntry extends CacheEntry
         final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
+            || (expectSubscribers() && this.state == REFRESHING);
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
-                doesNotVaryBy &&
-                satisfiesFreshnessRequirements &&
-                satisfiesStalenessRequirements &&
-                satisfiesAgeRequirements;
+            doesNotVaryBy &&
+            satisfiesFreshnessRequirements &&
+            satisfiesStalenessRequirements &&
+            satisfiesAgeRequirements;
     }
 
     boolean canServeUpdateRequest(
-            ListFW<HttpHeaderFW> request)
+        ListFW<HttpHeaderFW> request)
     {
         if (this.state == CacheEntryState.PURGED)
         {
@@ -526,25 +720,34 @@ public final class DefaultCacheEntry extends CacheEntry
 
     public boolean subscribeWhenNoneMatch(PreferWaitIfNoneMatchRequest preferWaitRequest)
     {
-        //TODO:Method to be removed after RA 2.0 migration
-        return false;
+        final boolean polling = this.state == REFRESHING || this.state == CAN_REFRESH;
+        if (polling)
+        {
+            this.subscribers.add(preferWaitRequest);
+        }
+        return polling;
     }
 
 
     public void subscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
     {
-        //TODO:Method to be removed after RA 2.0 migration
+        subscribers.stream().forEach(consumer);
+        subscribers.clear();
     }
 
     public boolean isUpdatedBy(CacheableRequest request)
     {
         ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+        String etag = request.etag();
+        boolean etagMatches = false;
+        if (etag != null && this.cachedRequest.etag() !=  null)
+        {
+            etagMatches = status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
+        }
 
         assert status != null;
-        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
-                status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
+        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
 
         return !notModified;
     }
@@ -558,13 +761,12 @@ public final class DefaultCacheEntry extends CacheEntry
         assert status != null;
 
         return status.equals(HttpStatus.NOT_MODIFIED_304) &&
-                this.cachedRequest.etag().equals(etag);
+            this.cachedRequest.etag().equals(etag);
     }
 
     public boolean expectSubscribers()
     {
-        //TODO:Method to be removed after RA 2.0 migration
-        return false;
+        return expectSubscribers || !subscribers.isEmpty();
     }
 
     public int requestUrl()

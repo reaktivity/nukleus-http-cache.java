@@ -20,7 +20,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.Random;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
-import java.util.function.Supplier;
+
 import java.util.function.ToIntFunction;
 
 import org.agrona.DirectBuffer;
@@ -43,6 +43,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -61,6 +62,7 @@ public class ProxyStreamFactory implements StreamFactory
     final ResetFW resetRO = new ResetFW();
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
+    final HttpEndExFW httpEndExRO = new HttpEndExFW();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     final RouteManager router;
@@ -72,7 +74,6 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> correlations;
-    final Supplier<String> supplyEtag;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -89,12 +90,10 @@ public class ProxyStreamFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Request> correlations,
         Cache cache,
-        Supplier<String> supplyEtag,
         HttpCacheCounters counters,
         LongSupplier supplyTrace,
         ToIntFunction<String> supplyTypeId)
     {
-        this.supplyEtag = supplyEtag;
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);

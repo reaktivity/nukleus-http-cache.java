@@ -68,4 +68,6 @@ public abstract class CacheEntry
     protected abstract ListFW<HttpHeaderFW> getCachedResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO, BufferPool bp);
 
     protected abstract boolean isIntendedForSingleUser();
+
+    public abstract void sendHttpPushPromise(AnswerableByCacheRequest request);
 }
