@@ -20,37 +20,26 @@ import static java.lang.Integer.parseInt;
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.CAN_REFRESH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.REFRESHING;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateFreshnessExtension;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
@@ -77,15 +66,9 @@ public final class DefaultCacheEntry extends CacheEntry
 
     final CacheableRequest cachedRequest;
 
-    private final List<PreferWaitIfNoneMatchRequest> subscribers = new ArrayList<>(); // TODO, lazy init
-
-    private boolean expectSubscribers;
-
     private CacheEntryState state;
 
-    private long pollAt = -1;
     private final LongSupplier supplyTrace;
-    private boolean sendRequestRefreshCompleted = true;
 
     public DefaultCacheEntry(
         Cache cache,
@@ -95,136 +78,13 @@ public final class DefaultCacheEntry extends CacheEntry
         super(request);
         this.cache = cache;
         this.cachedRequest = request;
-        this.expectSubscribers = expectSubscribers;
         this.state = CacheEntryState.INITIALIZED;
         this.supplyTrace = requireNonNull(supplyTrace);
     }
 
     public void commit()
     {
-        final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
-        if (freshnessExtension > 0)
-        {
-            if(this.state != REFRESHING && this.state != CAN_REFRESH)
-            {
-                this.state = CAN_REFRESH;
-                pollBackend();
-            }
-        }
-        else
-        {
-            this.state = CacheEntryState.CANT_REFRESH;
-        }
-    }
-
-    private void pollBackend()
-    {
-        if (this.state != CacheEntryState.PURGED)
-        {
-            if (this.state == REFRESHING && sendRequestRefreshCompleted)
-            {
-                if(!sendRefreshRequest())
-                {
-                    return;
-                }
-            }
-            this.state = CacheEntryState.REFRESHING;
-
-            int surrogateMaxAge = getSurrogateAge(getCachedResponseHeaders());
-            if (this.pollAt == -1)
-            {
-                this.pollAt = Instant.now().plusSeconds(surrogateMaxAge).toEpochMilli();
-            }
-            else
-            {
-                this.pollAt += surrogateMaxAge * 1000;
-            }
-            cache.scheduler.accept(pollAt, this::pollBackend);
-        }
-    }
-
-    private boolean sendRefreshRequest()
-    {
-        sendRequestRefreshCompleted = false;
-        if (this.state == CacheEntryState.PURGED)
-        {
-            sendRequestRefreshCompleted = true;
-            return false;
-        }
-        else if (!expectSubscribers())
-        {
-            this.state = CAN_REFRESH;
-            sendRequestRefreshCompleted = true;
-            return true;
-        }
-        int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
-        if (newSlot == NO_SLOT)
-        {
-            sendRequestRefreshCompleted = true;
-            return true;
-        }
-
-        // may have purged this
-        if (this.state == CacheEntryState.PURGED)
-        {
-            cache.refreshBufferPool.release(newSlot);
-        }
-        else
-        {
-            long connectRouteId = cachedRequest.connectRouteId();
-            long connectInitialId = cachedRequest.supplyInitialId().applyAsLong(connectRouteId);
-            long connectReplyId = cachedRequest.supplyReplyId().applyAsLong(connectInitialId);
-            MessageConsumer connectInitial = cachedRequest.supplyReceiver().apply(connectInitialId);
-            ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
-            final String etag = this.cachedRequest.etag();
-
-            if (DEBUG)
-            {
-                System.out.printf("[%016x] CONNECT %016x %s [sent refresh request]\n",
-                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-            }
-
-            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(), builder ->
-            {
-                requestHeaders.forEach(h ->
-                {
-                    switch (h.name().asString())
-                    {
-                        case AUTHORIZATION:
-                            String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
-                            String value = recentAuthorizationHeader != null
-                                ? recentAuthorizationHeader : h.value().asString();
-                            builder.item(item -> item.name(h.name()).value(value));
-                            break;
-                        default:
-                            builder.item(item -> item.name(h.name()).value(h.value()));
-                    }
-                });
-                if (etag != null)
-                {
-                    builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-                }
-            });
-            cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
-
-            // duplicate request into new slot (TODO optimize to single request)
-
-            MutableDirectBuffer newBuffer = cache.refreshBufferPool.buffer(newSlot);
-            this.cachedRequest.copyRequestTo(newBuffer);
-
-            final CacheRefreshRequest refreshRequest = new CacheRefreshRequest(
-                cachedRequest,
-                cache.refreshBufferPool,
-                newSlot,
-                etag,
-                this,
-                this.cache);
-            cache.correlations.put(connectReplyId, refreshRequest);
-            this.state = CAN_REFRESH;
-            expectSubscribers = false;
-        }
-        sendRequestRefreshCompleted = true;
-        return true;
+        //TODO: Delete
     }
 
     private void handleEndOfStream()
@@ -250,7 +110,6 @@ public final class DefaultCacheEntry extends CacheEntry
         AnswerableByCacheRequest request,
         boolean injectWarnings)
     {
-        addClient();
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
 
         ServeFromCacheStream serveFromCacheStream = new ServeFromCacheStream(
@@ -265,7 +124,7 @@ public final class DefaultCacheEntry extends CacheEntry
 
         // TODO should reduce freshness extension by how long it has aged
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
-        if (freshnessExtension > 0 && this.state == REFRESHING || this.state == CAN_REFRESH)
+        if (freshnessExtension > 0)
         {
             if (DEBUG)
             {
@@ -273,7 +132,6 @@ public final class DefaultCacheEntry extends CacheEntry
                     getHeader(responseHeaders, ":status"));
             }
 
-            expectSubscribers = true;
             this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                 acceptReply,
                 acceptRouteId,
@@ -285,16 +143,6 @@ public final class DefaultCacheEntry extends CacheEntry
                 request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader(),
                 supplyTrace.getAsLong());
 
-            this.cache.writer.doHttpPushPromise(
-                request,
-                cachedRequest,
-                responseHeaders,
-                freshnessExtension,
-                cachedRequest.etag());
-
-            // count all promises (prefer wait, if-none-match)
-            cache.counters.promises.getAsLong();
-            this.expectSubscribers = true;
         }
         else
         {
@@ -332,17 +180,7 @@ public final class DefaultCacheEntry extends CacheEntry
     public void sendHttpPushPromise(
         AnswerableByCacheRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
-        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
-        if (freshnessExtension > 0)
-        {
-            this.cache.writer.doHttpPushPromise(
-                request,
-                cachedRequest,
-                responseHeaders,
-                freshnessExtension,
-                cachedRequest.etag());
-        }
+        //TODO: Delete
     }
     public void purge()
     {
@@ -352,29 +190,7 @@ public final class DefaultCacheEntry extends CacheEntry
                 break;
             default:
                 this.state = CacheEntryState.PURGED;
-                if (clientCount == 0)
-                {
-                    cachedRequest.purge();
-                }
-                subscribers.stream().forEach(s ->
-                {
-                    MessageConsumer acceptReply = s.acceptReply();
-                    final long acceptRouteId = s.acceptRouteId();
-                    long acceptReplyId = s.acceptReplyId();
-                    cache.writer.do503AndAbort(acceptReply,
-                        acceptRouteId,
-                        acceptReplyId,
-                        supplyTrace.getAsLong(),
-                        acceptReplyId);
-                    s.purge();
-
-                    // count all responses
-                    cache.counters.responses.getAsLong();
-
-                    // count ABORTed responses
-                    cache.counters.responsesAbortedPurge.getAsLong();
-                });
-                subscribers.clear();
+                cachedRequest.purge();
                 break;
         }
     }
@@ -670,8 +486,7 @@ public final class DefaultCacheEntry extends CacheEntry
         final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
-            || (expectSubscribers() && this.state == REFRESHING);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now);
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
             doesNotVaryBy &&
@@ -720,19 +535,14 @@ public final class DefaultCacheEntry extends CacheEntry
 
     public boolean subscribeWhenNoneMatch(PreferWaitIfNoneMatchRequest preferWaitRequest)
     {
-        final boolean polling = this.state == REFRESHING || this.state == CAN_REFRESH;
-        if (polling)
-        {
-            this.subscribers.add(preferWaitRequest);
-        }
-        return polling;
+        //TODO: Delete
+        return false;
     }
 
 
     public void subscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
     {
-        subscribers.stream().forEach(consumer);
-        subscribers.clear();
+        //TODO: Delete
     }
 
     public boolean isUpdatedBy(CacheableRequest request)
@@ -766,7 +576,8 @@ public final class DefaultCacheEntry extends CacheEntry
 
     public boolean expectSubscribers()
     {
-        return expectSubscribers || !subscribers.isEmpty();
+        //TODO: Delete
+        return false;
     }
 
     public int requestUrl()

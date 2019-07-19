@@ -139,7 +139,7 @@ final class ProxyAcceptStream
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-        if (isPreferIfNoneMatch(requestHeaders) &&  protocolStackEmulated)
+        if (isPreferIfNoneMatch(requestHeaders) && protocolStackEmulated)
         {
             streamFactory.counters.requestsPreferWait.getAsLong();
             handlePreferWaitIfNoneMatchRequest(
