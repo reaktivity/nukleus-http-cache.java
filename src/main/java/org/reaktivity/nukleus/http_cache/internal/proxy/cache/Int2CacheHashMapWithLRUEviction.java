@@ -38,9 +38,9 @@ public class Int2CacheHashMapWithLRUEviction
 
     public void put(
         int requestUrlHash,
-        CacheEntry emulatedCacheCacheEntry)
+        CacheEntry cacheEntry)
     {
-        CacheEntry old = cachedEntries.put(requestUrlHash, emulatedCacheCacheEntry);
+        CacheEntry old = cachedEntries.put(requestUrlHash, cacheEntry);
         if (old == null)
         {
             entryCount.accept(1);

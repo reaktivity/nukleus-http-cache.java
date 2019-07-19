@@ -229,10 +229,10 @@ public class Cache
         short authScope,
         CacheableRequest cacheableRequest)
     {
-        final CacheEntry emulatedCacheCacheEntry = cachedEntries.get(requestURLHash);
-        if (emulatedCacheCacheEntry != null)
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        if (cacheEntry != null)
         {
-            return serveRequest(emulatedCacheCacheEntry, request, authScope, cacheableRequest);
+            return serveRequest(cacheEntry, request, authScope, cacheableRequest);
         }
         else
         {
@@ -243,7 +243,7 @@ public class Cache
     public void servePendingInitialRequests(
         int requestURLHash)
     {
-        final CacheEntry emulatedCacheCacheEntry = cachedEntries.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
         {
@@ -251,9 +251,9 @@ public class Cache
             {
                 boolean served = false;
 
-                if (emulatedCacheCacheEntry != null)
+                if (cacheEntry != null)
                 {
-                    served = serveRequest(emulatedCacheCacheEntry, s.getRequestHeaders(requestHeadersRO),
+                    served = serveRequest(cacheEntry, s.getRequestHeaders(requestHeadersRO),
                             s.authScope(), s);
                 }
 
@@ -327,7 +327,7 @@ public class Cache
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
-        final CacheEntry emulatedCacheCacheEntry = cachedEntries.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
@@ -337,7 +337,7 @@ public class Cache
         {
             uncommittedRequest.subscribe(preferWaitRequest);
         }
-        else if (emulatedCacheCacheEntry == null)
+        else if (cacheEntry == null)
         {
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
@@ -350,14 +350,14 @@ public class Cache
             // count ABORTed responses
             counters.responsesAbortedEvicted.getAsLong();
         }
-        else if (emulatedCacheCacheEntry.isUpdateRequestForThisEntry(requestHeaders))
+        else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
         {
             // TODO return value ??
-            emulatedCacheCacheEntry.subscribeWhenNoneMatch(preferWaitRequest);
+            cacheEntry.subscribeWhenNoneMatch(preferWaitRequest);
         }
-        else if (emulatedCacheCacheEntry.canServeUpdateRequest(requestHeaders))
+        else if (cacheEntry.canServeUpdateRequest(requestHeaders))
         {
-            emulatedCacheCacheEntry.serveClient(preferWaitRequest);
+            cacheEntry.serveClient(preferWaitRequest);
         }
         else
         {
