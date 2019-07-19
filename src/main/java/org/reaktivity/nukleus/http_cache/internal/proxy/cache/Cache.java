@@ -133,33 +133,33 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
-        CacheEntry oldCacheCacheEntry = cachedEntries.get(requestUrlHash);
-        if (oldCacheCacheEntry == null)
+        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        if (oldCacheEntry == null)
         {
-            final CacheEntry cachedCacheEntry = getCacheEntry(request, true, supplyTrace);
-            updateCache(requestUrlHash, cachedCacheEntry);
+            final CacheEntry cacheEntry = getCacheEntry(request, true, supplyTrace);
+            updateCache(requestUrlHash, cacheEntry);
         }
         else
         {
-            boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheCacheEntry.expectSubscribers();
+            boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
 
-            final CacheEntry cachedCacheEntry = getCacheEntry(request, expectSubscribers, supplyTrace);
-            if (cachedCacheEntry.isIntendedForSingleUser())
+            final CacheEntry cacheEntry = getCacheEntry(request, expectSubscribers, supplyTrace);
+            if (cacheEntry.isIntendedForSingleUser())
             {
-                cachedCacheEntry.purge();
+                cacheEntry.purge();
             }
-            else if (oldCacheCacheEntry.isUpdatedBy(request))
+            else if (oldCacheEntry.isUpdatedBy(request))
             {
-                updateCache(requestUrlHash, cachedCacheEntry);
+                updateCache(requestUrlHash, cacheEntry);
 
-                boolean notVaries = oldCacheCacheEntry.doesNotVaryBy(cachedCacheEntry);
+                boolean notVaries = oldCacheEntry.doesNotVaryBy(cacheEntry);
                 if (notVaries)
                 {
-                    oldCacheCacheEntry.subscribers(cachedCacheEntry::serveClient);
+                    oldCacheEntry.subscribers(cacheEntry::serveClient);
                 }
                 else
                 {
-                    oldCacheCacheEntry.subscribers(subscriber ->
+                    oldCacheEntry.subscribers(subscriber ->
                     {
                         final MessageConsumer acceptReply = subscriber.acceptReply();
                         final long acceptRouteId = subscriber.acceptRouteId();
@@ -177,16 +177,16 @@ public class Cache
                         counters.responsesAbortedVary.getAsLong();
                     });
                 }
-                oldCacheCacheEntry.purge();
+                oldCacheEntry.purge();
             }
             else
             {
-                if (oldCacheCacheEntry.isSelectedForUpdate(request))
+                if (oldCacheEntry.isSelectedForUpdate(request))
                 {
-                    oldCacheCacheEntry.cachedRequest.updateResponseHeader(request.getResponseHeaders(responseHeadersRO,
+                    oldCacheEntry.cachedRequest.updateResponseHeader(request.getResponseHeaders(responseHeadersRO,
                             cachedResponse1BufferPool));
                 }
-                cachedCacheEntry.purge();
+                cacheEntry.purge();
             }
         }
     }
