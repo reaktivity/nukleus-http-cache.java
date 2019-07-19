@@ -47,8 +47,11 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.CAN_REFRESH;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.REFRESHING;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 public final class CacheEntry extends Entry
@@ -98,44 +101,71 @@ public final class CacheEntry extends Entry
             case PURGED:
                 throw new IllegalStateException("Can not serve client when entry is purged");
             default:
-                sendResponseToClient(streamCorrelation);
+                sendResponseToClient(streamCorrelation, true);
                 break;
         }
         streamCorrelation.purge();
     }
 
-    private void sendResponseToClient(AnswerableByCacheRequest request)
+    private void sendResponseToClient(
+        AnswerableByCacheRequest request,
+        boolean injectWarnings)
     {
         addClient();
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
 
         ServeFromCacheStream serveFromCacheStream = new ServeFromCacheStream(
-                request,
-                cachedRequest,
-                this::handleEndOfStream);
+            request,
+            cachedRequest,
+            this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
+
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
+            .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptRouteId = request.acceptRouteId();
         long acceptReplyId = request.acceptReplyId();
 
-        if (DEBUG)
+        // TODO should reduce freshness extension by how long it has aged
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        if (freshnessExtension > 0 && this.state == REFRESHING || this.state == CAN_REFRESH)
         {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
                     getHeader(responseHeaders, ":status"));
-        }
+            }
 
-        this.cache.writer.doHttpResponseWithUpdatedCacheControl(
+            this.cache.writer.doHttpResponseWithUpdatedCacheControl(
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
                 cacheControlFW,
                 responseHeaders,
+                freshnessExtension,
                 cachedRequest.etag(),
                 request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader(),
                 supplyTrace.getAsLong());
+        }
+        else
+        {
+            // TODO inject stale on above if (freshnessExtension > 0)?
+            if (injectWarnings && isStale())
+            {
+                headers = headers.andThen(
+                    x ->  x.item(h -> h.name(WARNING).value(Cache.RESPONSE_IS_STALE))
+                );
+            }
 
-        // count all promises (prefer wait, if-none-match)
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
+                    getHeader(responseHeaders, ":status"));
+            }
+
+            this.cache.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), headers);
+        }
 
         // count all responses
         cache.counters.responses.getAsLong();

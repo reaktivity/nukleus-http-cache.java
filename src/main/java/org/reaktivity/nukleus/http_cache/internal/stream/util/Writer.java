@@ -130,27 +130,6 @@ public class Writer
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
-    public void doHttpResponseWithUpdatedCacheControl(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeaders,
-        String etag,
-        boolean cacheControlPrivate,
-        long traceId)
-    {
-        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-            builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, etag, cacheControlPrivate);
-        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .routeId(routeId)
-            .streamId(streamId)
-            .trace(traceId)
-            .extension(e -> e.set(visitHttpBeginEx(mutator)))
-            .build();
-        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
-    }
-
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         CacheControl cacheControlFW,
@@ -197,49 +176,6 @@ public class Writer
                     : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
         }
-        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
-        {
-            builder.item(header -> header.name(ETAG).value(etag));
-        }
-    }
-
-    private void updateResponseHeaders(
-        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-        CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeadersRO,
-        String etag,
-        boolean cacheControlPrivate)
-    {
-        responseHeadersRO.forEach(h ->
-        {
-            final StringFW nameFW = h.name();
-            final String name = nameFW.asString();
-            final String16FW valueFW = h.value();
-            final String value = valueFW.asString();
-
-            switch(name)
-            {
-                case HttpHeaders.CACHE_CONTROL:
-                    cacheControlFW.parse(value);
-                    if (cacheControlPrivate && !(cacheControlFW.contains("private") || cacheControlFW.contains("public")))
-                    {
-                        cacheControlFW.getValues().put("private", null);
-                    }
-                    StringBuilder cacheControlDirectives = new StringBuilder();
-                    cacheControlFW.getValues().forEach((k, v) ->
-                    {
-                        cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
-                        cacheControlDirectives.append(k);
-                        if (v != null)
-                        {
-                            cacheControlDirectives.append('=').append(v);
-                        }
-                    });
-                    builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
-                    break;
-                default: builder.item(header -> header.name(nameFW).value(valueFW));
-            }
-        });
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
         {
             builder.item(header -> header.name(ETAG).value(etag));
