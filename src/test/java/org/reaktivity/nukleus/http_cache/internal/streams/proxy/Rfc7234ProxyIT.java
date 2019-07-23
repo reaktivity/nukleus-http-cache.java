@@ -833,4 +833,20 @@ public class Rfc7234ProxyIT
         k3po.notifyBarrier("MAX_AGE_EXPIRED");
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/proxy.get.request.without.etag/accept/client",
+        "${streams}/proxy.get.request.without.etag/connect/server",
+    })
+    public void shouldProxyGetRequestWithoutEtag() throws Exception
+    {
+        k3po.finish();
+        counters.assertRequests(2);
+        counters.assertRequestsCacheable(2);
+        counters.assertResponses(2);
+        counters.assertResponsesCached(0);
+        counters.assertExpectedCacheEntries(1);
+    }
 }

@@ -20,6 +20,7 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -168,8 +169,12 @@ final class ProxyAcceptStream
         short authScope,
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        final String etag = streamFactory.supplyEtag.get();
-
+        String etag = null;
+        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
+        if (etagHeader != null)
+        {
+            etag = etagHeader.value().asString();
+        }
         final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
             acceptReply,
             acceptRouteId,
@@ -204,6 +209,12 @@ final class ProxyAcceptStream
             send503RetryAfter();
             return;
         }
+        String etag = null;
+        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
+        if (etagHeader != null)
+        {
+            etag = etagHeader.value().asString();
+        }
         InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
                 streamFactory.cache,
@@ -221,7 +232,7 @@ final class ProxyAcceptStream
                 authorizationHeader,
                 authorization,
                 authScope,
-                streamFactory.supplyEtag.get());
+                etag);
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {

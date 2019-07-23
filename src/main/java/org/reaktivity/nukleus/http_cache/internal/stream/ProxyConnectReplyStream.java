@@ -40,6 +40,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 
 
 final class ProxyConnectReplyStream
@@ -60,6 +61,7 @@ final class ProxyConnectReplyStream
     private int padding;
     private boolean endDeferred;
     private boolean cached;
+    private OctetsFW endExtension;
 
     ProxyConnectReplyStream(
         ProxyStreamFactory proxyStreamFactory,
@@ -198,7 +200,7 @@ final class ProxyConnectReplyStream
         {
             case DataFW.TYPE_ID:
                 final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-                boolean stored = request.storeResponseData(this.streamFactory.cache, data, streamFactory.responseBufferPool);
+                boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
                 if (!stored)
                 {
                     request.purge();
@@ -214,7 +216,8 @@ final class ProxyConnectReplyStream
                 break;
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-                request.cache(end, streamFactory.cache);
+                checkEtag(end, request);
+                cached = request.cache(end, streamFactory.cache);
                 break;
             case AbortFW.TYPE_ID:
             default:
@@ -286,8 +289,6 @@ final class ProxyConnectReplyStream
             // count all responses
             streamFactory.counters.responses.getAsLong();
 
-            streamFactory.writer.doHttpPushPromise(request, request, responseHeaders, freshnessExtension, request.etag());
-
             // count all promises (prefer wait, if-none-match)
             streamFactory.counters.promises.getAsLong();
 
@@ -357,7 +358,7 @@ final class ProxyConnectReplyStream
         {
         case DataFW.TYPE_ID:
             final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-            boolean stored = request.storeResponseData(streamFactory.cache, data, streamFactory.responseBufferPool);
+            boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
             if (!stored)
             {
                 request.purge();
@@ -365,6 +366,7 @@ final class ProxyConnectReplyStream
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+            checkEtag(end, request);
             cached = request.cache(end, streamFactory.cache);
             break;
         case AbortFW.TYPE_ID:
@@ -500,7 +502,7 @@ final class ProxyConnectReplyStream
         else
         {
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, traceId);
-            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
+            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
         }
     }
 
@@ -532,7 +534,19 @@ final class ProxyConnectReplyStream
             final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, window.trace());
-            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
+            if (this.endExtension !=null && this.endExtension.sizeof() > 0)
+            {
+                streamFactory.writer.doHttpEnd(acceptReply,
+                                                acceptRouteId,
+                                                acceptReplyStreamId,
+                                                window.trace(),
+                                                this.endExtension);
+            }
+            else
+            {
+                streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
+            }
+
         }
     }
 
@@ -564,6 +578,22 @@ final class ProxyConnectReplyStream
                                           connectReplyStreamId, trace, credit, padding, groupId);
 
             return 0;
+        }
+    }
+
+    private void checkEtag(EndFW end, CacheableRequest request)
+    {
+        final OctetsFW extension = end.extension();
+        if (extension.sizeof() > 0)
+        {
+            final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
+            ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+            HttpHeaderFW etag = trailers.matchFirst(h -> "etag".equals(h.name().asString()));
+            if (etag != null)
+            {
+                request.etag(etag.value().asString());
+            }
+            this.endExtension = extension;
         }
     }
 }

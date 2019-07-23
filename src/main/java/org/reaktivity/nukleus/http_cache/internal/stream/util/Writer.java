@@ -176,7 +176,7 @@ public class Writer
                     : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
         }
-        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())))
+        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));
         }
@@ -225,6 +225,23 @@ public class Writer
                 .build();
 
         receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
+    }
+
+    public void doHttpEnd(
+            final MessageConsumer receiver,
+            final long routeId,
+            final long streamId,
+            final long traceId,
+            OctetsFW extension)
+    {
+        final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                .routeId(routeId)
+                .streamId(streamId)
+                .trace(traceId)
+                .extension(extension)
+                .build();
+
+        receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
     }
 
     public void doHttpEnd(

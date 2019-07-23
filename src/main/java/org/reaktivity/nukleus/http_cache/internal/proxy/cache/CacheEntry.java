@@ -185,23 +185,26 @@ public final class CacheEntry
             }
 
             cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(), builder ->
+            {
+                requestHeaders.forEach(h ->
                 {
-                    requestHeaders.forEach(h ->
+                    switch (h.name().asString())
                     {
-                        switch (h.name().asString())
-                        {
-                            case AUTHORIZATION:
-                                String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
-                                String value = recentAuthorizationHeader != null
-                                        ? recentAuthorizationHeader : h.value().asString();
-                                builder.item(item -> item.name(h.name()).value(value));
-                                break;
-                            default:
-                                builder.item(item -> item.name(h.name()).value(h.value()));
-                        }
-                    });
-                    builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                        case AUTHORIZATION:
+                            String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
+                            String value = recentAuthorizationHeader != null
+                                ? recentAuthorizationHeader : h.value().asString();
+                            builder.item(item -> item.name(h.name()).value(value));
+                            break;
+                        default:
+                            builder.item(item -> item.name(h.name()).value(h.value()));
+                    }
                 });
+                if (etag != null)
+                {
+                    builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
+                }
+            });
             cache.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
 
             // duplicate request into new slot (TODO optimize to single request)
@@ -223,7 +226,6 @@ public final class CacheEntry
         sendRequestRefreshCompleted = true;
         return true;
     }
-
 
     private void handleEndOfStream()
     {
@@ -256,9 +258,6 @@ public final class CacheEntry
                 cachedRequest,
                 this::handleEndOfStream);
         request.setThrottle(serveFromCacheStream);
-
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
-            .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
         final MessageConsumer acceptReply = request.acceptReply();
         long acceptRouteId = request.acceptRouteId();
@@ -299,6 +298,9 @@ public final class CacheEntry
         }
         else
         {
+            Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
+                    .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
+
             // TODO inject stale on above if (freshnessExtension > 0)?
             if (injectWarnings && isStale())
             {
@@ -327,6 +329,21 @@ public final class CacheEntry
         }
     }
 
+    public void sendHttpPushPromise(
+            AnswerableByCacheRequest request)
+    {
+        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        if (freshnessExtension > 0)
+        {
+            this.cache.writer.doHttpPushPromise(
+                    request,
+                    cachedRequest,
+                    responseHeaders,
+                    freshnessExtension,
+                    cachedRequest.etag());
+        }
+    }
     public void purge()
     {
         switch (this.state)
@@ -721,11 +738,15 @@ public final class CacheEntry
     {
         ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
+        String etag = request.etag();
+        boolean etagMatches = false;
+        if (etag != null && this.cachedRequest.etag() !=  null)
+        {
+            etagMatches = status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
+        }
 
         assert status != null;
-        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) ||
-                status.equals(HttpStatus.OK_200) && this.cachedRequest.etag().equals(etag);
+        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
 
         return !notModified;
     }

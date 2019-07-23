@@ -112,7 +112,6 @@ public class EdgeArchProxyIT
         "${streams}/does.not.share.with.different.protected.scope/accept/client",
         "${streams}/does.not.share.with.different.protected.scope/connect/server",
     })
-
     public void doesNotShareWithDifferentProtectedScope() throws Exception
     {
         k3po.finish();
@@ -334,19 +333,6 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Configure(name="nukleus.http_cache.etag.prefix", value="99999")
-    @Specification({
-            "${route}/proxy/controller",
-            "${streams}/update.cache.when.200.response.doesnot.have.etag/accept/client",
-            "${streams}/update.cache.when.200.response.doesnot.have.etag/connect/server",
-    })
-    public void shouldCacheWhen200ResponseDoesnotHaveEtag() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
     @Specification({
         "${route}/proxy/controller",
         "${streams}/polling.stops.if.no.subscribers/accept/client",
@@ -423,9 +409,9 @@ public class EdgeArchProxyIT
 
     @Test
     @Specification({
-            "${route}/proxy/controller",
-            "${streams}/polling.vary.header.asterisk/accept/client",
-            "${streams}/polling.vary.header.asterisk/connect/server",
+        "${route}/proxy/controller",
+        "${streams}/polling.vary.header.asterisk/accept/client",
+        "${streams}/polling.vary.header.asterisk/connect/server",
     })
     public void pollingVaryHeaderAsterisk() throws Exception
     {
@@ -521,4 +507,73 @@ public class EdgeArchProxyIT
         counters.assertExpectedCacheEntries(1);
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.on.200.response/accept/client",
+        "${streams}/use.etag.from.trailer.on.200.response/connect/server",
+    })
+    public void shouldUseEtagFromTrailerOn200Response() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.and.update.subscriber/accept/client",
+        "${streams}/use.etag.from.trailer.and.update.subscriber/connect/server",
+    })
+    public void shouldUseEtagFromTrailerAndUpdateSubscriber() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/do.not.send.cache.update.if.trailer.etag.is.matching/accept/client",
+        "${streams}/do.not.send.cache.update.if.trailer.etag.is.matching/connect/server",
+    })
+    public void shouldNotSendCacheUpdateIfTrailerEtagIsMatching() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(10);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 4 buffer slots
+    @Configure(name="nukleus.http_cache.slot.capacity", value="2048")
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/accept/client",
+        "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/connect/server",
+    })
+    public void shouldUseEtagFromTrailerOn200ResponseAfterCacheFull() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("CACHE_UPDATE_SENT");
+        Thread.sleep(1000);
+        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
+        k3po.finish();
+        Thread.sleep(1000);
+        counters.assertExpectedCacheEntries(1);
+    }
 }

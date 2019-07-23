@@ -59,7 +59,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongConsumer> supplyAccumulator;
 
     private int etagCnt = 0;
-    private final Supplier<String> supplyEtag = this::getEtagSupply;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -176,7 +175,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     requestBufferPool,
                     cacheBufferPool,
                     correlations,
-                    supplyEtag,
                     counters,
                     cacheEntries,
                     supplyTrace,
@@ -192,7 +190,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyReplyId,
                 correlations,
                 cache,
-                supplyEtag,
                 counters,
                 supplyTrace,
                 supplyTypeId);

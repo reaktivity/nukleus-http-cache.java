@@ -23,9 +23,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 import java.util.Objects;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
-
 public class CacheRefreshRequest extends CacheableRequest
 {
     private final CacheEntry updatingEntry;
@@ -70,12 +67,6 @@ public class CacheRefreshRequest extends CacheableRequest
                         (Objects.requireNonNull(h.value().asString()).startsWith("2") ||
                                 Objects.requireNonNull(h.value().asString()).equals("304")))))
         {
-            if(responseHeaders.anyMatch(h ->
-                    (":status".equals(h.name().asString())
-                            && Objects.requireNonNull(h.value().asString()).startsWith("2"))))
-            {
-                etag(getHeaderOrDefault(responseHeaders, ETAG, cache.getEtagSupplier().get()));
-            }
 
             boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
