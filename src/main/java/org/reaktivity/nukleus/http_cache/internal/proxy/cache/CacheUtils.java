@@ -53,7 +53,7 @@ public final class CacheUtils
         // utility class
     }
 
-    public static boolean canBeServedByCache(
+    public static boolean canBeServedByEmulatedCache(
         ListFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
@@ -74,6 +74,47 @@ public final class CacheUtils
                 default:
                     return false;
                 }
+        });
+    }
+
+    public static boolean satisfiedByCache(
+        ListFW<HttpHeaderFW> headers)
+    {
+        return !headers.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            switch (name)
+            {
+                case CACHE_CONTROL:
+                    // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
+                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(CacheDirectives.MAX_AGE_0);
+                default:
+                    return false;
+            }
+        });
+    }
+
+    public static boolean canBeServedByCache(
+        ListFW<HttpHeaderFW> headers)
+    {
+        return !headers.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            switch (name)
+            {
+                case CACHE_CONTROL:
+                    return value.contains(CacheDirectives.NO_STORE);
+                case METHOD:
+                    return !HttpMethods.GET.equalsIgnoreCase(value);
+                case CONTENT_LENGTH:
+                    return true;
+                case TRANSFER_ENCODING:
+                    return true;
+                default:
+                    return false;
+            }
         });
     }
 

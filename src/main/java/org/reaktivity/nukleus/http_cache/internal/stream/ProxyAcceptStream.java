@@ -19,7 +19,7 @@ import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
@@ -31,7 +31,6 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -137,19 +136,14 @@ final class ProxyAcceptStream
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-        if (isPreferIfNoneMatch(requestHeaders))
+        if (canBeServedByCache(requestHeaders))
         {
-            streamFactory.counters.requestsPreferWait.getAsLong();
-            handlePreferWaitIfNoneMatchRequest(
-                    authorizationHeader,
-                    authorization,
-                    authorizationScope,
-                    requestHeaders);
-        }
-        else if (canBeServedByCache(requestHeaders))
-        {
-            streamFactory.counters.requestsCacheable.getAsLong();
-            handleCacheableRequest(requestHeaders, requestURL, authorizationHeader, authorization, authorizationScope);
+            if (satisfiedByCache(requestHeaders))
+            {
+                streamFactory.counters.requestsCacheable.getAsLong();
+            }
+
+            handleRequest(requestHeaders, requestURL, authorizationHeader, authorization, authorizationScope);
         }
         else
         {
@@ -163,41 +157,7 @@ final class ProxyAcceptStream
         return (short) (authorization >>> 48);
     }
 
-    private void handlePreferWaitIfNoneMatchRequest(
-        boolean authorizationHeader,
-        long authorization,
-        short authScope,
-        ListFW<HttpHeaderFW> requestHeaders)
-    {
-        String etag = null;
-        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
-        if (etagHeader != null)
-        {
-            etag = etagHeader.value().asString();
-        }
-        final PreferWaitIfNoneMatchRequest preferWaitRequest = new PreferWaitIfNoneMatchRequest(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyId,
-            streamFactory.router,
-            requestURLHash,
-            authorizationHeader,
-            authorization,
-            authScope,
-            etag,
-            false);
-
-        this.request = preferWaitRequest;
-
-        streamFactory.defaultCache.handlePreferWaitIfNoneMatchRequest(
-                requestURLHash,
-                preferWaitRequest,
-                requestHeaders,
-                authScope);
-        this.streamState = this::onStreamMessageWhenIgnoring;
-    }
-
-    private void handleCacheableRequest(
+    private void handleRequest(
         final ListFW<HttpHeaderFW> requestHeaders,
         final String requestURL,
         boolean authorizationHeader,
@@ -236,7 +196,8 @@ final class ProxyAcceptStream
                 etag,
                 false);
 
-        if (streamFactory.defaultCache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
+        if (satisfiedByCache(requestHeaders) &&
+            streamFactory.defaultCache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
             this.request.purge();
         }

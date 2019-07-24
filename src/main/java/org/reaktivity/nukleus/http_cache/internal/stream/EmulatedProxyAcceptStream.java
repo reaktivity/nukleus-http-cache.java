@@ -38,7 +38,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByEmulatedCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -146,7 +146,7 @@ final class EmulatedProxyAcceptStream
                     authorizationScope,
                     requestHeaders);
         }
-        else if (canBeServedByCache(requestHeaders))
+        else if (canBeServedByEmulatedCache(requestHeaders))
         {
             streamFactory.counters.requestsCacheable.getAsLong();
             handleCacheableRequest(requestHeaders, requestURL, authorizationHeader, authorization, authorizationScope);
