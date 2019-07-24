@@ -30,8 +30,8 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -189,7 +189,7 @@ final class ProxyAcceptStream
 
         this.request = preferWaitRequest;
 
-        streamFactory.emulatedCache.handlePreferWaitIfNoneMatchRequest(
+        streamFactory.defaultCache.handlePreferWaitIfNoneMatchRequest(
                 requestURLHash,
                 preferWaitRequest,
                 requestHeaders,
@@ -218,7 +218,7 @@ final class ProxyAcceptStream
         }
         InitialRequest cacheableRequest;
         this.request = cacheableRequest = new InitialRequest(
-                streamFactory.emulatedCache,
+                streamFactory.defaultCache,
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
@@ -236,17 +236,17 @@ final class ProxyAcceptStream
                 etag,
                 false);
 
-        if (streamFactory.emulatedCache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
+        if (streamFactory.defaultCache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {
             this.request.purge();
         }
-        else if (streamFactory.emulatedCache.hasPendingInitialRequests(requestURLHash))
+        else if (streamFactory.defaultCache.hasPendingInitialRequests(requestURLHash))
         {
-            streamFactory.emulatedCache.addPendingRequest(cacheableRequest);
+            streamFactory.defaultCache.addPendingRequest(cacheableRequest);
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
-            // TODO move this logic and edge case inside of emulatedCache
+            // TODO move this logic and edge case inside of defaultCache
             send504();
         }
         else
@@ -262,7 +262,7 @@ final class ProxyAcceptStream
             sendBeginToConnect(requestHeaders, connectReplyId);
             streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId,
                     streamFactory.supplyTrace.getAsLong());
-            streamFactory.emulatedCache.createPendingInitialRequests(cacheableRequest);
+            streamFactory.defaultCache.createPendingInitialRequests(cacheableRequest);
         }
 
         this.streamState = this::onStreamMessageWhenIgnoring;

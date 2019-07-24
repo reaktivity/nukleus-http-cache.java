@@ -61,6 +61,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongConsumer> supplyAccumulator;
 
     private int etagCnt = 0;
+    private LongConsumer cacheEntries;
 
     public ProxyStreamFactoryBuilder(
             HttpCacheConfiguration config,
@@ -170,9 +171,13 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
         }
 
+        if (cacheEntries == null)
+        {
+            cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
+        }
+
         if (emulatedCache == null)
         {
-            LongConsumer cacheEntries = supplyAccumulator.apply("http-emulatedCache.emulated.emulatedCache.entries");
             this.emulatedCache = new Cache(
                     scheduler,
                     budgetManager,
@@ -188,7 +193,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
         if (defaultCache == null)
         {
-            LongConsumer cacheEntries = supplyAccumulator.apply("http-emulatedCache.emulatedCache.entries");
             this.defaultCache = new DefaultCache(
                 scheduler,
                 budgetManager,
@@ -217,8 +221,4 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyTypeId);
     }
 
-    private String getEtagSupply()
-    {
-        return "\"" + config.cacheEtagPrefix() + "a" + etagCnt++ + "\"";
-    }
 }
