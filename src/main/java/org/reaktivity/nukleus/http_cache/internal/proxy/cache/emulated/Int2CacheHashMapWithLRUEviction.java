@@ -13,19 +13,19 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
-
-import org.agrona.collections.Int2ObjectHashMap;
-import org.agrona.collections.IntArrayList;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
 import java.util.List;
 import java.util.function.LongConsumer;
+
+import org.agrona.collections.Int2ObjectHashMap;
+import org.agrona.collections.IntArrayList;
 
 public class Int2CacheHashMapWithLRUEviction
 {
 
     private static final int PURGE_SIZE = 1;
-    private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntries;
+    private final Int2ObjectHashMap<CacheEntry> cachedEntries;
     private final IntArrayList lruEntryList;
     private final LongConsumer entryCount;
 
@@ -38,9 +38,9 @@ public class Int2CacheHashMapWithLRUEviction
 
     public void put(
         int requestUrlHash,
-        DefaultCacheEntry cacheEntry)
+        CacheEntry cacheEntry)
     {
-        DefaultCacheEntry old = cachedEntries.put(requestUrlHash, cacheEntry);
+        CacheEntry old = cachedEntries.put(requestUrlHash, cacheEntry);
         if (old == null)
         {
             entryCount.accept(1);
@@ -51,9 +51,9 @@ public class Int2CacheHashMapWithLRUEviction
         assert cachedEntries.size() == lruEntryList.size();
     }
 
-    public DefaultCacheEntry get(int requestUrlHash)
+    public CacheEntry get(int requestUrlHash)
     {
-        final DefaultCacheEntry result = cachedEntries.get(requestUrlHash);
+        final CacheEntry result = cachedEntries.get(requestUrlHash);
         if (result != null)
         {
             lruEntryList.removeInt(requestUrlHash);
@@ -62,9 +62,9 @@ public class Int2CacheHashMapWithLRUEviction
         return result;
     }
 
-    public DefaultCacheEntry remove(int requestUrlHash)
+    public CacheEntry remove(int requestUrlHash)
     {
-        final DefaultCacheEntry result = cachedEntries.remove(requestUrlHash);
+        final CacheEntry result = cachedEntries.remove(requestUrlHash);
         if (result != null)
         {
             lruEntryList.removeInt(requestUrlHash);
@@ -90,7 +90,7 @@ public class Int2CacheHashMapWithLRUEviction
         final List<Integer> subList = lruEntryList.subList(0, PURGE_SIZE);
         subList.forEach(i ->
         {
-            DefaultCacheEntry rm = cachedEntries.remove(i);
+            CacheEntry rm = cachedEntries.remove(i);
             assert rm != null;
             rm.purge();
         });

@@ -164,7 +164,7 @@ final class ProxyConnectReplyStream
             return;
         }
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
-        if (request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (request.storeResponseHeaders(responseHeaders, streamFactory.defaultCache, streamFactory.responseBufferPool))
         {
             this.streamState = this::handleCacheRefresh;
             streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
@@ -217,7 +217,7 @@ final class ProxyConnectReplyStream
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
                 checkEtag(end, request);
-                cached = request.cache(end, streamFactory.cache);
+                cached = request.cache(end, streamFactory.defaultCache);
                 break;
             case AbortFW.TYPE_ID:
             default:
@@ -261,7 +261,7 @@ final class ProxyConnectReplyStream
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
-        if (request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (request.storeResponseHeaders(responseHeaders, streamFactory.defaultCache, streamFactory.responseBufferPool))
         {
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             final long acceptRouteId = streamCorrelation.acceptRouteId();
@@ -338,7 +338,7 @@ final class ProxyConnectReplyStream
         long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        if (!request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (!request.storeResponseHeaders(responseHeaders, streamFactory.defaultCache, streamFactory.responseBufferPool))
         {
             request.purge();
         }
@@ -367,7 +367,7 @@ final class ProxyConnectReplyStream
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
             checkEtag(end, request);
-            cached = request.cache(end, streamFactory.cache);
+            cached = request.cache(end, streamFactory.defaultCache);
             break;
         case AbortFW.TYPE_ID:
         default:

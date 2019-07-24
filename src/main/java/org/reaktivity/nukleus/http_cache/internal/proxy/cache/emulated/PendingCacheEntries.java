@@ -13,10 +13,10 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +42,7 @@ public class PendingCacheEntries
         this.subscribers.add(preferWaitRequest);
     }
 
-    void addSubscribers(DefaultCacheEntry cacheEntry)
+    void addSubscribers(CacheEntry cacheEntry)
     {
         subscribers.forEach(cacheEntry::subscribeWhenNoneMatch);
     }

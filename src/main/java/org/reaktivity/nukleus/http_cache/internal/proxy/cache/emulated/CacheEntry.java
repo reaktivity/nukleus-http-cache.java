@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Integer.parseInt;
@@ -49,11 +49,17 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheRefreshRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -63,7 +69,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-public final class EmulatedCacheEntry extends CacheEntry
+public final class CacheEntry
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
@@ -87,13 +93,12 @@ public final class EmulatedCacheEntry extends CacheEntry
     private final LongSupplier supplyTrace;
     private boolean sendRequestRefreshCompleted = true;
 
-    public EmulatedCacheEntry(
+    public CacheEntry(
         Cache cache,
         CacheableRequest request,
         boolean expectSubscribers,
         LongSupplier supplyTrace)
     {
-        super(request);
         this.cache = cache;
         this.cachedRequest = request;
         this.expectSubscribers = expectSubscribers;
@@ -433,8 +438,7 @@ public final class EmulatedCacheEntry extends CacheEntry
                         final MessageConsumer acceptReply = request.acceptReply();
                         final long acceptRouteId = request.acceptRouteId();
                         final long acceptReplyStreamId = request.acceptReplyId();
-                        EmulatedCacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId,
-                            window.trace());
+                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
                         this.onEnd.run();
                         cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
                     }
@@ -482,12 +486,12 @@ public final class EmulatedCacheEntry extends CacheEntry
         return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
     }
 
-    protected ListFW<HttpHeaderFW> getCachedResponseHeaders()
+    private ListFW<HttpHeaderFW> getCachedResponseHeaders()
     {
         return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
     }
 
-    protected ListFW<HttpHeaderFW> getCachedResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO, BufferPool bp)
+    private ListFW<HttpHeaderFW> getCachedResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO, BufferPool bp)
     {
         return cachedRequest.getResponseHeaders(responseHeadersRO, bp);
     }

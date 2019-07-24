@@ -31,7 +31,8 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
@@ -72,6 +73,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
+    final DefaultCache defaultCache;
     final LongSupplier supplyTrace;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
@@ -79,7 +81,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
-    final Cache cache;
+    final Cache emulatedCache;
     final Random random;
     final HttpCacheCounters counters;
 
@@ -91,7 +93,8 @@ public class ProxyStreamFactory implements StreamFactory
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Request> correlations,
-        Cache cache,
+        Cache emulatedCache,
+        DefaultCache defaultCache,
         HttpCacheCounters counters,
         LongSupplier supplyTrace,
         ToIntFunction<String> supplyTypeId)
@@ -103,14 +106,15 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("http-cache.initial.request.acquires"),
-                counters.supplyCounter.apply("http-cache.initial.request.releases"));
+                counters.supplyCounter.apply("http-emulatedCache.initial.request.acquires"),
+                counters.supplyCounter.apply("http-emulatedCache.initial.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("http-cache.response.acquires"),
-                counters.supplyCounter.apply("http-cache.response.releases"));
+                counters.supplyCounter.apply("http-emulatedCache.response.acquires"),
+                counters.supplyCounter.apply("http-emulatedCache.response.releases"));
         this.correlations = requireNonNull(correlations);
-        this.cache = cache;
+        this.emulatedCache = emulatedCache;
+        this.defaultCache = defaultCache;
 
         this.writer = new Writer(supplyTypeId, writeBuffer);
         this.random = new Random();

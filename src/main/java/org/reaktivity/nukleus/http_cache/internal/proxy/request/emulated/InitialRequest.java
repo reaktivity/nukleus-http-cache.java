@@ -13,25 +13,25 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
+
+import java.util.function.LongFunction;
+import java.util.function.LongUnaryOperator;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
-import java.util.function.LongFunction;
-import java.util.function.LongUnaryOperator;
-
 public class InitialRequest extends CacheableRequest
 {
-    private final DefaultCache cache;
+    private final Cache cache;
 
     public InitialRequest(
-            DefaultCache cache,
+            Cache cache,
             MessageConsumer acceptReply,
             long acceptRouteId,
             long acceptReplyStreamId,
@@ -77,7 +77,7 @@ public class InitialRequest extends CacheableRequest
     @Override
     public boolean storeResponseHeaders(
             ListFW<HttpHeaderFW> responseHeaders,
-            DefaultCache cache,
+            Cache cache,
             BufferPool bp)
     {
         boolean stored = super.storeResponseHeaders(responseHeaders, cache, bp);
@@ -96,7 +96,7 @@ public class InitialRequest extends CacheableRequest
     }
 
     @Override
-    public boolean cache(EndFW end, DefaultCache cache)
+    public boolean cache(EndFW end, Cache cache)
     {
         boolean cached = super.cache(end, cache);
         cache.servePendingInitialRequests(requestURLHash());

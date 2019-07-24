@@ -15,11 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
-
-import java.util.function.ToIntFunction;
-
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -31,7 +26,6 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -43,6 +37,10 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
+import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
+import java.util.function.ToIntFunction;
+
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
@@ -52,7 +50,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
-public class Cache
+public class DefaultCache
 {
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
@@ -89,7 +87,7 @@ public class Cache
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
 
-    public Cache(
+    public DefaultCache(
         LongObjectBiConsumer<Runnable> scheduler,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
@@ -130,24 +128,22 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
-        EmulatedCacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        DefaultCacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
         {
-            EmulatedCacheEntry cacheEntry = new EmulatedCacheEntry(
+            DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
                     request,
-                    true,
                     supplyTrace);
             updateCache(requestUrlHash, cacheEntry);
             cacheEntry.sendHttpPushPromise(request);
         }
         else
         {
-            boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
-            EmulatedCacheEntry cacheEntry = new EmulatedCacheEntry(
+            boolean expectSubscribers = (request.getType() == Request.Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
+            DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
                     request,
-                    expectSubscribers,
                     supplyTrace);
 
             if (cacheEntry.isIntendedForSingleUser())
@@ -199,7 +195,7 @@ public class Cache
 
     private void updateCache(
             int requestUrlHash,
-            EmulatedCacheEntry cacheEntry)
+            DefaultCacheEntry cacheEntry)
     {
         cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
@@ -216,7 +212,7 @@ public class Cache
         short authScope,
         CacheableRequest cacheableRequest)
     {
-        final EmulatedCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
         {
             return serveRequest(cacheEntry, request, authScope, cacheableRequest);
@@ -230,7 +226,7 @@ public class Cache
     public void servePendingInitialRequests(
         int requestURLHash)
     {
-        final EmulatedCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
         {
@@ -314,7 +310,7 @@ public class Cache
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
-        final EmulatedCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
@@ -372,7 +368,7 @@ public class Cache
     }
 
     private boolean serveRequest(
-        EmulatedCacheEntry entry,
+        DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> request,
         short authScope,
         AnswerableByCacheRequest cacheableRequest)
@@ -398,7 +394,7 @@ public class Cache
     }
 
     private void send304(
-        EmulatedCacheEntry entry,
+        DefaultCacheEntry entry,
         AnswerableByCacheRequest request)
     {
         if (DEBUG)
@@ -447,7 +443,7 @@ public class Cache
     }
 
     public void purge(
-        EmulatedCacheEntry entry)
+        DefaultCacheEntry entry)
     {
         this.cachedEntries.remove(entry.requestUrl());
         entry.purge();

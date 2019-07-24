@@ -25,10 +25,10 @@ public abstract class Request
         PREFER_WAIT, PROXY, INITIAL_REQUEST, CACHE_REFRESH
     }
 
-    final MessageConsumer acceptReply;
-    final long acceptRouteId;
-    final long acceptReplyStreamId;
-    final RouteManager router;
+    public final MessageConsumer acceptReply;
+    public final long acceptRouteId;
+    public final long acceptReplyStreamId;
+    public final RouteManager router;
 
     private boolean isEmulated;
 

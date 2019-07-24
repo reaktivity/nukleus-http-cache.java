@@ -13,11 +13,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -25,16 +25,16 @@ import java.util.Objects;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
-    private final DefaultCacheEntry updatingEntry;
-    private final DefaultCache cache;
+    private final CacheEntry updatingEntry;
+    private final Cache cache;
 
     public CacheRefreshRequest(
             CacheableRequest req,
             BufferPool bufferPool,
             int requestSlot,
             String etag,
-            DefaultCacheEntry cacheEntry,
-            DefaultCache cache)
+            CacheEntry cacheEntry,
+            Cache cache)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
         super(req.acceptReply,
@@ -60,7 +60,7 @@ public class CacheRefreshRequest extends CacheableRequest
     @Override
     public boolean storeResponseHeaders(
         ListFW<HttpHeaderFW> responseHeaders,
-        DefaultCache cache,
+        Cache cache,
         BufferPool bufferPool)
     {
         if (responseHeaders.anyMatch(h ->

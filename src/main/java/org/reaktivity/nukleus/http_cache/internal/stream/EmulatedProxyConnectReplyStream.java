@@ -18,9 +18,9 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheRefreshRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -164,7 +164,7 @@ final class EmulatedProxyConnectReplyStream
             return;
         }
         CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
-        if (request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (request.storeResponseHeaders(responseHeaders, streamFactory.emulatedCache, streamFactory.responseBufferPool))
         {
             this.streamState = this::handleCacheRefresh;
             streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
@@ -217,7 +217,7 @@ final class EmulatedProxyConnectReplyStream
             case EndFW.TYPE_ID:
                 final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
                 checkEtag(end, request);
-                cached = request.cache(end, streamFactory.cache);
+                cached = request.cache(end, streamFactory.emulatedCache);
                 break;
             case AbortFW.TYPE_ID:
             default:
@@ -261,7 +261,7 @@ final class EmulatedProxyConnectReplyStream
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
 
-        if (request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (request.storeResponseHeaders(responseHeaders, streamFactory.emulatedCache, streamFactory.responseBufferPool))
         {
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             final long acceptRouteId = streamCorrelation.acceptRouteId();
@@ -338,7 +338,7 @@ final class EmulatedProxyConnectReplyStream
         long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        if (!request.storeResponseHeaders(responseHeaders, streamFactory.cache, streamFactory.responseBufferPool))
+        if (!request.storeResponseHeaders(responseHeaders, streamFactory.emulatedCache, streamFactory.responseBufferPool))
         {
             request.purge();
         }
@@ -367,7 +367,7 @@ final class EmulatedProxyConnectReplyStream
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
             checkEtag(end, request);
-            cached = request.cache(end, streamFactory.cache);
+            cached = request.cache(end, streamFactory.emulatedCache);
             break;
         case AbortFW.TYPE_ID:
         default:

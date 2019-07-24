@@ -52,13 +52,13 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-public final class DefaultCacheEntry extends CacheEntry
+public final class DefaultCacheEntry
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     private final CacheControl cacheControlFW = new CacheControl();
 
-    private final Cache cache;
+    private final DefaultCache cache;
     private int clientCount;
 
     private Instant lazyInitiatedResponseReceivedAt;
@@ -71,11 +71,10 @@ public final class DefaultCacheEntry extends CacheEntry
     private final LongSupplier supplyTrace;
 
     public DefaultCacheEntry(
-        Cache cache,
+        DefaultCache cache,
         CacheableRequest request,
         LongSupplier supplyTrace)
     {
-        super(request);
         this.cache = cache;
         this.cachedRequest = request;
         this.state = CacheEntryState.INITIALIZED;
@@ -153,7 +152,7 @@ public final class DefaultCacheEntry extends CacheEntry
             if (injectWarnings && isStale())
             {
                 headers = headers.andThen(
-                    x ->  x.item(h -> h.name(WARNING).value(Cache.RESPONSE_IS_STALE))
+                    x ->  x.item(h -> h.name(WARNING).value(DefaultCache.RESPONSE_IS_STALE))
                 );
             }
 
@@ -344,7 +343,7 @@ public final class DefaultCacheEntry extends CacheEntry
     }
 
     // Checks this entry's vary header with the given entry's vary header
-    public boolean doesNotVaryBy(CacheEntry entry)
+    public boolean doesNotVaryBy(DefaultCacheEntry entry)
     {
         final ListFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
         final ListFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(

@@ -13,14 +13,24 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
+
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.LongFunction;
+import java.util.function.LongUnaryOperator;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
@@ -31,16 +41,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.LongFunction;
-import java.util.function.LongUnaryOperator;
-
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 public abstract class CacheableRequest extends AnswerableByCacheRequest
 {
@@ -117,7 +117,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
 
     public boolean storeResponseHeaders(
             ListFW<HttpHeaderFW> responseHeaders,
-            DefaultCache cache,
+            Cache cache,
             BufferPool bp)
     {
         responsePool = bp;
@@ -152,7 +152,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return false;
     }
 
-    public boolean cache(EndFW end, DefaultCache cache)
+    public boolean cache(EndFW end, Cache cache)
     {
         if (state == CacheState.COMMITING)
         {
