@@ -35,9 +35,10 @@ public abstract class AnswerableByCacheRequest extends Request
         boolean authorizationHeader,
         long authorization,
         short authScope,
-        String etag)
+        String etag,
+        boolean isEmulated)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, router);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, router, isEmulated);
         this.requestURLHash = requestURLHash;
         this.authorizationHeader = authorizationHeader;
         this.authorization = authorization;

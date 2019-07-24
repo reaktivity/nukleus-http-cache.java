@@ -80,7 +80,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         boolean authorizationHeader,
         long authorization,
         short authScope,
-        String etag)
+        String etag,
+        boolean isEmulated)
     {
         super(acceptReply,
               acceptRouteId,
@@ -90,7 +91,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               authorizationHeader,
               authorization,
               authScope,
-              etag);
+              etag,
+              isEmulated);
         this.connectRouteId = connectRouteId;
         this.state = CacheState.COMMITING;
         this.supplyReplyId = supplyReplyId;

@@ -42,7 +42,7 @@ public class PendingCacheEntries
         this.subscribers.add(preferWaitRequest);
     }
 
-    void addSubscribers(CacheEntry cacheEntry)
+    void addSubscribers(EmulatedCacheEntry cacheEntry)
     {
         subscribers.forEach(cacheEntry::subscribeWhenNoneMatch);
     }

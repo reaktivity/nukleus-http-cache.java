@@ -130,10 +130,10 @@ public class Cache
         int requestUrlHash,
         CacheableRequest request)
     {
-        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        EmulatedCacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
         {
-            CacheEntry cacheEntry = new CacheEntry(
+            EmulatedCacheEntry cacheEntry = new EmulatedCacheEntry(
                     this,
                     request,
                     true,
@@ -144,7 +144,7 @@ public class Cache
         else
         {
             boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
-            CacheEntry cacheEntry = new CacheEntry(
+            EmulatedCacheEntry cacheEntry = new EmulatedCacheEntry(
                     this,
                     request,
                     expectSubscribers,
@@ -199,7 +199,7 @@ public class Cache
 
     private void updateCache(
             int requestUrlHash,
-            CacheEntry cacheEntry)
+            EmulatedCacheEntry cacheEntry)
     {
         cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
@@ -216,7 +216,7 @@ public class Cache
         short authScope,
         CacheableRequest cacheableRequest)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final EmulatedCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
         {
             return serveRequest(cacheEntry, request, authScope, cacheableRequest);
@@ -230,7 +230,7 @@ public class Cache
     public void servePendingInitialRequests(
         int requestURLHash)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final EmulatedCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
         {
@@ -314,7 +314,7 @@ public class Cache
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final EmulatedCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
@@ -372,7 +372,7 @@ public class Cache
     }
 
     private boolean serveRequest(
-        CacheEntry entry,
+        EmulatedCacheEntry entry,
         ListFW<HttpHeaderFW> request,
         short authScope,
         AnswerableByCacheRequest cacheableRequest)
@@ -398,7 +398,7 @@ public class Cache
     }
 
     private void send304(
-        CacheEntry entry,
+        EmulatedCacheEntry entry,
         AnswerableByCacheRequest request)
     {
         if (DEBUG)
@@ -447,7 +447,7 @@ public class Cache
     }
 
     public void purge(
-        CacheEntry entry)
+        EmulatedCacheEntry entry)
     {
         this.cachedEntries.remove(entry.requestUrl());
         entry.purge();

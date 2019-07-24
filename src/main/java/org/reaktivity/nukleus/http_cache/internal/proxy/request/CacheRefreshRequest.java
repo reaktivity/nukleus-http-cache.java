@@ -17,7 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.EmulatedCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -25,7 +25,7 @@ import java.util.Objects;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
-    private final CacheEntry updatingEntry;
+    private final EmulatedCacheEntry updatingEntry;
     private final Cache cache;
 
     public CacheRefreshRequest(
@@ -33,7 +33,7 @@ public class CacheRefreshRequest extends CacheableRequest
             BufferPool bufferPool,
             int requestSlot,
             String etag,
-            CacheEntry cacheEntry,
+            EmulatedCacheEntry cacheEntry,
             Cache cache)
     {
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
@@ -51,7 +51,8 @@ public class CacheRefreshRequest extends CacheableRequest
               req.authorizationHeader(),
               req.authorization(),
               req.authScope(),
-              etag);
+              etag,
+              true);
         this.updatingEntry = cacheEntry;
         this.cache = cache;
     }

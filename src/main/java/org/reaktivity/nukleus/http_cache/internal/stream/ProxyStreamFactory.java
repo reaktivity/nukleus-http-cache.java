@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
 import java.util.Random;
 import java.util.function.LongSupplier;
@@ -37,6 +38,7 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -157,8 +159,20 @@ public class ProxyStreamFactory implements StreamFactory
             final long acceptInitialId = begin.streamId();
             final long connectRouteId = route.correlationId();
 
-            newStream = new ProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
-                                              connectRouteId)::handleStream;
+            final OctetsFW extension = beginRO.extension();
+            final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
+            final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+
+            if(requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
+            {
+                newStream = new EmulatedProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
+                    connectRouteId)::handleStream;
+            }
+            else
+            {
+                newStream = new ProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
+                    connectRouteId)::handleStream;
+            }
         }
 
         return newStream;
@@ -171,7 +185,14 @@ public class ProxyStreamFactory implements StreamFactory
         final long sourceRouteId = begin.routeId();
         final long sourceId = begin.streamId();
 
-        return new ProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
+        if(correlations.get(sourceId).isEmulated())
+        {
+            return new EmulatedProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
+        }
+        else
+        {
+            return new ProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
+        }
     }
 
     private RouteFW wrapRoute(

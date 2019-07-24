@@ -26,7 +26,7 @@ public class ProxyRequest extends Request
         long acceptReplyStreamId,
         RouteManager router)
     {
-        super(acceptReply, acceptRouteId, acceptReplyStreamId, router);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, router, false);
     }
 
     @Override

@@ -24,6 +24,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORITY;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 
@@ -41,6 +42,12 @@ public final class HttpHeadersUtil
     {
         String name = h.name().asString();
         return AUTHORITY.equalsIgnoreCase(name);
+    };
+
+    public static final Predicate<? super HttpHeaderFW> HAS_EMULATED_PROTOCOL_STACK = h ->
+    {
+        String name = h.name().asString();
+        return EMULATED_PROTOCOL_STACK.equalsIgnoreCase(name);
     };
 
     public static final Predicate<? super HttpHeaderFW> HAS_RETRY_AFTER = h ->

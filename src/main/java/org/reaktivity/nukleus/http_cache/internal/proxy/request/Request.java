@@ -30,16 +30,20 @@ public abstract class Request
     final long acceptReplyStreamId;
     final RouteManager router;
 
+    private boolean isEmulated;
+
     public Request(
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
-        RouteManager router)
+        RouteManager router,
+        boolean isEmulated)
     {
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyStreamId = acceptReplyStreamId;
         this.router = router;
+        this.isEmulated = isEmulated;
     }
 
     public abstract Type getType();
@@ -65,4 +69,9 @@ public abstract class Request
     }
 
     public abstract void purge();
+
+    public boolean isEmulated()
+    {
+        return isEmulated;
+    }
 }

@@ -15,16 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
-
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -45,7 +35,17 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-final class ProxyAcceptStream
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
+final class EmulatedProxyAcceptStream
 {
     private final ProxyStreamFactory streamFactory;
     private final long acceptRouteId;
@@ -64,7 +64,7 @@ final class ProxyAcceptStream
     private Request request;
     private int requestURLHash;
 
-    ProxyAcceptStream(
+    EmulatedProxyAcceptStream(
         ProxyStreamFactory streamFactory,
         MessageConsumer acceptReply,
         long acceptRouteId,
@@ -185,7 +185,7 @@ final class ProxyAcceptStream
             authorization,
             authScope,
             etag,
-            false);
+            true);
 
         this.request = preferWaitRequest;
 
@@ -234,7 +234,7 @@ final class ProxyAcceptStream
                 authorization,
                 authScope,
                 etag,
-                false);
+                true);
 
         if (streamFactory.cache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
         {

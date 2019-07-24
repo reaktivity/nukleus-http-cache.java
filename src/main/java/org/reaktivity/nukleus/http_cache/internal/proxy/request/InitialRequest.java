@@ -46,7 +46,8 @@ public class InitialRequest extends CacheableRequest
             boolean authorizationHeader,
             long authorization,
             short authScope,
-            String etag)
+            String etag,
+            boolean isEmulated)
     {
         super(acceptReply,
               acceptRouteId,
@@ -62,7 +63,8 @@ public class InitialRequest extends CacheableRequest
               authorizationHeader,
               authorization,
               authScope,
-              etag);
+              etag,
+              isEmulated);
         this.cache = cache;
     }
 
