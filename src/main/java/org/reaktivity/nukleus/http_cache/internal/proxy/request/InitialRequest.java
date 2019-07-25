@@ -80,18 +80,12 @@ public class InitialRequest extends CacheableRequest
             DefaultCache cache,
             BufferPool bp)
     {
-        boolean stored = super.storeResponseHeaders(responseHeaders, cache, bp);
-        if (stored)
-        {
-            cache.notifyUncommitted(this);
-        }
-        return stored;
+        return super.storeResponseHeaders(responseHeaders, cache, bp);
     }
 
     public void purge()
     {
         super.purge();
-        cache.removeUncommitted(this);
         cache.sendPendingInitialRequests(requestURLHash());
     }
 

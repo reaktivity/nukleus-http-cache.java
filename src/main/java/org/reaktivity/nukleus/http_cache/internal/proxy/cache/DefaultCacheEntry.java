@@ -176,11 +176,6 @@ public final class DefaultCacheEntry
         }
     }
 
-    public void sendHttpPushPromise(
-        AnswerableByCacheRequest request)
-    {
-        //TODO: Delete
-    }
     public void purge()
     {
         switch (this.state)
@@ -304,11 +299,6 @@ public final class DefaultCacheEntry
     protected ListFW<HttpHeaderFW> getCachedResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO, BufferPool bp)
     {
         return cachedRequest.getResponseHeaders(responseHeadersRO, bp);
-    }
-
-    private void addClient()
-    {
-        this.clientCount++;
     }
 
     private void removeClient()
@@ -494,18 +484,6 @@ public final class DefaultCacheEntry
             satisfiesAgeRequirements;
     }
 
-    boolean canServeUpdateRequest(
-        ListFW<HttpHeaderFW> request)
-    {
-        if (this.state == CacheEntryState.PURGED)
-        {
-            return false;
-        }
-        ListFW<HttpHeaderFW> cachedRequestHeaders = cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
-        ListFW<HttpHeaderFW> cachedResponseHeaders = cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
-        return CacheUtils.doesNotVary(request, cachedResponseHeaders, cachedRequestHeaders);
-    }
-
     private boolean isStale()
     {
         return Instant.now().isAfter(staleAt());
@@ -524,24 +502,6 @@ public final class DefaultCacheEntry
             String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
             return cacheControl != null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
         }
-    }
-
-    public boolean isUpdateRequestForThisEntry(ListFW<HttpHeaderFW> requestHeaders)
-    {
-        return CacheUtils.isMatchByEtag(requestHeaders, this.cachedRequest.etag()) && doesNotVaryBy(requestHeaders);
-    }
-
-
-    public boolean subscribeWhenNoneMatch(PreferWaitIfNoneMatchRequest preferWaitRequest)
-    {
-        //TODO: Delete
-        return false;
-    }
-
-
-    public void subscribers(Consumer<PreferWaitIfNoneMatchRequest> consumer)
-    {
-        //TODO: Delete
     }
 
     public boolean isUpdatedBy(CacheableRequest request)
@@ -571,12 +531,6 @@ public final class DefaultCacheEntry
 
         return status.equals(HttpStatus.NOT_MODIFIED_304) &&
             this.cachedRequest.etag().equals(etag);
-    }
-
-    public boolean expectSubscribers()
-    {
-        //TODO: Delete
-        return false;
     }
 
     public int requestUrl()

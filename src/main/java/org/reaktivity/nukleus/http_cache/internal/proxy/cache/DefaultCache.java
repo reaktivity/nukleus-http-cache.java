@@ -24,12 +24,9 @@ import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -83,7 +80,6 @@ public class DefaultCache
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyTrace;
-    final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
 
@@ -139,7 +135,6 @@ public class DefaultCache
         }
         else
         {
-            boolean expectSubscribers = (request.getType() == Request.Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
             DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
                     request,
@@ -152,12 +147,6 @@ public class DefaultCache
             else if (oldCacheEntry.isUpdatedBy(request))
             {
                 updateCache(requestUrlHash, cacheEntry);
-
-                boolean notVaries = oldCacheEntry.doesNotVaryBy(cacheEntry);
-                if (notVaries)
-                {
-                    oldCacheEntry.subscribers(cacheEntry::serveClient);
-                }
                 oldCacheEntry.purge();
             }
             else
@@ -176,13 +165,7 @@ public class DefaultCache
             int requestUrlHash,
             DefaultCacheEntry cacheEntry)
     {
-        cacheEntry.commit();
         cachedEntries.put(requestUrlHash, cacheEntry);
-        PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
-        if (result != null)
-        {
-            result.addSubscribers(cacheEntry);
-        }
     }
 
     public boolean handleInitialRequest(
@@ -283,60 +266,6 @@ public class DefaultCache
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
-    public void handlePreferWaitIfNoneMatchRequest(
-        int requestURLHash,
-        PreferWaitIfNoneMatchRequest preferWaitRequest,
-        ListFW<HttpHeaderFW> requestHeaders,
-        short authScope)
-    {
-        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
-
-        String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
-        assert ifNoneMatch != null;
-        if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag())
-                && doesNotVary(requestHeaders, uncommittedRequest.request))
-        {
-            uncommittedRequest.subscribe(preferWaitRequest);
-        }
-        else if (cacheEntry == null)
-        {
-            final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
-            final long acceptRouteId = preferWaitRequest.acceptRouteId();
-            final long acceptReplyId = preferWaitRequest.acceptReplyId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
-
-            // count all responses
-            counters.responses.getAsLong();
-
-            // count ABORTed responses
-            counters.responsesAbortedEvicted.getAsLong();
-        }
-        else if (cacheEntry.isUpdateRequestForThisEntry(requestHeaders))
-        {
-            // TODO return value ??
-            cacheEntry.subscribeWhenNoneMatch(preferWaitRequest);
-        }
-        else if (cacheEntry.canServeUpdateRequest(requestHeaders))
-        {
-            cacheEntry.serveClient(preferWaitRequest);
-        }
-        else
-        {
-            final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
-            final long acceptRouteId = preferWaitRequest.acceptRouteId();
-            final long acceptReplyId = preferWaitRequest.acceptReplyId();
-
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
-
-            // count all responses
-            counters.responses.getAsLong();
-
-            // count ABORTed responses
-            counters.responsesAbortedMiss.getAsLong();
-        }
-    }
-
     private boolean doesNotVary(
         ListFW<HttpHeaderFW> requestHeaders,
         InitialRequest request)
@@ -393,33 +322,6 @@ public class DefaultCache
         counters.responses.getAsLong();
     }
 
-    public void notifyUncommitted(
-        InitialRequest request)
-    {
-        this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
-    }
-
-    public void removeUncommitted(
-        InitialRequest request)
-    {
-        this.uncommittedRequests.computeIfPresent(request.requestURLHash(), (k, v) ->
-        {
-            v.removeSubscribers(subscriber ->
-            {
-                final MessageConsumer acceptReply = subscriber.acceptReply();
-                final long acceptRouteId = subscriber.acceptRouteId();
-                final long acceptReplyId = subscriber.acceptReplyId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
-
-                // count all responses
-                counters.responses.getAsLong();
-
-                // count ABORTed responses
-                counters.responsesAbortedUncommited.getAsLong();
-            });
-            return null;
-        });
-    }
 
     public void purge(
         DefaultCacheEntry entry)
