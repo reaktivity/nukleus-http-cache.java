@@ -20,6 +20,7 @@ import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_CACHE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.PUBLIC;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
@@ -143,6 +144,8 @@ public final class CacheUtils
                 switch(directive)
                 {
                     // TODO expires
+                    case NO_STORE:
+                        return false;
                     case NO_CACHE:
                         return false;
                     case PUBLIC:

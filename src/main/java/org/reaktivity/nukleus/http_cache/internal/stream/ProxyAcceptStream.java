@@ -68,7 +68,10 @@ final class ProxyAcceptStream
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,
-        long connectRouteId)
+        long connectRouteId,
+        long connectInitialId,
+        MessageConsumer connect,
+        long acceptReplyId)
     {
         this.streamFactory = streamFactory;
         this.acceptReply = acceptReply;
@@ -76,6 +79,9 @@ final class ProxyAcceptStream
         this.acceptStreamId = acceptStreamId;
         this.connectRouteId = connectRouteId;
         this.streamState = this::beforeBegin;
+        this.connectInitialId = connectInitialId;
+        this.connect = connect;
+        this.acceptReplyId = acceptReplyId;
     }
 
     void handleStream(
@@ -108,14 +114,8 @@ final class ProxyAcceptStream
     private void onBegin(
         BeginFW begin)
     {
-        final long acceptInitialId = begin.streamId();
         final long authorization = begin.authorization();
         final short authorizationScope = authorizationScope(authorization);
-
-        this.connectInitialId = streamFactory.supplyInitialId.applyAsLong(connectRouteId);
-        this.connect = streamFactory.router.supplyReceiver(connectInitialId);
-
-        this.acceptReplyId = streamFactory.supplyReplyId.applyAsLong(acceptInitialId);
 
         final OctetsFW extension = streamFactory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
@@ -255,7 +255,7 @@ final class ProxyAcceptStream
         final ListFW<HttpHeaderFW> requestHeaders,
         long connectCorrelationId)
     {
-        streamFactory.correlations.put(connectCorrelationId, request);
+        streamFactory.requestCorrelations.put(connectCorrelationId, request);
 
         streamFactory.writer.doHttpRequest(
                                         connect,

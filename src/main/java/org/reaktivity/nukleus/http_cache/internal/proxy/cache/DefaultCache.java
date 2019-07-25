@@ -136,7 +136,6 @@ public class DefaultCache
                     request,
                     supplyTrace);
             updateCache(requestUrlHash, cacheEntry);
-            cacheEntry.sendHttpPushPromise(request);
         }
         else
         {
@@ -158,26 +157,6 @@ public class DefaultCache
                 if (notVaries)
                 {
                     oldCacheEntry.subscribers(cacheEntry::serveClient);
-                }
-                else
-                {
-                    oldCacheEntry.subscribers(subscriber ->
-                    {
-                        final MessageConsumer acceptReply = subscriber.acceptReply();
-                        final long acceptRouteId = subscriber.acceptRouteId();
-                        final long acceptReplyId = subscriber.acceptReplyId();
-                        this.writer.do503AndAbort(acceptReply,
-                                                acceptRouteId,
-                                                acceptReplyId,
-                                                supplyTrace.getAsLong(),
-                                                acceptReplyId);
-
-                        // count all responses
-                        counters.responses.getAsLong();
-
-                        // count ABORTed responses
-                        counters.responsesAbortedVary.getAsLong();
-                    });
                 }
                 oldCacheEntry.purge();
             }

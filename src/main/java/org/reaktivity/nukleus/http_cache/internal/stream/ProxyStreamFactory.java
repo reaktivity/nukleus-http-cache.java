@@ -77,7 +77,8 @@ public class ProxyStreamFactory implements StreamFactory
     final LongSupplier supplyTrace;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
-    final Long2ObjectHashMap<Request> correlations;
+    final Long2ObjectHashMap<Request> requestCorrelations;
+    final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -92,7 +93,8 @@ public class ProxyStreamFactory implements StreamFactory
         BufferPool requestBufferPool,
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
-        Long2ObjectHashMap<Request> correlations,
+        Long2ObjectHashMap<Request> requestCorrelations,
+        Long2ObjectHashMap<ProxyConnectReplyStream> correlations,
         Cache emulatedCache,
         DefaultCache defaultCache,
         HttpCacheCounters counters,
@@ -112,6 +114,7 @@ public class ProxyStreamFactory implements StreamFactory
                 requestBufferPool,
                 counters.supplyCounter.apply("http-emulatedCache.response.acquires"),
                 counters.supplyCounter.apply("http-emulatedCache.response.releases"));
+        this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
         this.emulatedCache = emulatedCache;
         this.defaultCache = defaultCache;
@@ -136,7 +139,7 @@ public class ProxyStreamFactory implements StreamFactory
 
         if ((streamId & 0x0000_0000_0000_0001L) != 0L)
         {
-            newStream = newAcceptStream(begin, throttle);
+            newStream = newInitialStream(begin, throttle);
         }
         else
         {
@@ -146,7 +149,7 @@ public class ProxyStreamFactory implements StreamFactory
         return newStream;
     }
 
-    private MessageConsumer newAcceptStream(
+    private MessageConsumer newInitialStream(
         final BeginFW begin,
         final MessageConsumer acceptReply)
     {
@@ -174,8 +177,27 @@ public class ProxyStreamFactory implements StreamFactory
             }
             else
             {
-                newStream = new ProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
-                    connectRouteId)::handleStream;
+                long connectInitialId = supplyInitialId.applyAsLong(connectRouteId);
+                MessageConsumer connectInitial = router.supplyReceiver(connectInitialId);
+                long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
+                long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
+                MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
+
+                newStream = new ProxyAcceptStream(this,
+                                                    acceptReply,
+                                                    acceptRouteId,
+                                                    acceptInitialId,
+                                                    connectRouteId,
+                                                    connectInitialId,
+                                                    connectInitial,
+                                                    acceptReplyId)::handleStream;
+
+                ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
+                                                                                    connectReply,
+                                                                                    connectRouteId,
+                                                                                    connectReplyId);
+                correlations.put(connectReplyId, replyStream);
+                router.setThrottle(acceptReplyId, replyStream::onThrottleMessageWhenProxying);
             }
         }
 
@@ -189,15 +211,24 @@ public class ProxyStreamFactory implements StreamFactory
         final long sourceRouteId = begin.routeId();
         final long sourceId = begin.streamId();
 
-        if(correlations.get(sourceId).isEmulated())
+        if(requestCorrelations.get(sourceId).isEmulated())
         {
             return new EmulatedProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
         }
         else
         {
-            return new ProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
+            ProxyConnectReplyStream replyStream = correlations.remove(sourceId);
+            MessageConsumer newStream = null;
+
+            if (replyStream != null)
+            {
+                newStream = replyStream::handleStream;
+            }
+
+            return newStream;
         }
     }
+
 
     private RouteFW wrapRoute(
             int msgTypeId,
@@ -206,5 +237,16 @@ public class ProxyStreamFactory implements StreamFactory
             int length)
     {
         return routeRO.wrap(buffer, index, index + length);
+    }
+
+    boolean cleanupCorrelationIfNecessary(long  connectReplyId, long acceptInitialId)
+    {
+        final ProxyConnectReplyStream correlated = correlations.remove(connectReplyId);
+        if (correlated != null)
+        {
+            router.clearThrottle(acceptInitialId);
+        }
+
+        return correlated != null;
     }
 }

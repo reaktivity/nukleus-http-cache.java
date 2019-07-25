@@ -294,7 +294,7 @@ final class EmulatedProxyAcceptStream
         final ListFW<HttpHeaderFW> requestHeaders,
         long connectCorrelationId)
     {
-        streamFactory.correlations.put(connectCorrelationId, request);
+        streamFactory.requestCorrelations.put(connectCorrelationId, request);
 
         streamFactory.writer.doHttpRequest(
                                         connect,

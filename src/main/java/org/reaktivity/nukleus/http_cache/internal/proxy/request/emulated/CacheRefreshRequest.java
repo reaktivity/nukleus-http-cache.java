@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -84,9 +85,9 @@ public class CacheRefreshRequest extends CacheableRequest
 }
 
     @Override
-    public Type getType()
+    public Request.Type getType()
     {
-        return Type.CACHE_REFRESH;
+        return Request.Type.CACHE_REFRESH;
     }
 
     @Override

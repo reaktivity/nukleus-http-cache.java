@@ -23,7 +23,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -117,7 +116,7 @@ final class ProxyConnectReplyStream
         final long connectReplyId = begin.streamId();
         final long traceId = begin.trace();
 
-        this.streamCorrelation = this.streamFactory.correlations.remove(connectReplyId);
+        this.streamCorrelation = this.streamFactory.requestCorrelations.remove(connectReplyId);
         final OctetsFW extension = streamFactory.beginRO.extension();
 
         if (streamCorrelation != null && extension.sizeof() > 0)
@@ -236,67 +235,15 @@ final class ProxyConnectReplyStream
             retryCacheableRequest(traceId);
             return;
         }
-        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
-        if (freshnessExtension > 0 && isCacheableResponse)
-        {
-            handleEdgeArchSync(responseHeaders, freshnessExtension, traceId);
-        }
-        else if(isCacheableResponse)
+        if(isCacheableResponse)
         {
             handleCacheableResponse(responseHeaders, traceId);
         }
         else
         {
             streamCorrelation.purge();
-            doProxyBegin(traceId, responseHeaders);
-        }
-    }
-
-    private void handleEdgeArchSync(
-        ListFW<HttpHeaderFW> responseHeaders,
-        int freshnessExtension,
-        long traceId)
-    {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
-
-        if (request.storeResponseHeaders(responseHeaders, streamFactory.defaultCache, streamFactory.responseBufferPool))
-        {
-            final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-            final long acceptRouteId = streamCorrelation.acceptRouteId();
-            final long acceptReplyId = streamCorrelation.acceptReplyId();
-
-            if (DEBUG)
-            {
-                System.out.printf("[%016x] ACCEPT %016x %s [sent cacheable response] [%s]\n", currentTimeMillis(), acceptReplyId,
-                        getHeader(responseHeaders, ":status"), this.toString());
-            }
-
-            streamCorrelation.setThrottle(this::onThrottleMessageWhenProxying);
-            streamFactory.writer.doHttpResponseWithUpdatedCacheControl(
-                    acceptReply,
-                    acceptRouteId,
-                    acceptReplyId,
-                    streamFactory.cacheControlParser,
-                    responseHeaders,
-                    freshnessExtension,
-                    request.etag(),
-                    false,
-                    traceId
-                    );
-
-            // count all responses
-            streamFactory.counters.responses.getAsLong();
-
-            // count all promises (prefer wait, if-none-match)
-            streamFactory.counters.promises.getAsLong();
-
-            this.streamState = this::handleCacheableRequestResponse;
-        }
-        else
-        {
-            request.purge();
             doProxyBegin(traceId, responseHeaders);
         }
     }
@@ -310,7 +257,7 @@ final class ProxyConnectReplyStream
         MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
 
-        streamFactory.correlations.put(connectReplyId, request);
+        streamFactory.requestCorrelations.put(connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
         final String etag = request.etag();
 
@@ -433,7 +380,7 @@ final class ProxyConnectReplyStream
         }
     }
 
-    private void onThrottleMessageWhenProxying(
+    void onThrottleMessageWhenProxying(
         int msgTypeId,
         DirectBuffer buffer,
         int index,

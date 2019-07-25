@@ -117,7 +117,7 @@ final class EmulatedProxyConnectReplyStream
         final long connectReplyId = begin.streamId();
         final long traceId = begin.trace();
 
-        this.streamCorrelation = this.streamFactory.correlations.remove(connectReplyId);
+        this.streamCorrelation = this.streamFactory.requestCorrelations.remove(connectReplyId);
         final OctetsFW extension = streamFactory.beginRO.extension();
 
         if (streamCorrelation != null && extension.sizeof() > 0)
@@ -310,7 +310,7 @@ final class EmulatedProxyConnectReplyStream
         MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
 
-        streamFactory.correlations.put(connectReplyId, request);
+        streamFactory.requestCorrelations.put(connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
         final String etag = request.etag();
 

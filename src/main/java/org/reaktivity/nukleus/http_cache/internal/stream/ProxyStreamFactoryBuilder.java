@@ -44,7 +44,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     private final HttpCacheConfiguration config;
     private final LongObjectBiConsumer<Runnable> scheduler;
-    private final Long2ObjectHashMap<Request> correlations;
+    private final Long2ObjectHashMap<Request> requestCorrelations;
+    private final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
 
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
@@ -60,7 +61,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
 
-    private int etagCnt = 0;
     private LongConsumer cacheEntries;
 
     public ProxyStreamFactoryBuilder(
@@ -68,6 +68,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             LongObjectBiConsumer<Runnable> scheduler)
     {
         this.config = config;
+        this.requestCorrelations = new Long2ObjectHashMap<>();
         this.correlations = new Long2ObjectHashMap<>();
         this.scheduler = scheduler;
     }
@@ -184,7 +185,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                     writeBuffer,
                     requestBufferPool,
                     cacheBufferPool,
-                    correlations,
+                    requestCorrelations,
                     counters,
                     cacheEntries,
                     supplyTrace,
@@ -199,7 +200,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 writeBuffer,
                 requestBufferPool,
                 cacheBufferPool,
-                correlations,
+                requestCorrelations,
                 counters,
                 cacheEntries,
                 supplyTrace,
@@ -213,6 +214,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 requestBufferPool,
                 supplyInitialId,
                 supplyReplyId,
+                requestCorrelations,
                 correlations,
                 emulatedCache,
                 defaultCache,
