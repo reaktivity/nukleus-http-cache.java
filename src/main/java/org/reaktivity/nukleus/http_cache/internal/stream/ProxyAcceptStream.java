@@ -331,10 +331,7 @@ final class ProxyAcceptStream
         int index,
         int length)
     {
-        switch (msgTypeId)
-        {
-            default:
-        }
+        // NOOP
     }
 
     private void onStreamMessageWhenProxying(

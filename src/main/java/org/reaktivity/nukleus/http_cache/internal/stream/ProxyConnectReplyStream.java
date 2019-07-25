@@ -23,11 +23,9 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -142,9 +140,6 @@ final class ProxyConnectReplyStream
                 case INITIAL_REQUEST:
                     handleInitialRequest(traceId, responseHeaders);
                     break;
-                case CACHE_REFRESH:
-                    handleCacheRefresh(traceId, responseHeaders);
-                    break;
                 default:
                     throw new RuntimeException("Not implemented");
             }
@@ -155,32 +150,6 @@ final class ProxyConnectReplyStream
         }
     }
 
-    ///////////// CACHE REFRESH
-    private void handleCacheRefresh(
-        long traceId, ListFW<HttpHeaderFW> responseHeaders)
-    {
-        boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        if (retry && ((CacheableRequest)streamCorrelation).attempts() < 3)
-        {
-            retryCacheableRequest(traceId);
-            return;
-        }
-        CacheRefreshRequest request = (CacheRefreshRequest) this.streamCorrelation;
-        if (request.storeResponseHeaders(responseHeaders, streamFactory.defaultCache, streamFactory.responseBufferPool))
-        {
-            this.streamState = this::handleCacheRefresh;
-            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                streamFactory.supplyTrace.getAsLong(), 32767, 0, 0L);
-        }
-        else
-        {
-            request.purge();
-            this.streamState = this::reset;
-            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                    streamFactory.supplyTrace.getAsLong());
-        }
-    }
-
     private void reset(
         int msgTypeId,
         DirectBuffer buffer,
@@ -188,45 +157,6 @@ final class ProxyConnectReplyStream
         int length)
     {
         // NOOP
-    }
-
-    private void handleCacheRefresh(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
-
-        switch (msgTypeId)
-        {
-            case DataFW.TYPE_ID:
-                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-                boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
-                if (!stored)
-                {
-                    request.purge();
-                    this.streamState = this::reset;
-                    streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                            streamFactory.supplyTrace.getAsLong());
-                }
-                else
-                {
-                    streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                        streamFactory.supplyTrace.getAsLong(), length, 0, 0L);
-                }
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-                checkEtag(end, request);
-                cached = request.cache(end, streamFactory.defaultCache);
-                break;
-            case AbortFW.TYPE_ID:
-            default:
-                request.purge();
-                streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
-                break;
-        }
     }
 
     ///////////// INITIAL_REQUEST REQUEST
@@ -263,7 +193,6 @@ final class ProxyConnectReplyStream
 
         streamFactory.requestCorrelations.put(connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
-        final String etag = request.etag();
 
         if (DEBUG)
         {
@@ -275,10 +204,6 @@ final class ProxyConnectReplyStream
         {
             requestHeaders.forEach(
                     h ->  builder.item(item -> item.name(h.name()).value(h.value())));
-            if (request instanceof CacheRefreshRequest)
-            {
-                builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
-            }
         });
         streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();

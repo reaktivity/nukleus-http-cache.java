@@ -42,7 +42,6 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -139,7 +138,7 @@ public final class DefaultCacheEntry
                 responseHeaders,
                 freshnessExtension,
                 cachedRequest.etag(),
-                request instanceof PreferWaitIfNoneMatchRequest && cachedRequest.authorizationHeader(),
+                cachedRequest.authorizationHeader(),
                 supplyTrace.getAsLong());
 
         }
