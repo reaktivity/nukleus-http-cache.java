@@ -51,6 +51,7 @@ final class ProxyConnectReplyStream
     private final MessageConsumer connectReplyThrottle;
     private final long connectRouteId;
     private final long connectReplyStreamId;
+    private long acceptInitialId;
 
     private Request streamCorrelation;
 
@@ -66,12 +67,14 @@ final class ProxyConnectReplyStream
         ProxyStreamFactory proxyStreamFactory,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
-        long connectReplyId)
+        long connectReplyId,
+        long acceptInitialId)
     {
         this.streamFactory = proxyStreamFactory;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyStreamId = connectReplyId;
+        this.acceptInitialId = acceptInitialId;
         this.streamState = this::beforeBegin;
     }
 
@@ -148,7 +151,7 @@ final class ProxyConnectReplyStream
         }
         else
         {
-            this.streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, 0L);
+            this.streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, traceId);
         }
     }
 
@@ -221,6 +224,7 @@ final class ProxyConnectReplyStream
             case AbortFW.TYPE_ID:
             default:
                 request.purge();
+                streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
                 break;
         }
     }
@@ -278,6 +282,8 @@ final class ProxyConnectReplyStream
         });
         streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
+        this.streamState = this::handle503Retry;
+        this.streamFactory.initializeNewConnectReplyStream(connectInitialId, connectRouteId, acceptInitialId);
     }
 
     private void handleCacheableResponse(
@@ -291,6 +297,16 @@ final class ProxyConnectReplyStream
         }
         doProxyBegin(traceId, responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
+    }
+
+
+    private void handle503Retry(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        // NOOP
     }
 
     private void handleCacheableRequestResponse(
@@ -319,6 +335,7 @@ final class ProxyConnectReplyStream
         case AbortFW.TYPE_ID:
         default:
             request.purge();
+            streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             break;
         }
         this.onStreamMessageWhenProxying(msgTypeId, buffer, index, length);
@@ -463,6 +480,7 @@ final class ProxyConnectReplyStream
 
         streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, traceId);
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
     private void onWindowWhenProxying(
@@ -508,6 +526,7 @@ final class ProxyConnectReplyStream
         {
             streamCorrelation.purge();
         }
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
     private int budgetAvailableWhenProxying(

@@ -55,6 +55,7 @@ final class ProxyAcceptStream
 
     private MessageConsumer connect;
     private long connectRouteId;
+    private long connectReplyId;
     private long connectInitialId;
 
     private MessageConsumer streamState;
@@ -68,20 +69,22 @@ final class ProxyAcceptStream
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,
-        long connectRouteId,
-        long connectInitialId,
+        long acceptReplyId,
         MessageConsumer connect,
-        long acceptReplyId)
+        long connectInitialId,
+        long connectReplyId,
+        long connectRouteId)
     {
         this.streamFactory = streamFactory;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
-        this.connectRouteId = connectRouteId;
-        this.streamState = this::beforeBegin;
-        this.connectInitialId = connectInitialId;
-        this.connect = connect;
         this.acceptReplyId = acceptReplyId;
+        this.connect = connect;
+        this.connectRouteId = connectRouteId;
+        this.connectReplyId = connectReplyId;
+        this.connectInitialId = connectInitialId;
+        this.streamState = this::beforeBegin;
     }
 
     void handleStream(
@@ -236,7 +239,8 @@ final class ProxyAcceptStream
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                streamFactory.router);
+                streamFactory.router,
+                false);
 
         long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
 
@@ -388,6 +392,7 @@ final class ProxyAcceptStream
     private void onAbortWhenProxying(
         final AbortFW abort)
     {
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         final long traceId = abort.trace();
         streamFactory.writer.doAbort(connect, connectRouteId, connectInitialId, traceId);
         request.purge();
@@ -409,6 +414,7 @@ final class ProxyAcceptStream
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
             final long traceId = reset.trace();
             streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
+            streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
             break;
         default:
             break;

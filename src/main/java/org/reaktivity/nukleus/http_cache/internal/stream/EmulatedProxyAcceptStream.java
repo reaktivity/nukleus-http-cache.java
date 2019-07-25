@@ -275,7 +275,8 @@ final class EmulatedProxyAcceptStream
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                streamFactory.router);
+                streamFactory.router,
+                true);
 
         long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
 

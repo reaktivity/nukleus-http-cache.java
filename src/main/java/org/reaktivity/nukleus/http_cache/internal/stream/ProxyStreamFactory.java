@@ -108,12 +108,12 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("http-emulatedCache.initial.request.acquires"),
-                counters.supplyCounter.apply("http-emulatedCache.initial.request.releases"));
+                counters.supplyCounter.apply("http-cache.initial.request.acquires"),
+                counters.supplyCounter.apply("http-cache.initial.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("http-emulatedCache.response.acquires"),
-                counters.supplyCounter.apply("http-emulatedCache.response.releases"));
+                counters.supplyCounter.apply("http-cache.response.acquires"),
+                counters.supplyCounter.apply("http-cache.response.releases"));
         this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
         this.emulatedCache = emulatedCache;
@@ -179,23 +179,25 @@ public class ProxyStreamFactory implements StreamFactory
             {
                 long connectInitialId = supplyInitialId.applyAsLong(connectRouteId);
                 MessageConsumer connectInitial = router.supplyReceiver(connectInitialId);
-                long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
                 long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
+                long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
                 MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
 
                 newStream = new ProxyAcceptStream(this,
                                                     acceptReply,
                                                     acceptRouteId,
                                                     acceptInitialId,
-                                                    connectRouteId,
-                                                    connectInitialId,
+                                                    acceptReplyId,
                                                     connectInitial,
-                                                    acceptReplyId)::handleStream;
+                                                    connectInitialId,
+                                                    connectReplyId,
+                                                    connectRouteId)::handleStream;
 
                 ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
                                                                                     connectReply,
                                                                                     connectRouteId,
-                                                                                    connectReplyId);
+                                                                                    connectReplyId,
+                                                                                    acceptInitialId);
                 correlations.put(connectReplyId, replyStream);
                 router.setThrottle(acceptReplyId, replyStream::onThrottleMessageWhenProxying);
             }
@@ -237,6 +239,19 @@ public class ProxyStreamFactory implements StreamFactory
             int length)
     {
         return routeRO.wrap(buffer, index, index + length);
+    }
+
+    void initializeNewConnectReplyStream(long connectInitialId, long connectRouteId, long acceptInitialId)
+    {
+        long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
+        MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
+
+        ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
+            connectReply,
+            connectRouteId,
+            connectReplyId,
+            acceptInitialId);
+        correlations.put(connectReplyId, replyStream);
     }
 
     boolean cleanupCorrelationIfNecessary(long  connectReplyId, long acceptInitialId)
