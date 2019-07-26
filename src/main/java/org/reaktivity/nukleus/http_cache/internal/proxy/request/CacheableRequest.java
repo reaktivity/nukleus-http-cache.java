@@ -52,6 +52,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     private int responseHeadersSize = 0;
     private int responseSize = 0;
 
+    final long acceptStreamId;
     final long connectRouteId;
     final LongUnaryOperator supplyReplyId;
     final LongUnaryOperator supplyInitialId;
@@ -59,6 +60,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     CacheState state;
     private int attempts;
     private String recentAuthorizationHeader;
+    private final MessageConsumer signaler;
 
     public enum CacheState
     {
@@ -68,6 +70,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     public CacheableRequest(
         MessageConsumer acceptReply,
         long acceptRouteId,
+        long acceptStreamId,
         long acceptReplyStreamId,
         long connectRouteId,
         LongUnaryOperator supplyInitialId,
@@ -100,19 +103,17 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.supplyReceiver = supplyReceiver;
         this.requestPool = bufferPool;
         this.requestSlot = requestSlot;
+        this.acceptStreamId = acceptStreamId;
+        this.signaler = router.supplyReceiver(acceptStreamId);
     }
     public long connectRouteId()
     {
         return connectRouteId;
     }
 
-
-    // TODO remove need for duplication
-    public void copyRequestTo(
-            MutableDirectBuffer buffer)
+    public MessageConsumer getSignaler()
     {
-        MutableDirectBuffer requestBuffer = requestPool.buffer(requestSlot());
-        requestBuffer.getBytes(0, buffer, 0, requestBuffer.capacity());
+        return signaler;
     }
 
     public boolean storeResponseHeaders(

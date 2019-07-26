@@ -34,6 +34,7 @@ public class InitialRequest extends CacheableRequest
             DefaultCache cache,
             MessageConsumer acceptReply,
             long acceptRouteId,
+            long acceptStreamId,
             long acceptReplyStreamId,
             long connectRouteId,
             LongUnaryOperator supplyInitialId,
@@ -51,6 +52,7 @@ public class InitialRequest extends CacheableRequest
     {
         super(acceptReply,
               acceptRouteId,
+              acceptStreamId,
               acceptReplyStreamId,
               connectRouteId,
               supplyInitialId,

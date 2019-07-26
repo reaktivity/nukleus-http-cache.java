@@ -28,6 +28,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
@@ -48,6 +49,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
@@ -63,6 +65,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     final WindowFW windowRO = new WindowFW();
     final ResetFW resetRO = new ResetFW();
+    final SignalFW signalRO = new SignalFW();
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
@@ -85,6 +88,7 @@ public class ProxyStreamFactory implements StreamFactory
     final Cache emulatedCache;
     final Random random;
     final HttpCacheCounters counters;
+    final SignalingExecutor executor;
 
     public ProxyStreamFactory(
         RouteManager router,
@@ -99,7 +103,8 @@ public class ProxyStreamFactory implements StreamFactory
         DefaultCache defaultCache,
         HttpCacheCounters counters,
         LongSupplier supplyTrace,
-        ToIntFunction<String> supplyTypeId)
+        ToIntFunction<String> supplyTypeId,
+        SignalingExecutor executor)
     {
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
@@ -122,6 +127,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.writer = new Writer(supplyTypeId, writeBuffer);
         this.random = new Random();
         this.counters = counters;
+        this.executor = executor;
     }
 
     @Override

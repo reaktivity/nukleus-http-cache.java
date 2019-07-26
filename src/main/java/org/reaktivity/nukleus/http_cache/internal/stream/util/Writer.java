@@ -46,6 +46,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public class Writer
@@ -57,6 +58,7 @@ public class Writer
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
+    private final SignalFW.Builder signalRW = new SignalFW.Builder();
 
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
@@ -310,6 +312,23 @@ public class Writer
         sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
+    public void doSignal(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long traceId,
+        long signalId)
+    {
+        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+            .routeId(routeId)
+            .streamId(streamId)
+            .trace(traceId)
+            .signalId(signalId)
+            .build();
+
+        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
+    }
+
     private Flyweight.Builder.Visitor visitHttpBeginEx(
         Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
@@ -329,9 +348,9 @@ public class Writer
         String etag)
     {
         final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
-        final MessageConsumer acceptReply = request.acceptReply();
-        final long routeId = request.acceptRouteId();
-        final long streamId = request.acceptReplyId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long routeId = request.acceptRouteId;
+        final long streamId = request.acceptReplyStreamId;
         final long authorization = request.authorization();
 
         doH2PushPromise(

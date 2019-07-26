@@ -36,6 +36,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 
@@ -341,6 +342,18 @@ final class ProxyConnectReplyStream
         default:
             // ignore
             break;
+        }
+    }
+
+    private void onSignal(
+        SignalFW signal)
+    {
+        final long signalId = signal.signalId();
+
+        if (signalId == TOKEN_EXPIRED_SIGNAL)
+        {
+
+
         }
     }
 

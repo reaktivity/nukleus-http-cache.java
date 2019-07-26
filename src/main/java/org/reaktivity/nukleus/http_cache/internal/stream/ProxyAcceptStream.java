@@ -184,6 +184,7 @@ final class ProxyAcceptStream
                 streamFactory.defaultCache,
                 acceptReply,
                 acceptRouteId,
+                acceptStreamId,
                 acceptReplyId,
                 connectRouteId,
                 streamFactory.supplyInitialId,

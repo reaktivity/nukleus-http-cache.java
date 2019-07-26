@@ -80,11 +80,6 @@ public final class DefaultCacheEntry
         this.supplyTrace = requireNonNull(supplyTrace);
     }
 
-    public void commit()
-    {
-        //TODO: Delete
-    }
-
     private void handleEndOfStream()
     {
         this.removeClient();

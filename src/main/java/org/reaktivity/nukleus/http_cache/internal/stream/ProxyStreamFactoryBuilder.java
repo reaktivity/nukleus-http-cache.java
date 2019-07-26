@@ -27,6 +27,7 @@ import java.util.function.ToIntFunction;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
@@ -60,6 +61,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private BudgetManager budgetManager;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
+    private SignalingExecutor executor;
 
     private LongConsumer cacheEntries;
 
@@ -159,6 +161,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setExecutor(
+        SignalingExecutor executor)
+    {
+        this.executor = executor;
+        return this;
+    }
+
+    @Override
     public StreamFactory build()
     {
         final HttpCacheCounters counters = new HttpCacheCounters(supplyCounter, supplyAccumulator);
@@ -204,7 +214,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 counters,
                 cacheEntries,
                 supplyTrace,
-                supplyTypeId);
+                supplyTypeId,
+                executor);
         }
 
         return new ProxyStreamFactory(
@@ -220,7 +231,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 defaultCache,
                 counters,
                 supplyTrace,
-                supplyTypeId);
+                supplyTypeId,
+                executor);
     }
 
 }

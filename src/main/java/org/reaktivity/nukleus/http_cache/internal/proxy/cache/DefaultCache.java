@@ -19,6 +19,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
@@ -41,6 +42,7 @@ import java.util.function.ToIntFunction;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SINGAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -82,6 +84,7 @@ public class DefaultCache
     final LongSupplier supplyTrace;
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     final HttpCacheCounters counters;
+    final SignalingExecutor executor;
 
     public DefaultCache(
         LongObjectBiConsumer<Runnable> scheduler,
@@ -93,7 +96,8 @@ public class DefaultCache
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
-        ToIntFunction<String> supplyTypeId)
+        ToIntFunction<String> supplyTypeId,
+        SignalingExecutor executor)
     {
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
@@ -118,6 +122,12 @@ public class DefaultCache
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
+        this.executor = executor;
+    }
+
+    public DefaultCacheEntry get(int requestUrlHash)
+    {
+        return cachedEntries.get(requestUrlHash);
     }
 
     public void put(
@@ -159,6 +169,23 @@ public class DefaultCache
                 cacheEntry.purge();
             }
         }
+        signalForUpdatedCacheEntry(requestUrlHash);
+    }
+
+    private void signalForUpdatedCacheEntry(int requestUrlHash)
+    {
+       pendingInitialRequestsMap.forEach((k, request) ->
+       {
+           InitialRequest initialRequest = request.initialRequest();
+           if(initialRequest.requestURLHash() == requestUrlHash)
+           {
+               writer.doSignal(initialRequest.getSignaler(),
+                   initialRequest.acceptRouteId,
+                   initialRequest.acceptReplyStreamId,
+                   supplyTrace.getAsLong(),
+                   CACHE_ENTRY_UPDATED_SINGAL);
+           }
+       });
     }
 
     private void updateCache(
@@ -311,10 +338,10 @@ public class DefaultCache
                     currentTimeMillis(), request.acceptReplyId(), "304");
         }
 
-        writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
+        writer.doHttpResponse(request.acceptReply, request.acceptRouteId,
                 request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTrace.getAsLong());
+        writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
 
         request.purge();
 
