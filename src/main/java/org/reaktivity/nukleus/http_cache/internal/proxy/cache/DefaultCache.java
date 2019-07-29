@@ -22,9 +22,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
@@ -130,58 +128,34 @@ public class DefaultCache
         return cachedEntries.get(requestUrlHash);
     }
 
-    public void put(
-        int requestUrlHash,
-        CacheableRequest request)
+    public DefaultCacheEntry put(int requestUrlHash)
     {
         DefaultCacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
         {
             DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
-                    request,
+                    requestUrlHash,
                     supplyTrace);
             updateCache(requestUrlHash, cacheEntry);
+            return cacheEntry;
         }
         else
         {
-            DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
-                    this,
-                    request,
-                    supplyTrace);
-
-            if (cacheEntry.isIntendedForSingleUser())
-            {
-                cacheEntry.purge();
-            }
-            else if (oldCacheEntry.isUpdatedBy(request))
-            {
-                updateCache(requestUrlHash, cacheEntry);
-                oldCacheEntry.purge();
-            }
-            else
-            {
-                if (oldCacheEntry.isSelectedForUpdate(request))
-                {
-                    oldCacheEntry.cachedRequest.updateResponseHeader(request.getResponseHeaders(responseHeadersRO,
-                            cachedResponse1BufferPool));
-                }
-                cacheEntry.purge();
-            }
+            return oldCacheEntry;
         }
-        signalForUpdatedCacheEntry(requestUrlHash);
     }
 
-    private void signalForUpdatedCacheEntry(int requestUrlHash)
+    public void signalForUpdatedCacheEntry(int requestUrlHash)
     {
        pendingInitialRequestsMap.forEach((k, request) ->
        {
-           InitialRequest initialRequest = request.initialRequest();
-           if(initialRequest.requestURLHash() == requestUrlHash)
+           CacheableRequest cacheableRequest = request.initialRequest();
+           if(cacheableRequest.requestURLHash() == requestUrlHash)
            {
-               writer.doSignal(initialRequest.getSignaler(),
-                   initialRequest.acceptRouteId,
-                   initialRequest.acceptReplyStreamId,
+               writer.doSignal(cacheableRequest.getSignaler(),
+                   cacheableRequest.acceptRouteId,
+                   cacheableRequest.acceptReplyStreamId,
                    supplyTrace.getAsLong(),
                    CACHE_ENTRY_UPDATED_SIGNAL);
            }
@@ -195,16 +169,16 @@ public class DefaultCache
         cachedEntries.put(requestUrlHash, cacheEntry);
     }
 
-    public boolean handleInitialRequest(
+    public boolean handleCacheableRequest(
         int requestURLHash,
-        ListFW<HttpHeaderFW> request,
+        ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
         CacheableRequest cacheableRequest)
     {
         final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
         {
-            return serveRequest(cacheEntry, request, authScope, cacheableRequest);
+            return serveRequest(cacheEntry, requestHeaders, authScope, cacheableRequest);
         }
         else
         {
@@ -253,7 +227,7 @@ public class DefaultCache
     }
 
     private void sendPendingInitialRequest(
-        final InitialRequest request)
+        final CacheableRequest request)
     {
         long connectRouteId = request.connectRouteId();
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
@@ -281,39 +255,40 @@ public class DefaultCache
     }
 
     public void addPendingRequest(
-        InitialRequest initialRequest)
+        CacheableRequest initialRequest)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
     public void createPendingInitialRequests(
-        InitialRequest initialRequest)
+        CacheableRequest initialRequest)
     {
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
     private boolean doesNotVary(
         ListFW<HttpHeaderFW> requestHeaders,
-        InitialRequest request)
+        CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
-        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
-        return CacheUtils.doesNotVary(requestHeaders, cachedResponseHeaders, cachedRequestHeaders);
+//        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
+//        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
+//        return CacheUtils.doesNotVary(requestHeaders, cachedResponseHeaders, cachedRequestHeaders);
+        return true;
     }
 
     private boolean serveRequest(
         DefaultCacheEntry entry,
-        ListFW<HttpHeaderFW> request,
+        ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
-        AnswerableByCacheRequest cacheableRequest)
+        CacheableRequest cacheableRequest)
     {
-        if (entry.canServeRequest(request, authScope))
+        if (entry.canServeRequest(requestHeaders, authScope))
         {
-            final String requestAuthorizationHeader = getHeader(request, AUTHORIZATION);
+            final String requestAuthorizationHeader = getHeader(requestHeaders, AUTHORIZATION);
             entry.recentAuthorizationHeader(requestAuthorizationHeader);
 
-            boolean etagMatched = CacheUtils.isMatchByEtag(request, entry.cachedRequest.etag());
+            boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.cachedRequest.etag());
             if (etagMatched)
             {
                 send304(entry, cacheableRequest);
@@ -330,7 +305,7 @@ public class DefaultCache
 
     private void send304(
         DefaultCacheEntry entry,
-        AnswerableByCacheRequest request)
+        CacheableRequest request)
     {
         if (DEBUG)
         {
@@ -342,8 +317,6 @@ public class DefaultCache
                 request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
         writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
-
-        request.purge();
 
         // count all responses
         counters.responses.getAsLong();

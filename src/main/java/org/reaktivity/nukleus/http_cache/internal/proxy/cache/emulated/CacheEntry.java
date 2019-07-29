@@ -330,7 +330,7 @@ public final class CacheEntry
         // count cached responses (cache hits)
         if (request instanceof InitialRequest)
         {
-            // matching with requestsCacheable (which accounts only InitialRequest)
+            // matching with requestsCacheable (which accounts only InitialRequestOld)
             cache.counters.responsesCached.getAsLong();
         }
     }

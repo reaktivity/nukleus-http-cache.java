@@ -58,7 +58,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private HeapBufferPool requestBufferPool;
     private Cache emulatedCache;
     private DefaultCache defaultCache;
-    private BudgetManager budgetManager;
+    private BudgetManager emulatedBudgetManager;
+    private BudgetManager defaultBudgetManager;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
     private SignalingExecutor executor;
@@ -173,9 +174,10 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     {
         final HttpCacheCounters counters = new HttpCacheCounters(supplyCounter, supplyAccumulator);
 
-        if (budgetManager == null)
+        if (emulatedBudgetManager == null && defaultBudgetManager == null)
         {
-            budgetManager = new BudgetManager();
+            emulatedBudgetManager = new BudgetManager();
+            defaultBudgetManager =  new BudgetManager();
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
@@ -191,7 +193,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         {
             this.emulatedCache = new Cache(
                     scheduler,
-                    budgetManager,
+                emulatedBudgetManager,
                     writeBuffer,
                     requestBufferPool,
                     cacheBufferPool,
@@ -206,7 +208,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         {
             this.defaultCache = new DefaultCache(
                 scheduler,
-                budgetManager,
+                emulatedBudgetManager,
                 writeBuffer,
                 requestBufferPool,
                 cacheBufferPool,
@@ -220,7 +222,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
         return new ProxyStreamFactory(
                 router,
-                budgetManager,
+                defaultBudgetManager,
                 writeBuffer,
                 requestBufferPool,
                 supplyInitialId,

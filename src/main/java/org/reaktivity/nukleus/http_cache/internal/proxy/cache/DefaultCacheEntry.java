@@ -27,27 +27,34 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 import org.agrona.DirectBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
+import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
@@ -59,25 +66,31 @@ public final class DefaultCacheEntry
 
     private final DefaultCache cache;
     private int clientCount;
+    private final int requestURLHash;
+    private String etag;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
-
-    final CacheableRequest cachedRequest;
 
     private CacheEntryState state;
 
     private final LongSupplier supplyTrace;
 
+    private BufferPool responsePool;
+    private IntArrayList responseSlots = new IntArrayList();
+    private static final int NUM_OF_HEADER_SLOTS = 1;
+    private int responseHeadersSize = 0;
+    private int responseSize = 0;
+
     public DefaultCacheEntry(
         DefaultCache cache,
-        CacheableRequest request,
+        int requestURLHash,
         LongSupplier supplyTrace)
     {
         this.cache = cache;
-        this.cachedRequest = request;
         this.state = CacheEntryState.INITIALIZED;
         this.supplyTrace = requireNonNull(supplyTrace);
+        this.requestURLHash = requestURLHash;
     }
 
     private void handleEndOfStream()
@@ -85,8 +98,7 @@ public final class DefaultCacheEntry
         this.removeClient();
     }
 
-    public void serveClient(
-        AnswerableByCacheRequest streamCorrelation)
+    public void serveClient(CacheableRequest streamCorrelation)
     {
         switch (this.state)
         {
@@ -96,11 +108,145 @@ public final class DefaultCacheEntry
                 sendResponseToClient(streamCorrelation, true);
                 break;
         }
-        streamCorrelation.purge();
+    }
+
+    public boolean storeResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeaders,
+        BufferPool bp)
+    {
+        responsePool = bp;
+        etag = getHeader(responseHeaders, ETAG);
+        final int slotCapacity = bp.slotCapacity();
+        if (slotCapacity < responseHeaders.sizeof())
+        {
+            return false;
+        }
+        int headerSlot = bp.acquire(requestURLHash);
+        if (headerSlot == Slab.NO_SLOT)
+        {
+            return false;
+        }
+        responseSlots.add(headerSlot);
+
+        MutableDirectBuffer buffer = bp.buffer(headerSlot);
+        buffer.putBytes(0, responseHeaders.buffer(), responseHeaders.offset(), responseHeaders.sizeof());
+        this.responseHeadersSize = responseHeaders.sizeof();
+
+        return true;
+    }
+
+    public void updateResponseHeader(ListFW<HttpHeaderFW> newHeaders)
+    {
+        final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
+        ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
+        String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
+            .toLowerCase().equals(":status"))).value().asString();
+
+        final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
+        oldHeaders.forEach(h ->
+            newHeadersMap.put(h.name().asString(), h.value().asString()));
+        newHeaders.forEach(h ->
+            newHeadersMap.put(h.name().asString(), h.value().asString()));
+        newHeadersMap.put(":status", statusCode);
+
+        Integer firstResponseSlot = responseSlots.get(0);
+        MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
+
+        final ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
+            new ListFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
+
+        this.responseHeadersSize = responseBuffer.capacity();
+        headersRW.wrap(responseBuffer, 0, responseHeadersSize);
+
+        for(Map.Entry<String, String> entry : newHeadersMap.entrySet())
+        {
+            headersRW.item(y -> y.name(entry.getKey()).value(entry.getValue()));
+        }
+
+        headersRW.build();
+    }
+
+    public ListFW<HttpHeaderFW> getResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeadersRO)
+    {
+        return getResponseHeaders(responseHeadersRO, responsePool);
+    }
+
+    public ListFW<HttpHeaderFW> getResponseHeaders(
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        BufferPool bp)
+    {
+        Integer firstResponseSlot = responseSlots.get(0);
+        MutableDirectBuffer responseBuffer = bp.buffer(firstResponseSlot);
+        return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
+    }
+
+    public static String getHeader(ListFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
+    {
+        // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
+        final StringBuilder header = new StringBuilder();
+        cachedRequestHeadersRO.forEach(h ->
+        {
+            if (headerName.equalsIgnoreCase(h.name().asString()))
+            {
+                header.append(h.value().asString());
+            }
+        });
+
+        return header.length() == 0 ? null : header.toString();
+    }
+
+    public boolean storeResponseData(
+        DataFW data,
+        BufferPool cacheBufferPool)
+    {
+        return storeResponseData(cacheBufferPool, data.payload());
+    }
+
+    private boolean storeResponseData(
+        BufferPool bp,
+        Flyweight data)
+    {
+        return this.storeResponseData(bp, data, 0);
+    }
+
+    private boolean storeResponseData(
+        BufferPool bp,
+        Flyweight data,
+        int written)
+    {
+        responsePool = bp;
+        if (data.sizeof() - written == 0)
+        {
+            return true;
+        }
+
+        final int slotCapacity = bp.slotCapacity();
+        int slotSpaceRemaining = (slotCapacity * (responseSlots.size() - NUM_OF_HEADER_SLOTS)) - responseSize;
+        if (slotSpaceRemaining == 0)
+        {
+            slotSpaceRemaining = slotCapacity;
+            int newSlot = bp.acquire(requestURLHash);
+            if (newSlot == Slab.NO_SLOT)
+            {
+                return false;
+            }
+            responseSlots.add(newSlot);
+        }
+
+        int toWrite = Math.min(slotSpaceRemaining, data.sizeof() - written);
+
+        int slot = responseSlots.get(responseSlots.size() - NUM_OF_HEADER_SLOTS);
+
+        MutableDirectBuffer buffer = bp.buffer(slot);
+        buffer.putBytes(slotCapacity - slotSpaceRemaining, data.buffer(), data.offset() + written, toWrite);
+        written += toWrite;
+        responseSize += toWrite;
+        return storeResponseData(bp, data, written);
     }
 
     private void sendResponseToClient(
-        AnswerableByCacheRequest request,
+        CacheableRequest request,
         boolean injectWarnings)
     {
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
@@ -161,13 +307,7 @@ public final class DefaultCacheEntry
 
         // count all responses
         cache.counters.responses.getAsLong();
-
-        // count cached responses (cache hits)
-        if (request instanceof InitialRequest)
-        {
-            // matching with requestsCacheable (which accounts only InitialRequest)
-            cache.counters.responsesCached.getAsLong();
-        }
+        cache.counters.responsesCached.getAsLong();
     }
 
     public void purge()
@@ -191,19 +331,29 @@ public final class DefaultCacheEntry
         }
     }
 
+    public String getEtag()
+    {
+        return etag;
+    }
+
+    public void setEtag(String etag)
+    {
+        this.etag = etag;
+    }
+
     class ServeFromCacheStream implements MessageConsumer
     {
         private final Request request;
         private int payloadWritten;
         private final Runnable onEnd;
-        private CacheableRequest cachedRequest;
+        private CacheableRequestOld cachedRequest;
         private long groupId;
         private int padding;
         private int acceptReplyBudget;
 
         ServeFromCacheStream(
             Request request,
-            CacheableRequest cachedRequest,
+            CacheableRequestOld cachedRequest,
             Runnable onEnd)
         {
             this.payloadWritten = 0;
@@ -498,7 +648,7 @@ public final class DefaultCacheEntry
         }
     }
 
-    public boolean isUpdatedBy(CacheableRequest request)
+    public boolean isUpdatedBy(CacheableRequestOld request)
     {
         ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
@@ -515,7 +665,7 @@ public final class DefaultCacheEntry
         return !notModified;
     }
 
-    public boolean isSelectedForUpdate(CacheableRequest request)
+    public boolean isSelectedForUpdate(CacheableRequestOld request)
     {
         ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);

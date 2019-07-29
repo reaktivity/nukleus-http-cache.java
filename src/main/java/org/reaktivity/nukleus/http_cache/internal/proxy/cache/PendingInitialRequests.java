@@ -16,7 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,15 +24,15 @@ import java.util.function.Consumer;
 
 public class PendingInitialRequests
 {
-    private final InitialRequest request;
-    private final List<InitialRequest> subscribers = new ArrayList<>();
+    private final CacheableRequest request;
+    private final List<CacheableRequest> subscribers = new ArrayList<>();
 
-    PendingInitialRequests(InitialRequest request)
+    PendingInitialRequests(CacheableRequest request)
     {
         this.request = request;
     }
 
-    public InitialRequest initialRequest()
+    public CacheableRequest initialRequest()
     {
         return request;
     }
@@ -42,12 +42,12 @@ public class PendingInitialRequests
         return request.etag();
     }
 
-    void subscribe(InitialRequest request)
+    void subscribe(CacheableRequest request)
     {
         this.subscribers.add(request);
     }
 
-    void removeSubscribers(Consumer<InitialRequest> consumer)
+    void removeSubscribers(Consumer<CacheableRequest> consumer)
     {
         subscribers.forEach(consumer);
         subscribers.clear();
@@ -60,7 +60,7 @@ public class PendingInitialRequests
             return null;
         }
 
-        final InitialRequest newInitialRequest = subscribers.remove(0);
+        final CacheableRequest newInitialRequest = subscribers.remove(0);
         final PendingInitialRequests newPendingRequests = new PendingInitialRequests(newInitialRequest);
         subscribers.forEach(newPendingRequests::subscribe);
         subscribers.clear();

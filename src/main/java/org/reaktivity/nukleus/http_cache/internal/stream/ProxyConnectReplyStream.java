@@ -61,8 +61,6 @@ final class ProxyConnectReplyStream
     private long groupId;
     private int padding;
     private boolean endDeferred;
-    private boolean cached;
-    private OctetsFW endExtension;
 
     private final int initialWindow;
     private int cacheOffset = -1;
@@ -196,9 +194,9 @@ final class ProxyConnectReplyStream
         CacheableRequest request = (CacheableRequest) streamCorrelation;
         request.incAttempts();
 
-        long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
+        long connectInitialId = this.streamFactory.supplyInitialId.applyAsLong(connectRouteId);
         MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
-        long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
+        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
 
         streamFactory.requestCorrelations.put(connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
@@ -225,7 +223,8 @@ final class ProxyConnectReplyStream
         long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        if (!request.storeResponseHeaders(responseHeaders, streamFactory.defaultCache, streamFactory.responseBufferPool))
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestURLHash());
+        if (!cacheEntry.storeResponseHeaders(responseHeaders, streamFactory.responseBufferPool))
         {
             request.purge();
         }
@@ -250,22 +249,23 @@ final class ProxyConnectReplyStream
         int length)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestURLHash());
 
         switch (msgTypeId)
         {
         case DataFW.TYPE_ID:
             final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-            boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
+            boolean stored = cacheEntry.storeResponseData(data, streamFactory.responseBufferPool);
             if (!stored)
             {
                 request.purge();
             }
-            sendWindow(data.payload().sizeof() + data.padding(), data.trace());
+            sendWindow(data.length() + data.padding(), data.trace());
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-            checkEtag(end, request);
-            cached = request.cache(end, streamFactory.defaultCache);
+            checkEtag(end, cacheEntry);
+            this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
             break;
         case AbortFW.TYPE_ID:
         default:
@@ -367,13 +367,22 @@ final class ProxyConnectReplyStream
             {
                 this.streamCorrelation = this.streamFactory.requestCorrelations.get(signal.streamId());
             }
-            CacheableRequest request = (CacheableRequest)streamCorrelation;
+            CacheableRequest request = (CacheableRequest) streamCorrelation;
             DefaultCacheEntry cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
             if(cacheOffset == -1)
             {
                 sendHttpResponseHeaders(cacheEntry);
             }
+            else
+            {
+                writePayload(cacheEntry);
+            }
         }
+    }
+
+    private void writePayload(DefaultCacheEntry cacheEntry)
+    {
+
     }
 
     private void sendHttpResponseHeaders(DefaultCacheEntry cacheEntry)
@@ -470,45 +479,18 @@ final class ProxyConnectReplyStream
     private void onWindowWhenProxying(
         final WindowFW window)
     {
-        final long streamId = window.streamId();
         final int credit = window.credit();
         acceptReplyBudget += credit;
         padding = window.padding();
         groupId = window.groupId();
-        streamFactory.budgetManager.window(StreamKind.PROXY, groupId, streamId, credit,
-            this::budgetAvailableWhenProxying, window.trace());
-        if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(groupId, streamId))
-        {
-            final long acceptRouteId = streamCorrelation.acceptRouteId();
-            final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-            final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-            streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, window.trace());
-            if (this.endExtension !=null && this.endExtension.sizeof() > 0)
-            {
-                streamFactory.writer.doHttpEnd(acceptReply,
-                                                acceptRouteId,
-                                                acceptReplyStreamId,
-                                                window.trace(),
-                                                this.endExtension);
-            }
-            else
-            {
-                streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
-            }
-        }
+        streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
+            connectReplyStreamId, window.trace(), credit, padding, groupId);
     }
 
     private void onResetWhenProxying(
         final ResetFW reset)
     {
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-        streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, reset.trace());
         streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
-        // if cached, do not purge the buffer slots as it may be used by other clients
-        if (!cached)
-        {
-            streamCorrelation.purge();
-        }
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
@@ -530,7 +512,7 @@ final class ProxyConnectReplyStream
         }
     }
 
-    private void checkEtag(EndFW end, CacheableRequest request)
+    private void checkEtag(EndFW end, DefaultCacheEntry cacheEntry)
     {
         final OctetsFW extension = end.extension();
         if (extension.sizeof() > 0)
@@ -540,9 +522,8 @@ final class ProxyConnectReplyStream
             HttpHeaderFW etag = trailers.matchFirst(h -> "etag".equals(h.name().asString()));
             if (etag != null)
             {
-                request.etag(etag.value().asString());
+                cacheEntry.setEtag(etag.value().asString());
             }
-            this.endExtension = extension;
         }
     }
 

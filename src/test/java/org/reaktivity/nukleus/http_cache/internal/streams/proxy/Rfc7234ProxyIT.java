@@ -370,7 +370,7 @@ public class Rfc7234ProxyIT
 
     @Test
     @Ignore("no-store is not implemented, need fix in ProxyAcceptStreamHandle begin" +
-            "(can be served by cache but is not CacheableRequest)")
+            "(can be served by cache but is not CacheableRequestOld)")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
