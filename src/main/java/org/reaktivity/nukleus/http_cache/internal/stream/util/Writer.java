@@ -132,6 +132,36 @@ public class Writer
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
+    public void doHttpResponseWithUpdatedHeaders(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        ListFW<HttpHeaderFW> responseHeaders,
+        String etag,
+        long traceId)
+    {
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+            builder -> updateResponseHeaders(builder, responseHeaders, etag);
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+            .routeId(routeId)
+            .streamId(streamId)
+            .trace(traceId)
+            .extension(e -> e.set(visitHttpBeginEx(mutator)))
+            .build();
+        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
+    }
+
+    private void updateResponseHeaders(
+        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+        ListFW<HttpHeaderFW> responseHeadersRO,
+        String etag)
+    {
+        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
+        {
+            builder.item(header -> header.name(ETAG).value(etag));
+        }
+    }
+
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         CacheControl cacheControlFW,

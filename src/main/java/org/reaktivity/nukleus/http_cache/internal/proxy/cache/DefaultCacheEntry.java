@@ -285,7 +285,7 @@ public final class DefaultCacheEntry
         return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
     }
 
-    protected ListFW<HttpHeaderFW> getCachedResponseHeaders()
+    public ListFW<HttpHeaderFW> getCachedResponseHeaders()
     {
         return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
     }

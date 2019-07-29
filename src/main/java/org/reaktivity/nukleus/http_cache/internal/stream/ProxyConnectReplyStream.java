@@ -18,11 +18,13 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
@@ -50,17 +52,21 @@ final class ProxyConnectReplyStream
     private final MessageConsumer connectReplyThrottle;
     private final long connectRouteId;
     private final long connectReplyStreamId;
-    private long acceptInitialId;
+    private int connectReplyBudget;
 
     private Request streamCorrelation;
-
+    private long acceptInitialId;
     private int acceptReplyBudget;
-    private int connectReplyBudget;
+
     private long groupId;
     private int padding;
     private boolean endDeferred;
     private boolean cached;
     private OctetsFW endExtension;
+
+    private final int initialWindow;
+    private int cacheOffset = -1;
+    private int cachePosition;
 
     ProxyConnectReplyStream(
         ProxyStreamFactory proxyStreamFactory,
@@ -75,6 +81,8 @@ final class ProxyConnectReplyStream
         this.connectReplyStreamId = connectReplyId;
         this.acceptInitialId = acceptInitialId;
         this.streamState = this::beforeBegin;
+
+        this.initialWindow = this.streamFactory.responseBufferPool.slotCapacity();
     }
 
     void handleStream(
@@ -221,8 +229,8 @@ final class ProxyConnectReplyStream
         {
             request.purge();
         }
-        doProxyBegin(traceId, responseHeaders);
         this.streamState = this::handleCacheableRequestResponse;
+        sendWindow(initialWindow, traceId);
     }
 
 
@@ -252,6 +260,7 @@ final class ProxyConnectReplyStream
             {
                 request.purge();
             }
+            sendWindow(data.payload().sizeof() + data.padding(), data.trace());
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
@@ -264,7 +273,6 @@ final class ProxyConnectReplyStream
             streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             break;
         }
-        this.onStreamMessageWhenProxying(msgTypeId, buffer, index, length);
     }
 
     ///////////// PROXY
@@ -339,23 +347,61 @@ final class ProxyConnectReplyStream
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
             onResetWhenProxying(reset);
             break;
+        case SignalFW.TYPE_ID:
+            final SignalFW signal = streamFactory.signalRO.wrap(buffer, index, index + length);
+            onSignal(signal);
+            break;
         default:
             // ignore
             break;
         }
     }
 
-    private void onSignal(
-        SignalFW signal)
+    private void onSignal(SignalFW signal)
     {
         final long signalId = signal.signalId();
 
-        if (signalId == TOKEN_EXPIRED_SIGNAL)
+        if (signalId == CACHE_ENTRY_UPDATED_SIGNAL)
         {
-
-
+            if (this.streamCorrelation == null)
+            {
+                this.streamCorrelation = this.streamFactory.requestCorrelations.get(signal.streamId());
+            }
+            CacheableRequest request = (CacheableRequest)streamCorrelation;
+            DefaultCacheEntry cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
+            if(cacheOffset == -1)
+            {
+                sendHttpResponseHeaders(cacheEntry);
+            }
         }
     }
+
+    private void sendHttpResponseHeaders(DefaultCacheEntry cacheEntry)
+    {
+        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+
+        final CacheableRequest request =(CacheableRequest)this.streamCorrelation;
+        final MessageConsumer acceptReply = request.acceptReply();
+        final long acceptRouteId = request.acceptRouteId();
+        final long acceptReplyId = request.acceptReplyId();
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReply,
+                getHeader(responseHeaders, ":status"));
+        }
+
+        streamFactory.writer.doHttpResponseWithUpdatedHeaders(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            responseHeaders,
+            request.etag(),
+            this.streamFactory.supplyTrace.getAsLong());
+
+        this.cacheOffset = 0;
+    }
+
 
     private void onDataWhenProxying(
         final DataFW data)
@@ -449,7 +495,6 @@ final class ProxyConnectReplyStream
             {
                 streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
             }
-
         }
     }
 
@@ -498,6 +543,16 @@ final class ProxyConnectReplyStream
                 request.etag(etag.value().asString());
             }
             this.endExtension = extension;
+        }
+    }
+
+    private void sendWindow(int credit, long traceId)
+    {
+        connectReplyBudget += credit;
+        if (connectReplyBudget > 0)
+        {
+            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
+                connectReplyStreamId, traceId, credit, padding, groupId);
         }
     }
 }

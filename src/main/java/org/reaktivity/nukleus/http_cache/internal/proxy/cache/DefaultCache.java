@@ -42,7 +42,7 @@ import java.util.function.ToIntFunction;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SINGAL;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -183,7 +183,7 @@ public class DefaultCache
                    initialRequest.acceptRouteId,
                    initialRequest.acceptReplyStreamId,
                    supplyTrace.getAsLong(),
-                   CACHE_ENTRY_UPDATED_SINGAL);
+                   CACHE_ENTRY_UPDATED_SIGNAL);
            }
        });
     }
