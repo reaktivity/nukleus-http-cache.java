@@ -210,7 +210,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 scheduler,
                 emulatedBudgetManager,
                 writeBuffer,
-                requestBufferPool,
                 cacheBufferPool,
                 requestCorrelations,
                 counters,

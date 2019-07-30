@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -39,7 +38,6 @@ import java.util.function.ToIntFunction;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
@@ -67,9 +65,6 @@ public class DefaultCache
     final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
 
-    final BufferPool requestBufferPool;
-    final BufferPool responseBufferPool;
-
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyTrace;
@@ -81,7 +76,6 @@ public class DefaultCache
         LongObjectBiConsumer<Runnable> scheduler,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
-        BufferPool requestBufferPool,
         BufferPool cacheBufferPool,
         Long2ObjectHashMap<Request> correlations,
         HttpCacheCounters counters,
@@ -102,8 +96,6 @@ public class DefaultCache
                 cacheBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.cached.response.acquires"),
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
-        this.requestBufferPool = requestBufferPool.duplicate();
-        this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
@@ -123,7 +115,8 @@ public class DefaultCache
             DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
                     requestUrlHash,
-                    cachedRequestBufferPool);
+                    cachedRequestBufferPool,
+                    cachedResponseBufferPool);
             updateCache(requestUrlHash, cacheEntry);
             return cacheEntry;
         }
@@ -228,16 +221,6 @@ public class DefaultCache
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
-    private boolean doesNotVary(
-        ListFW<HttpHeaderFW> requestHeaders,
-        DefaultRequest request)
-    {
-//        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
-//        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
-//        return CacheUtils.doesNotVary(requestHeaders, cachedResponseHeaders, cachedRequestHeaders);
-        return true;
-    }
-
     private boolean serveRequest(
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
@@ -283,31 +266,11 @@ public class DefaultCache
         counters.responses.getAsLong();
     }
 
-    private static int copy(int fromSlot, BufferPool fromBP, BufferPool toBP)
-    {
-        int toSlot = toBP.acquire(0);
-        // should we purge old cache entries ?
-        if (toSlot != NO_SLOT)
-        {
-            DirectBuffer fromBuffer = fromBP.buffer(fromSlot);
-            MutableDirectBuffer toBuffer = toBP.buffer(toSlot);
-            toBuffer.putBytes(0, fromBuffer, 0, fromBuffer.capacity());
-        }
-
-        return toSlot;
-    }
-
-
     public void purge(
         DefaultCacheEntry entry)
     {
         this.cachedEntries.remove(entry.requestURLHash());
         entry.purge();
-    }
-
-    public boolean purgeOld()
-    {
-        return this.cachedEntries.purgeLRU();
     }
 
 }

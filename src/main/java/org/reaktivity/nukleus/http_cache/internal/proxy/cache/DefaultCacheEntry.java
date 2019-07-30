@@ -33,7 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -286,16 +285,10 @@ public final class DefaultCacheEntry
     protected boolean isIntendedForSingleUser()
     {
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
-        if (SurrogateControl.isProtectedEx(responseHeaders))
-        {
-            return false;
-        }
-        else
-        {
-            // TODO pull out as utility of CacheUtils
-            String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
-            return cacheControl != null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
-        }
+
+        // TODO pull out as utility of CacheUtils
+        String cacheControl = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.CACHE_CONTROL);
+        return cacheControl != null && cache.responseCacheControlFW.parse(cacheControl).contains(CacheDirectives.PRIVATE);
     }
 
     private boolean storeResponseData(
@@ -359,20 +352,6 @@ public final class DefaultCacheEntry
         return Instant.now().isAfter(staleAt());
     }
 
-    private static int copy(int fromSlot, BufferPool fromBP, BufferPool toBP)
-    {
-        int toSlot = toBP.acquire(0);
-        // should we purge old cache entries ?
-        if (toSlot != NO_SLOT)
-        {
-            DirectBuffer fromBuffer = fromBP.buffer(fromSlot);
-            MutableDirectBuffer toBuffer = toBP.buffer(toSlot);
-            toBuffer.putBytes(0, fromBuffer, 0, fromBuffer.capacity());
-        }
-
-        return toSlot;
-    }
-
     private CacheControl responseCacheControl()
     {
         ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
@@ -403,11 +382,6 @@ public final class DefaultCacheEntry
     {
         final MutableDirectBuffer buffer = bp.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
-    }
-
-    public int requestSlot()
-    {
-        return requestSlot;
     }
 
     private boolean satisfiesFreshnessRequirementsOf(
