@@ -483,17 +483,6 @@ final class ProxyConnectReplyStream
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
-    private int budgetAvailableWhenProxying(
-        int credit,
-        long trace)
-    {
-        connectReplyBudget += credit;
-        streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
-                                      connectReplyStreamId, trace, credit, padding, groupId);
-
-        return 0;
-    }
-
     private void checkEtag(EndFW end, DefaultCacheEntry cacheEntry)
     {
         final OctetsFW extension = end.extension();

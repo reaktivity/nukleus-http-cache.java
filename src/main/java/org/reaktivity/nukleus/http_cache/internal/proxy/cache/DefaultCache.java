@@ -179,33 +179,7 @@ public class DefaultCache
         }
     }
 
-    public void servePendingInitialRequests(
-        int requestURLHash)
-    {
-        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
-        if (pendingInitialRequests != null)
-        {
-            pendingInitialRequests.removeSubscribers(s ->
-            {
-                boolean served = false;
-
-                if (cacheEntry != null)
-                {
-                    served = serveRequest(cacheEntry, s.getRequestHeaders(requestHeadersRO),
-                            s.authScope(), s);
-                }
-
-                if (!served)
-                {
-                    sendPendingInitialRequest(s);
-                }
-            });
-        }
-    }
-
-    public void sendPendingInitialRequests(
-        int requestURLHash)
+    public void sendPendingInitialRequests(int requestURLHash)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
