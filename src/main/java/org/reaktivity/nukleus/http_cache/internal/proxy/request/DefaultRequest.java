@@ -81,7 +81,7 @@ public class DefaultRequest extends Request
     @Override
     public Type getType()
     {
-        return Type.CACHEABLE_REQUEST;
+        return Type.DEFAULT_REQUEST;
     }
 
     public final boolean authorizationHeader()

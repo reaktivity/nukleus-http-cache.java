@@ -22,7 +22,7 @@ public abstract class Request
 {
     public enum Type
     {
-        PREFER_WAIT, PROXY, INITIAL_REQUEST, CACHE_REFRESH, CACHEABLE_REQUEST
+        PREFER_WAIT, PROXY, INITIAL_REQUEST, CACHE_REFRESH, DEFAULT_REQUEST
     }
 
     public final MessageConsumer acceptReply;
