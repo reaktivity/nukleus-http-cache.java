@@ -113,8 +113,8 @@ public class ProxyStreamFactory implements StreamFactory
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
-                counters.supplyCounter.apply("http-cache.initial.request.acquires"),
-                counters.supplyCounter.apply("http-cache.initial.request.releases"));
+                counters.supplyCounter.apply("http-cache.request.acquires"),
+                counters.supplyCounter.apply("http-cache.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.response.acquires"),

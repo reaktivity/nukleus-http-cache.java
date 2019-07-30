@@ -224,7 +224,8 @@ final class ProxyConnectReplyStream
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.put(request.requestURLHash());
-        if (!cacheEntry.storeResponseHeaders(responseHeaders, streamFactory.responseBufferPool))
+        if (!cacheEntry.storeResponseHeaders(responseHeaders)
+            && !cacheEntry.storeRequestHeaders(request.getRequestHeaders(streamFactory.requestHeadersRO)))
         {
             //TODO: Better handle if there is no slot available, For example, release response payload
             // which requests are in flight
@@ -258,7 +259,7 @@ final class ProxyConnectReplyStream
         {
         case DataFW.TYPE_ID:
             final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-            boolean stored = cacheEntry.storeResponseData(data, streamFactory.responseBufferPool);
+            boolean stored = cacheEntry.storeResponseData(data);
             if (!stored)
             {
                 //TODO: Better handle if there is no slot available, For example, release response payload
@@ -404,7 +405,7 @@ final class ProxyConnectReplyStream
 
         if (DEBUG)
         {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReply,
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
                 getHeader(responseHeaders, ":status"));
         }
 
@@ -418,7 +419,6 @@ final class ProxyConnectReplyStream
 
         this.cacheOffset = 0;
     }
-
 
     private void onDataWhenProxying(
         final DataFW data)

@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
@@ -38,6 +39,7 @@ import java.util.function.ToIntFunction;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
@@ -64,10 +66,7 @@ public class DefaultCache
     final Writer writer;
     final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
-    final BufferPool cachedRequest1BufferPool;
-    final BufferPool cachedResponse1BufferPool;
 
-    final BufferPool refreshBufferPool;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
 
@@ -95,10 +94,6 @@ public class DefaultCache
         this.budgetManager = budgetManager;
         this.correlations = correlations;
         this.writer = new Writer(supplyTypeId, writeBuffer);
-        this.refreshBufferPool = new CountingBufferPool(
-                requestBufferPool.duplicate(),
-                counters.supplyCounter.apply("http-cache.refresh.request.acquires"),
-                counters.supplyCounter.apply("http-cache.refresh.request.releases"));
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
                 counters.supplyCounter.apply("http-cache.cached.request.acquires"),
@@ -107,8 +102,6 @@ public class DefaultCache
                 cacheBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.cached.response.acquires"),
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
-        this.cachedRequest1BufferPool = cacheBufferPool.duplicate();
-        this.cachedResponse1BufferPool = cacheBufferPool.duplicate();
         this.requestBufferPool = requestBufferPool.duplicate();
         this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
@@ -129,7 +122,8 @@ public class DefaultCache
         {
             DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
-                    requestUrlHash);
+                    requestUrlHash,
+                    cachedRequestBufferPool);
             updateCache(requestUrlHash, cacheEntry);
             return cacheEntry;
         }
@@ -287,6 +281,20 @@ public class DefaultCache
 
         // count all responses
         counters.responses.getAsLong();
+    }
+
+    private static int copy(int fromSlot, BufferPool fromBP, BufferPool toBP)
+    {
+        int toSlot = toBP.acquire(0);
+        // should we purge old cache entries ?
+        if (toSlot != NO_SLOT)
+        {
+            DirectBuffer fromBuffer = fromBP.buffer(fromSlot);
+            MutableDirectBuffer toBuffer = toBP.buffer(toSlot);
+            toBuffer.putBytes(0, fromBuffer, 0, fromBuffer.capacity());
+        }
+
+        return toSlot;
     }
 
 
