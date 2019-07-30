@@ -31,7 +31,6 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -51,15 +50,10 @@ public class DefaultCache
 {
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
-    final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedResponse1HeadersRO = new HttpBeginExFW().headers();
 
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
-
-    final WindowFW windowRO = new WindowFW();
 
     final CacheControl responseCacheControlFW = new CacheControl();
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
