@@ -169,7 +169,8 @@ final class ProxyConnectReplyStream
         Long traceId, ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        if (retry && ((DefaultRequest)streamCorrelation).attempts() < 3)
+        DefaultRequest request = (DefaultRequest)streamCorrelation;
+        if (retry && request.attempts() < 3)
         {
             retryCacheableRequest(traceId);
             return;
@@ -184,6 +185,7 @@ final class ProxyConnectReplyStream
         {
             streamCorrelation.purge();
             doProxyBegin(traceId, responseHeaders);
+            this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestURLHash());
         }
     }
 
@@ -224,6 +226,8 @@ final class ProxyConnectReplyStream
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.put(request.requestURLHash());
         if (!cacheEntry.storeResponseHeaders(responseHeaders, streamFactory.responseBufferPool))
         {
+            //TODO: Better handle if there is not slot available, For example, release response payload
+            // which requests are in flight
             request.purge();
         }
         this.streamState = this::handleCacheableRequestResponse;
@@ -257,6 +261,8 @@ final class ProxyConnectReplyStream
             boolean stored = cacheEntry.storeResponseData(data, streamFactory.responseBufferPool);
             if (!stored)
             {
+                //TODO: Better handle if there is not slot available, For example, release response payload
+                // which requests are in flight
                 request.purge();
             }
             this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
@@ -270,6 +276,7 @@ final class ProxyConnectReplyStream
             break;
         case AbortFW.TYPE_ID:
         default:
+            //TODO: Find out what to do with abort on response.
             request.purge();
             streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             break;
