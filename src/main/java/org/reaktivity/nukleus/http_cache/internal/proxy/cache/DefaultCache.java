@@ -22,7 +22,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
@@ -149,12 +149,12 @@ public class DefaultCache
     {
        pendingInitialRequestsMap.forEach((k, request) ->
        {
-           CacheableRequest cacheableRequest = request.initialRequest();
-           if(cacheableRequest.requestURLHash() == requestUrlHash)
+           DefaultRequest defaultRequest = request.initialRequest();
+           if(defaultRequest.requestURLHash() == requestUrlHash)
            {
-               writer.doSignal(cacheableRequest.getSignaler(),
-                   cacheableRequest.acceptRouteId,
-                   cacheableRequest.acceptReplyStreamId,
+               writer.doSignal(defaultRequest.getSignaler(),
+                   defaultRequest.acceptRouteId,
+                   defaultRequest.acceptReplyStreamId,
                    supplyTrace.getAsLong(),
                    CACHE_ENTRY_UPDATED_SIGNAL);
            }
@@ -172,12 +172,12 @@ public class DefaultCache
         int requestURLHash,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
-        CacheableRequest cacheableRequest)
+        DefaultRequest defaultRequest)
     {
         final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
         if (cacheEntry != null)
         {
-            return serveRequest(cacheEntry, requestHeaders, authScope, cacheableRequest);
+            return serveRequest(cacheEntry, requestHeaders, authScope, defaultRequest);
         }
         else
         {
@@ -226,7 +226,7 @@ public class DefaultCache
     }
 
     private void sendPendingInitialRequest(
-        final CacheableRequest request)
+        final DefaultRequest request)
     {
         long connectRouteId = request.connectRouteId();
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
@@ -254,21 +254,21 @@ public class DefaultCache
     }
 
     public void addPendingRequest(
-        CacheableRequest initialRequest)
+        DefaultRequest initialRequest)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
     public void createPendingInitialRequests(
-        CacheableRequest initialRequest)
+        DefaultRequest initialRequest)
     {
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
     private boolean doesNotVary(
         ListFW<HttpHeaderFW> requestHeaders,
-        CacheableRequest request)
+        DefaultRequest request)
     {
 //        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
 //        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
@@ -280,7 +280,7 @@ public class DefaultCache
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
-        CacheableRequest cacheableRequest)
+        DefaultRequest defaultRequest)
     {
         if (entry.canServeRequest(requestHeaders, authScope))
         {
@@ -290,11 +290,11 @@ public class DefaultCache
             boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.getEtag());
             if (etagMatched)
             {
-                send304(entry, cacheableRequest);
+                send304(entry, defaultRequest);
             }
             else
             {
-                signalForUpdatedCacheEntry(cacheableRequest.requestURLHash());
+                signalForUpdatedCacheEntry(defaultRequest.requestURLHash());
             }
 
             return true;
@@ -304,7 +304,7 @@ public class DefaultCache
 
     private void send304(
         DefaultCacheEntry entry,
-        CacheableRequest request)
+        DefaultRequest request)
     {
         if (DEBUG)
         {

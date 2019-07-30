@@ -30,7 +30,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -178,8 +178,8 @@ final class ProxyAcceptStream
         {
             etag = etagHeader.value().asString();
         }
-        CacheableRequest cacheableRequest;
-        this.request = cacheableRequest = new CacheableRequest(
+        DefaultRequest defaultRequest;
+        this.request = defaultRequest = new DefaultRequest(
                 acceptReply,
                 acceptRouteId,
                 acceptStreamId,
@@ -199,13 +199,13 @@ final class ProxyAcceptStream
                 false);
 
         if (satisfiedByCache(requestHeaders) &&
-            streamFactory.defaultCache.handleCacheableRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
+            streamFactory.defaultCache.handleCacheableRequest(requestURLHash, requestHeaders, authScope, defaultRequest))
         {
             this.request.purge();
         }
         else if (streamFactory.defaultCache.hasPendingInitialRequests(requestURLHash))
         {
-            streamFactory.defaultCache.addPendingRequest(cacheableRequest);
+            streamFactory.defaultCache.addPendingRequest(defaultRequest);
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
@@ -225,7 +225,7 @@ final class ProxyAcceptStream
             sendBeginToConnect(requestHeaders, connectReplyId);
             streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId,
                     streamFactory.supplyTrace.getAsLong());
-            streamFactory.defaultCache.createPendingInitialRequests(cacheableRequest);
+            streamFactory.defaultCache.createPendingInitialRequests(defaultRequest);
         }
 
         this.streamState = this::onStreamMessageWhenIgnoring;

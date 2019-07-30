@@ -26,7 +26,7 @@ import org.reaktivity.nukleus.route.RouteManager;
 import java.util.function.LongFunction;
 import java.util.function.LongUnaryOperator;
 
-public class CacheableRequest extends Request
+public class DefaultRequest extends Request
 {
     private long acceptReplyId;
     private long connectRouteId;
@@ -43,7 +43,7 @@ public class CacheableRequest extends Request
     final LongUnaryOperator supplyReplyId;
     final LongUnaryOperator supplyInitialId;
 
-    public CacheableRequest(
+    public DefaultRequest(
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,

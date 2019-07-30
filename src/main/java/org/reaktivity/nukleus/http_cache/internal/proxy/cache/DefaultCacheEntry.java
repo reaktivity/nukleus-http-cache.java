@@ -34,7 +34,7 @@ import java.util.Objects;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
@@ -416,7 +416,7 @@ public final class DefaultCacheEntry
         }
     }
 
-    public boolean isUpdatedBy(CacheableRequest request)
+    public boolean isUpdatedBy(DefaultRequest request)
     {
         ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
@@ -433,7 +433,7 @@ public final class DefaultCacheEntry
         return !notModified;
     }
 
-    public boolean isSelectedForUpdate(CacheableRequest request)
+    public boolean isSelectedForUpdate(DefaultRequest request)
     {
         ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);

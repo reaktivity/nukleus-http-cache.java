@@ -25,7 +25,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -169,7 +169,7 @@ final class ProxyConnectReplyStream
         Long traceId, ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        if (retry && ((CacheableRequest)streamCorrelation).attempts() < 3)
+        if (retry && ((DefaultRequest)streamCorrelation).attempts() < 3)
         {
             retryCacheableRequest(traceId);
             return;
@@ -189,7 +189,7 @@ final class ProxyConnectReplyStream
 
     private void retryCacheableRequest(long traceId)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        DefaultRequest request = (DefaultRequest) streamCorrelation;
         request.incAttempts();
 
         long connectInitialId = this.streamFactory.supplyInitialId.applyAsLong(connectRouteId);
@@ -220,7 +220,7 @@ final class ProxyConnectReplyStream
         ListFW<HttpHeaderFW> responseHeaders,
         long traceId)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.put(request.requestURLHash());
         if (!cacheEntry.storeResponseHeaders(responseHeaders, streamFactory.responseBufferPool))
         {
@@ -247,7 +247,7 @@ final class ProxyConnectReplyStream
         int index,
         int length)
     {
-        CacheableRequest request = (CacheableRequest) streamCorrelation;
+        DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestURLHash());
 
         switch (msgTypeId)
@@ -368,7 +368,7 @@ final class ProxyConnectReplyStream
             {
                 this.streamCorrelation = this.streamFactory.requestCorrelations.get(signal.streamId());
             }
-            CacheableRequest request = (CacheableRequest) streamCorrelation;
+            DefaultRequest request = (DefaultRequest) streamCorrelation;
             DefaultCacheEntry cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
             if(cacheOffset == -1)
             {
@@ -390,7 +390,7 @@ final class ProxyConnectReplyStream
     {
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
-        final CacheableRequest request =(CacheableRequest)this.streamCorrelation;
+        final DefaultRequest request =(DefaultRequest)this.streamCorrelation;
         final MessageConsumer acceptReply = request.acceptReply();
         final long acceptRouteId = request.acceptRouteId();
         final long acceptReplyId = request.acceptReplyId();
