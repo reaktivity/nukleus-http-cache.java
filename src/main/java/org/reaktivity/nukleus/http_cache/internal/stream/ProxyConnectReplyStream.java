@@ -19,6 +19,7 @@ import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -223,17 +224,44 @@ final class ProxyConnectReplyStream
         long traceId)
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
-        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.put(request.requestURLHash());
-        if (!cacheEntry.storeResponseHeaders(responseHeaders)
-            && !cacheEntry.storeRequestHeaders(request.getRequestHeaders(streamFactory.requestHeadersRO)))
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.computeIfAbsent(request.requestURLHash());
+
+        if(cacheEntry.etag() == null)
         {
-            //TODO: Better handle if there is no slot available, For example, release response payload
-            // which requests are in flight
-            request.purge();
+            if (!cacheEntry.storeResponseHeaders(responseHeaders)
+                && !cacheEntry.storeRequestHeaders(request.getRequestHeaders(streamFactory.requestHeadersRO)))
+            {
+                //TODO: Better handle if there is no slot available, For example, release response payload
+                // which requests are in flight
+                request.purge();
+            }
+            this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
+            this.streamState = this::handleCacheableRequestResponse;
+
         }
-        this.streamState = this::handleCacheableRequestResponse;
+        else
+        {
+            String newEtag = getHeader(responseHeaders, ETAG);
+            if (cacheEntry.etag().equals(newEtag))
+            {
+                this.streamState = this::handleNoopStream;
+                this.streamFactory.defaultCache.send304(cacheEntry, request);
+            }
+            else
+            {
+                cacheEntry.evictResponse();
+                if (!cacheEntry.storeResponseHeaders(responseHeaders))
+                {
+                    //TODO: Better handle if there is no slot available, For example, release response payload
+                    // which requests are in flight
+                    request.purge();
+                }
+                this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
+                this.streamState = this::handleCacheableRequestResponse;
+            }
+        }
+
         sendWindow(initialWindow, traceId);
-        this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
     }
 
 
@@ -243,7 +271,29 @@ final class ProxyConnectReplyStream
         int index,
         int length)
     {
-        // NOOP
+        //NOOP
+    }
+
+    private void handleNoopStream(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        switch (msgTypeId)
+        {
+            case DataFW.TYPE_ID:
+                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
+                sendWindow(data.length() + data.padding(), data.trace());
+                break;
+            case EndFW.TYPE_ID:
+                break;
+            case AbortFW.TYPE_ID:
+            default:
+                //TODO: Figure out what to do with abort on response.
+                streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+                break;
+        }
     }
 
     private void handleCacheableRequestResponse(

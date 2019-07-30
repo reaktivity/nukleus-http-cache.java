@@ -193,9 +193,8 @@ public final class DefaultCacheEntry
 
     public void purge()
     {
-        this.responseSlots.forEach(i -> responsePool.release(i));
-        this.responseSlots = null;
-        this.state = CacheEntryState.PURGED;
+        this.evictRequest();
+        this.evictResponse();
     }
 
     void recentAuthorizationHeader(String authorizationHeader)
@@ -206,7 +205,7 @@ public final class DefaultCacheEntry
         }
     }
 
-    public String getEtag()
+    public String etag()
     {
         return etag;
     }
@@ -275,6 +274,21 @@ public final class DefaultCacheEntry
 
         return status.equals(HttpStatus.NOT_MODIFIED_304) &&
             this.etag.equals(etag);
+    }
+
+    public void evictRequest()
+    {
+        this.requestPool.release(requestSlot);
+        this.requestSlot = NO_SLOT;
+        this.requestPool = null;
+    }
+
+    public void evictResponse()
+    {
+        this.responseSlots.forEach(i -> responsePool.release(i));
+        this.responseSlots = null;
+        this.state = CacheEntryState.PURGED;
+        this.responseSize = 0;
     }
 
     public int requestURLHash()
@@ -483,5 +497,4 @@ public final class DefaultCacheEntry
         }
         return lazyInitiatedResponseReceivedAt;
     }
-
 }

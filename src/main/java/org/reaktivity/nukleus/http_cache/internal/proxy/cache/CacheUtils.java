@@ -145,13 +145,10 @@ public final class CacheUtils
                 {
                     // TODO expires
                     case NO_STORE:
-                        return false;
                     case NO_CACHE:
                         return false;
                     case PUBLIC:
-                        return true;
                     case MAX_AGE:
-                        return true;
                     case S_MAXAGE:
                         return true;
                     default:

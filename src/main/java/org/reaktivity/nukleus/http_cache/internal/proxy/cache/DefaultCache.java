@@ -58,8 +58,8 @@ public class DefaultCache
     final CacheControl responseCacheControlFW = new CacheControl();
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
 
-    public final BufferPool cachedRequestBufferPool;
-    public final BufferPool cachedResponseBufferPool;
+    final BufferPool cachedRequestBufferPool;
+    final BufferPool cachedResponseBufferPool;
 
     final Writer writer;
     final BudgetManager budgetManager;
@@ -107,7 +107,7 @@ public class DefaultCache
         return cachedEntries.get(requestUrlHash);
     }
 
-    public DefaultCacheEntry put(int requestUrlHash)
+    public DefaultCacheEntry computeIfAbsent(int requestUrlHash)
     {
         DefaultCacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
         if (oldCacheEntry == null)
@@ -142,13 +142,6 @@ public class DefaultCache
        });
     }
 
-    private void updateCache(
-            int requestUrlHash,
-            DefaultCacheEntry cacheEntry)
-    {
-        cachedEntries.put(requestUrlHash, cacheEntry);
-    }
-
     public boolean handleCacheableRequest(
         int requestURLHash,
         ListFW<HttpHeaderFW> requestHeaders,
@@ -180,45 +173,28 @@ public class DefaultCache
         }
     }
 
-    private void sendPendingInitialRequest(
-        final DefaultRequest request)
-    {
-        long connectRouteId = request.connectRouteId();
-        long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
-        MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
-        long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
-
-        correlations.put(connectReplyId, request);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [sent pending request]\n",
-                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-        }
-
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
-                builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
-        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
-    }
-
-    public boolean hasPendingInitialRequests(
-        int requestURLHash)
-    {
-        return pendingInitialRequestsMap.containsKey(requestURLHash);
-    }
-
-    public void addPendingRequest(
-        DefaultRequest initialRequest)
+    public void addPendingRequest(DefaultRequest initialRequest)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
-    public void createPendingInitialRequests(
-        DefaultRequest initialRequest)
+    public void createPendingInitialRequests(DefaultRequest initialRequest)
     {
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
+    }
+
+    public void purge(DefaultCacheEntry entry)
+    {
+        this.cachedEntries.remove(entry.requestURLHash());
+        entry.purge();
+    }
+
+    private void updateCache(
+        int requestUrlHash,
+        DefaultCacheEntry cacheEntry)
+    {
+        cachedEntries.put(requestUrlHash, cacheEntry);
     }
 
     private boolean serveRequest(
@@ -232,7 +208,7 @@ public class DefaultCache
             final String requestAuthorizationHeader = getHeader(requestHeaders, AUTHORIZATION);
             entry.recentAuthorizationHeader(requestAuthorizationHeader);
 
-            boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.getEtag());
+            boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.etag());
             if (etagMatched)
             {
                 send304(entry, defaultRequest);
@@ -247,7 +223,7 @@ public class DefaultCache
         return false;
     }
 
-    private void send304(
+    public void send304(
         DefaultCacheEntry entry,
         DefaultRequest request)
     {
@@ -259,18 +235,39 @@ public class DefaultCache
 
         writer.doHttpResponse(request.acceptReply, request.acceptRouteId,
                 request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
-                      .item(h -> h.name(ETAG).value(entry.getEtag())));
+                      .item(h -> h.name(ETAG).value(entry.etag())));
         writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
 
         // count all responses
         counters.responses.getAsLong();
     }
 
-    public void purge(
-        DefaultCacheEntry entry)
+    private void sendPendingInitialRequest(
+        final DefaultRequest request)
     {
-        this.cachedEntries.remove(entry.requestURLHash());
-        entry.purge();
+        long connectRouteId = request.connectRouteId();
+        long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
+        MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
+        long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        correlations.put(connectReplyId, request);
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [sent pending request]\n",
+                currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+        }
+
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
+            builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
+        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
+    }
+
+    public boolean hasPendingInitialRequests(
+        int requestURLHash)
+    {
+        return pendingInitialRequestsMap.containsKey(requestURLHash);
     }
 
 }
