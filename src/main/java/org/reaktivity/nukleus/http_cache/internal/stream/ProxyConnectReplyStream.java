@@ -15,15 +15,19 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import org.agrona.DirectBuffer;
+import org.agrona.MutableDirectBuffer;
+import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
@@ -62,8 +66,9 @@ final class ProxyConnectReplyStream
     private int padding;
 
     private final int initialWindow;
-    private int cacheOffset = -1;
     private int cachePosition;
+    private int payloadWritten = -1;
+    private DefaultCacheEntry cacheEntry;
 
     ProxyConnectReplyStream(
         ProxyStreamFactory proxyStreamFactory,
@@ -406,13 +411,55 @@ final class ProxyConnectReplyStream
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
             onResetWhenProxying(reset);
             break;
-        case SignalFW.TYPE_ID:
-            final SignalFW signal = streamFactory.signalRO.wrap(buffer, index, index + length);
-            onSignal(signal);
-            break;
         default:
             // ignore
             break;
+        }
+    }
+
+    public void onThrottleBeforeBegin(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        switch(msgTypeId)
+        {
+            case WindowFW.TYPE_ID:
+                final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
+                groupId = window.groupId();
+                padding = window.padding();
+                long streamId = window.streamId();
+                int credit = window.credit();
+                acceptReplyBudget += credit;
+                this.streamFactory.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
+                    this::writePayload, window.trace());
+
+                boolean ackedBudget = !this.streamFactory.budgetManager.hasUnackedBudget(groupId, streamId);
+                if (payloadWritten == cacheEntry.responseSize() && ackedBudget)
+                {
+                    final DefaultRequest request = (DefaultRequest) streamCorrelation;
+                    final MessageConsumer acceptReply = request.acceptReply();
+                    final long acceptRouteId = request.acceptRouteId();
+                    final long acceptReplyStreamId = request.acceptReplyId();
+                    this.streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
+                    this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
+                                                            groupId,
+                                                            acceptReplyStreamId,
+                                                            window.trace());
+                }
+                break;
+            case SignalFW.TYPE_ID:
+                final SignalFW signal = streamFactory.signalRO.wrap(buffer, index, index + length);
+                onSignal(signal);
+                break;
+            case ResetFW.TYPE_ID:
+            default:
+                this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
+                    groupId,
+                    streamCorrelation.acceptReplyId(),
+                    this.streamFactory.supplyTrace.getAsLong());
+                break;
         }
     }
 
@@ -427,21 +474,86 @@ final class ProxyConnectReplyStream
                 this.streamCorrelation = this.streamFactory.requestCorrelations.get(signal.streamId());
             }
             DefaultRequest request = (DefaultRequest) streamCorrelation;
-            DefaultCacheEntry cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
-            if(cacheOffset == -1)
+            cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
+            if(payloadWritten == -1)
             {
                 sendHttpResponseHeaders(cacheEntry);
             }
             else
             {
-                writePayload(cacheEntry);
+                 this.streamFactory.budgetManager.resumeAssigningBudget(groupId, 0, signal.trace());
             }
         }
     }
 
-    private void writePayload(DefaultCacheEntry cacheEntry)
+    private int writePayload(int budget, long trace)
     {
+        DefaultRequest request = (DefaultRequest) streamCorrelation;
+        final MessageConsumer acceptReply = request.acceptReply();
+        final long acceptRouteId = request.acceptRouteId();
+        final long acceptReplyStreamId = request.acceptReplyId();
 
+        final int minBudget = min(budget, acceptReplyBudget);
+        final int toWrite = min(minBudget - padding, cacheEntry.responseSize() - payloadWritten);
+        if (toWrite > 0)
+        {
+            this.streamFactory.writer.doHttpData(
+                acceptReply,
+                acceptRouteId,
+                acceptReplyStreamId,
+                trace,
+                0L,
+                padding,
+                p -> this.buildResponsePayload(payloadWritten,
+                                               toWrite,
+                                               p,
+                                               cacheEntry.getResponsePool())
+            );
+            payloadWritten += toWrite;
+            budget -= (toWrite + padding);
+            acceptReplyBudget -= (toWrite + padding);
+            assert acceptReplyBudget >= 0;
+        }
+
+        return budget;
+    }
+
+    public void buildResponsePayload(
+        int index,
+        int length,
+        OctetsFW.Builder p,
+        BufferPool bp)
+    {
+        final int slotCapacity = bp.slotCapacity();
+        final int startSlot = Math.floorDiv(index, slotCapacity) + NUM_OF_HEADER_SLOTS;
+        buildResponsePayload(index, length, p, bp, startSlot);
+    }
+
+    public void buildResponsePayload(
+        int index,
+        int length,
+        OctetsFW.Builder builder,
+        BufferPool bp,
+        int slotCnt)
+    {
+        if (length == 0)
+        {
+            return;
+        }
+
+        final int slotCapacity = bp.slotCapacity();
+        int chunkedWrite = (slotCnt * slotCapacity) - index;
+        int slot = cacheEntry.getResponseSlots().get(slotCnt);
+        if (chunkedWrite > 0)
+        {
+            MutableDirectBuffer buffer = bp.buffer(slot);
+            int offset = slotCapacity - chunkedWrite;
+            int chunkLength = Math.min(chunkedWrite, length);
+            builder.put(buffer, offset, chunkLength);
+            index += chunkLength;
+            length -= chunkLength;
+        }
+        buildResponsePayload(index, length, builder, bp, ++slotCnt);
     }
 
     private void sendHttpResponseHeaders(DefaultCacheEntry cacheEntry)
@@ -467,7 +579,7 @@ final class ProxyConnectReplyStream
             request.etag(),
             this.streamFactory.supplyTrace.getAsLong());
 
-        this.cacheOffset = 0;
+        this.payloadWritten = 0;
     }
 
     private void onDataWhenProxying(

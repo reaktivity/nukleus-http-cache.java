@@ -64,7 +64,7 @@ public final class DefaultCacheEntry
 
     private BufferPool responsePool;
     private IntArrayList responseSlots = new IntArrayList();
-    private static final int NUM_OF_HEADER_SLOTS = 1;
+    public static final int NUM_OF_HEADER_SLOTS = 1;
     private int responseHeadersSize = 0;
     private int responseSize = 0;
     private boolean responseCompleted = false;
@@ -80,6 +80,16 @@ public final class DefaultCacheEntry
         this.requestURLHash = requestURLHash;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
+    }
+
+    public BufferPool getResponsePool()
+    {
+        return responsePool;
+    }
+
+    public IntArrayList getResponseSlots()
+    {
+        return responseSlots;
     }
 
     public ListFW<HttpHeaderFW> getRequestHeaders(

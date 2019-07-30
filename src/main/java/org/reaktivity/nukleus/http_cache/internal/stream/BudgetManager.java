@@ -55,6 +55,11 @@ public class BudgetManager
         }
     }
 
+    public void resumeAssigningBudget(long groupId, int credit, long traceId)
+    {
+        groups.get(groupId).moreBudget(credit, traceId);
+    }
+
     private class GroupBudget
     {
         final long groupId;

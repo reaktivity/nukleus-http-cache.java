@@ -205,7 +205,7 @@ public class ProxyStreamFactory implements StreamFactory
                                                                                     connectReplyId,
                                                                                     acceptInitialId);
                 correlations.put(connectReplyId, replyStream);
-                router.setThrottle(acceptReplyId, replyStream::onThrottleMessageWhenProxying);
+                router.setThrottle(acceptReplyId, replyStream::onThrottleBeforeBegin);
             }
         }
 

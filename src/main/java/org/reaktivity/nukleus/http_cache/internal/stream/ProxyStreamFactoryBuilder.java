@@ -208,7 +208,6 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         {
             this.defaultCache = new DefaultCache(
                 scheduler,
-                emulatedBudgetManager,
                 writeBuffer,
                 cacheBufferPool,
                 requestCorrelations,

@@ -62,7 +62,6 @@ public class DefaultCache
     final BufferPool cachedResponseBufferPool;
 
     final Writer writer;
-    final BudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
 
     final LongObjectBiConsumer<Runnable> scheduler;
@@ -74,7 +73,6 @@ public class DefaultCache
 
     public DefaultCache(
         LongObjectBiConsumer<Runnable> scheduler,
-        BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
         Long2ObjectHashMap<Request> correlations,
@@ -85,7 +83,6 @@ public class DefaultCache
         SignalingExecutor executor)
     {
         this.scheduler = scheduler;
-        this.budgetManager = budgetManager;
         this.correlations = correlations;
         this.writer = new Writer(supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
