@@ -226,7 +226,7 @@ final class ProxyConnectReplyStream
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.put(request.requestURLHash());
         if (!cacheEntry.storeResponseHeaders(responseHeaders, streamFactory.responseBufferPool))
         {
-            //TODO: Better handle if there is not slot available, For example, release response payload
+            //TODO: Better handle if there is no slot available, For example, release response payload
             // which requests are in flight
             request.purge();
         }
@@ -261,7 +261,7 @@ final class ProxyConnectReplyStream
             boolean stored = cacheEntry.storeResponseData(data, streamFactory.responseBufferPool);
             if (!stored)
             {
-                //TODO: Better handle if there is not slot available, For example, release response payload
+                //TODO: Better handle if there is no slot available, For example, release response payload
                 // which requests are in flight
                 request.purge();
             }
@@ -276,7 +276,7 @@ final class ProxyConnectReplyStream
             break;
         case AbortFW.TYPE_ID:
         default:
-            //TODO: Find out what to do with abort on response.
+            //TODO: Figure out what to do with abort on response.
             request.purge();
             streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             break;
