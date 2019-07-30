@@ -1,3 +1,18 @@
+/**
+ * Copyright 2016-2019 The Reaktivity Project
+ *
+ * The Reaktivity Project licenses this file to you under the Apache License,
+ * version 2.0 (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at:
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 
 import org.agrona.MutableDirectBuffer;
@@ -9,6 +24,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
 
 import java.util.function.LongFunction;
+import java.util.function.LongUnaryOperator;
 
 public class CacheableRequest extends Request
 {
@@ -24,6 +40,8 @@ public class CacheableRequest extends Request
     final LongFunction<MessageConsumer> supplyReceiver;
     private MessageConsumer signaler;
     private int attempts;
+    final LongUnaryOperator supplyReplyId;
+    final LongUnaryOperator supplyInitialId;
 
     public CacheableRequest(
         MessageConsumer acceptReply,
@@ -40,6 +58,8 @@ public class CacheableRequest extends Request
         long authorization,
         short authScope,
         String etag,
+        LongUnaryOperator supplyInitialId,
+        LongUnaryOperator supplyReplyId,
         boolean isEmulated)
     {
         super(acceptReply, acceptRouteId, acceptReplyId, router, isEmulated);
@@ -54,6 +74,8 @@ public class CacheableRequest extends Request
         this.etag = etag;
         this.supplyReceiver = supplyReceiver;
         this.signaler = supplyReceiver.apply(acceptStreamId);
+        this.supplyReplyId = supplyReplyId;
+        this.supplyInitialId = supplyInitialId;
     }
 
     @Override
@@ -128,5 +150,30 @@ public class CacheableRequest extends Request
     {
         final MutableDirectBuffer buffer = bp.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
+    }
+
+    public long connectRouteId()
+    {
+        return connectRouteId;
+    }
+
+    public long getAcceptReplyId()
+    {
+        return acceptReplyId;
+    }
+
+    public LongUnaryOperator supplyReplyId()
+    {
+        return supplyReplyId;
+    }
+
+    public LongUnaryOperator supplyInitialId()
+    {
+        return supplyInitialId;
+    }
+
+    public LongFunction<MessageConsumer> supplyReceiver()
+    {
+        return supplyReceiver;
     }
 }

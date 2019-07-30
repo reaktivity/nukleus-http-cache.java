@@ -135,8 +135,7 @@ public class DefaultCache
         {
             DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
                     this,
-                    requestUrlHash,
-                    supplyTrace);
+                    requestUrlHash);
             updateCache(requestUrlHash, cacheEntry);
             return cacheEntry;
         }
@@ -288,14 +287,14 @@ public class DefaultCache
             final String requestAuthorizationHeader = getHeader(requestHeaders, AUTHORIZATION);
             entry.recentAuthorizationHeader(requestAuthorizationHeader);
 
-            boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.cachedRequest.etag());
+            boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.getEtag());
             if (etagMatched)
             {
                 send304(entry, cacheableRequest);
             }
             else
             {
-                entry.serveClient(cacheableRequest);
+                signalForUpdatedCacheEntry(cacheableRequest.requestURLHash());
             }
 
             return true;
@@ -315,7 +314,7 @@ public class DefaultCache
 
         writer.doHttpResponse(request.acceptReply, request.acceptRouteId,
                 request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
-                      .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
+                      .item(h -> h.name(ETAG).value(entry.getEtag())));
         writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
 
         // count all responses
@@ -326,7 +325,7 @@ public class DefaultCache
     public void purge(
         DefaultCacheEntry entry)
     {
-        this.cachedEntries.remove(entry.requestUrl());
+        this.cachedEntries.remove(entry.requestURLHash());
         entry.purge();
     }
 

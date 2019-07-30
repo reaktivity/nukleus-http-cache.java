@@ -27,7 +27,6 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
-import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -60,7 +59,6 @@ final class ProxyConnectReplyStream
 
     private long groupId;
     private int padding;
-    private boolean endDeferred;
 
     private final int initialWindow;
     private int cacheOffset = -1;
@@ -223,13 +221,14 @@ final class ProxyConnectReplyStream
         long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
-        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestURLHash());
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.put(request.requestURLHash());
         if (!cacheEntry.storeResponseHeaders(responseHeaders, streamFactory.responseBufferPool))
         {
             request.purge();
         }
         this.streamState = this::handleCacheableRequestResponse;
         sendWindow(initialWindow, traceId);
+        this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
     }
 
 
@@ -260,11 +259,13 @@ final class ProxyConnectReplyStream
             {
                 request.purge();
             }
+            this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
             sendWindow(data.length() + data.padding(), data.trace());
             break;
         case EndFW.TYPE_ID:
             final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
             checkEtag(end, cacheEntry);
+            cacheEntry.setResponseCompleted(true);
             this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
             break;
         case AbortFW.TYPE_ID:
@@ -419,29 +420,20 @@ final class ProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
-        connectReplyBudget -= data.length() + data.padding();
-        if (connectReplyBudget < 0)
-        {
-            streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                    streamFactory.supplyTrace.getAsLong());
-        }
-        else
-        {
-            final OctetsFW payload = data.payload();
-            acceptReplyBudget -= payload.sizeof() + data.padding();
-            assert acceptReplyBudget >= 0;
-            streamFactory.writer.doHttpData(
-                    acceptReply,
-                    acceptRouteId,
-                    acceptReplyStreamId,
-                    data.trace(),
-                    data.groupId(),
-                    payload.buffer(),
-                    payload.offset(),
-                    payload.sizeof(),
-                    data.padding()
-            );
-        }
+        final OctetsFW payload = data.payload();
+        acceptReplyBudget -= payload.sizeof() + data.padding();
+        assert acceptReplyBudget >= 0;
+        streamFactory.writer.doHttpData(
+                acceptReply,
+                acceptRouteId,
+                acceptReplyStreamId,
+                data.trace(),
+                data.groupId(),
+                payload.buffer(),
+                payload.offset(),
+                payload.sizeof(),
+                data.padding()
+        );
     }
 
     private void onEndWhenProxying(
@@ -451,16 +443,7 @@ final class ProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
         final long traceId = end.trace();
-        streamFactory.budgetManager.closing(groupId, acceptReplyStreamId, connectReplyBudget, traceId);
-        if (streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId))
-        {
-            endDeferred = true;
-        }
-        else
-        {
-            streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, traceId);
-            streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
-        }
+        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
     }
 
     private void onAbortWhenProxying(
@@ -471,7 +454,6 @@ final class ProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
-        streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, traceId);
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
@@ -480,7 +462,6 @@ final class ProxyConnectReplyStream
         final WindowFW window)
     {
         final int credit = window.credit();
-        acceptReplyBudget += credit;
         padding = window.padding();
         groupId = window.groupId();
         streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
@@ -491,6 +472,7 @@ final class ProxyConnectReplyStream
         final ResetFW reset)
     {
         streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
+        streamCorrelation.purge();
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
@@ -498,18 +480,11 @@ final class ProxyConnectReplyStream
         int credit,
         long trace)
     {
-        if (endDeferred)
-        {
-            return credit;
-        }
-        else
-        {
-            connectReplyBudget += credit;
-            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
-                                          connectReplyStreamId, trace, credit, padding, groupId);
+        connectReplyBudget += credit;
+        streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
+                                      connectReplyStreamId, trace, credit, padding, groupId);
 
-            return 0;
-        }
+        return 0;
     }
 
     private void checkEtag(EndFW end, DefaultCacheEntry cacheEntry)

@@ -194,6 +194,8 @@ final class ProxyAcceptStream
                 authorization,
                 authScope,
                 etag,
+                streamFactory.supplyInitialId,
+                streamFactory.supplyReplyId,
                 false);
 
         if (satisfiedByCache(requestHeaders) &&

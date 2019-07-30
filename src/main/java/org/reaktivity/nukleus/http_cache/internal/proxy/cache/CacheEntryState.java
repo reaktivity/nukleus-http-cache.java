@@ -21,6 +21,5 @@ public enum CacheEntryState
     CAN_REFRESH,
     CANT_REFRESH,
     REFRESHING,
-    WAITING_ON_UNCOMMITED,
     PURGED
 }
