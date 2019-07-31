@@ -61,6 +61,7 @@ public final class DefaultCacheEntry
 
     private BufferPool requestPool;
     private int requestSlot = NO_SLOT;
+    private int requestHeadersSize = 0;
 
     private BufferPool responsePool;
     private IntArrayList responseSlots = new IntArrayList();
@@ -114,7 +115,7 @@ public final class DefaultCacheEntry
 
         MutableDirectBuffer buffer = requestPool.buffer(requestSlot);
         buffer.putBytes(0, requestHeaders.buffer(), requestHeaders.offset(), requestHeaders.sizeof());
-
+        this.requestHeadersSize = requestHeaders.sizeof();
         return true;
     }
 
@@ -194,6 +195,11 @@ public final class DefaultCacheEntry
         DataFW data)
     {
         return storeResponseData(data.payload());
+    }
+
+    public int requestHeadersSize()
+    {
+        return requestHeadersSize;
     }
 
     public int responseSize()

@@ -201,7 +201,7 @@ final class ProxyAcceptStream
         if (satisfiedByCache(requestHeaders) &&
             streamFactory.defaultCache.handleCacheableRequest(requestURLHash, requestHeaders, authScope, defaultRequest))
         {
-            this.request.purge();
+            //NOOP
         }
         else if (streamFactory.defaultCache.hasPendingInitialRequests(requestURLHash))
         {

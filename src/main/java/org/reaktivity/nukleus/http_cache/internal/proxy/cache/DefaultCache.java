@@ -122,6 +122,15 @@ public class DefaultCache
         }
     }
 
+    public void signalForCacheEntry(DefaultRequest defaultRequest)
+    {
+            writer.doSignal(defaultRequest.getSignaler(),
+                defaultRequest.acceptRouteId,
+                defaultRequest.acceptReplyStreamId,
+                supplyTrace.getAsLong(),
+                CACHE_ENTRY_UPDATED_SIGNAL);
+    }
+
     public void signalForUpdatedCacheEntry(int requestUrlHash)
     {
        pendingInitialRequestsMap.forEach((k, request) ->
@@ -180,6 +189,16 @@ public class DefaultCache
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
 
+    public void removePendingInitialRequest(
+        DefaultRequest request)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(request.requestURLHash());
+        if (pendingInitialRequests != null)
+        {
+            pendingInitialRequests.removeSubscriber(request);
+        }
+    }
+
     public void purge(DefaultCacheEntry entry)
     {
         this.cachedEntries.remove(entry.requestURLHash());
@@ -211,7 +230,7 @@ public class DefaultCache
             }
             else
             {
-                signalForUpdatedCacheEntry(defaultRequest.requestURLHash());
+                signalForCacheEntry(defaultRequest);
             }
 
             return true;
@@ -233,6 +252,7 @@ public class DefaultCache
                 request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.etag())));
         writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
+        request.purge();
 
         // count all responses
         counters.responses.getAsLong();

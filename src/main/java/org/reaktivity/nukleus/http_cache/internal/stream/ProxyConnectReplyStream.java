@@ -230,10 +230,10 @@ final class ProxyConnectReplyStream
         DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.computeIfAbsent(request.requestURLHash());
 
-        if(cacheEntry.etag() == null)
+        if(cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
         {
-            if (!cacheEntry.storeResponseHeaders(responseHeaders)
-                && !cacheEntry.storeRequestHeaders(request.getRequestHeaders(streamFactory.requestHeadersRO)))
+            if (!cacheEntry.storeRequestHeaders(request.getRequestHeaders(streamFactory.requestHeadersRO))
+                || !cacheEntry.storeResponseHeaders(responseHeaders))
             {
                 //TODO: Better handle if there is no slot available, For example, release response payload
                 // which requests are in flight
@@ -448,6 +448,9 @@ final class ProxyConnectReplyStream
                                                             groupId,
                                                             acceptReplyStreamId,
                                                             window.trace());
+                    this.streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+                    this.streamFactory.defaultCache.removePendingInitialRequest(request);
+                    request.purge();
                 }
                 break;
             case SignalFW.TYPE_ID:
@@ -460,6 +463,8 @@ final class ProxyConnectReplyStream
                     groupId,
                     streamCorrelation.acceptReplyId(),
                     this.streamFactory.supplyTrace.getAsLong());
+                streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+                streamCorrelation.purge();
                 break;
         }
     }
@@ -616,6 +621,7 @@ final class ProxyConnectReplyStream
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
         final long traceId = end.trace();
         streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
     private void onAbortWhenProxying(
@@ -636,6 +642,7 @@ final class ProxyConnectReplyStream
         final int credit = window.credit();
         padding = window.padding();
         groupId = window.groupId();
+        acceptReplyBudget +=credit;
         streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
             connectReplyStreamId, window.trace(), credit, padding, groupId);
     }

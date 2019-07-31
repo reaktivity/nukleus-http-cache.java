@@ -20,7 +20,6 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 public class PendingInitialRequests
 {
@@ -47,10 +46,9 @@ public class PendingInitialRequests
         this.subscribers.add(request);
     }
 
-    void removeSubscribers(Consumer<DefaultRequest> consumer)
+    void removeSubscriber(DefaultRequest request)
     {
-        subscribers.forEach(consumer);
-        subscribers.clear();
+        subscribers.remove(request);
     }
 
     PendingInitialRequests withNextInitialRequest()
