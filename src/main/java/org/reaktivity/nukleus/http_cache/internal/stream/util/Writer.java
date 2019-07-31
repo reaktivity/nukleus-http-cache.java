@@ -156,6 +156,13 @@ public class Writer
         ListFW<HttpHeaderFW> responseHeadersRO,
         String etag)
     {
+        responseHeadersRO.forEach(h ->
+        {
+            final StringFW nameFW = h.name();
+            final String16FW valueFW = h.value();
+            builder.item(header -> header.name(nameFW).value(valueFW));
+        });
+
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));

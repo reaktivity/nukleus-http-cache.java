@@ -66,7 +66,6 @@ final class ProxyConnectReplyStream
     private int padding;
 
     private final int initialWindow;
-    private int cachePosition;
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
 
@@ -148,7 +147,7 @@ final class ProxyConnectReplyStream
                 case PROXY:
                     doProxyBegin(traceId, responseHeaders);
                     break;
-                case INITIAL_REQUEST:
+                case DEFAULT_REQUEST:
                     handleInitialRequest(traceId, responseHeaders);
                     break;
                 default:
@@ -436,7 +435,9 @@ final class ProxyConnectReplyStream
                     this::writePayload, window.trace());
 
                 boolean ackedBudget = !this.streamFactory.budgetManager.hasUnackedBudget(groupId, streamId);
-                if (payloadWritten == cacheEntry.responseSize() && ackedBudget)
+                if (payloadWritten == cacheEntry.responseSize()
+                    && ackedBudget
+                    && cacheEntry.isResponseCompleted())
                 {
                     final DefaultRequest request = (DefaultRequest) streamCorrelation;
                     final MessageConsumer acceptReply = request.acceptReply();
@@ -580,6 +581,8 @@ final class ProxyConnectReplyStream
             this.streamFactory.supplyTrace.getAsLong());
 
         this.payloadWritten = 0;
+
+        this.streamFactory.counters.responses.getAsLong();
     }
 
     private void onDataWhenProxying(
