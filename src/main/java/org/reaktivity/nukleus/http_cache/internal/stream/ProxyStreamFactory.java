@@ -19,6 +19,7 @@ import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
 import java.util.Random;
+import java.util.concurrent.Future;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 
@@ -33,6 +34,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Int2CacheHashMapWithLRUEviction;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -82,6 +84,7 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool responseBufferPool;
     public final Long2ObjectHashMap<Request> requestCorrelations;
     final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
+    final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -99,6 +102,7 @@ public class ProxyStreamFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Request> requestCorrelations,
         Long2ObjectHashMap<ProxyConnectReplyStream> correlations,
+        Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations,
         Cache emulatedCache,
         DefaultCache defaultCache,
         HttpCacheCounters counters,
@@ -121,6 +125,7 @@ public class ProxyStreamFactory implements StreamFactory
                 counters.supplyCounter.apply("http-cache.response.releases"));
         this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
+        this.expiryRequestsCorrelations = requireNonNull(expiryRequestsCorrelations);
         this.emulatedCache = emulatedCache;
         this.defaultCache = defaultCache;
 

@@ -23,6 +23,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCach
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -164,7 +165,8 @@ final class ProxyConnectReplyStream
 
     ///////////// INITIAL_REQUEST REQUEST
     private void handleInitialRequest(
-        Long traceId, ListFW<HttpHeaderFW> responseHeaders)
+        Long traceId,
+        ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
         DefaultRequest request = (DefaultRequest)streamCorrelation;
@@ -334,7 +336,8 @@ final class ProxyConnectReplyStream
 
     ///////////// PROXY
     private void doProxyBegin(
-        long traceId, ListFW<HttpHeaderFW> responseHeaders)
+        long traceId,
+        ListFW<HttpHeaderFW> responseHeaders)
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
@@ -451,7 +454,7 @@ final class ProxyConnectReplyStream
 
         if (this.streamCorrelation == null)
         {
-            this.streamCorrelation = this.streamFactory.requestCorrelations.get(signal.streamId());
+            this.streamCorrelation = this.streamFactory.requestCorrelations.remove(connectReplyStreamId);
         }
 
         if (signalId == CACHE_ENTRY_UPDATED_SIGNAL || signalId == CACHE_ENTRY_SIGNAL)
@@ -468,6 +471,12 @@ final class ProxyConnectReplyStream
                 this.streamFactory.budgetManager.resumeAssigningBudget(groupId, 0, signal.trace());
                 sendEndIfNecessary(signal.trace());
             }
+        }
+        else if (signalId == REQUEST_EXPIRED_SIGNAL)
+        {
+            DefaultRequest request = (DefaultRequest) streamCorrelation;
+            cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
+            this.streamFactory.defaultCache.send304(cacheEntry, request);
         }
         else if (signalId == ABORT_SIGNAL)
         {

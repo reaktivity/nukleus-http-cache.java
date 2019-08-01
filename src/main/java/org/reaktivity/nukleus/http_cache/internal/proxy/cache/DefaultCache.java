@@ -39,11 +39,14 @@ import java.util.function.ToIntFunction;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -258,9 +261,9 @@ public class DefaultCache
             }
             else
             {
-                streamFactory.requestCorrelations.put(defaultRequest.acceptReplyStreamId, defaultRequest);
-                this.counters.responsesCached.getAsLong();
+                streamFactory.requestCorrelations.put(defaultRequest.connectReplyId(), defaultRequest);
                 signalForCacheEntry(defaultRequest, CACHE_ENTRY_SIGNAL);
+                this.counters.responsesCached.getAsLong();
             }
 
             return true;
@@ -278,9 +281,29 @@ public class DefaultCache
                     currentTimeMillis(), request.acceptReplyId(), "304");
         }
 
-        writer.doHttpResponse(request.acceptReply, request.acceptRouteId,
-                request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
-                      .item(h -> h.name(ETAG).value(entry.etag())));
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        if (isPreferIfNoneMatch(requestHeaders))
+        {
+            String preferWait = getHeader(requestHeaders, PREFER);
+            writer.doHttpResponse(request.acceptReply,
+                                  request.acceptRouteId,
+                                  request.acceptReplyId(),
+                                  supplyTrace.getAsLong(),
+                                  e -> e.item(h -> h.name(STATUS).value("304"))
+                                        .item(h -> h.name(ETAG).value(entry.etag()))
+                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
+        }
+        else
+        {
+            writer.doHttpResponse(request.acceptReply,
+                                  request.acceptRouteId,
+                                  request.acceptReplyId(),
+                                  supplyTrace.getAsLong(),
+                                  e -> e.item(h -> h.name(STATUS).value("304"))
+                                        .item(h -> h.name(ETAG).value(entry.etag())));
+        }
+
         writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
         request.purge();
 

@@ -38,4 +38,15 @@ public final class PreferHeader
         final String name = h.name().asString();
         return PREFER.equals(name);
     };
+
+    public static int getPreferWait(ListFW<HttpHeaderFW> headers)
+    {
+        String wait = HttpHeadersUtil.getHeader(headers, PREFER);
+        if (wait != null)
+        {
+            return wait.toLowerCase().equals("wait") ? Integer.getInteger(wait.split("=")[1]) : 0;
+        }
+        return 0;
+    }
+
 }

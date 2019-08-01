@@ -20,4 +20,5 @@ public final class Signals
     public static final long CACHE_ENTRY_UPDATED_SIGNAL = 1L;
     public static final long CACHE_ENTRY_SIGNAL = 2L;
     public static final long ABORT_SIGNAL = 3L;
+    public static final long REQUEST_EXPIRED_SIGNAL = 4L;
 }

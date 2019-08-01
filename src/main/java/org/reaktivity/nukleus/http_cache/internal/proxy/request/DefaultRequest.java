@@ -30,6 +30,7 @@ public class DefaultRequest extends Request
 {
     private long acceptReplyId;
     private long connectRouteId;
+    private long connectReplyId;
     private final int requestURLHash;
     private final long authorization;
     private final short authScope;
@@ -49,6 +50,7 @@ public class DefaultRequest extends Request
         long acceptStreamId,
         long acceptReplyId,
         long connectRouteId,
+        long connectReplyId,
         RouteManager router,
         LongFunction<MessageConsumer> supplyReceiver,
         int requestURLHash,
@@ -65,6 +67,7 @@ public class DefaultRequest extends Request
         super(acceptReply, acceptRouteId, acceptReplyId, router, isEmulated);
         this.acceptReplyId = acceptReplyId;
         this.connectRouteId = connectRouteId;
+        this.connectReplyId = connectReplyId;
         this.requestURLHash = requestURLHash;
         this.bufferPool = bufferPool;
         this.requestSlot = requestSlot;
@@ -175,5 +178,10 @@ public class DefaultRequest extends Request
     public LongFunction<MessageConsumer> supplyReceiver()
     {
         return supplyReceiver;
+    }
+
+    public long connectReplyId()
+    {
+        return connectReplyId;
     }
 }

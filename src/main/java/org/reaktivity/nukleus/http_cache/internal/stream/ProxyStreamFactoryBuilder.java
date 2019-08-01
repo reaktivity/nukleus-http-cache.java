@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
@@ -47,6 +48,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private final LongObjectBiConsumer<Runnable> scheduler;
     private final Long2ObjectHashMap<Request> requestCorrelations;
     private final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
+    private final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
@@ -73,6 +75,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         this.config = config;
         this.requestCorrelations = new Long2ObjectHashMap<>();
         this.correlations = new Long2ObjectHashMap<>();
+        this.expiryRequestsCorrelations = new Long2ObjectHashMap<>();
         this.scheduler = scheduler;
     }
 
@@ -227,6 +230,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 supplyReplyId,
                 requestCorrelations,
                 correlations,
+                expiryRequestsCorrelations,
                 emulatedCache,
                 defaultCache,
                 counters,

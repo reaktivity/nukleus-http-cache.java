@@ -16,10 +16,14 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.System.currentTimeMillis;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
@@ -29,7 +33,6 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -43,6 +46,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+
+import java.util.concurrent.Future;
 
 final class ProxyAcceptStream
 {
@@ -63,6 +68,7 @@ final class ProxyAcceptStream
     private int requestSlot = NO_SLOT;
     private Request request;
     private int requestURLHash;
+    private Future<?> preferWaitExpired;
 
     ProxyAcceptStream(
         ProxyStreamFactory streamFactory,
@@ -185,6 +191,7 @@ final class ProxyAcceptStream
                 acceptStreamId,
                 acceptReplyId,
                 connectRouteId,
+                connectReplyId,
                 streamFactory.router,
                 streamFactory.router::supplyReceiver,
                 requestURLHash,
@@ -207,11 +214,6 @@ final class ProxyAcceptStream
         {
             streamFactory.defaultCache.addPendingRequest(defaultRequest);
         }
-        else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
-        {
-            // TODO move this logic and edge case inside of defaultCache
-            send504();
-        }
         else
         {
             long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
@@ -226,9 +228,28 @@ final class ProxyAcceptStream
             streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId,
                     streamFactory.supplyTrace.getAsLong());
             streamFactory.defaultCache.createPendingInitialRequests(defaultRequest);
+
+            scheduleRequestExpiredSignal(requestHeaders);
         }
 
         this.streamState = this::onStreamMessageWhenIgnoring;
+    }
+
+    private void scheduleRequestExpiredSignal(ListFW<HttpHeaderFW> requestHeaders)
+    {
+        if (isPreferIfNoneMatch(requestHeaders))
+        {
+            int preferWait = getPreferWait(requestHeaders);
+            if (preferWait > 0)
+            {
+                preferWaitExpired = streamFactory.executor.schedule(preferWait+1,
+                                                                    SECONDS,
+                                                                    acceptRouteId,
+                                                                    request.acceptReplyStreamId,
+                                                                    REQUEST_EXPIRED_SIGNAL);
+            }
+            streamFactory.expiryRequestsCorrelations.put(request.acceptReplyStreamId, preferWaitExpired);
+        }
     }
 
     private void proxyRequest(
@@ -284,24 +305,6 @@ final class ProxyAcceptStream
         MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestSlot);
         requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
         return true;
-    }
-
-    private void send504()
-    {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "504");
-        }
-
-        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
-                e.item(h -> h.name(STATUS)
-                             .value("504")));
-        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId,
-                streamFactory.supplyTrace.getAsLong());
-        request.purge();
-
-        // count all responses
-        streamFactory.counters.responses.getAsLong();
     }
 
     private void send503RetryAfter()

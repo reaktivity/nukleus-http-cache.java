@@ -39,4 +39,5 @@ public final class HttpHeaders
     public static final String LAST_MODIFIED = "last-modified";
     public static final String RETRY_AFTER = "retry-after";
     public static final String EMULATED_PROTOCOL_STACK = "x-protocol-stack";
+    public static final String PREFERENCE_APPLIED = "x-protocol-stack";
 }
