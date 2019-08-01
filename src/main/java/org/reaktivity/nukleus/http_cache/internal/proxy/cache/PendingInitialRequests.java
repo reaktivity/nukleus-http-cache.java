@@ -41,9 +41,14 @@ public class PendingInitialRequests
         return request.etag();
     }
 
-    void subscribe(DefaultRequest request)
+    public void subscribe(DefaultRequest request)
     {
         this.subscribers.add(request);
+    }
+
+    public int subscribers()
+    {
+        return this.subscribers.size();
     }
 
     void removeSubscriber(DefaultRequest request)

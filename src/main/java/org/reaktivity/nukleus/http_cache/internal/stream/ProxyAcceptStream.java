@@ -199,7 +199,7 @@ final class ProxyAcceptStream
                 false);
 
         if (satisfiedByCache(requestHeaders) &&
-            streamFactory.defaultCache.handleCacheableRequest(requestURLHash, requestHeaders, authScope, defaultRequest))
+            streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, defaultRequest))
         {
             //NOOP
         }

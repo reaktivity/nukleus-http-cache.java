@@ -53,6 +53,7 @@ public final class DefaultCacheEntry
     private final DefaultCache cache;
     private final int requestURLHash;
     private String etag;
+    private String recentAuthorizationHeader;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -213,12 +214,14 @@ public final class DefaultCacheEntry
         this.evictResponse();
     }
 
-    void recentAuthorizationHeader(String authorizationHeader)
+    public void recentAuthorizationHeader(String authorizationHeader)
     {
-        if (authorizationHeader != null)
-        {
-            this.recentAuthorizationHeader(authorizationHeader);
-        }
+        this.recentAuthorizationHeader = authorizationHeader;
+    }
+
+    public String recentAuthorizationHeader()
+    {
+        return recentAuthorizationHeader;
     }
 
     public String etag()
@@ -302,9 +305,10 @@ public final class DefaultCacheEntry
     public void evictResponse()
     {
         this.responseSlots.forEach(i -> responsePool.release(i));
-        this.responseSlots = null;
+        this.responseSlots.clear();
         this.state = CacheEntryState.PURGED;
         this.responseSize = 0;
+        this.setResponseCompleted(false);
     }
 
     public int requestURLHash()
@@ -377,7 +381,7 @@ public final class DefaultCacheEntry
         return header.length() == 0 ? null : header.toString();
     }
 
-    private boolean isStale()
+    public boolean isStale()
     {
         return Instant.now().isAfter(staleAt());
     }

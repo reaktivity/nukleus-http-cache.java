@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -30,6 +31,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
@@ -138,10 +140,11 @@ public class Writer
         long streamId,
         ListFW<HttpHeaderFW> responseHeaders,
         String etag,
+        boolean isStale,
         long traceId)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-            builder -> updateResponseHeaders(builder, responseHeaders, etag);
+            builder -> updateResponseHeaders(builder, responseHeaders, etag, isStale);
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .routeId(routeId)
             .streamId(streamId)
@@ -154,7 +157,8 @@ public class Writer
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         ListFW<HttpHeaderFW> responseHeadersRO,
-        String etag)
+        String etag,
+        boolean isStale)
     {
         responseHeadersRO.forEach(h ->
         {
@@ -166,6 +170,11 @@ public class Writer
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));
+        }
+
+        if (isStale)
+        {
+            builder.item(header -> header.name(WARNING).value(DefaultCache.RESPONSE_IS_STALE));
         }
     }
 

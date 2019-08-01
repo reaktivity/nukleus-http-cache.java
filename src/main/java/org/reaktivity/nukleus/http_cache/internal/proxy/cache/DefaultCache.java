@@ -24,6 +24,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactory;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
@@ -38,6 +39,8 @@ import java.util.function.ToIntFunction;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
@@ -47,7 +50,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 public class DefaultCache
 {
-    static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
+    public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
 
@@ -122,21 +125,21 @@ public class DefaultCache
         }
     }
 
-    public void signalForCacheEntry(DefaultRequest defaultRequest)
+    public void signalForCacheEntry(DefaultRequest defaultRequest, long signalId)
     {
             writer.doSignal(defaultRequest.getSignaler(),
                 defaultRequest.acceptRouteId,
                 defaultRequest.acceptReplyStreamId,
                 supplyTrace.getAsLong(),
-                CACHE_ENTRY_UPDATED_SIGNAL);
+                signalId);
     }
 
-    public void signalForUpdatedCacheEntry(int requestUrlHash)
+    public void signalForUpdatedCacheEntry(int requestURLHash)
     {
        pendingInitialRequestsMap.forEach((k, request) ->
        {
            DefaultRequest defaultRequest = request.initialRequest();
-           if(defaultRequest.requestURLHash() == requestUrlHash)
+           if(defaultRequest.requestURLHash() == requestURLHash)
            {
                writer.doSignal(defaultRequest.getSignaler(),
                    defaultRequest.acceptRouteId,
@@ -147,16 +150,36 @@ public class DefaultCache
        });
     }
 
+    public void signalAbort(int requestURLHash)
+    {
+        pendingInitialRequestsMap.forEach((k, request) ->
+        {
+            DefaultRequest defaultRequest = request.initialRequest();
+            if(defaultRequest.requestURLHash() == requestURLHash)
+            {
+                writer.doSignal(defaultRequest.getSignaler(),
+                    defaultRequest.acceptRouteId,
+                    defaultRequest.acceptReplyStreamId,
+                    supplyTrace.getAsLong(),
+                    ABORT_SIGNAL);
+            }
+        });
+    }
+
     public boolean handleCacheableRequest(
-        int requestURLHash,
+        ProxyStreamFactory streamFactory,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
         DefaultRequest defaultRequest)
     {
-        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final DefaultCacheEntry cacheEntry = cachedEntries.get(defaultRequest.requestURLHash());
         if (cacheEntry != null)
         {
-            return serveRequest(cacheEntry, requestHeaders, authScope, defaultRequest);
+            return serveRequest(streamFactory,
+                                cacheEntry,
+                                requestHeaders,
+                                authScope,
+                                defaultRequest);
         }
         else
         {
@@ -196,6 +219,10 @@ public class DefaultCache
         if (pendingInitialRequests != null)
         {
             pendingInitialRequests.removeSubscriber(request);
+            if(pendingInitialRequests.subscribers() == 0)
+            {
+                pendingInitialRequestsMap.remove(request.requestURLHash());
+            }
         }
     }
 
@@ -213,6 +240,7 @@ public class DefaultCache
     }
 
     private boolean serveRequest(
+        ProxyStreamFactory streamFactory,
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
@@ -230,7 +258,9 @@ public class DefaultCache
             }
             else
             {
-                signalForCacheEntry(defaultRequest);
+                streamFactory.requestCorrelations.put(defaultRequest.acceptReplyStreamId, defaultRequest);
+                this.counters.responsesCached.getAsLong();
+                signalForCacheEntry(defaultRequest, CACHE_ENTRY_SIGNAL);
             }
 
             return true;
@@ -285,5 +315,6 @@ public class DefaultCache
     {
         return pendingInitialRequestsMap.containsKey(requestURLHash);
     }
+
 
 }

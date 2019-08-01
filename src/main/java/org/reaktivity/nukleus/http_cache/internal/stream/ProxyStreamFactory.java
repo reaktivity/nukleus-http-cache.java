@@ -80,7 +80,7 @@ public class ProxyStreamFactory implements StreamFactory
     final LongSupplier supplyTrace;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
-    final Long2ObjectHashMap<Request> requestCorrelations;
+    public final Long2ObjectHashMap<Request> requestCorrelations;
     final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
 
     final Writer writer;
