@@ -242,13 +242,13 @@ final class ProxyAcceptStream
             int preferWait = getPreferWait(requestHeaders);
             if (preferWait > 0)
             {
-                preferWaitExpired = streamFactory.executor.schedule(preferWait+1,
-                                                                    SECONDS,
-                                                                    acceptRouteId,
-                                                                    request.acceptReplyStreamId,
-                                                                    REQUEST_EXPIRED_SIGNAL);
+                preferWaitExpired = this.streamFactory.executor.schedule(preferWait,
+                                                                         SECONDS,
+                                                                         acceptRouteId,
+                                                                         request.acceptReplyStreamId,
+                                                                         REQUEST_EXPIRED_SIGNAL);
+                streamFactory.expiryRequestsCorrelations.put(request.acceptReplyStreamId, preferWaitExpired);
             }
-            streamFactory.expiryRequestsCorrelations.put(request.acceptReplyStreamId, preferWaitExpired);
         }
     }
 
@@ -333,7 +333,15 @@ final class ProxyAcceptStream
         int index,
         int length)
     {
-        // NOOP
+        switch (msgTypeId)
+        {
+            case ResetFW.TYPE_ID:
+                preferWaitExpired.cancel(true);
+                streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
+                break;
+            default:
+                break;
+        }
     }
 
     private void onStreamMessageWhenProxying(

@@ -34,7 +34,6 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Int2CacheHashMapWithLRUEviction;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -224,9 +223,14 @@ public class ProxyStreamFactory implements StreamFactory
         final long sourceRouteId = begin.routeId();
         final long sourceId = begin.streamId();
 
-        if(requestCorrelations.get(sourceId).isEmulated())
+        Request request = requestCorrelations.get(sourceId);
+
+        if(request != null && request.isEmulated())
         {
-            return new EmulatedProxyConnectReplyStream(this, source, sourceRouteId, sourceId)::handleStream;
+            return new EmulatedProxyConnectReplyStream(this,
+                                                        source,
+                                                        sourceRouteId,
+                                                        sourceId)::handleStream;
         }
         else
         {

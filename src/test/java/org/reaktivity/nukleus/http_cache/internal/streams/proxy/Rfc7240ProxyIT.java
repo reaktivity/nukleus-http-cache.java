@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -63,12 +64,29 @@ public class Rfc7240ProxyIT
     public void shouldAcknowledgePreferWaitHeaderInResponse() throws Exception
     {
         k3po.start();
+        k3po.awaitBarrier("RECEIVED_FIRST_REQUEST");
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_ONE_COMPLETED");
+
+        k3po.awaitBarrier("RECEIVED_SECOND_REQUEST");
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_TWO_COMPLETED");
+
+        k3po.awaitBarrier("RECEIVED_THIRD_REQUEST");
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_THREE_COMPLETED");
+        k3po.finish();
+    }
+
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/send.304.on.prefer.wait.timeout/accept/client",
+        "${streams}/send.304.on.prefer.wait.timeout/connect/server",
+    })
+    public void shouldSend304OnPreferWaitTimeout() throws Exception
+    {
         k3po.finish();
     }
 
@@ -78,6 +96,7 @@ public class Rfc7240ProxyIT
         "${streams}/missing.preference.applied.header.on.prefer.wait/accept/client",
         "${streams}/missing.preference.applied.header.on.prefer.wait/connect/server",
     })
+    @Ignore
     public void shouldHandleMissingPreferenceAppliedHeaderOnPreferWait() throws Exception
     {
         k3po.start();

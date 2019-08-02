@@ -49,6 +49,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 
+import java.util.concurrent.Future;
+
 
 final class ProxyConnectReplyStream
 {
@@ -459,11 +461,15 @@ final class ProxyConnectReplyStream
 
         if (signalId == CACHE_ENTRY_UPDATED_SIGNAL || signalId == CACHE_ENTRY_SIGNAL)
         {
-
             DefaultRequest request = (DefaultRequest) streamCorrelation;
             cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
             if(payloadWritten == -1)
             {
+                Future<?> requestExpiryTimeout = this.streamFactory.expiryRequestsCorrelations.remove(signal.streamId());
+                if (requestExpiryTimeout != null)
+                {
+                    requestExpiryTimeout.cancel(true);
+                }
                 sendHttpResponseHeaders(cacheEntry, signalId);
             }
             else

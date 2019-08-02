@@ -44,7 +44,7 @@ public final class PreferHeader
         String wait = HttpHeadersUtil.getHeader(headers, PREFER);
         if (wait != null)
         {
-            return wait.toLowerCase().equals("wait") ? Integer.getInteger(wait.split("=")[1]) : 0;
+            return wait.toLowerCase().startsWith("wait=") ? Integer.parseInt(wait.split("=")[1]) : 0;
         }
         return 0;
     }
