@@ -850,4 +850,16 @@ public class Rfc7234ProxyIT
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.on.200.response/accept/client",
+        "${streams}/use.etag.from.trailer.on.200.response/connect/server",
+    })
+    public void shouldUseEtagFromTrailerOn200Response() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+    }
 }

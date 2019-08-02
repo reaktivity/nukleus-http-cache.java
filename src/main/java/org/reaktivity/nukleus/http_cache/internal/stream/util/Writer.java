@@ -47,6 +47,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
@@ -57,6 +58,7 @@ public class Writer
     private final DataFW.Builder dataRW = new DataFW.Builder();
     private final EndFW.Builder endRW = new EndFW.Builder();
     private final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
+    private final HttpEndExFW.Builder httpEndExRW = new HttpEndExFW.Builder();
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
@@ -80,8 +82,7 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        Consumer<Builder<HttpHeaderFW.Builder,
-        HttpHeaderFW>> mutator)
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
@@ -98,8 +99,7 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        Consumer<Builder<HttpHeaderFW.Builder,
-        HttpHeaderFW>> mutator)
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
@@ -276,6 +276,26 @@ public class Writer
     }
 
     public void doHttpEnd(
+        final MessageConsumer receiver,
+        final long routeId,
+        final long streamId,
+        final long traceId,
+        String etag)
+    {
+        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+            builder -> updateTrailer(builder, etag);
+
+        final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                               .routeId(routeId)
+                               .streamId(streamId)
+                               .trace(traceId)
+                               .extension(e -> e.set(visitHttpEndEx(mutator)))
+                               .build();
+
+        receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+    }
+
+    public void doHttpEnd(
             final MessageConsumer receiver,
             final long routeId,
             final long streamId,
@@ -290,6 +310,13 @@ public class Writer
                 .build();
 
         receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
+    }
+
+    private void updateTrailer(
+        Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
+        String etag)
+    {
+        builder.item(header -> header.name(ETAG).value(etag));
     }
 
     public void doHttpEnd(
@@ -384,6 +411,17 @@ public class Writer
                              .headers(headers)
                              .build()
                              .sizeof();
+    }
+
+    private Flyweight.Builder.Visitor visitHttpEndEx(
+        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
+    {
+        return (buffer, offset, limit) ->
+            httpEndExRW.wrap(buffer, offset, limit)
+                         .typeId(httpTypeId)
+                         .trailers(trailers)
+                         .build()
+                         .sizeof();
     }
 
     public void doHttpPushPromise(

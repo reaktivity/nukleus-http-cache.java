@@ -534,7 +534,7 @@ final class EmulatedProxyConnectReplyStream
             final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
             streamFactory.budgetManager.closed(StreamKind.PROXY, groupId, acceptReplyStreamId, window.trace());
-            if (this.endExtension !=null && this.endExtension.sizeof() > 0)
+            if (this.endExtension != null && this.endExtension.sizeof() > 0)
             {
                 streamFactory.writer.doHttpEnd(acceptReply,
                                                 acceptRouteId,

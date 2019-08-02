@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
-import java.util.Random;
 import java.util.concurrent.Future;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
@@ -70,6 +69,7 @@ public class ProxyStreamFactory implements StreamFactory
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
+    final HttpEndExFW.Builder httpEndExRW = new HttpEndExFW.Builder();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     final RouteManager router;
@@ -77,7 +77,6 @@ public class ProxyStreamFactory implements StreamFactory
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
-    final DefaultCache defaultCache;
     final LongSupplier supplyTrace;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
@@ -88,7 +87,7 @@ public class ProxyStreamFactory implements StreamFactory
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
     final Cache emulatedCache;
-    final Random random;
+    final DefaultCache defaultCache;
     final HttpCacheCounters counters;
     final SignalingExecutor executor;
 
@@ -129,7 +128,6 @@ public class ProxyStreamFactory implements StreamFactory
         this.defaultCache = defaultCache;
 
         this.writer = new Writer(supplyTypeId, writeBuffer);
-        this.random = new Random();
         this.counters = counters;
         this.executor = executor;
     }

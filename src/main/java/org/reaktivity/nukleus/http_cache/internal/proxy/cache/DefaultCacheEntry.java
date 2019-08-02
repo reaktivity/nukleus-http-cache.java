@@ -71,7 +71,6 @@ public final class DefaultCacheEntry
     private int responseSize = 0;
     private boolean responseCompleted = false;
 
-
     public DefaultCacheEntry(
         DefaultCache cache,
         int requestURLHash,

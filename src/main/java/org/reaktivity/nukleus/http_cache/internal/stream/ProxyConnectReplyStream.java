@@ -73,6 +73,7 @@ final class ProxyConnectReplyStream
     private final int initialWindow;
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
+    private boolean etagSent;
 
     ProxyConnectReplyStream(
         ProxyStreamFactory proxyStreamFactory,
@@ -408,7 +409,7 @@ final class ProxyConnectReplyStream
         }
     }
 
-    void onThrottleMessageWhenProxying(
+    public void onThrottleMessageWhenProxying(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -606,12 +607,17 @@ final class ProxyConnectReplyStream
             isStale = cacheEntry.isStale();
         }
 
+        if (cacheEntry.etag() != null)
+        {
+            this.etagSent = true;
+        }
+
         streamFactory.writer.doHttpResponseWithUpdatedHeaders(
             acceptReply,
             acceptRouteId,
             acceptReplyId,
             responseHeaders,
-            request.etag(),
+            cacheEntry.etag(),
             isStale,
             this.streamFactory.supplyTrace.getAsLong());
 
@@ -632,7 +638,22 @@ final class ProxyConnectReplyStream
             && ackedBudget
             && cacheEntry.isResponseCompleted())
         {
-            this.streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
+            if (!etagSent && cacheEntry.etag() != null)
+            {
+                this.streamFactory.writer.doHttpEnd(acceptReply,
+                                                    acceptRouteId,
+                                                    acceptReplyStreamId,
+                                                    traceId,
+                                                    cacheEntry.etag());
+            }
+            else
+            {
+                this.streamFactory.writer.doHttpEnd(acceptReply,
+                                                    acceptRouteId,
+                                                    acceptReplyStreamId,
+                                                    traceId);
+            }
+
             this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                 groupId,
                 acceptReplyStreamId,

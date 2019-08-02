@@ -89,7 +89,7 @@ public final class SurrogateControl
                     }
                     else
                     {
-                        return -1;
+                        return Integer.parseInt(maxAge);
                     }
                 }
             }
