@@ -99,16 +99,6 @@ public class Rfc7240ProxyIT
     @Ignore
     public void shouldHandleMissingPreferenceAppliedHeaderOnPreferWait() throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("FIRST_REQUEST_WAIT");
-        sleep(4000);
-        k3po.notifyBarrier("FIRST_REQUEST_RECEIVED");
-        k3po.awaitBarrier("SECOND_REQUEST_WAIT");
-        sleep(4000);
-        k3po.notifyBarrier("SECOND_REQUEST_RECEIVED");
-        k3po.awaitBarrier("THIRD_REQUEST_WAIT");
-        sleep(4000);
-        k3po.notifyBarrier("THIRD_REQUEST_RECEIVED");
         k3po.finish();
     }
 }

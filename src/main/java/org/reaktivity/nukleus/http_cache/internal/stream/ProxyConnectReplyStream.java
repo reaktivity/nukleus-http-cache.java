@@ -612,13 +612,16 @@ final class ProxyConnectReplyStream
             this.etagSent = true;
         }
 
+
         streamFactory.writer.doHttpResponseWithUpdatedHeaders(
             acceptReply,
             acceptRouteId,
             acceptReplyId,
             responseHeaders,
+            cacheEntry.getRequestHeaders(this.streamFactory.requestHeadersRO),
             cacheEntry.etag(),
             isStale,
+
             this.streamFactory.supplyTrace.getAsLong());
 
         this.payloadWritten = 0;

@@ -15,8 +15,12 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
@@ -139,12 +143,17 @@ public class Writer
         long routeId,
         long streamId,
         ListFW<HttpHeaderFW> responseHeaders,
+        ListFW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale,
         long traceId)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-            builder -> updateResponseHeaders(builder, responseHeaders, etag, isStale);
+            builder -> updateResponseHeaders(builder,
+                                             responseHeaders,
+                                             requestHeaders,
+                                             etag,
+                                             isStale);
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .routeId(routeId)
             .streamId(streamId)
@@ -157,6 +166,7 @@ public class Writer
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         ListFW<HttpHeaderFW> responseHeadersRO,
+        ListFW<HttpHeaderFW> requestHeadersRO,
         String etag,
         boolean isStale)
     {
@@ -170,6 +180,12 @@ public class Writer
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));
+        }
+
+        if (isPreferWait(requestHeadersRO) && !isPreferenceApplied(responseHeadersRO))
+        {
+            builder.item(header -> header.name(PREFERENCE_APPLIED)
+                                         .value("wait=" + getPreferWait(requestHeadersRO)));
         }
 
         if (isStale)
