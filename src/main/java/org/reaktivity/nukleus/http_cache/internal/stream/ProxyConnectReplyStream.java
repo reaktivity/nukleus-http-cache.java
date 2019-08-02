@@ -336,6 +336,21 @@ final class ProxyConnectReplyStream
         }
     }
 
+    private void checkEtag(EndFW end, DefaultCacheEntry cacheEntry)
+    {
+        final OctetsFW extension = end.extension();
+        if (extension.sizeof() > 0)
+        {
+            final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
+            ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+            HttpHeaderFW etag = trailers.matchFirst(h -> "etag".equals(h.name().asString()));
+            if (etag != null)
+            {
+                cacheEntry.setEtag(etag.value().asString());
+            }
+        }
+    }
+
     ///////////// PROXY
     private void doProxyBegin(
         long traceId,
@@ -413,6 +428,81 @@ final class ProxyConnectReplyStream
             // ignore
             break;
         }
+    }
+
+    private void sendWindow(int credit, long traceId)
+    {
+        connectReplyBudget += credit;
+        if (connectReplyBudget > 0)
+        {
+            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
+                connectReplyStreamId, traceId, credit, padding, groupId);
+        }
+    }
+
+    private void onDataWhenProxying(
+        final DataFW data)
+    {
+        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
+        final long acceptRouteId = streamCorrelation.acceptRouteId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
+
+        final OctetsFW payload = data.payload();
+        acceptReplyBudget -= payload.sizeof() + data.padding();
+        assert acceptReplyBudget >= 0;
+        streamFactory.writer.doHttpData(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyStreamId,
+            data.trace(),
+            data.groupId(),
+            payload.buffer(),
+            payload.offset(),
+            payload.sizeof(),
+            data.padding()
+                                       );
+    }
+
+    private void onEndWhenProxying(
+        final EndFW end)
+    {
+        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
+        final long acceptRouteId = streamCorrelation.acceptRouteId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
+        final long traceId = end.trace();
+        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+    }
+
+    private void onAbortWhenProxying(
+        final AbortFW abort)
+    {
+        final long traceId = abort.trace();
+        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
+        final long acceptRouteId = streamCorrelation.acceptRouteId();
+        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
+
+        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+    }
+
+    private void onWindowWhenProxying(
+        final WindowFW window)
+    {
+        final int credit = window.credit();
+        padding = window.padding();
+        groupId = window.groupId();
+        acceptReplyBudget +=credit;
+        streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
+                                      connectReplyStreamId, window.trace(), credit, padding, groupId);
+    }
+
+    private void onResetWhenProxying(
+        final ResetFW reset)
+    {
+        streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
+        streamCorrelation.purge();
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
     public void onThrottleBeforeBegin(
@@ -493,6 +583,41 @@ final class ProxyConnectReplyStream
             streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             this.streamFactory.defaultCache.purge(cacheEntry);
         }
+    }
+
+    private void sendHttpResponseHeaders(DefaultCacheEntry cacheEntry, long signalId)
+    {
+        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+
+        final DefaultRequest request =(DefaultRequest)this.streamCorrelation;
+        final MessageConsumer acceptReply = request.acceptReply();
+        final long acceptRouteId = request.acceptRouteId();
+        final long acceptReplyId = request.acceptReplyId();
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
+                              getHeader(responseHeaders, ":status"));
+        }
+
+        boolean isStale = false;
+        if(signalId == CACHE_ENTRY_SIGNAL)
+        {
+            isStale = cacheEntry.isStale();
+        }
+
+        streamFactory.writer.doHttpResponseWithUpdatedHeaders(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            responseHeaders,
+            request.etag(),
+            isStale,
+            this.streamFactory.supplyTrace.getAsLong());
+
+        this.payloadWritten = 0;
+
+        this.streamFactory.counters.responses.getAsLong();
     }
 
     private void sendEndIfNecessary(long traceId)
@@ -586,130 +711,5 @@ final class ProxyConnectReplyStream
             length -= chunkLength;
         }
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
-    }
-
-    private void sendHttpResponseHeaders(DefaultCacheEntry cacheEntry, long signalId)
-    {
-        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
-
-        final DefaultRequest request =(DefaultRequest)this.streamCorrelation;
-        final MessageConsumer acceptReply = request.acceptReply();
-        final long acceptRouteId = request.acceptRouteId();
-        final long acceptReplyId = request.acceptReplyId();
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
-                getHeader(responseHeaders, ":status"));
-        }
-
-        boolean isStale = false;
-        if(signalId == CACHE_ENTRY_SIGNAL)
-        {
-            isStale = cacheEntry.isStale();
-        }
-
-        streamFactory.writer.doHttpResponseWithUpdatedHeaders(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyId,
-            responseHeaders,
-            request.etag(),
-            isStale,
-            this.streamFactory.supplyTrace.getAsLong());
-
-        this.payloadWritten = 0;
-
-        this.streamFactory.counters.responses.getAsLong();
-    }
-
-    private void onDataWhenProxying(
-        final DataFW data)
-    {
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-
-        final OctetsFW payload = data.payload();
-        acceptReplyBudget -= payload.sizeof() + data.padding();
-        assert acceptReplyBudget >= 0;
-        streamFactory.writer.doHttpData(
-                acceptReply,
-                acceptRouteId,
-                acceptReplyStreamId,
-                data.trace(),
-                data.groupId(),
-                payload.buffer(),
-                payload.offset(),
-                payload.sizeof(),
-                data.padding()
-        );
-    }
-
-    private void onEndWhenProxying(
-        final EndFW end)
-    {
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-        final long traceId = end.trace();
-        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
-    }
-
-    private void onAbortWhenProxying(
-        final AbortFW abort)
-    {
-        final long traceId = abort.trace();
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-
-        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
-    }
-
-    private void onWindowWhenProxying(
-        final WindowFW window)
-    {
-        final int credit = window.credit();
-        padding = window.padding();
-        groupId = window.groupId();
-        acceptReplyBudget +=credit;
-        streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
-            connectReplyStreamId, window.trace(), credit, padding, groupId);
-    }
-
-    private void onResetWhenProxying(
-        final ResetFW reset)
-    {
-        streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
-        streamCorrelation.purge();
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
-    }
-
-    private void checkEtag(EndFW end, DefaultCacheEntry cacheEntry)
-    {
-        final OctetsFW extension = end.extension();
-        if (extension.sizeof() > 0)
-        {
-            final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
-            ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
-            HttpHeaderFW etag = trailers.matchFirst(h -> "etag".equals(h.name().asString()));
-            if (etag != null)
-            {
-                cacheEntry.setEtag(etag.value().asString());
-            }
-        }
-    }
-
-    private void sendWindow(int credit, long traceId)
-    {
-        connectReplyBudget += credit;
-        if (connectReplyBudget > 0)
-        {
-            streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
-                connectReplyStreamId, traceId, credit, padding, groupId);
-        }
     }
 }
