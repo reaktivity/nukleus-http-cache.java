@@ -340,4 +340,14 @@ public class DefaultCache
     }
 
 
+    public void purgeEntriesForNonPendingRequests()
+    {
+        cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
+                                                 {
+                                                     if (!hasPendingInitialRequests(cacheEntry.requestURLHash()))
+                                                     {
+                                                         this.purge(cacheEntry);
+                                                     }
+                                                 });
+    }
 }

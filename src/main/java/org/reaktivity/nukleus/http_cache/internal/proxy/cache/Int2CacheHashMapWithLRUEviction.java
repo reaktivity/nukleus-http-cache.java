@@ -76,6 +76,11 @@ public class Int2CacheHashMapWithLRUEviction
         return result;
     }
 
+    public Int2ObjectHashMap<DefaultCacheEntry> getCachedEntries()
+    {
+        return cachedEntries;
+    }
+
     /*
      * @return true if entries are purged
      *         false otherwise

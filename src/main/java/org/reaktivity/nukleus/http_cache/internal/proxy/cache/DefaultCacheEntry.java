@@ -110,7 +110,12 @@ public final class DefaultCacheEntry
         int requestHeaderSlot = requestPool.acquire(requestURLHash);
         if (requestHeaderSlot == Slab.NO_SLOT)
         {
-            return false;
+            this.cache.purgeEntriesForNonPendingRequests();
+            requestHeaderSlot = requestPool.acquire(requestURLHash);
+            if (requestHeaderSlot == Slab.NO_SLOT)
+            {
+                return false;
+            }
         }
         this.requestSlot = requestHeaderSlot;
 
@@ -148,9 +153,14 @@ public final class DefaultCacheEntry
             return false;
         }
         int headerSlot = responsePool.acquire(requestURLHash);
-        if (headerSlot == Slab.NO_SLOT)
+        if (headerSlot == NO_SLOT)
         {
-            return false;
+            this.cache.purgeEntriesForNonPendingRequests();
+            headerSlot = responsePool.acquire(requestURLHash);
+            if (headerSlot == NO_SLOT)
+            {
+                return false;
+            }
         }
         responseSlots.add(headerSlot);
 
@@ -348,10 +358,15 @@ public final class DefaultCacheEntry
         {
             slotSpaceRemaining = slotCapacity;
             int newSlot = bp.acquire(requestURLHash);
-            if (newSlot == Slab.NO_SLOT)
+            if (newSlot == NO_SLOT)
             {
-                return false;
-            }
+                this.cache.purgeEntriesForNonPendingRequests();
+                newSlot = bp.acquire(requestURLHash);
+                if (newSlot == NO_SLOT)
+                {
+                    return false;
+                }
+              }
             responseSlots.add(newSlot);
         }
 

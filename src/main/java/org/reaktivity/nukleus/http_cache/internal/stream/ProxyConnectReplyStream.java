@@ -247,8 +247,8 @@ final class ProxyConnectReplyStream
                 && cacheEntry.etag().equals(newEtag)
                 && cacheEntry.recentAuthorizationHeader() != null)
             {
-                this.streamState = this::handleNoopStream;
                 this.streamFactory.defaultCache.send304(cacheEntry, request);
+                this.streamState = this::handleNoopStream;
             }
             else
             {
