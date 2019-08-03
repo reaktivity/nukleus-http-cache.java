@@ -58,8 +58,6 @@ public final class DefaultCacheEntry
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
-    private CacheEntryState state;
-
     private BufferPool requestPool;
     private int requestSlot = NO_SLOT;
     private int requestHeadersSize = 0;
@@ -257,10 +255,6 @@ public final class DefaultCacheEntry
         ListFW<HttpHeaderFW> request,
         short authScope)
     {
-        if (this.state == CacheEntryState.PURGED)
-        {
-            return false;
-        }
         Instant now = Instant.now();
 
         final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
@@ -275,22 +269,7 @@ public final class DefaultCacheEntry
             satisfiesAgeRequirements;
     }
 
-    public boolean isUpdatedBy(DefaultRequest request)
-    {
-        ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders(cache.responseHeadersRO);
-        String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-        String etag = request.etag();
-        boolean etagMatches = false;
-        if (etag != null && this.etag !=  null)
-        {
-            etagMatches = status.equals(HttpStatus.OK_200) && this.etag.equals(etag);
-        }
 
-        assert status != null;
-        boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
-
-        return !notModified;
-    }
 
     public boolean isSelectedForUpdate(DefaultRequest request)
     {
@@ -315,7 +294,6 @@ public final class DefaultCacheEntry
     {
         this.responseSlots.forEach(i -> responsePool.release(i));
         this.responseSlots.clear();
-        this.state = CacheEntryState.PURGED;
         this.responseSize = 0;
         this.setResponseCompleted(false);
     }

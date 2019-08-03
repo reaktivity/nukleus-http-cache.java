@@ -20,11 +20,14 @@ import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -33,6 +36,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -171,16 +175,13 @@ final class ProxyConnectReplyStream
         Long traceId,
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        boolean retry = HttpHeadersUtil.retry(responseHeaders);
         DefaultRequest request = (DefaultRequest)streamCorrelation;
-        if (retry && request.attempts() < 3)
+        if (performRetryRequestIfNecessary(request, responseHeaders, traceId))
         {
-            retryCacheableRequest(traceId);
             return;
         }
-        final boolean isCacheableResponse = isCacheableResponse(responseHeaders);
 
-        if(isCacheableResponse)
+        if (isCacheableResponse(responseHeaders))
         {
             handleCacheableResponse(responseHeaders, traceId);
         }
@@ -190,6 +191,30 @@ final class ProxyConnectReplyStream
             doProxyBegin(traceId, responseHeaders);
             this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestURLHash());
         }
+    }
+
+    private boolean performRetryRequestIfNecessary(
+        DefaultRequest request,
+        ListFW<HttpHeaderFW> responseHeaders,
+        long traceId)
+    {
+        boolean retry = HttpHeadersUtil.retry(responseHeaders);
+        String status = getHeader(responseHeaders, STATUS);
+        assert status != null;
+
+        if (status.equals(HttpStatus.SERVICE_UNAVILABLE_503)
+            && retry
+            && request.attempts() < 3)
+        {
+            retryCacheableRequest(traceId);
+            return true;
+        }
+        else if (!this.streamFactory.defaultCache.isUpdatedBy(request, responseHeaders))
+        {
+            retryCacheableRequest(traceId);
+            return true;
+        }
+        return false;
     }
 
     private void retryCacheableRequest(long traceId)

@@ -26,12 +26,15 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactory;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
+import java.awt.*;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -40,6 +43,8 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
@@ -349,5 +354,32 @@ public class DefaultCache
                                                          this.purge(cacheEntry);
                                                      }
                                                  });
+    }
+
+    public boolean isUpdatedBy(
+        DefaultRequest request,
+        ListFW<HttpHeaderFW> responseHeaders)
+    {
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+        if (isPreferWait(requestHeaders)
+            && !isPreferenceApplied(responseHeaders))
+        {
+            String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+            String etag = request.etag();
+            String newEtag = getHeader(responseHeaders, ETAG);
+            boolean etagMatches = false;
+            assert status != null;
+
+            if (etag != null && newEtag !=  null)
+            {
+                etagMatches = status.equals(HttpStatus.OK_200) && etag.equals(newEtag);
+            }
+
+            boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
+
+            return !notModified;
+        }
+
+        return true;
     }
 }
