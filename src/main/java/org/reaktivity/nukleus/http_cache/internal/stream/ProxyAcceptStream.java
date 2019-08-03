@@ -33,6 +33,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -214,6 +215,11 @@ final class ProxyAcceptStream
         {
             streamFactory.defaultCache.addPendingRequest(defaultRequest);
         }
+        else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+        {
+            // TODO move this logic and edge case inside of emulatedCache
+            send504();
+        }
         else
         {
             long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
@@ -291,6 +297,24 @@ final class ProxyAcceptStream
          ));
 
         streamFactory.router.setThrottle(connectInitialId, this::onThrottleMessage);
+    }
+
+    private void send504()
+    {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "504");
+        }
+
+        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
+            e.item(h -> h.name(STATUS)
+                         .value("504")));
+        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId,
+                                     streamFactory.supplyTrace.getAsLong());
+        request.purge();
+
+        // count all responses
+        streamFactory.counters.responses.getAsLong();
     }
 
     private boolean storeRequest(
