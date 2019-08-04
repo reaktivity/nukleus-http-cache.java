@@ -13,4 +13,3 @@ buildNumber.properties
 .checkstyle
 .idea/
 *.iml
-!/src/main/java/org/reaktivity/nukleus/http_cache/internal/proxy/cache/DefaultCache.java

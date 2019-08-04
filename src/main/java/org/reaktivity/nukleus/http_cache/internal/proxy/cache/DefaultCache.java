@@ -34,7 +34,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
-import java.awt.*;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -77,7 +76,7 @@ public class DefaultCache
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyTrace;
-    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
     final SignalingExecutor executor;
 
@@ -92,6 +91,7 @@ public class DefaultCache
         ToIntFunction<String> supplyTypeId,
         SignalingExecutor executor)
     {
+        this.pendingInitialRequestsMap = new Int2ObjectHashMap<>();
         this.scheduler = scheduler;
         this.correlations = correlations;
         this.writer = new Writer(supplyTypeId, writeBuffer);
@@ -109,31 +109,32 @@ public class DefaultCache
         this.executor = executor;
     }
 
-    public DefaultCacheEntry get(int requestUrlHash)
+    public DefaultCacheEntry get(
+        int requestUrlHash)
     {
         return cachedEntries.get(requestUrlHash);
     }
 
-    public DefaultCacheEntry computeIfAbsent(int requestUrlHash)
+    public DefaultCacheEntry supply(
+        int requestUrlHash)
     {
-        DefaultCacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
-        if (oldCacheEntry == null)
+        DefaultCacheEntry defaultCacheEntry = cachedEntries.get(requestUrlHash);
+        if (defaultCacheEntry == null)
         {
-            DefaultCacheEntry cacheEntry = new DefaultCacheEntry(
+            defaultCacheEntry = new DefaultCacheEntry(
                     this,
                     requestUrlHash,
                     cachedRequestBufferPool,
                     cachedResponseBufferPool);
-            updateCache(requestUrlHash, cacheEntry);
-            return cacheEntry;
+            updateCache(requestUrlHash, defaultCacheEntry);
         }
-        else
-        {
-            return oldCacheEntry;
-        }
+
+        return defaultCacheEntry;
     }
 
-    public void signalForCacheEntry(DefaultRequest defaultRequest, long signalId)
+    public void signalForCacheEntry(
+        DefaultRequest defaultRequest,
+        long signalId)
     {
             writer.doSignal(defaultRequest.getSignaler(),
                 defaultRequest.acceptRouteId,
@@ -144,21 +145,23 @@ public class DefaultCache
 
     public void signalForUpdatedCacheEntry(int requestURLHash)
     {
-       pendingInitialRequestsMap.forEach((k, request) ->
+       PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(requestURLHash);
+
+       if (pendingInitialRequests != null)
        {
-           DefaultRequest defaultRequest = request.initialRequest();
-           if(defaultRequest.requestURLHash() == requestURLHash)
+           pendingInitialRequests.subcribers().forEach(request ->
            {
-               writer.doSignal(defaultRequest.getSignaler(),
-                   defaultRequest.acceptRouteId,
-                   defaultRequest.acceptReplyStreamId,
-                   supplyTrace.getAsLong(),
-                   CACHE_ENTRY_UPDATED_SIGNAL);
-           }
-       });
+               writer.doSignal(request.getSignaler(),
+                               request.acceptRouteId,
+                               request.acceptReplyStreamId,
+                               supplyTrace.getAsLong(),
+                               CACHE_ENTRY_UPDATED_SIGNAL);
+           });
+       }
     }
 
-    public void signalAbort(int requestURLHash)
+    public void signalAbort(
+        int requestURLHash)
     {
         pendingInitialRequestsMap.forEach((k, request) ->
         {
@@ -180,22 +183,16 @@ public class DefaultCache
         short authScope,
         DefaultRequest defaultRequest)
     {
-        final DefaultCacheEntry cacheEntry = cachedEntries.get(defaultRequest.requestURLHash());
-        if (cacheEntry != null)
-        {
-            return serveRequest(streamFactory,
-                                cacheEntry,
-                                requestHeaders,
-                                authScope,
-                                defaultRequest);
-        }
-        else
-        {
-            return false;
-        }
+        final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(defaultRequest.requestURLHash());
+        return defaultCacheEntry != null && serveRequest(streamFactory,
+                                                         defaultCacheEntry,
+                                                         requestHeaders,
+                                                         authScope,
+                                                         defaultRequest);
     }
 
-    public void sendPendingInitialRequests(int requestURLHash)
+    public void sendPendingInitialRequests(
+        int requestURLHash)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
         if (pendingInitialRequests != null)
@@ -209,13 +206,15 @@ public class DefaultCache
         }
     }
 
-    public void addPendingRequest(DefaultRequest initialRequest)
+    public void addPendingRequest(
+        DefaultRequest initialRequest)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
-    public void createPendingInitialRequests(DefaultRequest initialRequest)
+    public void createPendingInitialRequests(
+        DefaultRequest initialRequest)
     {
         pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
     }
@@ -227,14 +226,15 @@ public class DefaultCache
         if (pendingInitialRequests != null)
         {
             pendingInitialRequests.removeSubscriber(request);
-            if(pendingInitialRequests.subscribers() == 0)
+            if(pendingInitialRequests.numberOfSubscribers() == 0)
             {
                 pendingInitialRequestsMap.remove(request.requestURLHash());
             }
         }
     }
 
-    public void purge(DefaultCacheEntry entry)
+    public void purge(
+        DefaultCacheEntry entry)
     {
         this.cachedEntries.remove(entry.requestURLHash());
         entry.purge();

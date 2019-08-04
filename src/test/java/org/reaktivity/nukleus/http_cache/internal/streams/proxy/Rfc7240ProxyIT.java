@@ -96,7 +96,6 @@ public class Rfc7240ProxyIT
         "${streams}/missing.preference.applied.header.on.prefer.wait/accept/client",
         "${streams}/missing.preference.applied.header.on.prefer.wait/connect/server",
     })
-    @Ignore
     public void shouldHandleMissingPreferenceAppliedHeaderOnPreferWait() throws Exception
     {
         k3po.finish();

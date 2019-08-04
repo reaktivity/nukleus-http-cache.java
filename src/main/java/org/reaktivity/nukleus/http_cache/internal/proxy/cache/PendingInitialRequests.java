@@ -26,9 +26,11 @@ public class PendingInitialRequests
     private final DefaultRequest request;
     private final List<DefaultRequest> subscribers = new ArrayList<>();
 
-    PendingInitialRequests(DefaultRequest request)
+    PendingInitialRequests(
+        DefaultRequest request)
     {
         this.request = request;
+        this.subscribers.add(request);
     }
 
     public DefaultRequest initialRequest()
@@ -46,9 +48,14 @@ public class PendingInitialRequests
         this.subscribers.add(request);
     }
 
-    public int subscribers()
+    public int numberOfSubscribers()
     {
         return this.subscribers.size();
+    }
+
+    public List<DefaultRequest> subcribers()
+    {
+        return this.subscribers;
     }
 
     void removeSubscriber(DefaultRequest request)

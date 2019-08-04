@@ -187,6 +187,7 @@ final class ProxyConnectReplyStream
         {
             streamCorrelation.purge();
             doProxyBegin(traceId, responseHeaders);
+            this.streamFactory.defaultCache.removePendingInitialRequest(request);
             this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestURLHash());
         }
     }
@@ -249,7 +250,7 @@ final class ProxyConnectReplyStream
         long traceId)
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
-        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.computeIfAbsent(request.requestURLHash());
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.supply(request.requestURLHash());
 
         if(cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
         {
