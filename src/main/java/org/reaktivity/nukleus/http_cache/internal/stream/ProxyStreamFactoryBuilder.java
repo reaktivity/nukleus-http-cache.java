@@ -196,7 +196,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
         {
             this.emulatedCache = new Cache(
                     scheduler,
-                emulatedBudgetManager,
+                    emulatedBudgetManager,
                     writeBuffer,
                     requestBufferPool,
                     cacheBufferPool,
@@ -236,7 +236,8 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 counters,
                 supplyTrace,
                 supplyTypeId,
-                executor);
+                executor,
+                scheduler);
     }
 
 }

@@ -351,7 +351,7 @@ public class DefaultCache
                                                  });
     }
 
-    public boolean isUpdatedBy(
+    public boolean isUpdatedByResponseHeadersToRetry(
         DefaultRequest request,
         ListFW<HttpHeaderFW> responseHeaders)
     {
@@ -365,7 +365,7 @@ public class DefaultCache
             boolean etagMatches = false;
             assert status != null;
 
-            if (etag != null && newEtag !=  null)
+            if (etag != null && newEtag != null)
             {
                 etagMatches = status.equals(HttpStatus.OK_200) && etag.equals(newEtag);
             }
@@ -373,6 +373,29 @@ public class DefaultCache
             boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
 
             return !notModified;
+        }
+
+        return true;
+    }
+
+    public boolean isUpdatedByEtagToRetry(
+        DefaultRequest request,
+        DefaultCacheEntry cacheEntry)
+    {
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+        if (isPreferWait(requestHeaders)
+            && !isPreferenceApplied(responseHeaders))
+        {
+            String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+            String etag = request.etag();
+            String newEtag = cacheEntry.etag();
+            assert status != null;
+
+            if (etag != null && newEtag != null)
+            {
+                return !(status.equals(HttpStatus.OK_200) && etag.equals(newEtag));
+            }
         }
 
         return true;

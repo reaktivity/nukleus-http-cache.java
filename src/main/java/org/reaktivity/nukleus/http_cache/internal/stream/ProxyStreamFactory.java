@@ -37,6 +37,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -90,6 +91,7 @@ public class ProxyStreamFactory implements StreamFactory
     final DefaultCache defaultCache;
     final HttpCacheCounters counters;
     final SignalingExecutor executor;
+    final LongObjectBiConsumer<Runnable> scheduler;
 
     public ProxyStreamFactory(
         RouteManager router,
@@ -106,7 +108,8 @@ public class ProxyStreamFactory implements StreamFactory
         HttpCacheCounters counters,
         LongSupplier supplyTrace,
         ToIntFunction<String> supplyTypeId,
-        SignalingExecutor executor)
+        SignalingExecutor executor,
+        LongObjectBiConsumer<Runnable> scheduler)
     {
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
@@ -130,6 +133,7 @@ public class ProxyStreamFactory implements StreamFactory
         this.writer = new Writer(supplyTypeId, writeBuffer);
         this.counters = counters;
         this.executor = executor;
+        this.scheduler = scheduler;
     }
 
     @Override

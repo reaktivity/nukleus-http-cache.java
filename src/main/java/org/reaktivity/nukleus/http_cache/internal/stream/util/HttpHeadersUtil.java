@@ -132,7 +132,11 @@ public final class HttpHeadersUtil
         ListFW<HttpHeaderFW> responseHeaders)
     {
         HttpHeaderFW header = responseHeaders.matchFirst(HAS_RETRY_AFTER);
-        assert header != null;
+
+        if(header == null)
+        {
+            return 0L;
+        }
 
         String retryAfter = header.value().asString();
         try
