@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;

@@ -145,23 +145,18 @@ public class DefaultCache
 
     public void signalForUpdatedCacheEntry(int requestURLHash)
     {
-       PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(requestURLHash);
-
-       if (pendingInitialRequests != null)
-       {
-           pendingInitialRequests.subcribers().forEach(request ->
-           {
-               writer.doSignal(request.getSignaler(),
-                               request.acceptRouteId,
-                               request.acceptReplyStreamId,
-                               supplyTrace.getAsLong(),
-                               CACHE_ENTRY_UPDATED_SIGNAL);
-           });
-       }
+       this.sendSignalToPendingInitialRequestsSubscribers(requestURLHash, CACHE_ENTRY_UPDATED_SIGNAL);
     }
 
     public void signalAbort(
         int requestURLHash)
+    {
+        this.sendSignalToPendingInitialRequestsSubscribers(requestURLHash, ABORT_SIGNAL);
+    }
+
+    private void sendSignalToPendingInitialRequestsSubscribers(
+        int requestURLHash,
+        long signal)
     {
         pendingInitialRequestsMap.forEach((k, request) ->
         {
@@ -169,10 +164,10 @@ public class DefaultCache
             if(defaultRequest.requestURLHash() == requestURLHash)
             {
                 writer.doSignal(defaultRequest.getSignaler(),
-                    defaultRequest.acceptRouteId,
-                    defaultRequest.acceptReplyStreamId,
-                    supplyTrace.getAsLong(),
-                    ABORT_SIGNAL);
+                              defaultRequest.acceptRouteId,
+                              defaultRequest.acceptReplyStreamId,
+                              supplyTrace.getAsLong(),
+                                signal);
             }
         });
     }
