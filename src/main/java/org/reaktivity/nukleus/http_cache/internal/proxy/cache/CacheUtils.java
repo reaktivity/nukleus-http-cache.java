@@ -123,18 +123,14 @@ public final class CacheUtils
 
     public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)
     {
-        if (response.anyMatch(h ->
-                CACHE_CONTROL.equals(h.name().asString())
-                && h.value().asString().contains(CacheDirectives.PRIVATE)))
+        if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())
+                             && h.value().asString().contains(CacheDirectives.PRIVATE))
+            && response.anyMatch(h -> SURROGATE_CONTROL.equals(h.name().asString())
+                              && h.value().asString().contains(MAX_AGE_0)))
         {
             return false;
         }
-        else if (response.anyMatch(h ->
-                    SURROGATE_CONTROL.equals(h.name().asString())
-                    && h.value().asString().contains(MAX_AGE_0)))
-        {
-            return false;
-        }
+
         return isPrivatelyCacheable(response);
     }
 
