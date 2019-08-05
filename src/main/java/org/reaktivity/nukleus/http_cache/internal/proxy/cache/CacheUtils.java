@@ -19,6 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_CACHE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.PUBLIC;
@@ -27,6 +28,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.SURROGATE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -65,7 +67,7 @@ public final class CacheUtils
             {
                 case CACHE_CONTROL:
                     // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(CacheDirectives.MAX_AGE_0);
+                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
                 case METHOD:
                     return !HttpMethods.GET.equalsIgnoreCase(value);
                 case CONTENT_LENGTH:
@@ -89,7 +91,7 @@ public final class CacheUtils
             {
                 case CACHE_CONTROL:
                     // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(CacheDirectives.MAX_AGE_0);
+                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
                 default:
                     return false;
             }
@@ -124,6 +126,12 @@ public final class CacheUtils
         if (response.anyMatch(h ->
                 CACHE_CONTROL.equals(h.name().asString())
                 && h.value().asString().contains(CacheDirectives.PRIVATE)))
+        {
+            return false;
+        }
+        else if (response.anyMatch(h ->
+                    SURROGATE_CONTROL.equals(h.name().asString())
+                    && h.value().asString().contains(MAX_AGE_0)))
         {
             return false;
         }
