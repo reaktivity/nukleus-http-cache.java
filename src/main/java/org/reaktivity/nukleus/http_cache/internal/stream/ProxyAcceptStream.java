@@ -68,7 +68,7 @@ final class ProxyAcceptStream
 
     private int requestSlot = NO_SLOT;
     private Request request;
-    private int requestURLHash;
+    private int requestHash;
     private Future<?> preferWaitExpired;
 
     ProxyAcceptStream(
@@ -135,7 +135,7 @@ final class ProxyAcceptStream
         // Should already be canonicalized in http / http2 nuklei
         final String requestURL = getRequestURL(requestHeaders);
 
-        this.requestURLHash = 31 * authorizationScope + requestURL.hashCode();
+        this.requestHash = 31 * authorizationScope + requestURL.hashCode();
 
         // count all requests
         streamFactory.counters.requests.getAsLong();
@@ -153,7 +153,7 @@ final class ProxyAcceptStream
                 streamFactory.counters.requestsCacheable.getAsLong();
             }
 
-            handleRequest(requestHeaders, authorizationHeader, authorization, authorizationScope);
+            handleRequest(requestHeaders, authorizationHeader, authorization);
         }
         else
         {
@@ -161,7 +161,7 @@ final class ProxyAcceptStream
         }
     }
 
-    private short authorizationScope(
+    private static short authorizationScope(
         long authorization)
     {
         return (short) (authorization >>> 48);
@@ -170,8 +170,7 @@ final class ProxyAcceptStream
     private void handleRequest(
         final ListFW<HttpHeaderFW> requestHeaders,
         boolean authorizationHeader,
-        long authorization,
-        short authScope)
+        long authorization)
     {
         boolean stored = storeRequest(requestHeaders, streamFactory.requestBufferPool);
         if (!stored)
@@ -179,7 +178,9 @@ final class ProxyAcceptStream
             send503RetryAfter();
             return;
         }
+
         String etag = null;
+        short authScope = authorizationScope(authorization);
         HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
         if (etagHeader != null)
         {
@@ -195,7 +196,7 @@ final class ProxyAcceptStream
                 connectReplyId,
                 streamFactory.router,
                 streamFactory.router::supplyReceiver,
-                requestURLHash,
+                requestHash,
                 streamFactory.requestBufferPool,
                 requestSlot,
                 authorizationHeader,
@@ -211,13 +212,12 @@ final class ProxyAcceptStream
         {
             //NOOP
         }
-        else if (streamFactory.defaultCache.hasPendingInitialRequests(requestURLHash))
+        else if (streamFactory.defaultCache.hasPendingInitialRequests(requestHash))
         {
             streamFactory.defaultCache.addPendingRequest(defaultRequest);
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
-            // TODO move this logic and edge case inside of emulatedCache
             send504();
         }
         else
@@ -359,9 +359,8 @@ final class ProxyAcceptStream
     {
         switch (msgTypeId)
         {
-            case ResetFW.TYPE_ID:
-                preferWaitExpired.cancel(true);
-                streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
+            case AbortFW.TYPE_ID:
+                cleanupRequestIfNecessary();
                 break;
             default:
                 break;
@@ -445,7 +444,7 @@ final class ProxyAcceptStream
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
             final long traceId = reset.trace();
             streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-            streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
+            this.cleanupRequestIfNecessary();
             break;
         default:
             break;
@@ -460,5 +459,19 @@ final class ProxyAcceptStream
         final long groupId = window.groupId();
         final long traceId = window.trace();
         streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+    }
+
+    private void cleanupRequestIfNecessary()
+    {
+        if (preferWaitExpired != null)
+        {
+            preferWaitExpired.cancel(true);
+        }
+        DefaultRequest request = (DefaultRequest)this.streamFactory.requestCorrelations.remove(connectReplyId);
+        if (request != null)
+        {
+            this.streamFactory.defaultCache.removePendingInitialRequest(request);
+        }
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
     }
 }

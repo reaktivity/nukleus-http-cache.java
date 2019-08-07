@@ -70,7 +70,6 @@ public class ProxyStreamFactory implements StreamFactory
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
-    final HttpEndExFW.Builder httpEndExRW = new HttpEndExFW.Builder();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     final RouteManager router;

@@ -212,12 +212,12 @@ public class Cache
     }
 
     public boolean handleInitialRequest(
-        int requestURLHash,
+        int requestHash,
         ListFW<HttpHeaderFW> request,
         short authScope,
         CacheableRequest cacheableRequest)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestHash);
         if (cacheEntry != null)
         {
             return serveRequest(cacheEntry, request, authScope, cacheableRequest);
@@ -229,10 +229,10 @@ public class Cache
     }
 
     public void servePendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
         if (pendingInitialRequests != null)
         {
             pendingInitialRequests.removeSubscribers(s ->
@@ -254,15 +254,15 @@ public class Cache
     }
 
     public void sendPendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
         if (pendingInitialRequests != null)
         {
             final PendingInitialRequests newPendingInitialRequests = pendingInitialRequests.withNextInitialRequest();
             if (newPendingInitialRequests != null)
             {
-                pendingInitialRequestsMap.put(requestURLHash, newPendingInitialRequests);
+                pendingInitialRequestsMap.put(requestHash, newPendingInitialRequests);
                 sendPendingInitialRequest(newPendingInitialRequests.initialRequest());
             }
         }
@@ -291,32 +291,32 @@ public class Cache
     }
 
     public boolean hasPendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        return pendingInitialRequestsMap.containsKey(requestURLHash);
+        return pendingInitialRequestsMap.containsKey(requestHash);
     }
 
     public void addPendingRequest(
         InitialRequest initialRequest)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
     public void createPendingInitialRequests(
         InitialRequest initialRequest)
     {
-        pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
+        pendingInitialRequestsMap.put(initialRequest.requestHash(), new PendingInitialRequests(initialRequest));
     }
 
     public void handlePreferWaitIfNoneMatchRequest(
-        int requestURLHash,
+        int requestHash,
         PreferWaitIfNoneMatchRequest preferWaitRequest,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestHash);
+        PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestHash);
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
@@ -422,13 +422,13 @@ public class Cache
     public void notifyUncommitted(
         InitialRequest request)
     {
-        this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
+        this.uncommittedRequests.computeIfAbsent(request.requestHash(), p -> new PendingCacheEntries(request));
     }
 
     public void removeUncommitted(
         InitialRequest request)
     {
-        this.uncommittedRequests.computeIfPresent(request.requestURLHash(), (k, v) ->
+        this.uncommittedRequests.computeIfPresent(request.requestHash(), (k, v) ->
         {
             v.removeSubscribers(subscriber ->
             {

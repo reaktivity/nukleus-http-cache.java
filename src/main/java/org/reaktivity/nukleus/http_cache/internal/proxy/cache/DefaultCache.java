@@ -143,33 +143,33 @@ public class DefaultCache
                 signalId);
     }
 
-    public void signalForUpdatedCacheEntry(int requestURLHash)
+    public void signalForUpdatedCacheEntry(int requestHash)
     {
-       this.sendSignalToPendingInitialRequestsSubscribers(requestURLHash, CACHE_ENTRY_UPDATED_SIGNAL);
+       this.sendSignalToPendingInitialRequestsSubscribers(requestHash, CACHE_ENTRY_UPDATED_SIGNAL);
     }
 
-    public void signalAbort(
-        int requestURLHash)
+    public void signalAbortAllSubscribers(
+        int requestHash)
     {
-        this.sendSignalToPendingInitialRequestsSubscribers(requestURLHash, ABORT_SIGNAL);
+        this.sendSignalToPendingInitialRequestsSubscribers(requestHash, ABORT_SIGNAL);
     }
 
     private void sendSignalToPendingInitialRequestsSubscribers(
-        int requestURLHash,
+        int requestHash,
         long signal)
     {
-        pendingInitialRequestsMap.forEach((k, request) ->
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(requestHash);
+        if (pendingInitialRequests != null)
         {
-            DefaultRequest defaultRequest = request.initialRequest();
-            if(defaultRequest.requestURLHash() == requestURLHash)
+            pendingInitialRequests.subcribers().forEach(request ->
             {
-                writer.doSignal(defaultRequest.getSignaler(),
-                              defaultRequest.acceptRouteId,
-                              defaultRequest.acceptReplyStreamId,
-                              supplyTrace.getAsLong(),
+                writer.doSignal(request.getSignaler(),
+                                request.acceptRouteId,
+                                request.acceptReplyStreamId,
+                                supplyTrace.getAsLong(),
                                 signal);
-            }
-        });
+            });
+        }
     }
 
     public boolean handleCacheableRequest(
@@ -178,7 +178,7 @@ public class DefaultCache
         short authScope,
         DefaultRequest defaultRequest)
     {
-        final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(defaultRequest.requestURLHash());
+        final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(defaultRequest.requestHash());
         return defaultCacheEntry != null && serveRequest(streamFactory,
                                                          defaultCacheEntry,
                                                          requestHeaders,
@@ -187,43 +187,58 @@ public class DefaultCache
     }
 
     public void sendPendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
         if (pendingInitialRequests != null)
         {
             final PendingInitialRequests newPendingInitialRequests = pendingInitialRequests.withNextInitialRequest();
             if (newPendingInitialRequests != null)
             {
-                pendingInitialRequestsMap.put(requestURLHash, newPendingInitialRequests);
+                pendingInitialRequestsMap.put(requestHash, newPendingInitialRequests);
                 sendPendingInitialRequest(newPendingInitialRequests.initialRequest());
             }
+        }
+    }
+
+    public void send304ToPendingInitialRequests(
+        int requestHash)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
+        if (pendingInitialRequests != null)
+        {
+            DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
+            pendingInitialRequests.subcribers().forEach(request ->
+            {
+                send304(cacheEntry, request);
+            });
+            pendingInitialRequests.removeAllSubscribers();
         }
     }
 
     public void addPendingRequest(
         DefaultRequest initialRequest)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
     public void createPendingInitialRequests(
         DefaultRequest initialRequest)
     {
-        pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
+        pendingInitialRequestsMap.put(initialRequest.requestHash(), new PendingInitialRequests(initialRequest));
     }
 
     public void removePendingInitialRequest(
         DefaultRequest request)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(request.requestURLHash());
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(request.requestHash());
         if (pendingInitialRequests != null)
         {
             pendingInitialRequests.removeSubscriber(request);
             if(pendingInitialRequests.numberOfSubscribers() == 0)
             {
-                pendingInitialRequestsMap.remove(request.requestURLHash());
+                pendingInitialRequestsMap.remove(request.requestHash());
             }
         }
     }
@@ -231,7 +246,7 @@ public class DefaultCache
     public void purge(
         DefaultCacheEntry entry)
     {
-        this.cachedEntries.remove(entry.requestURLHash());
+        this.cachedEntries.remove(entry.requestHash());
         entry.purge();
     }
 
@@ -334,28 +349,37 @@ public class DefaultCache
     }
 
     public boolean hasPendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        return pendingInitialRequestsMap.containsKey(requestURLHash);
+        return pendingInitialRequestsMap.containsKey(requestHash);
     }
 
 
     public void purgeEntriesForNonPendingRequests()
     {
-        cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
-                                                 {
-                                                     if (!hasPendingInitialRequests(cacheEntry.requestURLHash()))
-                                                     {
-                                                         this.purge(cacheEntry);
-                                                     }
-                                                 });
+         cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
+         {
+             if (!hasPendingInitialRequests(cacheEntry.requestHash()))
+             {
+                 this.purge(cacheEntry);
+             }
+         });
     }
 
     public boolean isUpdatedByResponseHeadersToRetry(
         DefaultRequest request,
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        ListFW<HttpHeaderFW> requestHeaders = null;
+        try
+        {
+            requestHeaders = request.getRequestHeaders(requestHeadersRO);
+        }
+        catch (Exception ex)
+        {
+           ex.printStackTrace();
+        }
         if (isPreferWait(requestHeaders)
             && !isPreferenceApplied(responseHeaders))
         {
@@ -368,6 +392,12 @@ public class DefaultCache
             if (etag != null && newEtag != null)
             {
                 etagMatches = status.equals(HttpStatus.OK_200) && etag.equals(newEtag);
+
+                if (etagMatches)
+                {
+                    DefaultCacheEntry cacheEntry = cachedEntries.get(request.requestHash());
+                    cacheEntry.updateResponseHeader(responseHeaders);
+                }
             }
 
             boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;

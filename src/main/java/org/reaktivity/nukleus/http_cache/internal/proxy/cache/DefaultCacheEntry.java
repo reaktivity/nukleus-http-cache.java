@@ -36,7 +36,6 @@ import java.util.Objects;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
@@ -51,7 +50,7 @@ public final class DefaultCacheEntry
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     private final DefaultCache cache;
-    private final int requestURLHash;
+    private final int requestHash;
     private String etag;
     private String recentAuthorizationHeader;
 
@@ -71,12 +70,12 @@ public final class DefaultCacheEntry
 
     public DefaultCacheEntry(
         DefaultCache cache,
-        int requestURLHash,
+        int requestHash,
         BufferPool requestPool,
         BufferPool responsePool)
     {
         this.cache = cache;
-        this.requestURLHash = requestURLHash;
+        this.requestHash = requestHash;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
     }
@@ -104,11 +103,11 @@ public final class DefaultCacheEntry
         {
             return false;
         }
-        int requestHeaderSlot = requestPool.acquire(requestURLHash);
+        int requestHeaderSlot = requestPool.acquire(requestHash);
         if (requestHeaderSlot == Slab.NO_SLOT)
         {
             this.cache.purgeEntriesForNonPendingRequests();
-            requestHeaderSlot = requestPool.acquire(requestURLHash);
+            requestHeaderSlot = requestPool.acquire(requestHash);
             if (requestHeaderSlot == Slab.NO_SLOT)
             {
                 return false;
@@ -149,11 +148,11 @@ public final class DefaultCacheEntry
         {
             return false;
         }
-        int headerSlot = responsePool.acquire(requestURLHash);
+        int headerSlot = responsePool.acquire(requestHash);
         if (headerSlot == NO_SLOT)
         {
             this.cache.purgeEntriesForNonPendingRequests();
-            headerSlot = responsePool.acquire(requestURLHash);
+            headerSlot = responsePool.acquire(requestHash);
             if (headerSlot == NO_SLOT)
             {
                 return false;
@@ -269,20 +268,6 @@ public final class DefaultCacheEntry
             satisfiesAgeRequirements;
     }
 
-
-
-    public boolean isSelectedForUpdate(DefaultRequest request)
-    {
-        ListFW<HttpHeaderFW> responseHeaders = this.getResponseHeaders(cache.responseHeadersRO);
-        String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-        String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
-
-        assert status != null;
-
-        return status.equals(HttpStatus.NOT_MODIFIED_304) &&
-            this.etag.equals(etag);
-    }
-
     public void evictRequest()
     {
         this.requestPool.release(requestSlot);
@@ -298,9 +283,9 @@ public final class DefaultCacheEntry
         this.setResponseCompleted(false);
     }
 
-    public int requestURLHash()
+    public int requestHash()
     {
-        return this.requestURLHash;
+        return this.requestHash;
     }
 
     protected boolean isIntendedForSingleUser()
@@ -334,11 +319,11 @@ public final class DefaultCacheEntry
         if (slotSpaceRemaining == 0)
         {
             slotSpaceRemaining = slotCapacity;
-            int newSlot = bp.acquire(requestURLHash);
+            int newSlot = bp.acquire(requestHash);
             if (newSlot == NO_SLOT)
             {
                 this.cache.purgeEntriesForNonPendingRequests();
-                newSlot = bp.acquire(requestURLHash);
+                newSlot = bp.acquire(requestHash);
                 if (newSlot == NO_SLOT)
                 {
                     return false;

@@ -73,7 +73,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
         LongFunction<MessageConsumer> supplyReceiver,
-        int requestURLHash,
+        int requestHash,
         BufferPool bufferPool,
         int requestSlot,
         RouteManager router,
@@ -87,7 +87,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
               acceptRouteId,
               acceptReplyStreamId,
               router,
-              requestURLHash,
+              requestHash,
               authorizationHeader,
               authorization,
               authScope,
@@ -127,7 +127,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         {
             return false;
         }
-        int headerSlot = bp.acquire(requestURLHash());
+        int headerSlot = bp.acquire(requestHash());
         if (headerSlot == Slab.NO_SLOT)
         {
             return false;
@@ -160,7 +160,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             if (copied)
             {
                 state = CacheState.COMMITTED;
-                cache.put(requestURLHash(), this);
+                cache.put(requestHash(), this);
             }
             else
             {
@@ -289,7 +289,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         if (slotSpaceRemaining == 0)
         {
             slotSpaceRemaining = slotCapacity;
-            int newSlot = bp.acquire(requestURLHash());
+            int newSlot = bp.acquire(requestHash());
             if (newSlot == Slab.NO_SLOT)
             {
                 return false;

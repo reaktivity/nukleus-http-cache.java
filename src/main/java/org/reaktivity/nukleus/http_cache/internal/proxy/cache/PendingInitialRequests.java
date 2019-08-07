@@ -60,7 +60,14 @@ public class PendingInitialRequests
 
     void removeSubscriber(DefaultRequest request)
     {
+        request.purge();
         subscribers.remove(request);
+    }
+
+    void removeAllSubscribers()
+    {
+        request.purge();
+        subscribers.clear();
     }
 
     PendingInitialRequests withNextInitialRequest()

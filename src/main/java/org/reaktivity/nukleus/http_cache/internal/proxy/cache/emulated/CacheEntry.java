@@ -163,7 +163,7 @@ public final class CacheEntry
             sendRequestRefreshCompleted = true;
             return true;
         }
-        int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestURLHash());
+        int newSlot = cache.refreshBufferPool.acquire(cachedRequest.requestHash());
         if (newSlot == NO_SLOT)
         {
             sendRequestRefreshCompleted = true;
@@ -776,7 +776,7 @@ public final class CacheEntry
 
     public int requestUrl()
     {
-        return this.cachedRequest.requestURLHash();
+        return this.cachedRequest.requestHash();
     }
 
 }

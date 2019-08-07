@@ -125,7 +125,7 @@ public final class CacheUtils
     {
         if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())
                              && h.value().asString().contains(CacheDirectives.PRIVATE))
-            && response.anyMatch(h -> SURROGATE_CONTROL.equals(h.name().asString())
+            || response.anyMatch(h -> SURROGATE_CONTROL.equals(h.name().asString())
                               && h.value().asString().contains(MAX_AGE_0)))
         {
             return false;

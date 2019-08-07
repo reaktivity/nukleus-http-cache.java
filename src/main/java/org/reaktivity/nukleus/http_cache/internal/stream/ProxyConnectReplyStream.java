@@ -50,6 +50,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 
+import java.time.Instant;
 import java.util.concurrent.Future;
 
 final class ProxyConnectReplyStream
@@ -173,7 +174,8 @@ final class ProxyConnectReplyStream
         ListFW<HttpHeaderFW> responseHeaders)
     {
         DefaultRequest request = (DefaultRequest)streamCorrelation;
-        if (performRetryRequestIfNecessary(request, responseHeaders))
+
+        if (request.isRequestPurged() || performRetryRequestIfNecessary(request, responseHeaders))
         {
             return;
         }
@@ -187,7 +189,7 @@ final class ProxyConnectReplyStream
             streamCorrelation.purge();
             doProxyBegin(responseHeaders);
             this.streamFactory.defaultCache.removePendingInitialRequest(request);
-            this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestURLHash());
+            this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestHash());
         }
     }
 
@@ -221,7 +223,8 @@ final class ProxyConnectReplyStream
             }
             else
             {
-                this.streamFactory.scheduler.accept(retryAfter, this::retryCacheableRequest);
+                long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
+                this.streamFactory.scheduler.accept(requestAt, this::retryCacheableRequest);
             }
             return true;
         }
@@ -249,7 +252,7 @@ final class ProxyConnectReplyStream
         streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, builder ->
         {
             requestHeaders.forEach(
-                    h ->  builder.item(item -> item.name(h.name()).value(h.value())));
+                    h -> builder.item(item -> item.name(h.name()).value(h.value())));
         });
         streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
@@ -261,7 +264,8 @@ final class ProxyConnectReplyStream
         ListFW<HttpHeaderFW> responseHeaders)
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
-        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.supply(request.requestURLHash());
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.supply(request.requestHash());
+        newEtag = getHeader(responseHeaders, ETAG);
 
         //Initial cache entry
         if(cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
@@ -273,13 +277,15 @@ final class ProxyConnectReplyStream
                 // which requests are in flight
                 request.purge();
             }
-            this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
+            if(newEtag != null)
+            {
+                this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestHash());
+            }
             this.streamState = this::handleCacheableRequestResponse;
 
         }
         else
         {
-            newEtag = getHeader(responseHeaders, ETAG);
             if (cacheEntry.etag() != null
                 && cacheEntry.etag().equals(newEtag)
                 && cacheEntry.recentAuthorizationHeader() != null)
@@ -299,7 +305,7 @@ final class ProxyConnectReplyStream
                 this.streamState = this::handleCacheableRequestResponse;
                 if(newEtag != null)
                 {
-                    this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
+                    this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestHash());
                 }
             }
         }
@@ -346,7 +352,7 @@ final class ProxyConnectReplyStream
         int length)
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
-        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestURLHash());
+        DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestHash());
 
         switch (msgTypeId)
         {
@@ -361,7 +367,7 @@ final class ProxyConnectReplyStream
             }
             if (newEtag != null)
             {
-                this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
+                this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestHash());
             }
             sendWindow(data.length() + data.padding(), data.trace());
             break;
@@ -378,24 +384,40 @@ final class ProxyConnectReplyStream
                 }
                 else
                 {
-                    this.streamFactory.scheduler.accept(retryAfter, this::retryCacheableRequest);
+                    long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
+                    this.streamFactory.scheduler.accept(requestAt, this::retryCacheableRequest);
                 }
             }
             else
             {
-                this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestURLHash());
+                this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestHash());
             }
 
             break;
         case AbortFW.TYPE_ID:
         default:
-            this.streamFactory.defaultCache.signalAbort(request.requestURLHash());
-            request.purge();
+            if (newEtag != null)
+            {
+                this.streamFactory.defaultCache.signalAbortAllSubscribers(request.requestHash());
+                request.purge();
+            }
+            else
+            {
+                streamFactory.writer.doReset(request.acceptReply(),
+                                             request.acceptRouteId(),
+                                             acceptInitialId,
+                                             streamFactory.supplyTrace.getAsLong());
+                this.streamFactory.defaultCache.removePendingInitialRequest(request);
+                streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+            }
+
             break;
         }
     }
 
-    private void checkEtag(EndFW end, DefaultCacheEntry cacheEntry)
+    private void checkEtag(
+        EndFW end,
+        DefaultCacheEntry cacheEntry)
     {
         final OctetsFW extension = end.extension();
         if (extension.sizeof() > 0)
@@ -489,7 +511,9 @@ final class ProxyConnectReplyStream
         }
     }
 
-    private void sendWindow(int credit, long traceId)
+    private void sendWindow(
+        int credit,
+        long traceId)
     {
         connectReplyBudget += credit;
         if (connectReplyBudget > 0)
@@ -590,16 +614,17 @@ final class ProxyConnectReplyStream
             case ResetFW.TYPE_ID:
             default:
                 this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                    groupId,
-                    streamCorrelation.acceptReplyId(),
-                    this.streamFactory.supplyTrace.getAsLong());
+                                                        groupId,
+                                                        streamCorrelation.acceptReplyId(),
+                                                        this.streamFactory.supplyTrace.getAsLong());
                 streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
                 streamCorrelation.purge();
                 break;
         }
     }
 
-    private void onSignal(SignalFW signal)
+    private void onSignal(
+        SignalFW signal)
     {
         final long signalId = signal.signalId();
 
@@ -610,28 +635,14 @@ final class ProxyConnectReplyStream
 
         if (signalId == CACHE_ENTRY_UPDATED_SIGNAL || signalId == CACHE_ENTRY_SIGNAL)
         {
-            DefaultRequest request = (DefaultRequest) streamCorrelation;
-            cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
-            if(payloadWritten == -1)
-            {
-                Future<?> requestExpiryTimeout = this.streamFactory.expiryRequestsCorrelations.remove(signal.streamId());
-                if (requestExpiryTimeout != null)
-                {
-                    requestExpiryTimeout.cancel(true);
-                }
-                sendHttpResponseHeaders(cacheEntry, signalId);
-            }
-            else
-            {
-                this.streamFactory.budgetManager.resumeAssigningBudget(groupId, 0, signal.trace());
-                sendEndIfNecessary(signal.trace());
-            }
+            handleCacheUpdateSignal(signal);
         }
         else if (signalId == REQUEST_EXPIRED_SIGNAL)
         {
             DefaultRequest request = (DefaultRequest) streamCorrelation;
-            cacheEntry = streamFactory.defaultCache.get(request.requestURLHash());
-            this.streamFactory.defaultCache.send304(cacheEntry, request);
+            cacheEntry = streamFactory.defaultCache.get(request.requestHash());
+            this.streamFactory.defaultCache.send304ToPendingInitialRequests(request.requestHash());
+            streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
         }
         else if (signalId == ABORT_SIGNAL)
         {
@@ -644,7 +655,33 @@ final class ProxyConnectReplyStream
         }
     }
 
-    private void sendHttpResponseHeaders(DefaultCacheEntry cacheEntry, long signalId)
+    private void handleCacheUpdateSignal(
+        SignalFW signal)
+    {
+        DefaultRequest request = (DefaultRequest) streamCorrelation;
+        if (request != null)
+        {
+            cacheEntry = streamFactory.defaultCache.get(request.requestHash());
+            if(payloadWritten == -1)
+            {
+                Future<?> requestExpiryTimeout = this.streamFactory.expiryRequestsCorrelations.remove(signal.streamId());
+                if (requestExpiryTimeout != null)
+                {
+                    requestExpiryTimeout.cancel(true);
+                }
+                sendHttpResponseHeaders(cacheEntry, signal.signalId());
+            }
+            else
+            {
+                this.streamFactory.budgetManager.resumeAssigningBudget(groupId, 0, signal.trace());
+                sendEndIfNecessary(signal.trace());
+            }
+        }
+    }
+
+    private void sendHttpResponseHeaders(
+        DefaultCacheEntry cacheEntry,
+        long signalId)
     {
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
@@ -686,7 +723,8 @@ final class ProxyConnectReplyStream
         this.streamFactory.counters.responses.getAsLong();
     }
 
-    private void sendEndIfNecessary(long traceId)
+    private void sendEndIfNecessary(
+        long traceId)
     {
         final DefaultRequest request = (DefaultRequest) streamCorrelation;
         final MessageConsumer acceptReply = request.acceptReply();
@@ -724,7 +762,9 @@ final class ProxyConnectReplyStream
         }
     }
 
-    private int writePayload(int budget, long trace)
+    private int writePayload(
+        int budget,
+        long trace)
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
         final MessageConsumer acceptReply = request.acceptReply();

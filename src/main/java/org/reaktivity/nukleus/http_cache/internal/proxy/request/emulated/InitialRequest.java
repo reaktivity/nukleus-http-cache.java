@@ -39,7 +39,7 @@ public class InitialRequest extends CacheableRequest
             LongUnaryOperator supplyInitialId,
             LongUnaryOperator supplyReplyId,
             LongFunction<MessageConsumer> supplyReceiver,
-            int requestURLHash,
+            int requestHash,
             BufferPool bufferPool,
             int requestSlot,
             RouteManager router,
@@ -56,7 +56,7 @@ public class InitialRequest extends CacheableRequest
               supplyInitialId,
               supplyReplyId,
               supplyReceiver,
-              requestURLHash,
+              requestHash,
               bufferPool,
               requestSlot,
               router,
@@ -92,14 +92,14 @@ public class InitialRequest extends CacheableRequest
     {
         super.purge();
         cache.removeUncommitted(this);
-        cache.sendPendingInitialRequests(requestURLHash());
+        cache.sendPendingInitialRequests(requestHash());
     }
 
     @Override
     public boolean cache(EndFW end, Cache cache)
     {
         boolean cached = super.cache(end, cache);
-        cache.servePendingInitialRequests(requestURLHash());
+        cache.servePendingInitialRequests(requestHash());
         return cached;
     }
 

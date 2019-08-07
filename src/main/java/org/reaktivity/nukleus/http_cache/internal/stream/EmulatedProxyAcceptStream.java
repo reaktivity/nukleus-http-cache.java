@@ -62,7 +62,7 @@ final class EmulatedProxyAcceptStream
 
     private int requestSlot = NO_SLOT;
     private Request request;
-    private int requestURLHash;
+    private int requestHash;
 
     EmulatedProxyAcceptStream(
         ProxyStreamFactory streamFactory,
@@ -126,7 +126,7 @@ final class EmulatedProxyAcceptStream
         // Should already be canonicalized in http / http2 nuklei
         final String requestURL = getRequestURL(requestHeaders);
 
-        this.requestURLHash = 31 * authorizationScope + requestURL.hashCode();
+        this.requestHash = 31 * authorizationScope + requestURL.hashCode();
 
         // count all requests
         streamFactory.counters.requests.getAsLong();
@@ -180,7 +180,7 @@ final class EmulatedProxyAcceptStream
             acceptRouteId,
             acceptReplyId,
             streamFactory.router,
-            requestURLHash,
+            requestHash,
             authorizationHeader,
             authorization,
             authScope,
@@ -190,7 +190,7 @@ final class EmulatedProxyAcceptStream
         this.request = preferWaitRequest;
 
         streamFactory.emulatedCache.handlePreferWaitIfNoneMatchRequest(
-                requestURLHash,
+                requestHash,
                 preferWaitRequest,
                 requestHeaders,
                 authScope);
@@ -226,7 +226,7 @@ final class EmulatedProxyAcceptStream
                 streamFactory.supplyInitialId,
                 streamFactory.supplyReplyId,
                 streamFactory.router::supplyReceiver,
-                requestURLHash,
+                requestHash,
                 streamFactory.requestBufferPool,
                 requestSlot,
                 streamFactory.router,
@@ -236,11 +236,11 @@ final class EmulatedProxyAcceptStream
                 etag,
                 true);
 
-        if (streamFactory.emulatedCache.handleInitialRequest(requestURLHash, requestHeaders, authScope, cacheableRequest))
+        if (streamFactory.emulatedCache.handleInitialRequest(requestHash, requestHeaders, authScope, cacheableRequest))
         {
             this.request.purge();
         }
-        else if (streamFactory.emulatedCache.hasPendingInitialRequests(requestURLHash))
+        else if (streamFactory.emulatedCache.hasPendingInitialRequests(requestHash))
         {
             streamFactory.emulatedCache.addPendingRequest(cacheableRequest);
         }

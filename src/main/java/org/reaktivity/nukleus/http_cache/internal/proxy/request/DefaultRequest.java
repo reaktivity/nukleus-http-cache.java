@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.request;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -26,12 +25,14 @@ import org.reaktivity.nukleus.route.RouteManager;
 import java.util.function.LongFunction;
 import java.util.function.LongUnaryOperator;
 
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+
 public class DefaultRequest extends Request
 {
     private long acceptReplyId;
     private long connectRouteId;
     private long connectReplyId;
-    private final int requestURLHash;
+    private final int requestHash;
     private final long authorization;
     private final short authScope;
     private BufferPool bufferPool;
@@ -43,6 +44,7 @@ public class DefaultRequest extends Request
     private int attempts;
     final LongUnaryOperator supplyReplyId;
     final LongUnaryOperator supplyInitialId;
+    private boolean isRequestPurged;
 
     public DefaultRequest(
         MessageConsumer acceptReply,
@@ -53,7 +55,7 @@ public class DefaultRequest extends Request
         long connectReplyId,
         RouteManager router,
         LongFunction<MessageConsumer> supplyReceiver,
-        int requestURLHash,
+        int requestHash,
         BufferPool bufferPool,
         int requestSlot,
         boolean authorizationHeader,
@@ -68,7 +70,7 @@ public class DefaultRequest extends Request
         this.acceptReplyId = acceptReplyId;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
-        this.requestURLHash = requestURLHash;
+        this.requestHash = requestHash;
         this.bufferPool = bufferPool;
         this.requestSlot = requestSlot;
         this.authorizationHeader = authorizationHeader;
@@ -107,9 +109,9 @@ public class DefaultRequest extends Request
         return etag;
     }
 
-    public final int requestURLHash()
+    public final int requestHash()
     {
-        return requestURLHash;
+        return requestHash;
     }
 
     public void etag(String etag)
@@ -119,11 +121,12 @@ public class DefaultRequest extends Request
 
     public void purge()
     {
-        if (requestSlot != Slab.NO_SLOT)
+        if (requestSlot != NO_SLOT)
         {
             bufferPool.release(requestSlot);
-            this.requestSlot = Slab.NO_SLOT;
+            this.requestSlot = NO_SLOT;
         }
+        this.isRequestPurged = true;
     }
 
     public MessageConsumer getSignaler()
@@ -183,5 +186,10 @@ public class DefaultRequest extends Request
     public long connectReplyId()
     {
         return connectReplyId;
+    }
+
+    public boolean isRequestPurged()
+    {
+        return isRequestPurged;
     }
 }

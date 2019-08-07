@@ -21,7 +21,7 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class AnswerableByCacheRequest extends Request
 {
-    private final int requestURLHash;
+    private final int requestHash;
     private final long authorization;
     private final short authScope;
     private final boolean authorizationHeader;
@@ -32,7 +32,7 @@ public abstract class AnswerableByCacheRequest extends Request
         long acceptRouteId,
         long acceptReplyStreamId,
         RouteManager router,
-        int requestURLHash,
+        int requestHash,
         boolean authorizationHeader,
         long authorization,
         short authScope,
@@ -40,7 +40,7 @@ public abstract class AnswerableByCacheRequest extends Request
         boolean isEmulated)
     {
         super(acceptReply, acceptRouteId, acceptReplyStreamId, router, isEmulated);
-        this.requestURLHash = requestURLHash;
+        this.requestHash = requestHash;
         this.authorizationHeader = authorizationHeader;
         this.authorization = authorization;
         this.authScope = authScope;
@@ -67,9 +67,9 @@ public abstract class AnswerableByCacheRequest extends Request
         return etag;
     }
 
-    public final int requestURLHash()
+    public final int requestHash()
     {
-        return requestURLHash;
+        return requestHash;
     }
 
     public void etag(String etag)
