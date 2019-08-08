@@ -244,10 +244,13 @@ public class DefaultCache
     }
 
     public void purge(
-        DefaultCacheEntry entry)
+        int requestHash)
     {
-        this.cachedEntries.remove(entry.requestHash());
-        entry.purge();
+        DefaultCacheEntry cacheEntry = this.cachedEntries.remove(requestHash);
+        if (cacheEntry != null)
+        {
+            cacheEntry.purge();
+        }
     }
 
     private void updateCache(
@@ -361,7 +364,7 @@ public class DefaultCache
          {
              if (!hasPendingInitialRequests(cacheEntry.requestHash()))
              {
-                 this.purge(cacheEntry);
+                 this.purge(cacheEntry.requestHash());
              }
          });
     }

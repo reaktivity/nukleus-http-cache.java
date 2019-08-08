@@ -467,11 +467,11 @@ final class ProxyAcceptStream
         {
             preferWaitExpired.cancel(true);
         }
-        DefaultRequest request = (DefaultRequest)this.streamFactory.requestCorrelations.remove(connectReplyId);
-        if (request != null)
+        Request request = this.streamFactory.requestCorrelations.remove(connectReplyId);
+        if (request.getType() != null && request.getType() == Request.Type.DEFAULT_REQUEST)
         {
-            this.streamFactory.defaultCache.removePendingInitialRequest(request);
+            this.streamFactory.defaultCache.removePendingInitialRequest((DefaultRequest) request);
+            streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         }
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
     }
 }
