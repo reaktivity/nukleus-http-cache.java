@@ -637,7 +637,13 @@ final class ProxyConnectReplyStream
                                                         streamCorrelation.acceptReplyId(),
                                                         this.streamFactory.supplyTrace.getAsLong());
                 streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
-                streamCorrelation.purge();
+                DefaultRequest request = (DefaultRequest) streamCorrelation;
+                this.streamFactory.defaultCache.removePendingInitialRequest(request);
+                request.purge();
+                streamFactory.writer.doReset(request.acceptReply(),
+                                             request.acceptRouteId(),
+                                             acceptInitialId,
+                                             streamFactory.supplyTrace.getAsLong());
                 break;
         }
     }
@@ -771,9 +777,9 @@ final class ProxyConnectReplyStream
             }
 
             this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                groupId,
-                acceptReplyStreamId,
-                traceId);
+                                                    groupId,
+                                                    acceptReplyStreamId,
+                                                    traceId);
             this.streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             this.streamFactory.defaultCache.removePendingInitialRequest(request);
             request.purge();
