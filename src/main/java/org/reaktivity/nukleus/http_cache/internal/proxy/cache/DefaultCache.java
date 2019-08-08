@@ -210,7 +210,18 @@ public class DefaultCache
             pendingInitialRequests.subcribers().forEach(request ->
             {
                 send304(cacheEntry, request);
+                request.purge();
             });
+            pendingInitialRequests.removeAllSubscribers();
+        }
+    }
+
+    public void removeAllPendingInitialRequests(
+        int requestHash)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
+        if (pendingInitialRequests != null)
+        {
             pendingInitialRequests.removeAllSubscribers();
         }
     }

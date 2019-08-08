@@ -403,6 +403,7 @@ final class ProxyConnectReplyStream
         else
         {
             this.streamFactory.defaultCache.signalForUpdatedCacheEntry(request.requestHash());
+            this.streamFactory.defaultCache.removeAllPendingInitialRequests(request.requestHash());
         }
     }
 

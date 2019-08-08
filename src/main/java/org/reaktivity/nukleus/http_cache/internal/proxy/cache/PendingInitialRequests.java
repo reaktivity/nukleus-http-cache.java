@@ -66,7 +66,6 @@ public class PendingInitialRequests
 
     void removeAllSubscribers()
     {
-        request.purge();
         subscribers.clear();
     }
 
