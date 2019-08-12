@@ -21,6 +21,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
@@ -174,7 +175,10 @@ public class Writer
         {
             final StringFW nameFW = h.name();
             final String16FW valueFW = h.value();
-            builder.item(header -> header.name(nameFW).value(valueFW));
+            if (!nameFW.asString().equalsIgnoreCase(RETRY_AFTER))
+            {
+                builder.item(header -> header.name(nameFW).value(valueFW));
+            }
         });
 
         if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)

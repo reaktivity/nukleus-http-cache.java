@@ -228,6 +228,11 @@ final class ProxyConnectReplyStream
     private void retryCacheableRequest()
     {
         DefaultRequest request = (DefaultRequest) streamCorrelation;
+        if (request.isRequestPurged())
+        {
+            return;
+        }
+
         request.incAttempts();
 
         long connectInitialId = this.streamFactory.supplyInitialId.applyAsLong(connectRouteId);
