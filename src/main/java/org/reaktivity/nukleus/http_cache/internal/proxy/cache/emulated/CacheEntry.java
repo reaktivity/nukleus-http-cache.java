@@ -350,6 +350,7 @@ public final class CacheEntry
                 cachedRequest.etag());
         }
     }
+
     public void purge()
     {
         switch (this.state)
