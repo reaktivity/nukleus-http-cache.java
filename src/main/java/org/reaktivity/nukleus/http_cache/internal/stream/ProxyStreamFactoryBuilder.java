@@ -187,10 +187,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
             this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
         }
 
-        if (cacheEntries == null)
-        {
-            cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
-        }
+        cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
 
         if (emulatedCache == null)
         {

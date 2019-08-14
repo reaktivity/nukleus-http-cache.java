@@ -30,7 +30,7 @@ public abstract class Request
     public final long acceptReplyStreamId;
     public final RouteManager router;
 
-    private boolean isEmulated;
+    private final boolean isEmulated;
 
     public Request(
         MessageConsumer acceptReply,

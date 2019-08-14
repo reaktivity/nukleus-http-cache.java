@@ -86,8 +86,8 @@ public class Cache
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
     final LongSupplier supplyTrace;
-    final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
-    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests;
+    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
 
     public Cache(
@@ -125,6 +125,8 @@ public class Cache
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
+        this.uncommittedRequests = new Int2ObjectHashMap<>();
+        this.pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     }
 
     public void put(
