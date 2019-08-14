@@ -110,4 +110,15 @@ public class Rfc7240ProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/missing.preference.applied.header.with.retry.after/accept/client",
+        "${streams}/missing.preference.applied.header.with.retry.after/connect/server",
+    })
+    public void shouldHandleMissingPreferenceAppliedHeaderWithRetryAfter() throws Exception
+    {
+        k3po.finish();
+    }
 }
