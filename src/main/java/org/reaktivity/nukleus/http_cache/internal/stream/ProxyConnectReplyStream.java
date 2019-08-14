@@ -20,6 +20,7 @@ import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
@@ -428,8 +429,8 @@ final class ProxyConnectReplyStream
         else
         {
             this.streamFactory.defaultCache.signalAbortAllSubscribers(request.requestHash());
-            request.purge();
         }
+        request.purge();
         this.streamFactory.defaultCache.purge(request.requestHash());
     }
 
@@ -677,12 +678,47 @@ final class ProxyConnectReplyStream
         }
         else if (signalId == ABORT_SIGNAL)
         {
-            streamFactory.writer.doAbort(streamCorrelation.acceptReply(),
-                                        streamCorrelation.acceptRouteId(),
-                                        streamCorrelation.acceptReplyStreamId,
-                                        signal.trace());
-            streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+            if (this.payloadWritten >= 0)
+            {
+                streamFactory.writer.doAbort(streamCorrelation.acceptReply(),
+                                             streamCorrelation.acceptRouteId(),
+                                             streamCorrelation.acceptReplyStreamId,
+                                             signal.trace());
+                streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+            }
+            else
+            {
+                send503RetryAfter();
+            }
+
+
         }
+    }
+
+    private void send503RetryAfter()
+    {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(),
+                              streamCorrelation.acceptReplyStreamId, "503");
+        }
+
+        streamFactory.writer.doHttpResponse(streamCorrelation.acceptReply(),
+                                            streamCorrelation.acceptRouteId(),
+                                            streamCorrelation.acceptReplyStreamId,
+                                            streamFactory.supplyTrace.getAsLong(), e ->
+                                            e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
+                                             .item(h -> h.name("retry-after").value("0")));
+        streamFactory.writer.doHttpEnd(streamCorrelation.acceptReply(),
+                                       streamCorrelation.acceptRouteId(),
+                                       streamCorrelation.acceptReplyStreamId,
+                                       streamFactory.supplyTrace.getAsLong());
+
+        // count all responses
+        streamFactory.counters.responses.getAsLong();
+
+        // count retry responses
+        streamFactory.counters.responsesRetry.getAsLong();
     }
 
     private void handleCacheUpdateSignal(
@@ -692,6 +728,10 @@ final class ProxyConnectReplyStream
         if (request != null)
         {
             cacheEntry = streamFactory.defaultCache.get(request.requestHash());
+            if (cacheEntry == null)
+            {
+                return;
+            }
             if(payloadWritten == -1)
             {
                 Future<?> requestExpiryTimeout = this.streamFactory.expiryRequestsCorrelations.remove(signal.streamId());

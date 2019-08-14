@@ -19,5 +19,5 @@ public final class HttpStatus
 {
     public static final String OK_200 = "200";
     public static final String NOT_MODIFIED_304 = "304";
-    public static final String SERVICE_UNAVILABLE_503 = "503";
+    public static final String SERVICE_UNAVAILABLE_503 = "503";
 }
