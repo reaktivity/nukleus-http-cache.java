@@ -227,8 +227,8 @@ final class ProxyAcceptStream
                 streamFactory.supplyReplyId,
                 false);
 
-        if (satisfiedByCache(requestHeaders)
-            && streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, defaultRequest))
+        if (satisfiedByCache(requestHeaders) &&
+            streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, defaultRequest))
         {
             //NOOP
         }
