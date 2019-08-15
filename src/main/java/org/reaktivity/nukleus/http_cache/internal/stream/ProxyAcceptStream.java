@@ -63,8 +63,6 @@ final class ProxyAcceptStream
     private long connectReplyId;
     private long connectInitialId;
 
-    private MessageConsumer streamState;
-
     private int requestSlot = NO_SLOT;
     private Request request;
     private int requestHash;
@@ -90,19 +88,10 @@ final class ProxyAcceptStream
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
-        this.streamState = this::onRequestMessage;
     }
 
-    void handleStream(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        streamState.accept(msgTypeId, buffer, index, length);
-    }
 
-    private void onRequestMessage(
+    void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -247,7 +236,6 @@ final class ProxyAcceptStream
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        this.streamState = this::onRequestMessage;
     }
 
     private void schedulePreferWaitIfNoneMatchIfNecessary(ListFW<HttpHeaderFW> requestHeaders)
@@ -287,7 +275,6 @@ final class ProxyAcceptStream
 
         sendBeginToConnect(requestHeaders, connectReplyId);
 
-        this.streamState = this::onRequestMessage;
     }
 
     private void sendBeginToConnect(

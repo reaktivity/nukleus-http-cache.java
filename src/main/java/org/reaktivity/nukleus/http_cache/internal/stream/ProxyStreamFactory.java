@@ -202,7 +202,7 @@ public class ProxyStreamFactory implements StreamFactory
                                                     connectInitial,
                                                     connectInitialId,
                                                     connectReplyId,
-                                                    connectRouteId)::handleStream;
+                                                    connectRouteId)::onRequestMessage;
 
                 ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
                                                                                     connectReply,
