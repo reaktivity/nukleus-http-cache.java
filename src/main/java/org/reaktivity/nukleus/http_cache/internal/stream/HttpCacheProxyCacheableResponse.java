@@ -54,9 +54,9 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import java.time.Instant;
 import java.util.concurrent.Future;
 
-final class ProxyConnectReplyStream
+final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 {
-    private final ProxyStreamFactory streamFactory;
+    private final HttpCacheProxyFactory streamFactory;
 
     private MessageConsumer streamState;
 
@@ -79,14 +79,14 @@ final class ProxyConnectReplyStream
     private long traceId;
     private boolean isResponseBuffering;
 
-    ProxyConnectReplyStream(
-        ProxyStreamFactory proxyStreamFactory,
+    HttpCacheProxyCacheableResponse(
+        HttpCacheProxyFactory httpCacheProxyFactory,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
         long connectReplyId,
         long acceptInitialId)
     {
-        this.streamFactory = proxyStreamFactory;
+        this.streamFactory = httpCacheProxyFactory;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyStreamId = connectReplyId;
@@ -614,7 +614,7 @@ final class ProxyConnectReplyStream
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 
-    public void onThrottleBeforeBegin(
+    void onThrottleBeforeBegin(
         int msgTypeId,
         DirectBuffer buffer,
         int index,

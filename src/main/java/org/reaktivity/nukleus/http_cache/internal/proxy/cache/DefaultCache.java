@@ -24,7 +24,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
-import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactory;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactory;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -172,7 +172,7 @@ public class DefaultCache
     }
 
     public boolean handleCacheableRequest(
-        ProxyStreamFactory streamFactory,
+        HttpCacheProxyFactory streamFactory,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
         DefaultRequest defaultRequest)
@@ -288,7 +288,7 @@ public class DefaultCache
     }
 
     private boolean serveRequest(
-        ProxyStreamFactory streamFactory,
+        HttpCacheProxyFactory streamFactory,
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,

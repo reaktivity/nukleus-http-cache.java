@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
 import java.util.concurrent.Future;
@@ -55,7 +56,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 
-public class ProxyStreamFactory implements StreamFactory
+public class HttpCacheProxyFactory implements StreamFactory
 {
     private final RouteFW routeRO = new RouteFW();
 
@@ -81,7 +82,7 @@ public class ProxyStreamFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     public final Long2ObjectHashMap<Request> requestCorrelations;
-    final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
+    final Long2ObjectHashMap<HttpCacheProxyResponse> correlations;
     final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     final Writer writer;
@@ -92,7 +93,7 @@ public class ProxyStreamFactory implements StreamFactory
     final SignalingExecutor executor;
     final LongObjectBiConsumer<Runnable> scheduler;
 
-    public ProxyStreamFactory(
+    public HttpCacheProxyFactory(
         RouteManager router,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
@@ -100,7 +101,7 @@ public class ProxyStreamFactory implements StreamFactory
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Request> requestCorrelations,
-        Long2ObjectHashMap<ProxyConnectReplyStream> correlations,
+        Long2ObjectHashMap<HttpCacheProxyResponse> correlations,
         Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations,
         Cache emulatedCache,
         DefaultCache defaultCache,
@@ -193,22 +194,39 @@ public class ProxyStreamFactory implements StreamFactory
                 long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
                 long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
                 MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
+                HttpCacheProxyResponse replyStream;
 
-                newStream = new ProxyAcceptStream(this,
-                                                    acceptReply,
-                                                    acceptRouteId,
-                                                    acceptInitialId,
-                                                    acceptReplyId,
-                                                    connectInitial,
-                                                    connectInitialId,
-                                                    connectReplyId,
-                                                    connectRouteId)::onRequestMessage;
+                if (canBeServedByCache(requestHeaders))
+                {
+                    HttpCacheProxyCacheableRequest cacheableRequest = new HttpCacheProxyCacheableRequest(this,
+                                                                          acceptReply,
+                                                                          acceptRouteId,
+                                                                          acceptInitialId,
+                                                                          acceptReplyId,
+                                                                          connectInitial,
+                                                                          connectReply,
+                                                                          connectInitialId,
+                                                                          connectReplyId,
+                                                                          connectRouteId);
+                    newStream = cacheableRequest::onRequestMessage;
+                    replyStream = cacheableRequest.newResponse();
+                }
+                else
+                {
+                    HttpCacheProxyNonCacheableRequest nonCacheableRequest = new HttpCacheProxyNonCacheableRequest(this,
+                                                                                acceptReply,
+                                                                                acceptRouteId,
+                                                                                acceptInitialId,
+                                                                                acceptReplyId,
+                                                                                connectInitial,
+                                                                                connectReply,
+                                                                                connectInitialId,
+                                                                                connectReplyId,
+                                                                                connectRouteId);
+                    newStream = nonCacheableRequest::onRequestMessage;
+                    replyStream = nonCacheableRequest.newResponse();
+                }
 
-                ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
-                                                                                    connectReply,
-                                                                                    connectRouteId,
-                                                                                    connectReplyId,
-                                                                                    acceptInitialId);
                 correlations.put(connectReplyId, replyStream);
                 router.setThrottle(acceptReplyId, replyStream::onThrottleBeforeBegin);
             }
@@ -235,7 +253,7 @@ public class ProxyStreamFactory implements StreamFactory
         }
         else
         {
-            ProxyConnectReplyStream replyStream = correlations.remove(sourceId);
+            HttpCacheProxyResponse replyStream = correlations.remove(sourceId);
             MessageConsumer newStream = null;
 
             if (replyStream != null)
@@ -262,17 +280,17 @@ public class ProxyStreamFactory implements StreamFactory
         long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
         MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
 
-        ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
-            connectReply,
-            connectRouteId,
-            connectReplyId,
-            acceptInitialId);
+        HttpCacheProxyCacheableResponse replyStream = new HttpCacheProxyCacheableResponse(this,
+                                                                                          connectReply,
+                                                                                          connectRouteId,
+                                                                                          connectReplyId,
+                                                                                          acceptInitialId);
         correlations.put(connectReplyId, replyStream);
     }
 
     boolean cleanupCorrelationIfNecessary(long  connectReplyId, long acceptInitialId)
     {
-        final ProxyConnectReplyStream correlated = correlations.remove(connectReplyId);
+        final HttpCacheProxyResponse correlated = correlations.remove(connectReplyId);
         if (correlated != null)
         {
             router.clearThrottle(acceptInitialId);

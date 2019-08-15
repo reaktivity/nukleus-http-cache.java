@@ -41,13 +41,13 @@ import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 
-public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
+public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 {
 
     private final HttpCacheConfiguration config;
     private final LongObjectBiConsumer<Runnable> scheduler;
     private final Long2ObjectHashMap<Request> requestCorrelations;
-    private final Long2ObjectHashMap<ProxyConnectReplyStream> correlations;
+    private final Long2ObjectHashMap<HttpCacheProxyResponse> correlations;
     private final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     private RouteManager router;
@@ -68,7 +68,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
 
     private LongConsumer cacheEntries;
 
-    public ProxyStreamFactoryBuilder(
+    public HttpCacheProxyFactoryBuilder(
             HttpCacheConfiguration config,
             LongObjectBiConsumer<Runnable> scheduler)
     {
@@ -80,7 +80,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setRouteManager(
+    public HttpCacheProxyFactoryBuilder setRouteManager(
         RouteManager router)
     {
         this.router = router;
@@ -88,7 +88,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setWriteBuffer(
+    public HttpCacheProxyFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
@@ -96,7 +96,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setInitialIdSupplier(
+    public HttpCacheProxyFactoryBuilder setInitialIdSupplier(
         LongUnaryOperator supplyInitialId)
     {
         this.supplyInitialId = supplyInitialId;
@@ -128,14 +128,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setGroupBudgetClaimer(
+    public HttpCacheProxyFactoryBuilder setGroupBudgetClaimer(
         LongFunction<IntUnaryOperator> groupBudgetClaimer)
     {
         return this;
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setGroupBudgetReleaser(
+    public HttpCacheProxyFactoryBuilder setGroupBudgetReleaser(
         LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         return this;
@@ -218,7 +218,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
                 executor);
         }
 
-        return new ProxyStreamFactory(
+        return new HttpCacheProxyFactory(
                 router,
                 defaultBudgetManager,
                 writeBuffer,

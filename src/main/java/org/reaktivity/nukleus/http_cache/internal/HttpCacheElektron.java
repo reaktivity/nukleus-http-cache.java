@@ -22,7 +22,7 @@ import java.util.EnumMap;
 import java.util.Map;
 
 import org.reaktivity.nukleus.Elektron;
-import org.reaktivity.nukleus.http_cache.internal.stream.ProxyStreamFactoryBuilder;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactoryBuilder;
 import org.reaktivity.nukleus.http_cache.internal.stream.ServerStreamFactoryBuilder;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.DelayedTaskScheduler;
 import org.reaktivity.nukleus.route.RouteKind;
@@ -39,7 +39,7 @@ final class HttpCacheElektron implements Elektron
         DelayedTaskScheduler scheduler = new DelayedTaskScheduler();
         Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders = new EnumMap<>(RouteKind.class);
         streamFactoryBuilders.put(SERVER, new ServerStreamFactoryBuilder());
-        streamFactoryBuilders.put(PROXY, new ProxyStreamFactoryBuilder(config, scheduler::schedule));
+        streamFactoryBuilders.put(PROXY, new HttpCacheProxyFactoryBuilder(config, scheduler::schedule));
 
         this.agent = new HttpCacheAgent(scheduler);
         this.streamFactoryBuilders = streamFactoryBuilders;

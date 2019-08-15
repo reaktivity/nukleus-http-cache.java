@@ -45,7 +45,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 final class EmulatedProxyConnectReplyStream
 {
-    private final ProxyStreamFactory streamFactory;
+    private final HttpCacheProxyFactory streamFactory;
 
     private MessageConsumer streamState;
 
@@ -64,12 +64,12 @@ final class EmulatedProxyConnectReplyStream
     private OctetsFW endExtension;
 
     EmulatedProxyConnectReplyStream(
-        ProxyStreamFactory proxyStreamFactory,
+        HttpCacheProxyFactory httpCacheProxyFactory,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
         long connectReplyId)
     {
-        this.streamFactory = proxyStreamFactory;
+        this.streamFactory = httpCacheProxyFactory;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyStreamId = connectReplyId;

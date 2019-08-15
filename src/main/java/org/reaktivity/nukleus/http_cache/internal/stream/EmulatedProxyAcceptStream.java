@@ -47,7 +47,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 final class EmulatedProxyAcceptStream
 {
-    private final ProxyStreamFactory streamFactory;
+    private final HttpCacheProxyFactory streamFactory;
     private final long acceptRouteId;
     private final long acceptStreamId;
     private final MessageConsumer acceptReply;
@@ -65,7 +65,7 @@ final class EmulatedProxyAcceptStream
     private int requestHash;
 
     EmulatedProxyAcceptStream(
-        ProxyStreamFactory streamFactory,
+        HttpCacheProxyFactory streamFactory,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,

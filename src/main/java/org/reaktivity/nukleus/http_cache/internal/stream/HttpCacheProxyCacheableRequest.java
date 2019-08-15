@@ -15,20 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.canBeServedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
-
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -49,9 +35,22 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 import java.util.concurrent.Future;
 
-final class ProxyAcceptStream
+import static java.lang.System.currentTimeMillis;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
+final class HttpCacheProxyCacheableRequest
 {
-    private final ProxyStreamFactory streamFactory;
+    private final HttpCacheProxyFactory streamFactory;
     private final long acceptRouteId;
     private final long acceptStreamId;
     private final MessageConsumer acceptReply;
@@ -59,6 +58,7 @@ final class ProxyAcceptStream
     private long acceptReplyId;
 
     private MessageConsumer connect;
+    private MessageConsumer connectReply;
     private long connectRouteId;
     private long connectReplyId;
     private long connectInitialId;
@@ -68,13 +68,14 @@ final class ProxyAcceptStream
     private int requestHash;
     private Future<?> preferWaitExpired;
 
-    ProxyAcceptStream(
-        ProxyStreamFactory streamFactory,
+    HttpCacheProxyCacheableRequest(
+        HttpCacheProxyFactory streamFactory,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,
         long acceptReplyId,
         MessageConsumer connect,
+        MessageConsumer connectReply,
         long connectInitialId,
         long connectReplyId,
         long connectRouteId)
@@ -85,9 +86,19 @@ final class ProxyAcceptStream
         this.acceptStreamId = acceptStreamId;
         this.acceptReplyId = acceptReplyId;
         this.connect = connect;
+        this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
+    }
+
+    HttpCacheProxyResponse newResponse()
+    {
+        return new HttpCacheProxyCacheableResponse(streamFactory,
+                                                   connectReply,
+                                                   connectRouteId,
+                                                   connectReplyId,
+                                                   acceptStreamId);
     }
 
     void onRequestMessage(
@@ -152,14 +163,7 @@ final class ProxyAcceptStream
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-        if (canBeServedByCache(requestHeaders))
-        {
-            handleRequest(requestHeaders, authorizationHeader, authorization);
-        }
-        else
-        {
-            proxyRequest(requestHeaders);
-        }
+        handleRequest(requestHeaders, authorizationHeader, authorization);
     }
 
     private void onData(
