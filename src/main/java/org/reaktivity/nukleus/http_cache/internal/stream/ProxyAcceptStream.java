@@ -120,9 +120,7 @@ final class ProxyAcceptStream
                 break;
             case ResetFW.TYPE_ID:
                 final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
-                final long traceId = reset.trace();
-                streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-                this.cleanupRequestIfNecessary();
+                onReset(reset);
                 break;
             default:
                 break;
@@ -383,6 +381,13 @@ final class ProxyAcceptStream
         final long groupId = window.groupId();
         final long traceId = window.trace();
         streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+    }
+
+    private void onReset(ResetFW reset)
+    {
+        final long traceId = reset.trace();
+        streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
+        this.cleanupRequestIfNecessary();
     }
 
     private void cleanupRequestIfNecessary()
