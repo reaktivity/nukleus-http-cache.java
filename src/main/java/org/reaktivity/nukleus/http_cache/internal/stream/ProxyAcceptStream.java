@@ -162,170 +162,6 @@ final class ProxyAcceptStream
         }
     }
 
-    private static short authorizationScope(
-        long authorization)
-    {
-        return (short) (authorization >>> 48);
-    }
-
-    private void handleRequest(
-        final ListFW<HttpHeaderFW> requestHeaders,
-        boolean authorizationHeader,
-        long authorization)
-    {
-        if (satisfiedByCache(requestHeaders))
-        {
-            streamFactory.counters.requestsCacheable.getAsLong();
-        }
-
-        boolean stored = storeRequest(requestHeaders, streamFactory.requestBufferPool);
-        if (!stored)
-        {
-            send503RetryAfter();
-            return;
-        }
-
-        String etag = null;
-        short authScope = authorizationScope(authorization);
-        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
-        if (etagHeader != null)
-        {
-            etag = etagHeader.value().asString();
-        }
-        DefaultRequest defaultRequest;
-        this.request = defaultRequest = new DefaultRequest(
-                acceptReply,
-                acceptRouteId,
-                acceptStreamId,
-                acceptReplyId,
-                connectRouteId,
-                connectReplyId,
-                streamFactory.router,
-                streamFactory.router::supplyReceiver,
-                requestHash,
-                streamFactory.requestBufferPool,
-                requestSlot,
-                authorizationHeader,
-                authorization,
-                authScope,
-                etag,
-                streamFactory.supplyInitialId,
-                streamFactory.supplyReplyId,
-                false);
-
-        if (satisfiedByCache(requestHeaders) &&
-            streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, defaultRequest))
-        {
-            //NOOP
-        }
-        else
-        {
-            long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
-
-            if (DEBUG)
-            {
-                System.out.printf("[%016x] CONNECT %016x %s [sent initial request]\n",
-                        currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-            }
-
-            sendBeginToConnect(requestHeaders, connectReplyId);
-            streamFactory.defaultCache.createPendingInitialRequests(defaultRequest);
-            schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
-        }
-
-    }
-
-    private void schedulePreferWaitIfNoneMatchIfNecessary(ListFW<HttpHeaderFW> requestHeaders)
-    {
-        if (isPreferIfNoneMatch(requestHeaders))
-        {
-            int preferWait = getPreferWait(requestHeaders);
-            if (preferWait > 0)
-            {
-                preferWaitExpired = this.streamFactory.executor.schedule(preferWait,
-                                                                         SECONDS,
-                                                                         acceptRouteId,
-                                                                         request.acceptReplyStreamId,
-                                                                         REQUEST_EXPIRED_SIGNAL);
-                streamFactory.expiryRequestsCorrelations.put(request.acceptReplyStreamId, preferWaitExpired);
-            }
-        }
-    }
-
-    private void proxyRequest(
-        final ListFW<HttpHeaderFW> requestHeaders)
-    {
-        this.request = new ProxyRequest(
-                acceptReply,
-                acceptRouteId,
-                acceptReplyId,
-                streamFactory.router,
-                false);
-
-        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [sent proxy request]\n",
-                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-        }
-
-        sendBeginToConnect(requestHeaders, connectReplyId);
-
-    }
-
-    private void sendBeginToConnect(
-        final ListFW<HttpHeaderFW> requestHeaders,
-        long connectCorrelationId)
-    {
-        streamFactory.requestCorrelations.put(connectCorrelationId, request);
-
-        streamFactory.writer.doHttpRequest(
-                                        connect,
-                                        connectRouteId,
-                                        connectInitialId,
-                                        streamFactory.supplyTrace.getAsLong(),
-                                        builder -> requestHeaders.forEach(
-                                            h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-         ));
-
-        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
-    }
-
-    private boolean storeRequest(
-        final ListFW<HttpHeaderFW> headers,
-        final BufferPool bufferPool)
-    {
-        this.requestSlot = bufferPool.acquire(acceptStreamId);
-        if (requestSlot == NO_SLOT)
-        {
-            return false;
-        }
-        MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestSlot);
-        requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
-        return true;
-    }
-
-    private void send503RetryAfter()
-    {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "503");
-        }
-
-        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
-                e.item(h -> h.name(STATUS).value("503"))
-                 .item(h -> h.name("retry-after").value("0")));
-        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId,
-                streamFactory.supplyTrace.getAsLong());
-
-        // count all responses
-        streamFactory.counters.responses.getAsLong();
-
-        // count retry responses
-        streamFactory.counters.responsesRetry.getAsLong();
-    }
-
     private void onData(
         final DataFW data)
     {
@@ -399,6 +235,170 @@ final class ProxyAcceptStream
             this.streamFactory.defaultCache.removePendingInitialRequest((DefaultRequest) request);
         }
         streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
+    }
+
+    private void handleRequest(
+        final ListFW<HttpHeaderFW> requestHeaders,
+        boolean authorizationHeader,
+        long authorization)
+    {
+        if (satisfiedByCache(requestHeaders))
+        {
+            streamFactory.counters.requestsCacheable.getAsLong();
+        }
+
+        boolean stored = storeRequest(requestHeaders, streamFactory.requestBufferPool);
+        if (!stored)
+        {
+            send503RetryAfter();
+            return;
+        }
+
+        String etag = null;
+        short authScope = authorizationScope(authorization);
+        HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
+        if (etagHeader != null)
+        {
+            etag = etagHeader.value().asString();
+        }
+        DefaultRequest defaultRequest;
+        this.request = defaultRequest = new DefaultRequest(
+            acceptReply,
+            acceptRouteId,
+            acceptStreamId,
+            acceptReplyId,
+            connectRouteId,
+            connectReplyId,
+            streamFactory.router,
+            streamFactory.router::supplyReceiver,
+            requestHash,
+            streamFactory.requestBufferPool,
+            requestSlot,
+            authorizationHeader,
+            authorization,
+            authScope,
+            etag,
+            streamFactory.supplyInitialId,
+            streamFactory.supplyReplyId,
+            false);
+
+        if (satisfiedByCache(requestHeaders) &&
+            streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, defaultRequest))
+        {
+            //NOOP
+        }
+        else
+        {
+            long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
+
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] CONNECT %016x %s [sent initial request]\n",
+                                  currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+            }
+
+            sendBeginToConnect(requestHeaders, connectReplyId);
+            streamFactory.defaultCache.createPendingInitialRequests(defaultRequest);
+            schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
+        }
+
+    }
+
+    private void schedulePreferWaitIfNoneMatchIfNecessary(ListFW<HttpHeaderFW> requestHeaders)
+    {
+        if (isPreferIfNoneMatch(requestHeaders))
+        {
+            int preferWait = getPreferWait(requestHeaders);
+            if (preferWait > 0)
+            {
+                preferWaitExpired = this.streamFactory.executor.schedule(preferWait,
+                                                                         SECONDS,
+                                                                         acceptRouteId,
+                                                                         request.acceptReplyStreamId,
+                                                                         REQUEST_EXPIRED_SIGNAL);
+                streamFactory.expiryRequestsCorrelations.put(request.acceptReplyStreamId, preferWaitExpired);
+            }
+        }
+    }
+
+    private void proxyRequest(
+        final ListFW<HttpHeaderFW> requestHeaders)
+    {
+        this.request = new ProxyRequest(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            streamFactory.router,
+            false);
+
+        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [sent proxy request]\n",
+                              currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+        }
+
+        sendBeginToConnect(requestHeaders, connectReplyId);
+
+    }
+
+    private void sendBeginToConnect(
+        final ListFW<HttpHeaderFW> requestHeaders,
+        long connectCorrelationId)
+    {
+        streamFactory.requestCorrelations.put(connectCorrelationId, request);
+
+        streamFactory.writer.doHttpRequest(
+            connect,
+            connectRouteId,
+            connectInitialId,
+            streamFactory.supplyTrace.getAsLong(),
+            builder -> requestHeaders.forEach(
+                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+                                             ));
+
+        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
+    }
+
+    private boolean storeRequest(
+        final ListFW<HttpHeaderFW> headers,
+        final BufferPool bufferPool)
+    {
+        this.requestSlot = bufferPool.acquire(acceptStreamId);
+        if (requestSlot == NO_SLOT)
+        {
+            return false;
+        }
+        MutableDirectBuffer requestCacheBuffer = bufferPool.buffer(requestSlot);
+        requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
+        return true;
+    }
+
+    private void send503RetryAfter()
+    {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "503");
+        }
+
+        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
+            e.item(h -> h.name(STATUS).value("503"))
+             .item(h -> h.name("retry-after").value("0")));
+        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId,
+                                       streamFactory.supplyTrace.getAsLong());
+
+        // count all responses
+        streamFactory.counters.responses.getAsLong();
+
+        // count retry responses
+        streamFactory.counters.responsesRetry.getAsLong();
+    }
+
+    private static short authorizationScope(
+        long authorization)
+    {
+        return (short) (authorization >>> 48);
     }
 
 }
