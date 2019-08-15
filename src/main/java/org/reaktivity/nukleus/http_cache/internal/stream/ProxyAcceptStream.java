@@ -90,7 +90,6 @@ final class ProxyAcceptStream
         this.connectInitialId = connectInitialId;
     }
 
-
     void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
