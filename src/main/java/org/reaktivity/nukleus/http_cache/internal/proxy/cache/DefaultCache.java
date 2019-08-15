@@ -109,23 +109,23 @@ public class DefaultCache
     }
 
     public DefaultCacheEntry get(
-        int requestUrlHash)
+        int requestHash)
     {
-        return cachedEntries.get(requestUrlHash);
+        return cachedEntries.get(requestHash);
     }
 
     public DefaultCacheEntry supply(
-        int requestUrlHash)
+        int requestHash)
     {
-        DefaultCacheEntry defaultCacheEntry = cachedEntries.get(requestUrlHash);
+        DefaultCacheEntry defaultCacheEntry = cachedEntries.get(requestHash);
         if (defaultCacheEntry == null)
         {
             defaultCacheEntry = new DefaultCacheEntry(
                     this,
-                    requestUrlHash,
+                    requestHash,
                     cachedRequestBufferPool,
                     cachedResponseBufferPool);
-            updateCache(requestUrlHash, defaultCacheEntry);
+            updateCache(requestHash, defaultCacheEntry);
         }
 
         return defaultCacheEntry;
@@ -177,12 +177,29 @@ public class DefaultCache
         short authScope,
         DefaultRequest defaultRequest)
     {
+        boolean canHandleRequest = false;
         final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(defaultRequest.requestHash());
-        return defaultCacheEntry != null && serveRequest(streamFactory,
+
+        if (defaultCacheEntry != null && serveRequest(streamFactory,
                                                          defaultCacheEntry,
                                                          requestHeaders,
                                                          authScope,
-                                                         defaultRequest);
+                                                         defaultRequest))
+        {
+            canHandleRequest = true;
+        }
+        else if (hasPendingInitialRequests(defaultRequest.requestHash()))
+        {
+            addPendingRequest(defaultRequest);
+            canHandleRequest = true;
+        }
+        else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+        {
+            send504(defaultRequest);
+            canHandleRequest = true;
+        }
+
+        return canHandleRequest;
     }
 
     public void sendPendingInitialRequests(
@@ -264,10 +281,10 @@ public class DefaultCache
     }
 
     private void updateCache(
-        int requestUrlHash,
+        int requestHash,
         DefaultCacheEntry cacheEntry)
     {
-        cachedEntries.put(requestUrlHash, cacheEntry);
+        cachedEntries.put(requestHash, cacheEntry);
     }
 
     private boolean serveRequest(
@@ -442,5 +459,28 @@ public class DefaultCache
         }
 
         return true;
+    }
+
+    private void send504(DefaultRequest request)
+    {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), request.acceptReplyId(), "504");
+        }
+
+        writer.doHttpResponse(request.acceptReply(),
+                              request.acceptRouteId(),
+                              request.acceptReplyId(),
+                              supplyTrace.getAsLong(), e ->
+                                                    e.item(h -> h.name(STATUS)
+                                                                 .value("504")));
+        writer.doAbort(request.acceptReply(),
+                       request.acceptRouteId(),
+                       request.acceptReplyId(),
+                       supplyTrace.getAsLong());
+        request.purge();
+
+        // count all responses
+        counters.responses.getAsLong();
     }
 }

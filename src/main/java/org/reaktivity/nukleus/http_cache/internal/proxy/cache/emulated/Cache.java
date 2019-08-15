@@ -130,10 +130,10 @@ public class Cache
     }
 
     public void put(
-        int requestUrlHash,
+        int requestHash,
         CacheableRequest request)
     {
-        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        CacheEntry oldCacheEntry = cachedEntries.get(requestHash);
         if (oldCacheEntry == null)
         {
             CacheEntry cacheEntry = new CacheEntry(
@@ -141,7 +141,7 @@ public class Cache
                     request,
                     true,
                     supplyTrace);
-            updateCache(requestUrlHash, cacheEntry);
+            updateCache(requestHash, cacheEntry);
             cacheEntry.sendHttpPushPromise(request);
         }
         else
@@ -159,7 +159,7 @@ public class Cache
             }
             else if (oldCacheEntry.isUpdatedBy(request))
             {
-                updateCache(requestUrlHash, cacheEntry);
+                updateCache(requestHash, cacheEntry);
 
                 boolean notVaries = oldCacheEntry.doesNotVaryBy(cacheEntry);
                 if (notVaries)
@@ -201,12 +201,12 @@ public class Cache
     }
 
     private void updateCache(
-            int requestUrlHash,
+            int requestHash,
             CacheEntry cacheEntry)
     {
         cacheEntry.commit();
-        cachedEntries.put(requestUrlHash, cacheEntry);
-        PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
+        cachedEntries.put(requestHash, cacheEntry);
+        PendingCacheEntries result = this.uncommittedRequests.remove(requestHash);
         if (result != null)
         {
             result.addSubscribers(cacheEntry);

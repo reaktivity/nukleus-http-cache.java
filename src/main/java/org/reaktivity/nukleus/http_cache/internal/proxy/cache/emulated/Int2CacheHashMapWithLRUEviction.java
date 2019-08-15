@@ -37,37 +37,37 @@ public class Int2CacheHashMapWithLRUEviction
     }
 
     public void put(
-        int requestUrlHash,
+        int requestHash,
         CacheEntry cacheEntry)
     {
-        CacheEntry old = cachedEntries.put(requestUrlHash, cacheEntry);
+        CacheEntry old = cachedEntries.put(requestHash, cacheEntry);
         if (old == null)
         {
             entryCount.accept(1);
         }
-        lruEntryList.removeInt(requestUrlHash);
-        lruEntryList.add(requestUrlHash);
+        lruEntryList.removeInt(requestHash);
+        lruEntryList.add(requestHash);
 
         assert cachedEntries.size() == lruEntryList.size();
     }
 
-    public CacheEntry get(int requestUrlHash)
+    public CacheEntry get(int requestHash)
     {
-        final CacheEntry result = cachedEntries.get(requestUrlHash);
+        final CacheEntry result = cachedEntries.get(requestHash);
         if (result != null)
         {
-            lruEntryList.removeInt(requestUrlHash);
-            lruEntryList.add(requestUrlHash);
+            lruEntryList.removeInt(requestHash);
+            lruEntryList.add(requestHash);
         }
         return result;
     }
 
-    public CacheEntry remove(int requestUrlHash)
+    public CacheEntry remove(int requestHash)
     {
-        final CacheEntry result = cachedEntries.remove(requestUrlHash);
+        final CacheEntry result = cachedEntries.remove(requestHash);
         if (result != null)
         {
-            lruEntryList.removeInt(requestUrlHash);
+            lruEntryList.removeInt(requestHash);
             entryCount.accept(-1);
         }
 

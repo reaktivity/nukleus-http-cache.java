@@ -33,7 +33,6 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
@@ -91,7 +90,7 @@ final class ProxyAcceptStream
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
-        this.streamState = this::beforeBegin;
+        this.streamState = this::onRequestMessage;
     }
 
     void handleStream(
@@ -103,21 +102,42 @@ final class ProxyAcceptStream
         streamState.accept(msgTypeId, buffer, index, length);
     }
 
-    private void beforeBegin(
+    private void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
         int length)
     {
-        if (msgTypeId == BeginFW.TYPE_ID)
+        switch (msgTypeId)
         {
-            final BeginFW begin = streamFactory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
-        }
-        else
-        {
-            streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId,
-                    streamFactory.supplyTrace.getAsLong());
+            case BeginFW.TYPE_ID:
+                final BeginFW begin = streamFactory.beginRO.wrap(buffer, index, index + length);
+                onBegin(begin);
+                break;
+            case DataFW.TYPE_ID:
+                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
+                onData(data);
+                break;
+            case EndFW.TYPE_ID:
+                final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+                onEnd(end);
+                break;
+            case AbortFW.TYPE_ID:
+                final AbortFW abort = streamFactory.abortRO.wrap(buffer, index, index + length);
+                onAbort(abort);
+                break;
+            case WindowFW.TYPE_ID:
+                final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
+                onWindow(window);
+                break;
+            case ResetFW.TYPE_ID:
+                final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
+                final long traceId = reset.trace();
+                streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
+                this.cleanupRequestIfNecessary();
+                break;
+            default:
+                break;
         }
     }
 
@@ -148,11 +168,6 @@ final class ProxyAcceptStream
 
         if (canBeServedByCache(requestHeaders))
         {
-            if (satisfiedByCache(requestHeaders))
-            {
-                streamFactory.counters.requestsCacheable.getAsLong();
-            }
-
             handleRequest(requestHeaders, authorizationHeader, authorization);
         }
         else
@@ -172,6 +187,11 @@ final class ProxyAcceptStream
         boolean authorizationHeader,
         long authorization)
     {
+        if (satisfiedByCache(requestHeaders))
+        {
+            streamFactory.counters.requestsCacheable.getAsLong();
+        }
+
         boolean stored = storeRequest(requestHeaders, streamFactory.requestBufferPool);
         if (!stored)
         {
@@ -212,14 +232,6 @@ final class ProxyAcceptStream
         {
             //NOOP
         }
-        else if (streamFactory.defaultCache.hasPendingInitialRequests(requestHash))
-        {
-            streamFactory.defaultCache.addPendingRequest(defaultRequest);
-        }
-        else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
-        {
-            send504();
-        }
         else
         {
             long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
@@ -231,17 +243,14 @@ final class ProxyAcceptStream
             }
 
             sendBeginToConnect(requestHeaders, connectReplyId);
-            streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId,
-                    streamFactory.supplyTrace.getAsLong());
             streamFactory.defaultCache.createPendingInitialRequests(defaultRequest);
-
-            scheduleRequestExpiredSignal(requestHeaders);
+            schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        this.streamState = this::onStreamMessageWhenIgnoring;
+        this.streamState = this::onRequestMessage;
     }
 
-    private void scheduleRequestExpiredSignal(ListFW<HttpHeaderFW> requestHeaders)
+    private void schedulePreferWaitIfNoneMatchIfNecessary(ListFW<HttpHeaderFW> requestHeaders)
     {
         if (isPreferIfNoneMatch(requestHeaders))
         {
@@ -278,7 +287,7 @@ final class ProxyAcceptStream
 
         sendBeginToConnect(requestHeaders, connectReplyId);
 
-        this.streamState = this::onStreamMessageWhenProxying;
+        this.streamState = this::onRequestMessage;
     }
 
     private void sendBeginToConnect(
@@ -296,25 +305,7 @@ final class ProxyAcceptStream
                                             h ->  builder.item(item -> item.name(h.name()).value(h.value()))
          ));
 
-        streamFactory.router.setThrottle(connectInitialId, this::onThrottleMessage);
-    }
-
-    private void send504()
-    {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "504");
-        }
-
-        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
-            e.item(h -> h.name(STATUS)
-                         .value("504")));
-        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId,
-                                     streamFactory.supplyTrace.getAsLong());
-        request.purge();
-
-        // count all responses
-        streamFactory.counters.responses.getAsLong();
+        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }
 
     private boolean storeRequest(
@@ -351,104 +342,51 @@ final class ProxyAcceptStream
         streamFactory.counters.responsesRetry.getAsLong();
     }
 
-    private void onStreamMessageWhenIgnoring(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-            case AbortFW.TYPE_ID:
-                cleanupRequestIfNecessary();
-                break;
-            default:
-                break;
-        }
-    }
-
-    private void onStreamMessageWhenProxying(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case DataFW.TYPE_ID:
-            final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-            onDataWhenProxying(data);
-            break;
-        case EndFW.TYPE_ID:
-            final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-            onEndWhenProxying(end);
-            break;
-        case AbortFW.TYPE_ID:
-            final AbortFW abort = streamFactory.abortRO.wrap(buffer, index, index + length);
-            onAbortWhenProxying(abort);
-            break;
-        default:
-            streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId,
-                    streamFactory.supplyTrace.getAsLong());
-            break;
-        }
-    }
-
-    private void onDataWhenProxying(
+    private void onData(
         final DataFW data)
     {
-        final long groupId = data.groupId();
-        final int padding = data.padding();
-        final OctetsFW payload = data.payload();
+        if (request.getType() == Request.Type.DEFAULT_REQUEST)
+        {
+            streamFactory.writer.doWindow(acceptReply,
+                                          acceptRouteId,
+                                          acceptStreamId,
+                                          data.trace(),
+                                          data.sizeof(),
+                                          data.padding(),
+                                          data.groupId());
+        }
+        else
+        {
+            final long groupId = data.groupId();
+            final int padding = data.padding();
+            final OctetsFW payload = data.payload();
 
-        streamFactory.writer.doHttpData(connect,
-                                        connectRouteId,
-                                        connectInitialId,
-                                        data.trace(),
-                                        groupId,
-                                        payload.buffer(),
-                                        payload.offset(),
-                                        payload.sizeof(),
-                                        padding);
+            streamFactory.writer.doHttpData(connect,
+                                            connectRouteId,
+                                            connectInitialId,
+                                            data.trace(),
+                                            groupId,
+                                            payload.buffer(),
+                                            payload.offset(),
+                                            payload.sizeof(),
+                                            padding);
+        }
     }
 
-    private void onEndWhenProxying(
+    private void onEnd(
         final EndFW end)
     {
         final long traceId = end.trace();
         streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId, traceId);
     }
 
-    private void onAbortWhenProxying(
+    private void onAbort(
         final AbortFW abort)
     {
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         final long traceId = abort.trace();
         streamFactory.writer.doAbort(connect, connectRouteId, connectInitialId, traceId);
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         request.purge();
-    }
-
-    private void onThrottleMessage(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case WindowFW.TYPE_ID:
-            final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
-            onWindow(window);
-            break;
-        case ResetFW.TYPE_ID:
-            final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
-            final long traceId = reset.trace();
-            streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-            this.cleanupRequestIfNecessary();
-            break;
-        default:
-            break;
-        }
     }
 
     private void onWindow(
