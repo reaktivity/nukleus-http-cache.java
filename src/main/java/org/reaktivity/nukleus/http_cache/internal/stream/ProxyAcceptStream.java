@@ -304,7 +304,8 @@ final class ProxyAcceptStream
 
     }
 
-    private void schedulePreferWaitIfNoneMatchIfNecessary(ListFW<HttpHeaderFW> requestHeaders)
+    private void schedulePreferWaitIfNoneMatchIfNecessary(
+        ListFW<HttpHeaderFW> requestHeaders)
     {
         if (isPreferIfNoneMatch(requestHeaders))
         {
