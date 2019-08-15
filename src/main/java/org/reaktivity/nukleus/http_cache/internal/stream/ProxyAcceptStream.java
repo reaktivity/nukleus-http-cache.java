@@ -121,7 +121,6 @@ final class ProxyAcceptStream
             case ResetFW.TYPE_ID:
                 final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
                 onReset(reset);
-                this.cleanupRequestIfNecessary();
                 break;
             default:
                 break;
@@ -389,10 +388,7 @@ final class ProxyAcceptStream
     {
         final long traceId = reset.trace();
         streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-    }
 
-    private void cleanupRequestIfNecessary()
-    {
         if (preferWaitExpired != null)
         {
             preferWaitExpired.cancel(true);
@@ -404,4 +400,5 @@ final class ProxyAcceptStream
         }
         streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
     }
+
 }
