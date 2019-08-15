@@ -39,6 +39,7 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
@@ -48,7 +49,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
-final class HttpCacheProxyCacheableRequest
+final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
 {
     private final HttpCacheProxyFactory streamFactory;
     private final long acceptRouteId;
@@ -80,6 +81,7 @@ final class HttpCacheProxyCacheableRequest
         long connectReplyId,
         long connectRouteId)
     {
+        super(acceptReplyId);
         this.streamFactory = streamFactory;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
@@ -92,13 +94,42 @@ final class HttpCacheProxyCacheableRequest
         this.connectInitialId = connectInitialId;
     }
 
-    HttpCacheProxyResponse newResponse()
+    HttpCacheProxyResponse newResponse(
+        ListFW<HttpHeaderFW> responseHeaders)
     {
-        return new HttpCacheProxyCacheableResponse(streamFactory,
-                                                   connectReply,
-                                                   connectRouteId,
-                                                   connectReplyId,
-                                                   acceptStreamId);
+        if (isCacheableResponse(responseHeaders))
+        {
+            return new HttpCacheProxyCacheableResponse(streamFactory,
+                                                          connectReply,
+                                                          connectRouteId,
+                                                          connectReplyId,
+                                                          acceptStreamId);
+        }
+        else
+        {
+            return new HttpCacheProxyNonCacheableResponse(streamFactory,
+                                                          connectReply,
+                                                          connectRouteId,
+                                                          connectReplyId,
+                                                          acceptStreamId);
+        }
+    }
+
+    void onResponseMessage(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        switch(msgTypeId)
+        {
+            case ResetFW.TYPE_ID:
+                streamFactory.writer.doReset(acceptReply,
+                                             acceptRouteId,
+                                             acceptStreamId,
+                                             streamFactory.supplyTrace.getAsLong());
+                break;
+        }
     }
 
     void onRequestMessage(
