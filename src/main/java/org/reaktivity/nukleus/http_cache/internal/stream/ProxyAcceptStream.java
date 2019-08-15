@@ -409,7 +409,7 @@ final class ProxyAcceptStream
         if (request != null && request.getType() == Request.Type.DEFAULT_REQUEST)
         {
             this.streamFactory.defaultCache.removePendingInitialRequest((DefaultRequest) request);
-            streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         }
+        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
     }
 }
