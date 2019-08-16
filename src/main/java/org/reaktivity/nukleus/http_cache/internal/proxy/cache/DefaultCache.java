@@ -137,7 +137,7 @@ public class DefaultCache
     {
             writer.doSignal(defaultRequest.getSignaler(),
                 defaultRequest.acceptRouteId,
-                defaultRequest.acceptStreamId,
+                defaultRequest.acceptReplyId,
                 supplyTrace.getAsLong(),
                 signalId);
     }
@@ -163,9 +163,9 @@ public class DefaultCache
         final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(request.requestHash());
 
         if (defaultCacheEntry != null && serveRequest(streamFactory,
-                                                         defaultCacheEntry,
-                                                         requestHeaders,
-                                                         authScope,
+                                                      defaultCacheEntry,
+                                                      requestHeaders,
+                                                      authScope,
                                                       request))
         {
             canHandleRequest = true;
@@ -396,7 +396,7 @@ public class DefaultCache
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
-        HttpCacheProxyCacheableRequest defaultRequest)
+        HttpCacheProxyCacheableRequest request)
     {
         if (entry.canServeRequest(requestHeaders, authScope))
         {
@@ -406,12 +406,14 @@ public class DefaultCache
             boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, entry.etag());
             if (etagMatched)
             {
-                send304(entry, defaultRequest);
+                send304(entry, request);
             }
             else
             {
-                streamFactory.correlations.put(defaultRequest.connectReplyId, defaultRequest);
-                signalForCacheEntry(defaultRequest, CACHE_ENTRY_SIGNAL);
+                streamFactory.router.setThrottle(request.acceptReplyId,
+                                                 request.newResponse(null)::onResponseMessage);
+                streamFactory.correlations.put(request.acceptReplyId, request);
+                signalForCacheEntry(request, CACHE_ENTRY_SIGNAL);
                 this.counters.responsesCached.getAsLong();
             }
 
@@ -477,7 +479,7 @@ public class DefaultCache
                                                         {
                                                             writer.doSignal(request.getSignaler(),
                                                                             request.acceptRouteId,
-                                                                            request.acceptStreamId,
+                                                                            request.acceptReplyId,
                                                                             supplyTrace.getAsLong(),
                                                                             signal);
                                                         });

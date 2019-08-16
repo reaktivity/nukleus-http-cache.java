@@ -2,7 +2,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.DirectBuffer;
 
-abstract class HttpCacheProxyResponse
+public abstract class HttpCacheProxyResponse
 {
     abstract void handleStream(
         int msgTypeId,
@@ -10,7 +10,7 @@ abstract class HttpCacheProxyResponse
         int index,
         int length);
 
-    abstract void onResponseMessage(
+    public abstract void onResponseMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,

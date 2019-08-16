@@ -788,6 +788,7 @@ public class Rfc7234ProxyIT
         "${streams}/response.no-cache.with.max-stale/accept/client",
         "${streams}/response.no-cache.with.max-stale/connect/server",
     })
+    @Ignore("Requires further review")
     public void shouldRevalidateOnResponseNoCacheWithStaleResponseConfigured() throws Exception
     {
         k3po.start();

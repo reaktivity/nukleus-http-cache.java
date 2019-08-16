@@ -73,7 +73,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
-    final RouteManager router;
+    public final RouteManager router;
     final BudgetManager budgetManager;
 
     final LongUnaryOperator supplyInitialId;
@@ -81,7 +81,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final LongSupplier supplyTrace;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
-    public final Long2ObjectHashMap<Request> requestCorrelations;
+    final Long2ObjectHashMap<Request> requestCorrelations;
     public final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
     final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 

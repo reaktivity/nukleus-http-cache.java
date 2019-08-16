@@ -137,10 +137,10 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         return request.getSignaler();
     }
 
-    HttpCacheProxyResponse newResponse(
+    public HttpCacheProxyResponse newResponse(
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        if (isCacheableResponse(responseHeaders))
+        if (responseHeaders == null || isCacheableResponse(responseHeaders))
         {
             return new HttpCacheProxyCacheableResponse(streamFactory,
                                                       this,

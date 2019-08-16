@@ -68,7 +68,7 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         this.streamState = this::onResponseMessage;
     }
 
-    void onResponseMessage(
+    public void onResponseMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -223,7 +223,10 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final long acceptReplyStreamId = request.acceptReplyId;
         final long traceId = end.trace();
         streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+        if (request instanceof HttpCacheProxyCacheableRequest)
+        {
+            streamFactory.defaultCache.removePendingInitialRequest((HttpCacheProxyCacheableRequest) request);
+        }
     }
 
     private void onAbortWhenProxying(
@@ -233,9 +236,11 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final MessageConsumer acceptReply = request.acceptReply;
         final long acceptRouteId = request.acceptRouteId;
         final long acceptReplyStreamId = request.acceptReplyId;
-
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
+        if (request instanceof HttpCacheProxyCacheableRequest)
+        {
+            streamFactory.defaultCache.removePendingInitialRequest((HttpCacheProxyCacheableRequest) request);
+        }
     }
 
     private void onWindowWhenProxying(
@@ -253,6 +258,5 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final ResetFW reset)
     {
         streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 }

@@ -210,25 +210,31 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
         request.incAttempts();
 
-        long connectInitialId = this.streamFactory.supplyInitialId.applyAsLong(connectRouteId);
-        MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
-        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
+        request.connectInitialId = this.streamFactory.supplyInitialId.applyAsLong(connectRouteId);
+        request.connectReplyId = streamFactory.supplyReplyId.applyAsLong(request.connectInitialId);
+        request.connectInitial = this.streamFactory.router.supplyReceiver(request.connectInitialId);
 
-        streamFactory.correlations.put(connectReplyId, request);
+        streamFactory.correlations.put(request.connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
 
         if (DEBUG)
         {
             System.out.printf("[%016x] CONNECT %016x %s [retry cacheable request]\n",
-                    currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+                    currentTimeMillis(), request.connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, builder ->
-        {
-            requestHeaders.forEach(
-                    h -> builder.item(item -> item.name(h.name()).value(h.value())));
-        });
-        streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
+        streamFactory.writer.doHttpRequest(request.connectInitial,
+                                           connectRouteId,
+                                           request.connectInitialId,
+                                           traceId, builder ->
+                                           {
+                                                requestHeaders.forEach(
+                                                        h -> builder.item(item -> item.name(h.name()).value(h.value())));
+                                           });
+        streamFactory.writer.doHttpEnd(request.connectInitial,
+                                       request.connectRouteId,
+                                       request.connectInitialId,
+                                       streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
         this.streamState = this::handle503Retry;
     }
@@ -434,7 +440,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         }
     }
 
-    void onResponseMessage(
+    public void onResponseMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,

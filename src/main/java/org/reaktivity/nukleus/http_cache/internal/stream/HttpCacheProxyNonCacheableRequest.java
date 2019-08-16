@@ -63,7 +63,7 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
               connectRouteId);
     }
 
-    HttpCacheProxyResponse newResponse(
+    public HttpCacheProxyResponse newResponse(
         ListFW<HttpHeaderFW> responseHeaders)
     {
         return new HttpCacheProxyNonCacheableResponse(streamFactory,

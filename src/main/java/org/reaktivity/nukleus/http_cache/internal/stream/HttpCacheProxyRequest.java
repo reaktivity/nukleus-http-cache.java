@@ -10,15 +10,14 @@ public abstract class HttpCacheProxyRequest
     public final HttpCacheProxyFactory streamFactory;
     public final long acceptRouteId;
     public final long acceptStreamId;
+    public final long acceptReplyId;
     public final MessageConsumer acceptReply;
 
-    public final long acceptReplyId;
-
-    public final MessageConsumer connectInitial;
-    public final MessageConsumer connectReply;
-    public final long connectRouteId;
-    public final long connectReplyId;
-    public final long connectInitialId;
+    public MessageConsumer connectInitial;
+    public MessageConsumer connectReply;
+    public long connectRouteId;
+    public long connectReplyId;
+    public long connectInitialId;
 
     HttpCacheProxyRequest(
         HttpCacheProxyFactory streamFactory,
@@ -57,7 +56,7 @@ public abstract class HttpCacheProxyRequest
         int index,
         int length);
 
-    abstract HttpCacheProxyResponse newResponse(
+    public abstract HttpCacheProxyResponse newResponse(
         ListFW<HttpHeaderFW> responseHeaders);
 
 }
