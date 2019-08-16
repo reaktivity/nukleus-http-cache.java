@@ -52,19 +52,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
 {
-    private final HttpCacheProxyFactory streamFactory;
-    public final long acceptRouteId;
-    public final long acceptStreamId;
-    public final MessageConsumer acceptReply;
-
-    private long acceptReplyId;
-
-    private MessageConsumer connectInitial;
-    private MessageConsumer connectReply;
-    public long connectRouteId;
-    public long connectReplyId;
-    public long connectInitialId;
-
     private int requestSlot = NO_SLOT;
     private DefaultRequest request;
     private int requestHash;
@@ -82,28 +69,27 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         long connectReplyId,
         long connectRouteId)
     {
-        super(acceptReplyId);
-        this.streamFactory = streamFactory;
-        this.acceptReply = acceptReply;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptStreamId = acceptStreamId;
-        this.acceptReplyId = acceptReplyId;
-        this.connectInitial = connectInitial;
-        this.connectReply = connectReply;
-        this.connectRouteId = connectRouteId;
-        this.connectReplyId = connectReplyId;
-        this.connectInitialId = connectInitialId;
-    }
+        super(streamFactory,
+              acceptReply,
+              acceptRouteId,
+              acceptStreamId,
+              acceptReplyId,
+              connectInitial,
+              connectReply,
+              connectInitialId,
+              connectReplyId,
+              connectRouteId);
 
+    }
 
     public int attempts()
     {
         return request.attempts();
     }
 
-    public ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeadersRO)
+    public ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeaders)
     {
-        return request.getRequestHeaders(requestHeadersRO);
+        return request.getRequestHeaders(requestHeaders);
     }
 
     public String etag()
@@ -166,6 +152,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         else
         {
             return new HttpCacheProxyNonCacheableResponse(streamFactory,
+                                                          this,
                                                           connectReply,
                                                           connectRouteId,
                                                           connectReplyId,
@@ -258,32 +245,13 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
     private void onData(
         final DataFW data)
     {
-        if (request.getType() == Request.Type.DEFAULT_REQUEST)
-        {
-            streamFactory.writer.doWindow(acceptReply,
-                                          acceptRouteId,
-                                          acceptStreamId,
-                                          data.trace(),
-                                          data.sizeof(),
-                                          data.padding(),
-                                          data.groupId());
-        }
-        else
-        {
-            final long groupId = data.groupId();
-            final int padding = data.padding();
-            final OctetsFW payload = data.payload();
-
-            streamFactory.writer.doHttpData(connectInitial,
-                                            connectRouteId,
-                                            connectInitialId,
-                                            data.trace(),
-                                            groupId,
-                                            payload.buffer(),
-                                            payload.offset(),
-                                            payload.sizeof(),
-                                            padding);
-        }
+        streamFactory.writer.doWindow(acceptReply,
+                                      acceptRouteId,
+                                      acceptStreamId,
+                                      data.trace(),
+                                      data.sizeof(),
+                                      data.padding(),
+                                      data.groupId());
     }
 
     private void onEnd(
@@ -354,26 +322,25 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         {
             etag = etagHeader.value().asString();
         }
-        DefaultRequest defaultRequest;
-        this.request = defaultRequest = new DefaultRequest(
-            acceptReply,
-            acceptRouteId,
-            acceptStreamId,
-            acceptReplyId,
-            connectRouteId,
-            connectReplyId,
-            streamFactory.router,
-            streamFactory.router::supplyReceiver,
-            requestHash,
-            streamFactory.requestBufferPool,
-            requestSlot,
-            authorizationHeader,
-            authorization,
-            authScope,
-            etag,
-            streamFactory.supplyInitialId,
-            streamFactory.supplyReplyId,
-            false);
+
+        this.request = new DefaultRequest(acceptReply,
+                                         acceptRouteId,
+                                         acceptStreamId,
+                                         acceptReplyId,
+                                         connectRouteId,
+                                         connectReplyId,
+                                         streamFactory.router,
+                                         streamFactory.router::supplyReceiver,
+                                         requestHash,
+                                         streamFactory.requestBufferPool,
+                                         requestSlot,
+                                         authorizationHeader,
+                                         authorization,
+                                         authScope,
+                                         etag,
+                                         streamFactory.supplyInitialId,
+                                         streamFactory.supplyReplyId,
+                                         false);
 
         if (satisfiedByCache(requestHeaders) &&
             streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, this))
@@ -408,9 +375,9 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
                 preferWaitExpired = this.streamFactory.executor.schedule(preferWait,
                                                                          SECONDS,
                                                                          acceptRouteId,
-                                                                         Request.this.acceptReplyId,
+                                                                         this.acceptReplyId,
                                                                          REQUEST_EXPIRED_SIGNAL);
-                streamFactory.expiryRequestsCorrelations.put(Request.this.acceptReplyId, preferWaitExpired);
+                streamFactory.expiryRequestsCorrelations.put(this.acceptReplyId, preferWaitExpired);
             }
         }
     }
@@ -455,10 +422,16 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "503");
         }
 
-        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
-            e.item(h -> h.name(STATUS).value("503"))
-             .item(h -> h.name("retry-after").value("0")));
-        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId,
+        streamFactory.writer.doHttpResponse(acceptReply,
+                                            acceptRouteId,
+                                            acceptReplyId,
+                                            streamFactory.supplyTrace.getAsLong(), e ->
+                                            e.item(h -> h.name(STATUS).value("503"))
+                                             .item(h -> h.name("retry-after").value("0")));
+
+        streamFactory.writer.doHttpEnd(acceptReply,
+                                       acceptRouteId,
+                                       acceptReplyId,
                                        streamFactory.supplyTrace.getAsLong());
 
         // count all responses

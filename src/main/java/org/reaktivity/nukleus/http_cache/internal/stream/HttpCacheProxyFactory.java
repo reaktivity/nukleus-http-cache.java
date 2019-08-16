@@ -194,6 +194,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                 long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
                 long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
                 MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
+
                 HttpCacheProxyRequest acceptStream;
 
                 if (canBeServedByCache(requestHeaders))
@@ -256,7 +257,7 @@ public class HttpCacheProxyFactory implements StreamFactory
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
             HttpCacheProxyResponse httpCacheProxyResponse = acceptStream.newResponse(responseHeaders);
-            router.setThrottle(acceptStream.acceptReplyId(), httpCacheProxyResponse::onResponseMessage);
+            router.setThrottle(acceptStream.acceptReplyId, httpCacheProxyResponse::onResponseMessage);
             return httpCacheProxyResponse::handleStream;
         }
     }

@@ -36,18 +36,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyRequest
 {
-    private final HttpCacheProxyFactory streamFactory;
-    private final long acceptRouteId;
-    private final long acceptStreamId;
-    private final MessageConsumer acceptReply;
-
-    private long acceptReplyId;
-
-    private MessageConsumer connect;
-    private MessageConsumer connectReply;
-    private long connectRouteId;
-    private long connectReplyId;
-    private long connectInitialId;
 
     private Request request;
 
@@ -57,29 +45,29 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
         long acceptRouteId,
         long acceptStreamId,
         long acceptReplyId,
-        MessageConsumer connect,
+        MessageConsumer connectInitial,
         MessageConsumer connectReply,
         long connectInitialId,
         long connectReplyId,
         long connectRouteId)
     {
-        super(acceptReplyId);
-        this.streamFactory = streamFactory;
-        this.acceptReply = acceptReply;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptStreamId = acceptStreamId;
-        this.acceptReplyId = acceptReplyId;
-        this.connect = connect;
-        this.connectReply = connectReply;
-        this.connectRouteId = connectRouteId;
-        this.connectReplyId = connectReplyId;
-        this.connectInitialId = connectInitialId;
+        super(streamFactory,
+              acceptReply,
+              acceptRouteId,
+              acceptStreamId,
+              acceptReplyId,
+              connectInitial,
+              connectReply,
+              connectInitialId,
+              connectReplyId,
+              connectRouteId);
     }
 
     HttpCacheProxyResponse newResponse(
         ListFW<HttpHeaderFW> responseHeaders)
     {
         return new HttpCacheProxyNonCacheableResponse(streamFactory,
+                                                      this,
                                                       connectReply,
                                                       connectRouteId,
                                                       connectReplyId,
@@ -143,12 +131,9 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
     private void onBegin(
         BeginFW begin)
     {
-
         final OctetsFW extension = streamFactory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
         final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
-
-        // Should already be canonicalized in http / http2 nuklei
 
         // count all requests
         streamFactory.counters.requests.getAsLong();
@@ -169,7 +154,7 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
             final int padding = data.padding();
             final OctetsFW payload = data.payload();
 
-            streamFactory.writer.doHttpData(connect,
+            streamFactory.writer.doHttpData(connectInitial,
                                             connectRouteId,
                                             connectInitialId,
                                             data.trace(),
@@ -184,14 +169,14 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
         final EndFW end)
     {
         final long traceId = end.trace();
-        streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId, traceId);
+        streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onAbort(
         final AbortFW abort)
     {
         final long traceId = abort.trace();
-        streamFactory.writer.doAbort(connect, connectRouteId, connectInitialId, traceId);
+        streamFactory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
         streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         request.purge();
     }
@@ -232,18 +217,14 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
                               currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        sendBeginToConnect(requestHeaders, connectReplyId);
-
+        sendBeginToConnect(requestHeaders);
     }
 
     private void sendBeginToConnect(
-        final ListFW<HttpHeaderFW> requestHeaders,
-        long connectCorrelationId)
+        final ListFW<HttpHeaderFW> requestHeaders)
     {
-        streamFactory.requestCorrelations.put(connectCorrelationId, request);
-
         streamFactory.writer.doHttpRequest(
-            connect,
+            connectInitial,
             connectRouteId,
             connectInitialId,
             streamFactory.supplyTrace.getAsLong(),

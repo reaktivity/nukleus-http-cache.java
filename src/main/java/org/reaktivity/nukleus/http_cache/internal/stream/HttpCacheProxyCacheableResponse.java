@@ -456,7 +456,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
                 int credit = window.credit();
                 acceptReplyBudget += credit;
                 this.streamFactory.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
-                    this::writePayload, window.trace());
+                                                        this::writePayload, window.trace());
                 sendEndIfNecessary(window.trace());
                 break;
             case SignalFW.TYPE_ID:
@@ -467,7 +467,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
             default:
                 this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                                                         groupId,
-                                                        request.acceptReplyId(),
+                                                        request.acceptReplyId,
                                                         this.streamFactory.supplyTrace.getAsLong());
                 streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
                 this.streamFactory.defaultCache.removePendingInitialRequest(request);
@@ -500,7 +500,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
             {
                 streamFactory.writer.doAbort(request.acceptReply,
                                              request.acceptRouteId,
-                                             request.acceptReplyId(),
+                                             request.acceptReplyId,
                                              signal.trace());
                 streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             }
@@ -518,18 +518,18 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(),
-                              request.acceptReplyId(), "503");
+                              request.acceptReplyId, "503");
         }
 
         streamFactory.writer.doHttpResponse(request.acceptReply,
                                             request.acceptRouteId,
-                                            request.acceptReplyId(),
+                                            request.acceptReplyId,
                                             streamFactory.supplyTrace.getAsLong(), e ->
                                             e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
                                              .item(h -> h.name("retry-after").value("0")));
         streamFactory.writer.doHttpEnd(request.acceptReply,
                                        request.acceptRouteId,
-                                       request.acceptReplyId(),
+                                       request.acceptReplyId,
                                        streamFactory.supplyTrace.getAsLong());
 
         // count all responses
@@ -574,7 +574,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
         final MessageConsumer acceptReply = request.acceptReply;
         final long acceptRouteId = request.acceptRouteId;
-        final long acceptReplyId = request.acceptReplyId();
+        final long acceptReplyId = request.acceptReplyId;
 
         if (DEBUG)
         {
@@ -614,7 +614,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     {
         final MessageConsumer acceptReply = request.acceptReply;
         final long acceptRouteId = request.acceptRouteId;
-        final long acceptReplyStreamId = request.acceptReplyId();
+        final long acceptReplyStreamId = request.acceptReplyId;
         boolean ackedBudget = !this.streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId);
 
         if (payloadWritten == cacheEntry.responseSize()
@@ -653,7 +653,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     {
         final MessageConsumer acceptReply = request.acceptReply;
         final long acceptRouteId = request.acceptRouteId;
-        final long acceptReplyStreamId = request.acceptReplyId();
+        final long acceptReplyStreamId = request.acceptReplyId;
 
         final int minBudget = min(budget, acceptReplyBudget);
         final int toWrite = min(minBudget - padding, cacheEntry.responseSize() - payloadWritten);

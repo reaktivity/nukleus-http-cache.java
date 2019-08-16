@@ -323,7 +323,7 @@ public class DefaultCache
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                    currentTimeMillis(), request.acceptReplyId(), "304");
+                    currentTimeMillis(), request.acceptReplyId, "304");
         }
 
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
@@ -333,7 +333,7 @@ public class DefaultCache
             String preferWait = getHeader(requestHeaders, PREFER);
             writer.doHttpResponse(request.acceptReply,
                                   request.acceptRouteId,
-                                  request.acceptReplyId(),
+                                  request.acceptReplyId,
                                   supplyTrace.getAsLong(),
                                   e -> e.item(h -> h.name(STATUS).value("304"))
                                         .item(h -> h.name(ETAG).value(entry.etag()))
@@ -343,13 +343,13 @@ public class DefaultCache
         {
             writer.doHttpResponse(request.acceptReply,
                                   request.acceptRouteId,
-                                  request.acceptReplyId(),
+                                  request.acceptReplyId,
                                   supplyTrace.getAsLong(),
                                   e -> e.item(h -> h.name(STATUS).value("304"))
                                         .item(h -> h.name(ETAG).value(entry.etag())));
         }
 
-        writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId(), supplyTrace.getAsLong());
+        writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId, supplyTrace.getAsLong());
         request.purge();
 
         // count all responses
@@ -459,18 +459,18 @@ public class DefaultCache
     {
         if (DEBUG)
         {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), request.acceptReplyId(), "504");
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), request.acceptReplyId, "504");
         }
 
         writer.doHttpResponse(request.acceptReply,
                               request.acceptRouteId,
-                              request.acceptReplyId(),
+                              request.acceptReplyId,
                               supplyTrace.getAsLong(), e ->
                                                     e.item(h -> h.name(STATUS)
                                                                  .value("504")));
         writer.doAbort(request.acceptReply,
                        request.acceptRouteId,
-                       request.acceptReplyId(),
+                       request.acceptReplyId,
                        supplyTrace.getAsLong());
         request.purge();
 

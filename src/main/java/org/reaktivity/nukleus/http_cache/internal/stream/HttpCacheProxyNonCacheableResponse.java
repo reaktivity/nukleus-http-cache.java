@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -39,11 +38,11 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
 
     private MessageConsumer streamState;
 
+    private HttpCacheProxyRequest request;
     private final MessageConsumer connectReplyThrottle;
     private final long connectRouteId;
     private final long connectReplyStreamId;
 
-    private Request streamCorrelation;
     private long acceptInitialId;
     private int acceptReplyBudget;
 
@@ -54,12 +53,14 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
 
     HttpCacheProxyNonCacheableResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
+        HttpCacheProxyRequest request,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
         long connectReplyId,
         long acceptInitialId)
     {
         this.streamFactory = httpCacheProxyFactory;
+        this.request = request;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyStreamId = connectReplyId;
@@ -117,10 +118,9 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final long connectReplyId = begin.streamId();
         traceId = begin.trace();
 
-        this.streamCorrelation = this.streamFactory.requestCorrelations.remove(connectReplyId);
         final OctetsFW extension = streamFactory.beginRO.extension();
 
-        if (streamCorrelation != null && extension.sizeof() > 0)
+        if (extension.sizeof() > 0)
         {
             final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
 
@@ -143,9 +143,9 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
     private void doProxyBegin(
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyId = streamCorrelation.acceptReplyId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
+        final long acceptReplyId = request.acceptReplyId;
 
         if (DEBUG)
         {
@@ -153,7 +153,6 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
                     getHeader(responseHeaders, ":status"));
         }
 
-        streamCorrelation.setThrottle(this::onResponseMessage);
         streamFactory.writer.doHttpResponse(
                 acceptReply,
                 acceptRouteId,
@@ -198,9 +197,9 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
     private void onDataWhenProxying(
         final DataFW data)
     {
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
+        final long acceptReplyStreamId = request.acceptReplyId;
 
         final OctetsFW payload = data.payload();
         acceptReplyBudget -= payload.sizeof() + data.padding();
@@ -221,9 +220,9 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
     private void onEndWhenProxying(
         final EndFW end)
     {
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
+        final long acceptReplyStreamId = request.acceptReplyId;
         final long traceId = end.trace();
         streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
@@ -233,9 +232,9 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final AbortFW abort)
     {
         final long traceId = abort.trace();
-        final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-        final long acceptRouteId = streamCorrelation.acceptRouteId();
-        final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
+        final long acceptReplyStreamId = request.acceptReplyId;
 
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
@@ -256,7 +255,6 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final ResetFW reset)
     {
         streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.trace());
-        streamCorrelation.purge();
         streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
     }
 }
