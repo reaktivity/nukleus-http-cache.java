@@ -22,7 +22,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -38,7 +37,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 import java.util.concurrent.Future;
 
-final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyRequest
+public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyRequest
 {
     private final HttpCacheProxyFactory streamFactory;
     private final long acceptRouteId;
@@ -236,16 +235,6 @@ final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyRequest
     {
         final long traceId = reset.trace();
         streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-
-        if (preferWaitExpired != null)
-        {
-            preferWaitExpired.cancel(true);
-        }
-        Request request = this.streamFactory.requestCorrelations.remove(connectReplyId);
-        if (request != null && request.getType() == Request.Type.DEFAULT_REQUEST)
-        {
-            this.streamFactory.defaultCache.removePendingInitialRequest((DefaultRequest) request);
-        }
         streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
     }
 

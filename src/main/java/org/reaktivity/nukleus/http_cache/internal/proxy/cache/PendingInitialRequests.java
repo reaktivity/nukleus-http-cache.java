@@ -16,24 +16,24 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyCacheableRequest;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class PendingInitialRequests
 {
-    private final DefaultRequest request;
-    private final List<DefaultRequest> subscribers = new ArrayList<>();
+    private final HttpCacheProxyCacheableRequest request;
+    private final List<HttpCacheProxyCacheableRequest> subscribers = new ArrayList<>();
 
     PendingInitialRequests(
-        DefaultRequest request)
+        HttpCacheProxyCacheableRequest request)
     {
         this.request = request;
         this.subscribers.add(request);
     }
 
-    public DefaultRequest initialRequest()
+    public HttpCacheProxyCacheableRequest initialRequest()
     {
         return request;
     }
@@ -43,7 +43,7 @@ public class PendingInitialRequests
         return request.etag();
     }
 
-    public void subscribe(DefaultRequest request)
+    public void subscribe(HttpCacheProxyCacheableRequest request)
     {
         this.subscribers.add(request);
     }
@@ -53,12 +53,12 @@ public class PendingInitialRequests
         return this.subscribers.size();
     }
 
-    public List<DefaultRequest> subcribers()
+    public List<HttpCacheProxyCacheableRequest> subcribers()
     {
         return this.subscribers;
     }
 
-    void removeSubscriber(DefaultRequest request)
+    void removeSubscriber(HttpCacheProxyCacheableRequest request)
     {
         request.purge();
         subscribers.remove(request);
@@ -76,7 +76,7 @@ public class PendingInitialRequests
             return null;
         }
 
-        final DefaultRequest newInitialRequest = subscribers.remove(0);
+        final HttpCacheProxyCacheableRequest newInitialRequest = subscribers.remove(0);
         final PendingInitialRequests newPendingRequests = new PendingInitialRequests(newInitialRequest);
         subscribers.forEach(newPendingRequests::subscribe);
         subscribers.clear();

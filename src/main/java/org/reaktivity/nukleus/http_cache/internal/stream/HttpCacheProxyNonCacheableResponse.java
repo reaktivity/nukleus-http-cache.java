@@ -144,7 +144,7 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
                     getHeader(responseHeaders, ":status"));
         }
 
-        streamCorrelation.setThrottle(this::onThrottleMessageWhenProxying);
+        streamCorrelation.setThrottle(this::onResponseMessage);
         streamFactory.writer.doHttpResponse(
                 acceptReply,
                 acceptRouteId,
@@ -186,7 +186,7 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         }
     }
 
-    void onThrottleMessageWhenProxying(
+    void onResponseMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,

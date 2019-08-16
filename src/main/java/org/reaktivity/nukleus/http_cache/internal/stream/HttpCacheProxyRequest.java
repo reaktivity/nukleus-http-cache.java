@@ -4,7 +4,7 @@ import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
-abstract class HttpCacheProxyRequest
+public abstract class HttpCacheProxyRequest
 {
     private long acceptReplyId;
 

@@ -22,9 +22,9 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactory;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -73,7 +73,7 @@ public class DefaultCache
     final Int2CacheHashMapWithLRUEviction cachedEntries;
 
     final LongObjectBiConsumer<Runnable> scheduler;
-    final Long2ObjectHashMap<Request> correlations;
+    final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
     final LongSupplier supplyTrace;
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
@@ -83,7 +83,7 @@ public class DefaultCache
         LongObjectBiConsumer<Runnable> scheduler,
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
-        Long2ObjectHashMap<Request> correlations,
+        Long2ObjectHashMap<HttpCacheProxyRequest> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
@@ -132,12 +132,12 @@ public class DefaultCache
     }
 
     public void signalForCacheEntry(
-        DefaultRequest defaultRequest,
+        HttpCacheProxyCacheableRequest defaultRequest,
         long signalId)
     {
             writer.doSignal(defaultRequest.getSignaler(),
                 defaultRequest.acceptRouteId,
-                defaultRequest.acceptReplyStreamId,
+                defaultRequest.acceptStreamId,
                 supplyTrace.getAsLong(),
                 signalId);
     }
@@ -164,7 +164,7 @@ public class DefaultCache
             {
                 writer.doSignal(request.getSignaler(),
                                 request.acceptRouteId,
-                                request.acceptReplyStreamId,
+                                request.acceptStreamId,
                                 supplyTrace.getAsLong(),
                                 signal);
             });
@@ -175,27 +175,27 @@ public class DefaultCache
         HttpCacheProxyFactory streamFactory,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
-        DefaultRequest defaultRequest)
+        HttpCacheProxyCacheableRequest request)
     {
         boolean canHandleRequest = false;
-        final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(defaultRequest.requestHash());
+        final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(request.requestHash());
 
         if (defaultCacheEntry != null && serveRequest(streamFactory,
                                                          defaultCacheEntry,
                                                          requestHeaders,
                                                          authScope,
-                                                         defaultRequest))
+                                                      request))
         {
             canHandleRequest = true;
         }
-        else if (hasPendingInitialRequests(defaultRequest.requestHash()))
+        else if (hasPendingInitialRequests(request.requestHash()))
         {
-            addPendingRequest(defaultRequest);
+            addPendingRequest(request);
             canHandleRequest = true;
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
-            send504(defaultRequest);
+            send504(request);
             canHandleRequest = true;
         }
 
@@ -244,20 +244,20 @@ public class DefaultCache
     }
 
     public void addPendingRequest(
-        DefaultRequest initialRequest)
+        HttpCacheProxyCacheableRequest initialRequest)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
     public void createPendingInitialRequests(
-        DefaultRequest initialRequest)
+        HttpCacheProxyCacheableRequest initialRequest)
     {
         pendingInitialRequestsMap.put(initialRequest.requestHash(), new PendingInitialRequests(initialRequest));
     }
 
     public void removePendingInitialRequest(
-        DefaultRequest request)
+        HttpCacheProxyCacheableRequest request)
     {
         PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(request.requestHash());
         if (pendingInitialRequests != null)
@@ -292,7 +292,7 @@ public class DefaultCache
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
-        DefaultRequest defaultRequest)
+        HttpCacheProxyCacheableRequest defaultRequest)
     {
         if (entry.canServeRequest(requestHeaders, authScope))
         {
@@ -306,7 +306,7 @@ public class DefaultCache
             }
             else
             {
-                streamFactory.requestCorrelations.put(defaultRequest.connectReplyId(), defaultRequest);
+                streamFactory.correlations.put(defaultRequest.connectReplyId, defaultRequest);
                 signalForCacheEntry(defaultRequest, CACHE_ENTRY_SIGNAL);
                 this.counters.responsesCached.getAsLong();
             }
@@ -318,7 +318,7 @@ public class DefaultCache
 
     public void send304(
         DefaultCacheEntry entry,
-        DefaultRequest request)
+        HttpCacheProxyCacheableRequest request)
     {
         if (DEBUG)
         {
@@ -357,9 +357,9 @@ public class DefaultCache
     }
 
     private void sendPendingInitialRequest(
-        final DefaultRequest request)
+        final HttpCacheProxyCacheableRequest request)
     {
-        long connectRouteId = request.connectRouteId();
+        long connectRouteId = request.connectRouteId;
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
         MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
@@ -397,19 +397,12 @@ public class DefaultCache
     }
 
     public boolean isUpdatedByResponseHeadersToRetry(
-        DefaultRequest request,
+        HttpCacheProxyCacheableRequest request,
         ListFW<HttpHeaderFW> responseHeaders)
     {
-
         ListFW<HttpHeaderFW> requestHeaders = null;
-        try
-        {
-            requestHeaders = request.getRequestHeaders(requestHeadersRO);
-        }
-        catch (Exception ex)
-        {
-           ex.printStackTrace();
-        }
+        requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
         if (isPreferWait(requestHeaders)
             && !isPreferenceApplied(responseHeaders))
         {
@@ -439,7 +432,7 @@ public class DefaultCache
     }
 
     public boolean isUpdatedByEtagToRetry(
-        DefaultRequest request,
+        HttpCacheProxyCacheableRequest request,
         DefaultCacheEntry cacheEntry)
     {
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
@@ -461,21 +454,22 @@ public class DefaultCache
         return true;
     }
 
-    private void send504(DefaultRequest request)
+    private void send504(
+        HttpCacheProxyCacheableRequest request)
     {
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), request.acceptReplyId(), "504");
         }
 
-        writer.doHttpResponse(request.acceptReply(),
-                              request.acceptRouteId(),
+        writer.doHttpResponse(request.acceptReply,
+                              request.acceptRouteId,
                               request.acceptReplyId(),
                               supplyTrace.getAsLong(), e ->
                                                     e.item(h -> h.name(STATUS)
                                                                  .value("504")));
-        writer.doAbort(request.acceptReply(),
-                       request.acceptRouteId(),
+        writer.doAbort(request.acceptReply,
+                       request.acceptRouteId,
                        request.acceptReplyId(),
                        supplyTrace.getAsLong());
         request.purge();

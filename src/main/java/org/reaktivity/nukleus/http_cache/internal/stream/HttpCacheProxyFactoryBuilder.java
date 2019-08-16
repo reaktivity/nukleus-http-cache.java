@@ -47,7 +47,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private final HttpCacheConfiguration config;
     private final LongObjectBiConsumer<Runnable> scheduler;
     private final Long2ObjectHashMap<Request> requestCorrelations;
-    private final Long2ObjectHashMap<HttpCacheProxyResponse> correlations;
+    private final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
     private final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     private RouteManager router;
@@ -210,7 +210,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                 scheduler,
                 writeBuffer,
                 cacheBufferPool,
-                requestCorrelations,
+                correlations,
                 counters,
                 cacheEntries,
                 supplyTrace,

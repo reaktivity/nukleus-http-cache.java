@@ -34,8 +34,6 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.DefaultRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -59,12 +57,12 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
     private MessageConsumer streamState;
 
+    private HttpCacheProxyCacheableRequest request;
     private final MessageConsumer connectReplyThrottle;
     private final long connectRouteId;
     private final long connectReplyStreamId;
     private int connectReplyBudget;
 
-    private Request streamCorrelation;
     private long acceptInitialId;
     private int acceptReplyBudget;
 
@@ -80,12 +78,14 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
+        HttpCacheProxyCacheableRequest request,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
         long connectReplyId,
         long acceptInitialId)
     {
         this.streamFactory = httpCacheProxyFactory;
+        this.request = request;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyStreamId = connectReplyId;
@@ -136,10 +136,9 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         final long connectReplyId = begin.streamId();
         traceId = begin.trace();
 
-        this.streamCorrelation = this.streamFactory.requestCorrelations.remove(connectReplyId);
         final OctetsFW extension = streamFactory.beginRO.extension();
 
-        if (streamCorrelation != null && extension.sizeof() > 0)
+        if (extension.sizeof() > 0)
         {
             final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
 
@@ -162,9 +161,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     private void handleInitialRequest(
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        DefaultRequest request = (DefaultRequest)streamCorrelation;
-
-        if (request.isRequestPurged() || performRetryRequestIfNecessary(request, responseHeaders))
+        if (request.isRequestPurged() || performRetryRequestIfNecessary(responseHeaders))
         {
             return;
         }
@@ -173,7 +170,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     }
 
     private boolean performRetryRequestIfNecessary(
-        DefaultRequest request,
         ListFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
@@ -207,7 +203,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
     private void retryCacheableRequest()
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         if (request.isRequestPurged())
         {
             return;
@@ -219,7 +214,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         MessageConsumer connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
         long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
 
-        streamFactory.requestCorrelations.put(connectReplyId, request);
+        streamFactory.correlations.put(connectReplyId, request);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
 
         if (DEBUG)
@@ -236,13 +231,11 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
         this.streamState = this::handle503Retry;
-        this.streamFactory.initializeNewConnectReplyStream(connectInitialId, connectRouteId, acceptInitialId);
     }
 
     private void handleCacheableResponse(
         ListFW<HttpHeaderFW> responseHeaders)
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.supply(request.requestHash());
         String newEtag = getHeader(responseHeaders, ETAG);
 
@@ -355,7 +348,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     private void handleConnectReplyData(
         DataFW data)
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestHash());
         boolean stored = cacheEntry.storeResponseData(data);
         if (!stored)
@@ -374,7 +366,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     private void handleConnectReplyEnd(
         EndFW end)
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         DefaultCacheEntry cacheEntry = this.streamFactory.defaultCache.get(request.requestHash());
 
         checkEtag(end, cacheEntry);
@@ -394,11 +385,10 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
     private void handleConnectReplyAbort()
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         if (isResponseBuffering)
         {
-            streamFactory.writer.doReset(request.acceptReply(),
-                                         request.acceptRouteId(),
+            streamFactory.writer.doReset(request.acceptReply,
+                                         request.acceptRouteId,
                                          acceptInitialId,
                                          streamFactory.supplyTrace.getAsLong());
             serverNextPendingInitialRequest();
@@ -433,7 +423,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
 
     private void serverNextPendingInitialRequest()
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         this.streamFactory.defaultCache.removePendingInitialRequest(request);
         this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestHash());
     }
@@ -478,14 +467,13 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
             default:
                 this.streamFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                                                         groupId,
-                                                        streamCorrelation.acceptReplyId(),
+                                                        request.acceptReplyId(),
                                                         this.streamFactory.supplyTrace.getAsLong());
                 streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
-                DefaultRequest request = (DefaultRequest) streamCorrelation;
                 this.streamFactory.defaultCache.removePendingInitialRequest(request);
                 request.purge();
-                streamFactory.writer.doReset(request.acceptReply(),
-                                             request.acceptRouteId(),
+                streamFactory.writer.doReset(request.acceptReply,
+                                             request.acceptRouteId,
                                              acceptInitialId,
                                              streamFactory.supplyTrace.getAsLong());
                 break;
@@ -496,13 +484,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         SignalFW signal)
     {
         final long signalId = signal.signalId();
-
-        if (this.streamCorrelation == null)
-        {
-            this.streamCorrelation = this.streamFactory.requestCorrelations.remove(connectReplyStreamId);
-        }
-
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
 
         if (signalId == CACHE_ENTRY_UPDATED_SIGNAL || signalId == CACHE_ENTRY_SIGNAL)
         {
@@ -517,9 +498,9 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         {
             if (this.payloadWritten >= 0)
             {
-                streamFactory.writer.doAbort(streamCorrelation.acceptReply(),
-                                             streamCorrelation.acceptRouteId(),
-                                             streamCorrelation.acceptReplyStreamId,
+                streamFactory.writer.doAbort(request.acceptReply,
+                                             request.acceptRouteId,
+                                             request.acceptReplyId(),
                                              signal.trace());
                 streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
             }
@@ -537,18 +518,18 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(),
-                              streamCorrelation.acceptReplyStreamId, "503");
+                              request.acceptReplyId(), "503");
         }
 
-        streamFactory.writer.doHttpResponse(streamCorrelation.acceptReply(),
-                                            streamCorrelation.acceptRouteId(),
-                                            streamCorrelation.acceptReplyStreamId,
+        streamFactory.writer.doHttpResponse(request.acceptReply,
+                                            request.acceptRouteId,
+                                            request.acceptReplyId(),
                                             streamFactory.supplyTrace.getAsLong(), e ->
                                             e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
                                              .item(h -> h.name("retry-after").value("0")));
-        streamFactory.writer.doHttpEnd(streamCorrelation.acceptReply(),
-                                       streamCorrelation.acceptRouteId(),
-                                       streamCorrelation.acceptReplyStreamId,
+        streamFactory.writer.doHttpEnd(request.acceptReply,
+                                       request.acceptRouteId,
+                                       request.acceptReplyId(),
                                        streamFactory.supplyTrace.getAsLong());
 
         // count all responses
@@ -561,7 +542,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     private void handleCacheUpdateSignal(
         SignalFW signal)
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
         if (request != null)
         {
             cacheEntry = streamFactory.defaultCache.get(request.requestHash());
@@ -592,9 +572,8 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     {
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
-        final DefaultRequest request =(DefaultRequest)this.streamCorrelation;
-        final MessageConsumer acceptReply = request.acceptReply();
-        final long acceptRouteId = request.acceptRouteId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
         final long acceptReplyId = request.acceptReplyId();
 
         if (DEBUG)
@@ -633,9 +612,8 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
     private void sendEndIfNecessary(
         long traceId)
     {
-        final DefaultRequest request = (DefaultRequest) streamCorrelation;
-        final MessageConsumer acceptReply = request.acceptReply();
-        final long acceptRouteId = request.acceptRouteId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
         final long acceptReplyStreamId = request.acceptReplyId();
         boolean ackedBudget = !this.streamFactory.budgetManager.hasUnackedBudget(groupId, acceptReplyStreamId);
 
@@ -673,9 +651,8 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
         int budget,
         long trace)
     {
-        DefaultRequest request = (DefaultRequest) streamCorrelation;
-        final MessageConsumer acceptReply = request.acceptReply();
-        final long acceptRouteId = request.acceptRouteId();
+        final MessageConsumer acceptReply = request.acceptReply;
+        final long acceptRouteId = request.acceptRouteId;
         final long acceptReplyStreamId = request.acceptReplyId();
 
         final int minBudget = min(budget, acceptReplyBudget);

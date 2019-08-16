@@ -82,7 +82,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     public final Long2ObjectHashMap<Request> requestCorrelations;
-    final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
+    public final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
     final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     final Writer writer;
@@ -269,22 +269,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         int length)
     {
         return routeRO.wrap(buffer, index, index + length);
-    }
-
-    void initializeNewConnectReplyStream(
-        long connectInitialId,
-        long connectRouteId,
-        long acceptInitialId)
-    {
-        long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
-        MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
-
-        ProxyConnectReplyStream replyStream = new ProxyConnectReplyStream(this,
-                                                                          connectReply,
-                                                                          connectRouteId,
-                                                                          connectReplyId,
-                                                                          acceptInitialId);
-        correlations.put(acce, replyStream);
     }
 
     boolean cleanupCorrelationIfNecessary(long  connectReplyId, long acceptInitialId)
