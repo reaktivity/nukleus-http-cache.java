@@ -166,12 +166,12 @@ public class Writer
 
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-        ListFW<HttpHeaderFW> responseHeadersRO,
-        ListFW<HttpHeaderFW> requestHeadersRO,
+        ListFW<HttpHeaderFW> responseHeaders,
+        ListFW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale)
     {
-        responseHeadersRO.forEach(h ->
+        responseHeaders.forEach(h ->
         {
             final StringFW nameFW = h.name();
             final String16FW valueFW = h.value();
@@ -181,15 +181,15 @@ public class Writer
             }
         });
 
-        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
+        if (!responseHeaders.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));
         }
 
-        if (isPreferWait(requestHeadersRO) && !isPreferenceApplied(responseHeadersRO))
+        if (isPreferWait(requestHeaders) && !isPreferenceApplied(responseHeaders))
         {
             builder.item(header -> header.name(PREFERENCE_APPLIED)
-                                         .value("wait=" + getPreferWait(requestHeadersRO)));
+                                         .value("wait=" + getPreferWait(requestHeaders)));
         }
 
         if (isStale)
@@ -201,12 +201,12 @@ public class Writer
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeadersRO,
+        ListFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
         boolean cacheControlPrivate)
     {
-        responseHeadersRO.forEach(h ->
+        responseHeaders.forEach(h ->
         {
             final StringFW nameFW = h.name();
             final String name = nameFW.asString();
@@ -237,14 +237,14 @@ public class Writer
                 default: builder.item(header -> header.name(nameFW).value(valueFW));
             }
         });
-        if (!responseHeadersRO.anyMatch(HAS_CACHE_CONTROL))
+        if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL))
         {
             final String value = cacheControlPrivate
                     ? "private, stale-while-revalidate=" + staleWhileRevalidate
                     : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
         }
-        if (!responseHeadersRO.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
+        if (!responseHeaders.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
         {
             builder.item(header -> header.name(ETAG).value(etag));
         }
@@ -454,7 +454,7 @@ public class Writer
         final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply;
         final long routeId = request.acceptRouteId;
-        final long streamId = request.acceptReplyStreamId;
+        final long streamId = request.acceptReplyId;
         final long authorization = request.authorization();
 
         doH2PushPromise(

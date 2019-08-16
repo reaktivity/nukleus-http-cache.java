@@ -142,7 +142,7 @@ public class HttpCacheProxyFactory implements StreamFactory
             DirectBuffer buffer,
             int index,
             int length,
-            MessageConsumer throttle)
+            MessageConsumer source)
     {
         final BeginFW begin = beginRO.wrap(buffer, index, index + length);
         final long streamId = begin.streamId();
@@ -151,11 +151,11 @@ public class HttpCacheProxyFactory implements StreamFactory
 
         if ((streamId & 0x0000_0000_0000_0001L) != 0L)
         {
-            newStream = newInitialStream(begin, throttle);
+            newStream = newInitialStream(begin, source);
         }
         else
         {
-            newStream = newConnectReplyStream(begin, throttle);
+            newStream = newReplyStream(begin, source);
         }
 
         return newStream;
@@ -233,9 +233,9 @@ public class HttpCacheProxyFactory implements StreamFactory
         return newStream;
     }
 
-    private MessageConsumer newConnectReplyStream(
+    private MessageConsumer newReplyStream(
         final BeginFW begin,
-        final MessageConsumer source)
+        final MessageConsumer connectInitial)
     {
         final long sourceRouteId = begin.routeId();
         final long sourceId = begin.streamId();
@@ -245,7 +245,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         if(request != null && request.isEmulated())
         {
             return new EmulatedProxyConnectReplyStream(this,
-                                                        source,
+                                                        connectInitial,
                                                         sourceRouteId,
                                                         sourceId)::handleStream;
         }

@@ -59,7 +59,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
 
     private long acceptReplyId;
 
-    private MessageConsumer connect;
+    private MessageConsumer connectInitial;
     private MessageConsumer connectReply;
     public long connectRouteId;
     public long connectReplyId;
@@ -76,7 +76,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         long acceptRouteId,
         long acceptStreamId,
         long acceptReplyId,
-        MessageConsumer connect,
+        MessageConsumer connectInitial,
         MessageConsumer connectReply,
         long connectInitialId,
         long connectReplyId,
@@ -88,7 +88,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
         this.acceptReplyId = acceptReplyId;
-        this.connect = connect;
+        this.connectInitial = connectInitial;
         this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -98,7 +98,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
 
     public int attempts()
     {
-        return  request.attempts();
+        return request.attempts();
     }
 
     public ListFW<HttpHeaderFW> getRequestHeaders(ListFW<HttpHeaderFW> requestHeadersRO)
@@ -125,7 +125,6 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
     {
         request.incAttempts();
     }
-
 
     public void purge()
     {
@@ -275,7 +274,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
             final int padding = data.padding();
             final OctetsFW payload = data.payload();
 
-            streamFactory.writer.doHttpData(connect,
+            streamFactory.writer.doHttpData(connectInitial,
                                             connectRouteId,
                                             connectInitialId,
                                             data.trace(),
@@ -291,14 +290,14 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         final EndFW end)
     {
         final long traceId = end.trace();
-        streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId, traceId);
+        streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onAbort(
         final AbortFW abort)
     {
         final long traceId = abort.trace();
-        streamFactory.writer.doAbort(connect, connectRouteId, connectInitialId, traceId);
+        streamFactory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
         streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
         request.purge();
     }
@@ -409,9 +408,9 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
                 preferWaitExpired = this.streamFactory.executor.schedule(preferWait,
                                                                          SECONDS,
                                                                          acceptRouteId,
-                                                                         request.acceptReplyStreamId,
+                                                                         Request.this.acceptReplyId,
                                                                          REQUEST_EXPIRED_SIGNAL);
-                streamFactory.expiryRequestsCorrelations.put(request.acceptReplyStreamId, preferWaitExpired);
+                streamFactory.expiryRequestsCorrelations.put(Request.this.acceptReplyId, preferWaitExpired);
             }
         }
     }
@@ -424,7 +423,7 @@ public final class HttpCacheProxyCacheableRequest extends HttpCacheProxyRequest
         streamFactory.requestCorrelations.put(connectCorrelationId, request);
 
         streamFactory.writer.doHttpRequest(
-            connect,
+            connectInitial,
             connectRouteId,
             connectInitialId,
             streamFactory.supplyTrace.getAsLong(),

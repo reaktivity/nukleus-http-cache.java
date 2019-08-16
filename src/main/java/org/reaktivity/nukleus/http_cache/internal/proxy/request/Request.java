@@ -27,7 +27,7 @@ public abstract class Request
 
     public final MessageConsumer acceptReply;
     public final long acceptRouteId;
-    public final long acceptReplyStreamId;
+    public final long acceptReplyId;
     public final RouteManager router;
 
     private final boolean isEmulated;
@@ -35,13 +35,13 @@ public abstract class Request
     public Request(
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptReplyStreamId,
+        long acceptReplyId,
         RouteManager router,
         boolean isEmulated)
     {
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
-        this.acceptReplyStreamId = acceptReplyStreamId;
+        this.acceptReplyId = acceptReplyId;
         this.router = router;
         this.isEmulated = isEmulated;
     }
@@ -60,12 +60,12 @@ public abstract class Request
 
     public long acceptReplyId()
     {
-        return acceptReplyStreamId;
+        return acceptReplyId;
     }
 
     public void setThrottle(MessageConsumer throttle)
     {
-        this.router.setThrottle(acceptReplyStreamId, throttle);
+        this.router.setThrottle(acceptReplyId, throttle);
     }
 
     public abstract void purge();

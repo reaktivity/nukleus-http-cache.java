@@ -64,7 +64,33 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         this.connectRouteId = connectRouteId;
         this.connectReplyStreamId = connectReplyId;
         this.acceptInitialId = acceptInitialId;
-        this.streamState = this::beforeBegin;
+        this.streamState = this::onResponseMessage;
+    }
+
+    void onResponseMessage(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        switch (msgTypeId)
+        {
+            case BeginFW.TYPE_ID:
+                final BeginFW begin = this.streamFactory.beginRO.wrap(buffer, index, index + length);
+                handleBegin(begin);
+                break;
+            case WindowFW.TYPE_ID:
+                final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
+                onWindowWhenProxying(window);
+                break;
+            case ResetFW.TYPE_ID:
+                final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
+                onResetWhenProxying(reset);
+                break;
+            default:
+                // ignore
+                break;
+        }
     }
 
     void handleStream(
@@ -84,23 +110,6 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
             connectRouteId, connectReplyStreamId, acceptReplyBudget, padding);
     }
 
-    private void beforeBegin(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        if (msgTypeId == BeginFW.TYPE_ID)
-        {
-            final BeginFW begin = this.streamFactory.beginRO.wrap(buffer, index, index + length);
-            handleBegin(begin);
-        }
-        else
-        {
-            this.streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                    streamFactory.supplyTrace.getAsLong());
-        }
-    }
 
     private void handleBegin(
         BeginFW begin)
@@ -182,28 +191,6 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         default:
             streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
                                          streamFactory.supplyTrace.getAsLong());
-            break;
-        }
-    }
-
-    void onResponseMessage(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case WindowFW.TYPE_ID:
-            final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
-            onWindowWhenProxying(window);
-            break;
-        case ResetFW.TYPE_ID:
-            final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
-            onResetWhenProxying(reset);
-            break;
-        default:
-            // ignore
             break;
         }
     }

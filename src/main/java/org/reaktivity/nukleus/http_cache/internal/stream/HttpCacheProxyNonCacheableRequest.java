@@ -16,7 +16,6 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -35,8 +34,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-import java.util.concurrent.Future;
-
 public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyRequest
 {
     private final HttpCacheProxyFactory streamFactory;
@@ -52,10 +49,7 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
     private long connectReplyId;
     private long connectInitialId;
 
-    private int requestSlot = NO_SLOT;
     private Request request;
-    private int requestHash;
-    private Future<?> preferWaitExpired;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory streamFactory,
@@ -149,17 +143,12 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
     private void onBegin(
         BeginFW begin)
     {
-        final long authorization = begin.authorization();
-        final short authorizationScope = authorizationScope(authorization);
 
         final OctetsFW extension = streamFactory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
         final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // Should already be canonicalized in http / http2 nuklei
-        final String requestURL = getRequestURL(requestHeaders);
-
-        this.requestHash = 31 * authorizationScope + requestURL.hashCode();
 
         // count all requests
         streamFactory.counters.requests.getAsLong();
@@ -176,18 +165,6 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
     private void onData(
         final DataFW data)
     {
-        if (request.getType() == Request.Type.DEFAULT_REQUEST)
-        {
-            streamFactory.writer.doWindow(acceptReply,
-                                          acceptRouteId,
-                                          acceptStreamId,
-                                          data.trace(),
-                                          data.sizeof(),
-                                          data.padding(),
-                                          data.groupId());
-        }
-        else
-        {
             final long groupId = data.groupId();
             final int padding = data.padding();
             final OctetsFW payload = data.payload();
@@ -201,7 +178,6 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
                                             payload.offset(),
                                             payload.sizeof(),
                                             padding);
-        }
     }
 
     private void onEnd(
@@ -276,12 +252,6 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
                                              ));
 
         streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
-    }
-
-    private static short authorizationScope(
-        long authorization)
-    {
-        return (short) (authorization >>> 48);
     }
 
 }

@@ -40,7 +40,7 @@ public class CacheRefreshRequest extends CacheableRequest
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
         super(req.acceptReply,
               req.acceptRouteId,
-              req.acceptReplyStreamId,
+              req.acceptReplyId,
               req.connectRouteId,
               req.supplyInitialId,
               req.supplyReplyId,
