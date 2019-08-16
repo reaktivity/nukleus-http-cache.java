@@ -391,7 +391,7 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
                                          request.acceptRouteId,
                                          acceptInitialId,
                                          streamFactory.supplyTrace.getAsLong());
-            serverNextPendingInitialRequest();
+            streamFactory.defaultCache.serveNextPendingInitialRequest(request);
             streamFactory.cleanupCorrelationIfNecessary(connectReplyStreamId, acceptInitialId);
 
         }
@@ -419,12 +419,6 @@ final class HttpCacheProxyCacheableResponse extends HttpCacheProxyResponse
                 isResponseBuffering = false;
             }
         }
-    }
-
-    private void serverNextPendingInitialRequest()
-    {
-        this.streamFactory.defaultCache.removePendingInitialRequest(request);
-        this.streamFactory.defaultCache.sendPendingInitialRequests(request.requestHash());
     }
 
 

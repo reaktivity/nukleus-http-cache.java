@@ -153,24 +153,6 @@ public class DefaultCache
         this.sendSignalToPendingInitialRequestsSubscribers(requestHash, ABORT_SIGNAL);
     }
 
-    private void sendSignalToPendingInitialRequestsSubscribers(
-        int requestHash,
-        long signal)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(requestHash);
-        if (pendingInitialRequests != null)
-        {
-            pendingInitialRequests.subcribers().forEach(request ->
-            {
-                writer.doSignal(request.getSignaler(),
-                                request.acceptRouteId,
-                                request.acceptStreamId,
-                                supplyTrace.getAsLong(),
-                                signal);
-            });
-        }
-    }
-
     public boolean handleCacheableRequest(
         HttpCacheProxyFactory streamFactory,
         ListFW<HttpHeaderFW> requestHeaders,
@@ -270,6 +252,12 @@ public class DefaultCache
         }
     }
 
+    public void serveNextPendingInitialRequest(HttpCacheProxyCacheableRequest request)
+    {
+        removePendingInitialRequest(request);
+        sendPendingInitialRequests(request.requestHash());
+    }
+
     public void purge(
         int requestHash)
     {
@@ -278,6 +266,122 @@ public class DefaultCache
         {
             cacheEntry.purge();
         }
+    }
+
+    public boolean hasPendingInitialRequests(
+        int requestHash)
+    {
+        return pendingInitialRequestsMap.containsKey(requestHash);
+    }
+
+
+    public void purgeEntriesForNonPendingRequests()
+    {
+        cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
+                                                 {
+                                                     if (!hasPendingInitialRequests(cacheEntry.requestHash()))
+                                                     {
+                                                         this.purge(cacheEntry.requestHash());
+                                                     }
+                                                 });
+    }
+
+    public boolean isUpdatedByEtagToRetry(
+        HttpCacheProxyCacheableRequest request,
+        DefaultCacheEntry cacheEntry)
+    {
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+        if (isPreferWait(requestHeaders)
+            && !isPreferenceApplied(responseHeaders))
+        {
+            String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+            String etag = request.etag();
+            String newEtag = cacheEntry.etag();
+            assert status != null;
+
+            if (etag != null && newEtag != null)
+            {
+                return !(status.equals(HttpStatus.OK_200) && etag.equals(newEtag));
+            }
+        }
+
+        return true;
+    }
+
+    public boolean isUpdatedByResponseHeadersToRetry(
+        HttpCacheProxyCacheableRequest request,
+        ListFW<HttpHeaderFW> responseHeaders)
+    {
+        ListFW<HttpHeaderFW> requestHeaders = null;
+        requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        if (isPreferWait(requestHeaders)
+            && !isPreferenceApplied(responseHeaders))
+        {
+            String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+            String etag = request.etag();
+            String newEtag = getHeader(responseHeaders, ETAG);
+            boolean etagMatches = false;
+            assert status != null;
+
+            if (etag != null && newEtag != null)
+            {
+                etagMatches = status.equals(HttpStatus.OK_200) && etag.equals(newEtag);
+
+                if (etagMatches)
+                {
+                    DefaultCacheEntry cacheEntry = cachedEntries.get(request.requestHash());
+                    cacheEntry.updateResponseHeader(responseHeaders);
+                }
+            }
+
+            boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
+
+            return !notModified;
+        }
+
+        return true;
+    }
+
+    public void send304(
+        DefaultCacheEntry entry,
+        HttpCacheProxyCacheableRequest request)
+    {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
+                              currentTimeMillis(), request.acceptReplyId, "304");
+        }
+
+        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+
+        if (isPreferIfNoneMatch(requestHeaders))
+        {
+            String preferWait = getHeader(requestHeaders, PREFER);
+            writer.doHttpResponse(request.acceptReply,
+                                  request.acceptRouteId,
+                                  request.acceptReplyId,
+                                  supplyTrace.getAsLong(),
+                                  e -> e.item(h -> h.name(STATUS).value("304"))
+                                        .item(h -> h.name(ETAG).value(entry.etag()))
+                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
+        }
+        else
+        {
+            writer.doHttpResponse(request.acceptReply,
+                                  request.acceptRouteId,
+                                  request.acceptReplyId,
+                                  supplyTrace.getAsLong(),
+                                  e -> e.item(h -> h.name(STATUS).value("304"))
+                                        .item(h -> h.name(ETAG).value(entry.etag())));
+        }
+
+        writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId, supplyTrace.getAsLong());
+        request.purge();
+
+        // count all responses
+        counters.responses.getAsLong();
     }
 
     private void updateCache(
@@ -316,46 +420,6 @@ public class DefaultCache
         return false;
     }
 
-    public void send304(
-        DefaultCacheEntry entry,
-        HttpCacheProxyCacheableRequest request)
-    {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                    currentTimeMillis(), request.acceptReplyId, "304");
-        }
-
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
-
-        if (isPreferIfNoneMatch(requestHeaders))
-        {
-            String preferWait = getHeader(requestHeaders, PREFER);
-            writer.doHttpResponse(request.acceptReply,
-                                  request.acceptRouteId,
-                                  request.acceptReplyId,
-                                  supplyTrace.getAsLong(),
-                                  e -> e.item(h -> h.name(STATUS).value("304"))
-                                        .item(h -> h.name(ETAG).value(entry.etag()))
-                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
-        }
-        else
-        {
-            writer.doHttpResponse(request.acceptReply,
-                                  request.acceptRouteId,
-                                  request.acceptReplyId,
-                                  supplyTrace.getAsLong(),
-                                  e -> e.item(h -> h.name(STATUS).value("304"))
-                                        .item(h -> h.name(ETAG).value(entry.etag())));
-        }
-
-        writer.doHttpEnd(request.acceptReply, request.acceptRouteId, request.acceptReplyId, supplyTrace.getAsLong());
-        request.purge();
-
-        // count all responses
-        counters.responses.getAsLong();
-    }
-
     private void sendPendingInitialRequest(
         final HttpCacheProxyCacheableRequest request)
     {
@@ -376,82 +440,6 @@ public class DefaultCache
         writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
         writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
-    }
-
-    public boolean hasPendingInitialRequests(
-        int requestHash)
-    {
-        return pendingInitialRequestsMap.containsKey(requestHash);
-    }
-
-
-    public void purgeEntriesForNonPendingRequests()
-    {
-         cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
-         {
-             if (!hasPendingInitialRequests(cacheEntry.requestHash()))
-             {
-                 this.purge(cacheEntry.requestHash());
-             }
-         });
-    }
-
-    public boolean isUpdatedByResponseHeadersToRetry(
-        HttpCacheProxyCacheableRequest request,
-        ListFW<HttpHeaderFW> responseHeaders)
-    {
-        ListFW<HttpHeaderFW> requestHeaders = null;
-        requestHeaders = request.getRequestHeaders(requestHeadersRO);
-
-        if (isPreferWait(requestHeaders)
-            && !isPreferenceApplied(responseHeaders))
-        {
-            String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-            String etag = request.etag();
-            String newEtag = getHeader(responseHeaders, ETAG);
-            boolean etagMatches = false;
-            assert status != null;
-
-            if (etag != null && newEtag != null)
-            {
-                etagMatches = status.equals(HttpStatus.OK_200) && etag.equals(newEtag);
-
-                if (etagMatches)
-                {
-                    DefaultCacheEntry cacheEntry = cachedEntries.get(request.requestHash());
-                    cacheEntry.updateResponseHeader(responseHeaders);
-                }
-            }
-
-            boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
-
-            return !notModified;
-        }
-
-        return true;
-    }
-
-    public boolean isUpdatedByEtagToRetry(
-        HttpCacheProxyCacheableRequest request,
-        DefaultCacheEntry cacheEntry)
-    {
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
-        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
-        if (isPreferWait(requestHeaders)
-            && !isPreferenceApplied(responseHeaders))
-        {
-            String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-            String etag = request.etag();
-            String newEtag = cacheEntry.etag();
-            assert status != null;
-
-            if (etag != null && newEtag != null)
-            {
-                return !(status.equals(HttpStatus.OK_200) && etag.equals(newEtag));
-            }
-        }
-
-        return true;
     }
 
     private void send504(
@@ -476,5 +464,23 @@ public class DefaultCache
 
         // count all responses
         counters.responses.getAsLong();
+    }
+
+    private void sendSignalToPendingInitialRequestsSubscribers(
+        int requestHash,
+        long signal)
+    {
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(requestHash);
+        if (pendingInitialRequests != null)
+        {
+            pendingInitialRequests.subcribers().forEach(request ->
+                                                        {
+                                                            writer.doSignal(request.getSignaler(),
+                                                                            request.acceptRouteId,
+                                                                            request.acceptStreamId,
+                                                                            supplyTrace.getAsLong(),
+                                                                            signal);
+                                                        });
+        }
     }
 }

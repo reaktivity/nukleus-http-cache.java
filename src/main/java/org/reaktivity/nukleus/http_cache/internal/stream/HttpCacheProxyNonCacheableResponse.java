@@ -204,17 +204,15 @@ final class HttpCacheProxyNonCacheableResponse extends HttpCacheProxyResponse
         final OctetsFW payload = data.payload();
         acceptReplyBudget -= payload.sizeof() + data.padding();
         assert acceptReplyBudget >= 0;
-        streamFactory.writer.doHttpData(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyStreamId,
-            data.trace(),
-            data.groupId(),
-            payload.buffer(),
-            payload.offset(),
-            payload.sizeof(),
-            data.padding()
-                                       );
+        streamFactory.writer.doHttpData(acceptReply,
+                                        acceptRouteId,
+                                        acceptReplyStreamId,
+                                        data.trace(),
+                                        data.groupId(),
+                                        payload.buffer(),
+                                        payload.offset(),
+                                        payload.sizeof(),
+                                        data.padding());
     }
 
     private void onEndWhenProxying(
