@@ -47,7 +47,7 @@ public final class CacheUtils
 {
 
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
-            asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501", "503"));
+            asList("200", "203", "204", "206", "300", "301", "304", "404", "405", "410", "414", "501", "503"));
 
     public static final String LAST_MODIFIED = "last-modified";
 
