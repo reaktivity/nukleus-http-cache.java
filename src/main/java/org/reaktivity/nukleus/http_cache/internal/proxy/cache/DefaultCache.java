@@ -24,7 +24,6 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactory;
-import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -73,7 +72,7 @@ public class DefaultCache
     final Int2CacheHashMapWithLRUEviction cachedEntries;
 
     final LongObjectBiConsumer<Runnable> scheduler;
-    final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
+    final Long2ObjectHashMap<HttpCacheProxyCacheableRequest> correlations;
     final LongSupplier supplyTrace;
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
@@ -83,7 +82,7 @@ public class DefaultCache
         LongObjectBiConsumer<Runnable> scheduler,
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
-        Long2ObjectHashMap<HttpCacheProxyRequest> correlations,
+        Long2ObjectHashMap<HttpCacheProxyCacheableRequest> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
@@ -132,14 +131,14 @@ public class DefaultCache
     }
 
     public void signalForCacheEntry(
-        HttpCacheProxyCacheableRequest defaultRequest,
+        HttpCacheProxyCacheableRequest request,
         long signalId)
     {
-            writer.doSignal(defaultRequest.getSignaler(),
-                defaultRequest.acceptRouteId,
-                defaultRequest.acceptReplyId,
-                supplyTrace.getAsLong(),
-                signalId);
+            writer.doSignal(request.signaler,
+                            request.acceptRouteId,
+                            request.acceptReplyId,
+                            supplyTrace.getAsLong(),
+                            signalId);
     }
 
     public void signalForUpdatedCacheEntry(int requestHash)
@@ -410,6 +409,7 @@ public class DefaultCache
             }
             else
             {
+
                 streamFactory.router.setThrottle(request.acceptReplyId,
                                                  request.newResponse(null)::onResponseMessage);
                 streamFactory.correlations.put(request.acceptReplyId, request);
@@ -427,7 +427,7 @@ public class DefaultCache
     {
         long connectRouteId = request.connectRouteId;
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
-        MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
+        MessageConsumer connectInitial = request.supplyReceiver.apply(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 

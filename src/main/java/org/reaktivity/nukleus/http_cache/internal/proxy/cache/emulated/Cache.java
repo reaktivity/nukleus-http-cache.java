@@ -28,7 +28,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;

@@ -33,7 +33,7 @@ import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HeapBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;

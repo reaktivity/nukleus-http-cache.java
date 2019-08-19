@@ -16,7 +16,6 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.route.RouteManager;
 
 public abstract class AnswerableByCacheRequest extends Request

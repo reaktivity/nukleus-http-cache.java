@@ -18,7 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;

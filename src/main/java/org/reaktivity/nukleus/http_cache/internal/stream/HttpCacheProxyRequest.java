@@ -7,17 +7,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public abstract class HttpCacheProxyRequest
 {
-    public final HttpCacheProxyFactory streamFactory;
-    public final long acceptRouteId;
-    public final long acceptStreamId;
-    public final long acceptReplyId;
-    public final MessageConsumer acceptReply;
 
-    public MessageConsumer connectInitial;
-    public MessageConsumer connectReply;
-    public long connectRouteId;
-    public long connectReplyId;
-    public long connectInitialId;
 
     HttpCacheProxyRequest(
         HttpCacheProxyFactory streamFactory,
@@ -32,16 +22,7 @@ public abstract class HttpCacheProxyRequest
         long connectRouteId)
     {
 
-        this.streamFactory = streamFactory;
-        this.acceptReply = acceptReply;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptStreamId = acceptStreamId;
-        this.acceptReplyId = acceptReplyId;
-        this.connectInitial = connectInitial;
-        this.connectReply = connectReply;
-        this.connectRouteId = connectRouteId;
-        this.connectReplyId = connectReplyId;
-        this.connectInitialId = connectInitialId;
+
     }
 
     abstract void onRequestMessage(
@@ -56,7 +37,7 @@ public abstract class HttpCacheProxyRequest
         int index,
         int length);
 
-    public abstract HttpCacheProxyResponse newResponse(
+    public abstract MessageConsumer newResponse(
         ListFW<HttpHeaderFW> responseHeaders);
 
 }

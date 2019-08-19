@@ -60,7 +60,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheRe
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;

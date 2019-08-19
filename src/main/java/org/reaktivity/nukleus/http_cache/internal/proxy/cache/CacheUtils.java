@@ -98,7 +98,7 @@ public final class CacheUtils
         });
     }
 
-    public static boolean canBeServedByCache(
+    public static boolean isRequestCacheable(
         ListFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->

@@ -21,8 +21,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.ProxyRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -34,44 +32,57 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyRequest
+final class HttpCacheProxyNonCacheableRequest
 {
+    private final HttpCacheProxyFactory streamFactory;
+    private final long acceptRouteId;
+    private final long acceptStreamId;
+    private final long acceptReplyId;
+    private final MessageConsumer acceptReply;
 
-    private Request request;
+    private MessageConsumer connectInitial;
+    private MessageConsumer connectReply;
+    private long connectRouteId;
+    private long connectReplyId;
+    private long connectInitialId;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory streamFactory,
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptStreamId,
         long acceptReplyId,
+        long acceptStreamId,
         MessageConsumer connectInitial,
         MessageConsumer connectReply,
         long connectInitialId,
         long connectReplyId,
         long connectRouteId)
     {
-        super(streamFactory,
-              acceptReply,
-              acceptRouteId,
-              acceptStreamId,
-              acceptReplyId,
-              connectInitial,
-              connectReply,
-              connectInitialId,
-              connectReplyId,
-              connectRouteId);
+        this.streamFactory = streamFactory;
+        this.acceptReply = acceptReply;
+        this.acceptRouteId = acceptRouteId;
+        this.acceptStreamId = acceptStreamId;
+        this.acceptReplyId = acceptReplyId;
+        this.connectInitial = connectInitial;
+        this.connectReply = connectReply;
+        this.connectRouteId = connectRouteId;
+        this.connectReplyId = connectReplyId;
+        this.connectInitialId = connectInitialId;
     }
 
-    public HttpCacheProxyResponse newResponse(
-        ListFW<HttpHeaderFW> responseHeaders)
+    MessageConsumer newResponse(
+        HttpBeginExFW beginEx)
     {
-        return new HttpCacheProxyNonCacheableResponse(streamFactory,
-                                                      this,
-                                                      connectReply,
-                                                      connectRouteId,
-                                                      connectReplyId,
-                                                      acceptStreamId);
+        final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
+            new HttpCacheProxyNonCacheableResponse(streamFactory,
+                                                   connectReply,
+                                                   connectRouteId,
+                                                   connectReplyId,
+                                                   acceptReply,
+                                                   acceptRouteId,
+                                                   acceptReplyId);
+        streamFactory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
+        return nonCacheableResponse::onResponseMessage;
     }
 
     void onResponseMessage(
@@ -144,7 +155,15 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-        proxyRequest(requestHeaders);
+        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [sent proxy request]\n",
+                              currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+        }
+
+        sendBeginToConnect(requestHeaders);
     }
 
     private void onData(
@@ -177,8 +196,6 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
     {
         final long traceId = abort.trace();
         streamFactory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
-        request.purge();
     }
 
     private void onWindow(
@@ -196,28 +213,6 @@ public final class HttpCacheProxyNonCacheableRequest extends HttpCacheProxyReque
     {
         final long traceId = reset.trace();
         streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-        streamFactory.cleanupCorrelationIfNecessary(connectReplyId, acceptStreamId);
-    }
-
-    private void proxyRequest(
-        final ListFW<HttpHeaderFW> requestHeaders)
-    {
-        this.request = new ProxyRequest(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyId,
-            streamFactory.router,
-            false);
-
-        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [sent proxy request]\n",
-                              currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-        }
-
-        sendBeginToConnect(requestHeaders);
     }
 
     private void sendBeginToConnect(
