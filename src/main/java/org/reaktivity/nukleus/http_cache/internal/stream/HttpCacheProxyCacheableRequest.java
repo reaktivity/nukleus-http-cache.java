@@ -19,6 +19,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -41,6 +42,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
@@ -52,13 +54,13 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 public final class HttpCacheProxyCacheableRequest
 {
-    public final HttpCacheProxyFactory streamFactory;
+    public final HttpCacheProxyFactory httpCacheProxyFactory;
+    public final LongFunction<MessageConsumer> supplyReceiver;
     public final MessageConsumer acceptReply;
     public final long acceptRouteId;
     public final long acceptStreamId;
     public final long acceptReplyId;
 
-    public final LongFunction<MessageConsumer> supplyReceiver;
     public MessageConsumer connectInitial;
     public MessageConsumer connectReply;
     public long connectRouteId;
@@ -74,7 +76,7 @@ public final class HttpCacheProxyCacheableRequest
     private int attempts;
 
     HttpCacheProxyCacheableRequest(
-        HttpCacheProxyFactory streamFactory,
+        HttpCacheProxyFactory httpCacheProxyFactory,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptStreamId,
@@ -85,7 +87,7 @@ public final class HttpCacheProxyCacheableRequest
         long connectReplyId,
         long connectRouteId)
     {
-        this.streamFactory = streamFactory;
+        this.httpCacheProxyFactory = httpCacheProxyFactory;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
@@ -95,14 +97,14 @@ public final class HttpCacheProxyCacheableRequest
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
-        this.supplyReceiver = streamFactory.router::supplyReceiver;
+        this.supplyReceiver = httpCacheProxyFactory.router::supplyReceiver;
         this.signaler = supplyReceiver.apply(acceptStreamId);
     }
 
     public ListFW<HttpHeaderFW> getRequestHeaders(
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        return getRequestHeaders(requestHeaders, streamFactory.requestBufferPool);
+        return getRequestHeaders(requestHeaders, httpCacheProxyFactory.requestBufferPool);
     }
 
     public ListFW<HttpHeaderFW> getRequestHeaders(
@@ -115,12 +117,12 @@ public final class HttpCacheProxyCacheableRequest
 
     public LongUnaryOperator supplyInitialId()
     {
-        return streamFactory.supplyInitialId;
+        return httpCacheProxyFactory.supplyInitialId;
     }
 
     public LongUnaryOperator supplyReplyId()
     {
-        return streamFactory.supplyReplyId;
+        return httpCacheProxyFactory.supplyReplyId;
     }
 
     public String etag()
@@ -142,7 +144,7 @@ public final class HttpCacheProxyCacheableRequest
     {
         if (requestSlot != NO_SLOT)
         {
-            streamFactory.requestBufferPool.release(requestSlot);
+            httpCacheProxyFactory.requestBufferPool.release(requestSlot);
             this.requestSlot = NO_SLOT;
         }
         this.isRequestPurged = true;
@@ -157,7 +159,7 @@ public final class HttpCacheProxyCacheableRequest
         else
         {
             long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
-            this.streamFactory.scheduler.accept(requestAt, this::retryCacheableRequest);
+            this.httpCacheProxyFactory.scheduler.accept(requestAt, this::retryCacheableRequest);
         }
     }
 
@@ -165,48 +167,84 @@ public final class HttpCacheProxyCacheableRequest
         HttpBeginExFW beginEx)
     {
         ListFW<HttpHeaderFW> responseHeaders = beginEx.headers();
-        String status = getHeader(responseHeaders, STATUS);
-        assert status != null;
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
+        DefaultCacheEntry cacheEntry = httpCacheProxyFactory.defaultCache.supply(requestHash);
+        String newEtag = getHeader(responseHeaders, ETAG);
         MessageConsumer newStream;
 
         if ((retry  &&
              attempts < 3) ||
-            !this.streamFactory.defaultCache.isUpdatedByResponseHeadersToRetry(this, responseHeaders))
+            !this.httpCacheProxyFactory.defaultCache.isUpdatedByResponseHeadersToRetry(this, responseHeaders))
         {
             final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
-                new HttpCacheProxyRetryResponse(streamFactory,
+                new HttpCacheProxyRetryResponse(httpCacheProxyFactory,
                                                 this);
-            streamFactory.router.setThrottle(acceptReplyId, cacheProxyRetryResponse::onResponseMessage);
+            httpCacheProxyFactory.router.setThrottle(acceptReplyId, cacheProxyRetryResponse::onResponseMessage);
             newStream = cacheProxyRetryResponse::onResponseMessage;
 
+        }
+        else if (cacheEntry.etag() != null &&
+                 cacheEntry.etag().equals(newEtag) &&
+                 cacheEntry.recentAuthorizationHeader() != null)
+        {
+            final HttpCacheProxyNotModifiedResponse notModifiedResponse =
+                new HttpCacheProxyNotModifiedResponse(httpCacheProxyFactory,
+                                                      this);
+            httpCacheProxyFactory.router.setThrottle(acceptReplyId, notModifiedResponse::onResponseMessage);
+            newStream = notModifiedResponse::onResponseMessage;
         }
         else if (isCacheableResponse(responseHeaders))
         {
             final HttpCacheProxyCacheableResponse cacheableResponse =
-                new HttpCacheProxyCacheableResponse(streamFactory,
+                new HttpCacheProxyCacheableResponse(httpCacheProxyFactory,
+                                                    requestHash,
+                                                    requestSlot,
+                                                    acceptReply,
+                                                    acceptRouteId,
+                                                    acceptStreamId,
+                                                    acceptReplyId,
+                                                    connectReply,
+                                                    connectReplyId,
+                                                    connectRouteId,
                                                     this);
-            streamFactory.router.setThrottle(acceptReplyId, cacheableResponse::onResponseMessage);
+            httpCacheProxyFactory.router.setThrottle(acceptReplyId, cacheableResponse::onResponseMessage);
             newStream = cacheableResponse::onResponseMessage;
         }
         else
         {
             final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
-                    new HttpCacheProxyNonCacheableResponse(streamFactory,
+                    new HttpCacheProxyNonCacheableResponse(httpCacheProxyFactory,
                                                            connectReply,
                                                            connectRouteId,
                                                            connectReplyId,
                                                            acceptReply,
                                                            acceptRouteId,
                                                            acceptReplyId);
-            streamFactory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
+            httpCacheProxyFactory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
             newStream = nonCacheableResponse::onResponseMessage;
-            this.purge();
+            httpCacheProxyFactory.defaultCache.serveNextPendingInitialRequest(this);
+            purge();
         }
 
         return newStream;
     }
 
+    public void newResponse()
+    {
+            final HttpCacheProxyCacheableResponse cacheableResponse =
+                new HttpCacheProxyCacheableResponse(httpCacheProxyFactory,
+                                                    requestHash,
+                                                    requestSlot,
+                                                    acceptReply,
+                                                    acceptRouteId,
+                                                    acceptStreamId,
+                                                    acceptReplyId,
+                                                    connectReply,
+                                                    connectReplyId,
+                                                    connectRouteId,
+                                                    this);
+            httpCacheProxyFactory.router.setThrottle(acceptReplyId, cacheableResponse::onResponseMessage);
+    }
 
     void onResponseMessage(
         int msgTypeId,
@@ -217,10 +255,10 @@ public final class HttpCacheProxyCacheableRequest
         switch(msgTypeId)
         {
             case ResetFW.TYPE_ID:
-                streamFactory.writer.doReset(acceptReply,
-                                             acceptRouteId,
-                                             acceptStreamId,
-                                             streamFactory.supplyTrace.getAsLong());
+                httpCacheProxyFactory.writer.doReset(acceptReply,
+                                                     acceptRouteId,
+                                                     acceptStreamId,
+                                                     httpCacheProxyFactory.supplyTrace.getAsLong());
                 break;
         }
     }
@@ -234,27 +272,27 @@ public final class HttpCacheProxyCacheableRequest
         switch (msgTypeId)
         {
             case BeginFW.TYPE_ID:
-                final BeginFW begin = streamFactory.beginRO.wrap(buffer, index, index + length);
+                final BeginFW begin = httpCacheProxyFactory.beginRO.wrap(buffer, index, index + length);
                 onBegin(begin);
                 break;
             case DataFW.TYPE_ID:
-                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
+                final DataFW data = httpCacheProxyFactory.dataRO.wrap(buffer, index, index + length);
                 onData(data);
                 break;
             case EndFW.TYPE_ID:
-                final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+                final EndFW end = httpCacheProxyFactory.endRO.wrap(buffer, index, index + length);
                 onEnd(end);
                 break;
             case AbortFW.TYPE_ID:
-                final AbortFW abort = streamFactory.abortRO.wrap(buffer, index, index + length);
+                final AbortFW abort = httpCacheProxyFactory.abortRO.wrap(buffer, index, index + length);
                 onAbort(abort);
                 break;
             case WindowFW.TYPE_ID:
-                final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
+                final WindowFW window = httpCacheProxyFactory.windowRO.wrap(buffer, index, index + length);
                 onWindow(window);
                 break;
             case ResetFW.TYPE_ID:
-                final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
+                final ResetFW reset = httpCacheProxyFactory.resetRO.wrap(buffer, index, index + length);
                 onReset(reset);
                 break;
             default:
@@ -268,8 +306,8 @@ public final class HttpCacheProxyCacheableRequest
         final long authorization = begin.authorization();
         final short authorizationScope = authorizationScope(authorization);
 
-        final OctetsFW extension = streamFactory.beginRO.extension();
-        final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
+        final OctetsFW extension = httpCacheProxyFactory.beginRO.extension();
+        final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::wrap);
         final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // Should already be canonicalized in http / http2 nuklei
@@ -278,7 +316,7 @@ public final class HttpCacheProxyCacheableRequest
         this.requestHash = 31 * authorizationScope + requestURL.hashCode();
 
         // count all requests
-        streamFactory.counters.requests.getAsLong();
+        httpCacheProxyFactory.counters.requests.getAsLong();
 
         if (DEBUG)
         {
@@ -288,10 +326,10 @@ public final class HttpCacheProxyCacheableRequest
 
         if (satisfiedByCache(requestHeaders))
         {
-            streamFactory.counters.requestsCacheable.getAsLong();
+            httpCacheProxyFactory.counters.requestsCacheable.getAsLong();
         }
 
-        boolean stored = storeRequest(requestHeaders, streamFactory.requestBufferPool);
+        boolean stored = storeRequest(requestHeaders, httpCacheProxyFactory.requestBufferPool);
         if (!stored)
         {
             send503RetryAfter();
@@ -306,13 +344,13 @@ public final class HttpCacheProxyCacheableRequest
         }
 
         if (satisfiedByCache(requestHeaders) &&
-            streamFactory.defaultCache.handleCacheableRequest(requestHeaders, authScope, this))
+            httpCacheProxyFactory.defaultCache.handleCacheableRequest(requestHeaders, authScope, this))
         {
             //NOOP
         }
         else
         {
-            long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
+            long connectReplyId = httpCacheProxyFactory.supplyReplyId.applyAsLong(connectInitialId);
 
             if (DEBUG)
             {
@@ -321,7 +359,7 @@ public final class HttpCacheProxyCacheableRequest
             }
 
             sendBeginToConnect(requestHeaders);
-            streamFactory.defaultCache.createPendingInitialRequests(this);
+            httpCacheProxyFactory.defaultCache.createPendingInitialRequests(this);
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
     }
@@ -329,27 +367,28 @@ public final class HttpCacheProxyCacheableRequest
     private void onData(
         final DataFW data)
     {
-        streamFactory.writer.doWindow(acceptReply,
-                                      acceptRouteId,
-                                      acceptStreamId,
-                                      data.trace(),
-                                      data.sizeof(),
-                                      data.padding(),
-                                      data.groupId());
+        httpCacheProxyFactory.writer.doWindow(acceptReply,
+                                              acceptRouteId,
+                                              acceptStreamId,
+                                              data.trace(),
+                                              data.sizeof(),
+                                              data.padding(),
+                                              data.groupId());
     }
 
     private void onEnd(
         final EndFW end)
     {
         final long traceId = end.trace();
-        streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
+        httpCacheProxyFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onAbort(
         final AbortFW abort)
     {
         final long traceId = abort.trace();
-        streamFactory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
+        httpCacheProxyFactory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
+        httpCacheProxyFactory.defaultCache.removePendingInitialRequest(this);
         purge();
     }
 
@@ -360,21 +399,21 @@ public final class HttpCacheProxyCacheableRequest
         final int padding = window.padding();
         final long groupId = window.groupId();
         final long traceId = window.trace();
-        streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+        httpCacheProxyFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
     }
 
     private void onReset(
         final ResetFW reset)
     {
         final long traceId = reset.trace();
-        streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
+        httpCacheProxyFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
 
         if (preferWaitExpired != null)
         {
             preferWaitExpired.cancel(true);
         }
 
-        this.streamFactory.defaultCache.removePendingInitialRequest(this);
+        this.httpCacheProxyFactory.defaultCache.removePendingInitialRequest(this);
     }
 
     private void schedulePreferWaitIfNoneMatchIfNecessary(
@@ -385,12 +424,12 @@ public final class HttpCacheProxyCacheableRequest
             int preferWait = getPreferWait(requestHeaders);
             if (preferWait > 0)
             {
-                preferWaitExpired = this.streamFactory.executor.schedule(preferWait,
-                                                                         SECONDS,
-                                                                         acceptRouteId,
-                                                                         this.acceptReplyId,
-                                                                         REQUEST_EXPIRED_SIGNAL);
-                streamFactory.expiryRequestsCorrelations.put(this.acceptReplyId, preferWaitExpired);
+                preferWaitExpired = this.httpCacheProxyFactory.executor.schedule(preferWait,
+                                                                                 SECONDS,
+                                                                                 acceptRouteId,
+                                                                                 this.acceptReplyId,
+                                                                                 REQUEST_EXPIRED_SIGNAL);
+                httpCacheProxyFactory.expiryRequestsCorrelations.put(this.acceptReplyId, preferWaitExpired);
             }
         }
     }
@@ -399,16 +438,16 @@ public final class HttpCacheProxyCacheableRequest
         final ListFW<HttpHeaderFW> requestHeaders)
     {
 
-        streamFactory.writer.doHttpRequest(
+        httpCacheProxyFactory.writer.doHttpRequest(
             connectInitial,
             connectRouteId,
             connectInitialId,
-            streamFactory.supplyTrace.getAsLong(),
+            httpCacheProxyFactory.supplyTrace.getAsLong(),
             builder -> requestHeaders.forEach(
                 h ->  builder.item(item -> item.name(h.name()).value(h.value()))
                                              ));
 
-        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
+        httpCacheProxyFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }
 
     private boolean storeRequest(
@@ -432,23 +471,23 @@ public final class HttpCacheProxyCacheableRequest
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "503");
         }
 
-        streamFactory.writer.doHttpResponse(acceptReply,
-                                            acceptRouteId,
-                                            acceptReplyId,
-                                            streamFactory.supplyTrace.getAsLong(), e ->
+        httpCacheProxyFactory.writer.doHttpResponse(acceptReply,
+                                                    acceptRouteId,
+                                                    acceptReplyId,
+                                                    httpCacheProxyFactory.supplyTrace.getAsLong(), e ->
                                             e.item(h -> h.name(STATUS).value("503"))
                                              .item(h -> h.name("retry-after").value("0")));
 
-        streamFactory.writer.doHttpEnd(acceptReply,
-                                       acceptRouteId,
-                                       acceptReplyId,
-                                       streamFactory.supplyTrace.getAsLong());
+        httpCacheProxyFactory.writer.doHttpEnd(acceptReply,
+                                               acceptRouteId,
+                                               acceptReplyId,
+                                               httpCacheProxyFactory.supplyTrace.getAsLong());
 
         // count all responses
-        streamFactory.counters.responses.getAsLong();
+        httpCacheProxyFactory.counters.responses.getAsLong();
 
         // count retry responses
-        streamFactory.counters.responsesRetry.getAsLong();
+        httpCacheProxyFactory.counters.responsesRetry.getAsLong();
     }
 
     private void retryCacheableRequest()
@@ -460,12 +499,12 @@ public final class HttpCacheProxyCacheableRequest
 
         incAttempts();
 
-        connectInitialId = this.streamFactory.supplyInitialId.applyAsLong(connectRouteId);
-        connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
-        connectInitial = this.streamFactory.router.supplyReceiver(connectInitialId);
+        connectInitialId = this.httpCacheProxyFactory.supplyInitialId.applyAsLong(connectRouteId);
+        connectReplyId = httpCacheProxyFactory.supplyReplyId.applyAsLong(connectInitialId);
+        connectInitial = this.httpCacheProxyFactory.router.supplyReceiver(connectInitialId);
 
-        streamFactory.correlations.put(connectReplyId, this::newResponse);
-        ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(streamFactory.requestHeadersRO);
+        httpCacheProxyFactory.correlations.put(connectReplyId, this::newResponse);
+        ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders(httpCacheProxyFactory.requestHeadersRO);
 
         if (DEBUG)
         {
@@ -473,20 +512,20 @@ public final class HttpCacheProxyCacheableRequest
                               currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connectInitial,
-                                           connectRouteId,
-                                           connectInitialId,
-                                           streamFactory.supplyTrace.getAsLong(),
+        httpCacheProxyFactory.writer.doHttpRequest(connectInitial,
+                                                   connectRouteId,
+                                                   connectInitialId,
+                                                   httpCacheProxyFactory.supplyTrace.getAsLong(),
                                            builder ->
                                            {
                                                requestHeaders.forEach(
                                                    h -> builder.item(item -> item.name(h.name()).value(h.value())));
                                            });
-        streamFactory.writer.doHttpEnd(connectInitial,
-                                       connectRouteId,
-                                       connectInitialId,
-                                       streamFactory.supplyTrace.getAsLong());
-        streamFactory.counters.requestsRetry.getAsLong();
+        httpCacheProxyFactory.writer.doHttpEnd(connectInitial,
+                                               connectRouteId,
+                                               connectInitialId,
+                                               httpCacheProxyFactory.supplyTrace.getAsLong());
+        httpCacheProxyFactory.counters.requestsRetry.getAsLong();
     }
 
     private void incAttempts()

@@ -406,7 +406,7 @@ public class DefaultCache
             }
             else
             {
-                request
+                request.newResponse();
                 signalForCacheEntry(request, CACHE_ENTRY_SIGNAL);
                 this.counters.responsesCached.getAsLong();
             }
@@ -424,8 +424,6 @@ public class DefaultCache
         MessageConsumer connectInitial = request.supplyReceiver.apply(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
         ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
-
-        correlations.put(connectReplyId, request);
 
         if (DEBUG)
         {
