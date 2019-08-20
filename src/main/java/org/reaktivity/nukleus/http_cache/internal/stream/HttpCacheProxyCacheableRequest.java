@@ -19,6 +19,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -33,19 +34,20 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import java.time.Instant;
 import java.util.concurrent.Future;
 import java.util.function.LongFunction;
+import java.util.function.LongUnaryOperator;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.REQUEST_EXPIRED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 public final class HttpCacheProxyCacheableRequest
@@ -56,6 +58,7 @@ public final class HttpCacheProxyCacheableRequest
     public final long acceptStreamId;
     public final long acceptReplyId;
 
+    public final LongFunction<MessageConsumer> supplyReceiver;
     public MessageConsumer connectInitial;
     public MessageConsumer connectReply;
     public long connectRouteId;
@@ -68,7 +71,6 @@ public final class HttpCacheProxyCacheableRequest
     private boolean isRequestPurged;
     private String etag;
     private Future<?> preferWaitExpired;
-    private final LongFunction<MessageConsumer> supplyReceiver;
     private int attempts;
 
     HttpCacheProxyCacheableRequest(
@@ -111,14 +113,19 @@ public final class HttpCacheProxyCacheableRequest
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
+    public LongUnaryOperator supplyInitialId()
+    {
+        return streamFactory.supplyInitialId;
+    }
+
+    public LongUnaryOperator supplyReplyId()
+    {
+        return streamFactory.supplyReplyId;
+    }
+
     public String etag()
     {
         return etag;
-    }
-
-    public void setEtag(String etag)
-    {
-        this.etag = etag;
     }
 
     public int requestHash()
@@ -141,16 +148,6 @@ public final class HttpCacheProxyCacheableRequest
         this.isRequestPurged = true;
     }
 
-    public void incAttempts()
-    {
-        attempts++;
-    }
-
-    public int attempts()
-    {
-        return attempts;
-    }
-
     public void scheduleRequest(long retryAfter)
     {
         if (retryAfter <= 0L)
@@ -164,16 +161,31 @@ public final class HttpCacheProxyCacheableRequest
         }
     }
 
-    MessageConsumer newResponse(
+    public MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
+        ListFW<HttpHeaderFW> responseHeaders = beginEx.headers();
+        String status = getHeader(responseHeaders, STATUS);
+        assert status != null;
+        boolean retry = HttpHeadersUtil.retry(responseHeaders);
         MessageConsumer newStream;
 
-        if (isCacheableResponse(beginEx.headers()))
+        if ((retry  &&
+             attempts < 3) ||
+            !this.streamFactory.defaultCache.isUpdatedByResponseHeadersToRetry(this, responseHeaders))
+        {
+            final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
+                new HttpCacheProxyRetryResponse(streamFactory,
+                                                this);
+            streamFactory.router.setThrottle(acceptReplyId, cacheProxyRetryResponse::onResponseMessage);
+            newStream = cacheProxyRetryResponse::onResponseMessage;
+
+        }
+        else if (isCacheableResponse(responseHeaders))
         {
             final HttpCacheProxyCacheableResponse cacheableResponse =
-                    new HttpCacheProxyCacheableResponse(streamFactory,
-                                                       this);
+                new HttpCacheProxyCacheableResponse(streamFactory,
+                                                    this);
             streamFactory.router.setThrottle(acceptReplyId, cacheableResponse::onResponseMessage);
             newStream = cacheableResponse::onResponseMessage;
         }
@@ -259,7 +271,6 @@ public final class HttpCacheProxyCacheableRequest
         final OctetsFW extension = streamFactory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
         final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
-        final boolean authorizationHeader = requestHeaders.anyMatch(HAS_AUTHORIZATION);
 
         // Should already be canonicalized in http / http2 nuklei
         final String requestURL = getRequestURL(requestHeaders);
@@ -287,7 +298,6 @@ public final class HttpCacheProxyCacheableRequest
             return;
         }
 
-        String etag = null;
         short authScope = authorizationScope(authorization);
         HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
         if (etagHeader != null)
@@ -296,7 +306,7 @@ public final class HttpCacheProxyCacheableRequest
         }
 
         if (satisfiedByCache(requestHeaders) &&
-            streamFactory.defaultCache.handleCacheableRequest(streamFactory, requestHeaders, authScope, this))
+            streamFactory.defaultCache.handleCacheableRequest(requestHeaders, authScope, this))
         {
             //NOOP
         }
@@ -477,6 +487,11 @@ public final class HttpCacheProxyCacheableRequest
                                        connectInitialId,
                                        streamFactory.supplyTrace.getAsLong());
         streamFactory.counters.requestsRetry.getAsLong();
+    }
+
+    private void incAttempts()
+    {
+        attempts++;
     }
 
     private static short authorizationScope(

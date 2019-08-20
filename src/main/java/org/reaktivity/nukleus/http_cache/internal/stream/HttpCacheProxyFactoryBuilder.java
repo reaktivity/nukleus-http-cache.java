@@ -29,6 +29,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
+import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
@@ -37,6 +38,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HeapBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
@@ -47,7 +49,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private final HttpCacheConfiguration config;
     private final LongObjectBiConsumer<Runnable> scheduler;
     private final Long2ObjectHashMap<Request> requestCorrelations;
-    private final Long2ObjectHashMap<HttpCacheProxyRequest> correlations;
+    private final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     private final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     private RouteManager router;
@@ -206,35 +208,33 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         if (defaultCache == null)
         {
-            this.defaultCache = new DefaultCache(
-                scheduler,
-                writeBuffer,
-                cacheBufferPool,
-                correlations,
-                counters,
-                cacheEntries,
-                supplyTrace,
-                supplyTypeId,
-                executor);
+            this.defaultCache = new DefaultCache(scheduler,
+                                                writeBuffer,
+                                                cacheBufferPool,
+                                                correlations,
+                                                counters,
+                                                cacheEntries,
+                                                supplyTrace,
+                                                supplyTypeId,
+                                                executor);
         }
 
-        return new HttpCacheProxyFactory(
-                router,
-                defaultBudgetManager,
-                writeBuffer,
-                requestBufferPool,
-                supplyInitialId,
-                supplyReplyId,
-                requestCorrelations,
-                correlations,
-                expiryRequestsCorrelations,
-                emulatedCache,
-                defaultCache,
-                counters,
-                supplyTrace,
-                supplyTypeId,
-                executor,
-                scheduler);
+        return new HttpCacheProxyFactory(router,
+                                         defaultBudgetManager,
+                                         writeBuffer,
+                                         requestBufferPool,
+                                         supplyInitialId,
+                                         supplyReplyId,
+                                         requestCorrelations,
+                                         correlations,
+                                         expiryRequestsCorrelations,
+                                         emulatedCache,
+                                         defaultCache,
+                                         counters,
+                                         supplyTrace,
+                                         supplyTypeId,
+                                         executor,
+                                         scheduler);
     }
 
 }

@@ -163,7 +163,7 @@ final class HttpCacheProxyNonCacheableRequest
                               currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        sendBeginToConnect(requestHeaders);
+        doHttpRequest(requestHeaders);
     }
 
     private void onData(
@@ -215,7 +215,7 @@ final class HttpCacheProxyNonCacheableRequest
         streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
     }
 
-    private void sendBeginToConnect(
+    private void doHttpRequest(
         final ListFW<HttpHeaderFW> requestHeaders)
     {
         streamFactory.writer.doHttpRequest(

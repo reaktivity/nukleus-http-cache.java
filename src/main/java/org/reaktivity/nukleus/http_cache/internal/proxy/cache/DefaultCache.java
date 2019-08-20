@@ -23,7 +23,6 @@ import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyCacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactory;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -33,6 +32,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
+import java.util.function.Function;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -72,7 +72,7 @@ public class DefaultCache
     final Int2CacheHashMapWithLRUEviction cachedEntries;
 
     final LongObjectBiConsumer<Runnable> scheduler;
-    final Long2ObjectHashMap<HttpCacheProxyCacheableRequest> correlations;
+    final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     final LongSupplier supplyTrace;
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
@@ -82,7 +82,7 @@ public class DefaultCache
         LongObjectBiConsumer<Runnable> scheduler,
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
-        Long2ObjectHashMap<HttpCacheProxyCacheableRequest> correlations,
+        Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
@@ -153,7 +153,6 @@ public class DefaultCache
     }
 
     public boolean handleCacheableRequest(
-        HttpCacheProxyFactory streamFactory,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
         HttpCacheProxyCacheableRequest request)
@@ -161,8 +160,7 @@ public class DefaultCache
         boolean canHandleRequest = false;
         final DefaultCacheEntry defaultCacheEntry = cachedEntries.get(request.requestHash());
 
-        if (defaultCacheEntry != null && serveRequest(streamFactory,
-                                                      defaultCacheEntry,
+        if (defaultCacheEntry != null && serveRequest(defaultCacheEntry,
                                                       requestHeaders,
                                                       authScope,
                                                       request))
@@ -277,12 +275,12 @@ public class DefaultCache
     public void purgeEntriesForNonPendingRequests()
     {
         cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
-                                                 {
-                                                     if (!hasPendingInitialRequests(cacheEntry.requestHash()))
-                                                     {
-                                                         this.purge(cacheEntry.requestHash());
-                                                     }
-                                                 });
+        {
+             if (!hasPendingInitialRequests(cacheEntry.requestHash()))
+             {
+                 this.purge(cacheEntry.requestHash());
+             }
+        });
     }
 
     public boolean isUpdatedByEtagToRetry(
@@ -391,7 +389,6 @@ public class DefaultCache
     }
 
     private boolean serveRequest(
-        HttpCacheProxyFactory streamFactory,
         DefaultCacheEntry entry,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
@@ -409,10 +406,7 @@ public class DefaultCache
             }
             else
             {
-
-                streamFactory.router.setThrottle(request.acceptReplyId,
-                                                 request.newResponse(null)::onResponseMessage);
-                streamFactory.correlations.put(request.acceptReplyId, request);
+                request
                 signalForCacheEntry(request, CACHE_ENTRY_SIGNAL);
                 this.counters.responsesCached.getAsLong();
             }
@@ -476,13 +470,13 @@ public class DefaultCache
         if (pendingInitialRequests != null)
         {
             pendingInitialRequests.subcribers().forEach(request ->
-                                                        {
-                                                            writer.doSignal(request.getSignaler(),
-                                                                            request.acceptRouteId,
-                                                                            request.acceptReplyId,
-                                                                            supplyTrace.getAsLong(),
-                                                                            signal);
-                                                        });
+            {
+                writer.doSignal(request.signaler,
+                                request.acceptRouteId,
+                                request.acceptReplyId,
+                                supplyTrace.getAsLong(),
+                                signal);
+            });
         }
     }
 }

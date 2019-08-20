@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
@@ -59,6 +60,7 @@ final class HttpCacheProxyCacheableResponse
     private long groupId;
     private int padding;
 
+    private int requestSlot = NO_SLOT;
     private final int initialWindow;
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
@@ -68,10 +70,12 @@ final class HttpCacheProxyCacheableResponse
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
+        int requestSlot,
         HttpCacheProxyCacheableRequest request)
     {
         this.httpCacheProxyFactory = httpCacheProxyFactory;
         this.request = request;
+        this.requestSlot = requestSlot;
         this.initialWindow = httpCacheProxyFactory.responseBufferPool.slotCapacity();
     }
 
@@ -83,7 +87,7 @@ final class HttpCacheProxyCacheableResponse
             request.connectRouteId, request.connectReplyId, acceptReplyBudget, connectReplyBudget, padding);
     }
 
-    public void onResponseMessage(
+    void onResponseMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -109,14 +113,7 @@ final class HttpCacheProxyCacheableResponse
                 break;
             case WindowFW.TYPE_ID:
                 final WindowFW window = httpCacheProxyFactory.windowRO.wrap(buffer, index, index + length);
-                groupId = window.groupId();
-                padding = window.padding();
-                long streamId = window.streamId();
-                int credit = window.credit();
-                acceptReplyBudget += credit;
-                httpCacheProxyFactory.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
-                                                           this::writePayload, window.trace());
-                sendEndIfNecessary(window.trace());
+                onWindow(window);
                 break;
             case SignalFW.TYPE_ID:
                 final SignalFW signal = httpCacheProxyFactory.signalRO.wrap(buffer, index, index + length);
@@ -136,7 +133,6 @@ final class HttpCacheProxyCacheableResponse
         traceId = begin.trace();
 
         final OctetsFW extension = httpCacheProxyFactory.beginRO.extension();
-
         final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::wrap);
 
         if (DEBUG)
@@ -283,6 +279,22 @@ final class HttpCacheProxyCacheableResponse
 
 
         }
+    }
+
+    private void onWindow(WindowFW window)
+    {
+        groupId = window.groupId();
+        padding = window.padding();
+        long streamId = window.streamId();
+        int credit = window.credit();
+        acceptReplyBudget += credit;
+        httpCacheProxyFactory.budgetManager.window(BudgetManager.StreamKind.CACHE,
+                                                   groupId,
+                                                   streamId,
+                                                   credit,
+                                                   this::writePayload,
+                                                   window.trace());
+        sendEndIfNecessary(window.trace());
     }
 
     private void onResponseReset(ResetFW reset)
@@ -454,7 +466,7 @@ final class HttpCacheProxyCacheableResponse
                 p -> buildResponsePayload(payloadWritten,
                                                toWrite,
                                                p,
-                                               cacheEntry.getResponsePool()) );
+                                               cacheEntry.getResponsePool()));
             payloadWritten += toWrite;
             budget -= (toWrite + padding);
             acceptReplyBudget -= (toWrite + padding);
@@ -534,6 +546,15 @@ final class HttpCacheProxyCacheableResponse
                                                   credit,
                                                   padding,
                                                   groupId);
+        }
+    }
+
+    private void purgeRequestHeaders()
+    {
+        if (requestSlot != NO_SLOT)
+        {
+            httpCacheProxyFactory.requestBufferPool.release(requestSlot);
+            this.requestSlot = NO_SLOT;
         }
     }
 }
