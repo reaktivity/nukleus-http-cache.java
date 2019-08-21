@@ -119,14 +119,14 @@ final class HttpCacheProxyNonCacheableResponse
         if (extension.sizeof() > 0)
         {
             final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::wrap);
+            final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
             if (DEBUG)
             {
                 System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
-                                  getHeader(httpBeginFW.headers(), ":status"));
+                                  getHeader(responseHeaders, ":status"));
             }
 
-            final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
             if (DEBUG)
             {

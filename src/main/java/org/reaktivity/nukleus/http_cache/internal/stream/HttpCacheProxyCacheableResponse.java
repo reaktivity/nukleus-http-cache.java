@@ -52,7 +52,6 @@ import java.util.concurrent.Future;
 final class HttpCacheProxyCacheableResponse
 {
     private final HttpCacheProxyFactory httpCacheProxyFactory;
-    private final HttpCacheProxyCacheableRequest request;
 
     private int connectReplyBudget;
     private int acceptReplyBudget;
@@ -68,9 +67,10 @@ final class HttpCacheProxyCacheableResponse
     private boolean isResponseBuffering;
 
     private int requestHash;
+    private Future<?> preferWaitExpired;
     public final MessageConsumer acceptReply;
     public final long acceptRouteId;
-    public final long acceptStreamId;
+    public final long acceptInitialId;
     public final long acceptReplyId;
 
     public MessageConsumer connectReply;
@@ -82,26 +82,26 @@ final class HttpCacheProxyCacheableResponse
         HttpCacheProxyFactory httpCacheProxyFactory,
         int requestHash,
         int requestSlot,
+        Future<?> preferWaitExpired,
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptStreamId,
+        long acceptInitialId,
         long acceptReplyId,
         MessageConsumer connectReply,
         long connectReplyId,
-        long connectRouteId,
-        HttpCacheProxyCacheableRequest request)
+        long connectRouteId)
     {
         this.httpCacheProxyFactory = httpCacheProxyFactory;
         this.requestSlot = requestSlot;
         this.requestHash = requestHash;
+        this.preferWaitExpired = preferWaitExpired;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
-        this.acceptStreamId = acceptStreamId;
+        this.acceptInitialId = acceptInitialId;
         this.acceptReplyId = acceptReplyId;
         this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
-        this.request = request;
         this.initialWindow = httpCacheProxyFactory.responseBufferPool.slotCapacity();
     }
 
@@ -147,7 +147,7 @@ final class HttpCacheProxyCacheableResponse
                 break;
             case ResetFW.TYPE_ID:
                 final ResetFW reset = httpCacheProxyFactory.resetRO.wrap(buffer, index, index + length);
-                onResponseReset(reset);
+                onReset(reset);
                 break;
         }
     }
@@ -313,7 +313,7 @@ final class HttpCacheProxyCacheableResponse
         sendEndIfNecessary(window.trace());
     }
 
-    private void onResponseReset(ResetFW reset)
+    private void onReset(ResetFW reset)
     {
         httpCacheProxyFactory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                                                    groupId,
@@ -323,7 +323,7 @@ final class HttpCacheProxyCacheableResponse
         request.purge();
         httpCacheProxyFactory.writer.doReset(acceptReply,
                                              acceptRouteId,
-                                             acceptStreamId,
+                                             acceptInitialId,
                                              httpCacheProxyFactory.supplyTrace.getAsLong());
     }
 
@@ -363,10 +363,9 @@ final class HttpCacheProxyCacheableResponse
         }
         if(payloadWritten == -1)
         {
-            Future<?> requestExpiryTimeout = httpCacheProxyFactory.expiryRequestsCorrelations.remove(signal.streamId());
-            if (requestExpiryTimeout != null)
+            if (preferWaitExpired != null)
             {
-                requestExpiryTimeout.cancel(true);
+                preferWaitExpired.cancel(true);
             }
             sendHttpResponseHeaders(cacheEntry, signal.signalId());
         }

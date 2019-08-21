@@ -21,6 +21,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import org.agrona.DirectBuffer;
+import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -31,21 +32,34 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
+import java.util.function.Function;
+
 final class HttpCacheProxyRetryResponse
 {
     private final HttpCacheProxyFactory httpCacheProxyFactory;
-    private final HttpCacheProxyCacheableRequest request;
 
     private final int initialWindow;
     private int connectReplyBudget;
+    private long retryAfter;
+
+    private final MessageConsumer connectReply;
+    private final long connectRouteId;
+    private final long connectReplyId;
+    private Function<Long, Boolean> scheduleRequest;
 
 
     HttpCacheProxyRetryResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
-        HttpCacheProxyCacheableRequest request)
+        MessageConsumer connectReply,
+        long connectRouteId,
+        long connectReplyId,
+        Function<Long, Boolean> scheduleRequest)
     {
         this.httpCacheProxyFactory = httpCacheProxyFactory;
-        this.request = request;
+        this.connectReply = connectReply;
+        this.connectRouteId = connectRouteId;
+        this.connectReplyId = connectReplyId;
+        this.scheduleRequest = scheduleRequest;
         this.initialWindow = httpCacheProxyFactory.responseBufferPool.slotCapacity();
     }
 
@@ -53,9 +67,7 @@ final class HttpCacheProxyRetryResponse
     public String toString()
     {
         return String.format("%s[connectRouteId=%016x, connectReplyStreamId=%d]",
-                             getClass().getSimpleName(),
-                             request.connectRouteId,
-                             request.connectReplyId);
+                             getClass().getSimpleName(), connectRouteId, connectReplyId);
     }
 
     void onResponseMessage(
@@ -89,7 +101,7 @@ final class HttpCacheProxyRetryResponse
         BeginFW begin)
     {
         final long connectReplyId = begin.streamId();
-        final OctetsFW extension = httpCacheProxyFactory.beginRO.extension();
+        final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::wrap);
 
         if (DEBUG)
@@ -100,10 +112,9 @@ final class HttpCacheProxyRetryResponse
 
         final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
         String status = getHeader(responseHeaders, STATUS);
-        long retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
+        retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
         assert status != null;
 
-        request.scheduleRequest(retryAfter);
         sendWindow(initialWindow, begin.trace());
     }
 
@@ -115,12 +126,12 @@ final class HttpCacheProxyRetryResponse
 
     private void onEnd(EndFW end)
     {
-        //NOOP
+        scheduleRequest.apply(retryAfter);
     }
 
     private void onAbort(AbortFW abort)
     {
-        //NOOP
+        scheduleRequest.apply(retryAfter);
     }
 
     private void sendWindow(
@@ -130,9 +141,9 @@ final class HttpCacheProxyRetryResponse
         connectReplyBudget += credit;
         if (connectReplyBudget > 0)
         {
-            httpCacheProxyFactory.writer.doWindow(request.connectReply,
-                                                  request.connectRouteId,
-                                                  request.connectReplyId,
+            httpCacheProxyFactory.writer.doWindow(connectReply,
+                                                  connectRouteId,
+                                                  connectReplyId,
                                                   traceId,
                                                   credit,
                                                   0,

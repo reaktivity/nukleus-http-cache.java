@@ -18,8 +18,9 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isRequestCacheable;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
-import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
@@ -40,6 +41,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -84,7 +86,6 @@ public class HttpCacheProxyFactory implements StreamFactory
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> requestCorrelations;
     public final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
-    final Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -103,7 +104,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         LongUnaryOperator supplyReplyId,
         Long2ObjectHashMap<Request> requestCorrelations,
         Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations,
-        Long2ObjectHashMap<Future<?>> expiryRequestsCorrelations,
         Cache emulatedCache,
         DefaultCache defaultCache,
         HttpCacheCounters counters,
@@ -127,7 +127,6 @@ public class HttpCacheProxyFactory implements StreamFactory
                 counters.supplyCounter.apply("http-cache.response.releases"));
         this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
-        this.expiryRequestsCorrelations = requireNonNull(expiryRequestsCorrelations);
         this.emulatedCache = emulatedCache;
         this.defaultCache = defaultCache;
 
@@ -182,6 +181,9 @@ public class HttpCacheProxyFactory implements StreamFactory
             final OctetsFW extension = beginRO.extension();
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
             final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+            final String requestURL = getRequestURL(requestHeaders);
+            final short authorizationScope = authorizationScope(authorization);
+            final int requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
 
             if(requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
             {
@@ -196,7 +198,22 @@ public class HttpCacheProxyFactory implements StreamFactory
                 long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
                 MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
 
-                if (isRequestCacheable(requestHeaders))
+                if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
+                {
+                    final HttpCacheProxyCachedRequest cachedRequest =
+                        new HttpCacheProxyCachedRequest(this,
+                                                        requestHash,
+                                                        acceptReply,
+                                                        acceptRouteId,
+                                                        acceptReplyId,
+                                                        acceptInitialId,
+                                                        connectReply,
+                                                        connectReplyId,
+                                                        connectRouteId);
+                    newStream = cachedRequest::onRequestMessage;
+                    router.setThrottle(acceptReplyId, cachedRequest::onResponseMessage);
+                }
+                else if (isRequestCacheable(requestHeaders))
                 {
                     final HttpCacheProxyCacheableRequest cacheableRequest =
                         new HttpCacheProxyCacheableRequest(this,
@@ -244,6 +261,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         final long sourceId = begin.streamId();
 
         Request request = requestCorrelations.get(sourceId);
+        MessageConsumer newStream = null;
 
         if(request != null && request.isEmulated())
         {
@@ -261,12 +279,12 @@ public class HttpCacheProxyFactory implements StreamFactory
                 final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
                 if (httpBeginFW != null)
                 {
-                    return newResponse.apply(httpBeginFW);
+                    newStream = newResponse.apply(httpBeginFW);
                 }
             }
         }
 
-        return null;
+        return newStream;
     }
 
     private RouteFW wrapRoute(
@@ -277,4 +295,5 @@ public class HttpCacheProxyFactory implements StreamFactory
     {
         return routeRO.wrap(buffer, index, index + length);
     }
+
 }

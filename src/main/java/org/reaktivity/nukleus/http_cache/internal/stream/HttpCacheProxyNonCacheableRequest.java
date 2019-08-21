@@ -142,9 +142,10 @@ final class HttpCacheProxyNonCacheableRequest
     private void onBegin(
         BeginFW begin)
     {
-        final OctetsFW extension = streamFactory.beginRO.extension();
-        final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final OctetsFW extension = begin.extension();
+        final HttpBeginExFW httpBeginEx = extension.get(streamFactory.httpBeginExRO::tryWrap);
+        assert httpBeginEx != null;
+        final ListFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
 
         // count all requests
         streamFactory.counters.requests.getAsLong();
@@ -152,7 +153,7 @@ final class HttpCacheProxyNonCacheableRequest
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
+                    currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginEx.headers()));
         }
 
         long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
@@ -163,7 +164,16 @@ final class HttpCacheProxyNonCacheableRequest
                               currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        doHttpRequest(requestHeaders);
+        streamFactory.writer.doHttpRequest(
+            connectInitial,
+            connectRouteId,
+            connectInitialId,
+            streamFactory.supplyTrace.getAsLong(),
+            builder -> requestHeaders.forEach(
+                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
+                                             ));
+
+        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }
 
     private void onData(
@@ -213,21 +223,6 @@ final class HttpCacheProxyNonCacheableRequest
     {
         final long traceId = reset.trace();
         streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
-    }
-
-    private void doHttpRequest(
-        final ListFW<HttpHeaderFW> requestHeaders)
-    {
-        streamFactory.writer.doHttpRequest(
-            connectInitial,
-            connectRouteId,
-            connectInitialId,
-            streamFactory.supplyTrace.getAsLong(),
-            builder -> requestHeaders.forEach(
-                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-                                             ));
-
-        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }
 
 }
