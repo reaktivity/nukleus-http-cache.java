@@ -328,9 +328,8 @@ final class ProxyAcceptStream
         }
 
         streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
-                e.item(h -> h.representation((byte) 0)
-                        .name(STATUS)
-                        .value("504")));
+                e.item(h -> h.name(STATUS)
+                             .value("504")));
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId,
                 streamFactory.supplyTrace.getAsLong());
         request.purge();
