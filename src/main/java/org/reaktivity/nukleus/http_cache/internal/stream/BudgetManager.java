@@ -23,7 +23,7 @@ import static java.util.Objects.requireNonNull;
 
 public class BudgetManager
 {
-    private final Long2ObjectHashMap<GroupBudget> groups;             // group id -> GroupBudget
+    private final Long2ObjectHashMap<GroupBudget> groups;  // group id -> GroupBudget
 
     public enum StreamKind
     {
@@ -68,7 +68,7 @@ public class BudgetManager
     {
         final long groupId;
         final int initialBudget;
-        final Long2ObjectHashMap<StreamBudget> streamMap;          // stream id -> BudgetEnty
+        final Long2ObjectHashMap<StreamBudget> streamMap;  // stream id -> BudgetEnty
         int budget;
 
         GroupBudget(long groupId, int initialBudget)
