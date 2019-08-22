@@ -16,13 +16,11 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyCacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -44,14 +42,11 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 public class DefaultCache
 {
@@ -72,7 +67,6 @@ public class DefaultCache
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     final LongSupplier supplyTrace;
-    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final SignalingExecutor executor;
     public final HttpCacheCounters counters;
 
@@ -87,7 +81,6 @@ public class DefaultCache
         ToIntFunction<String> supplyTypeId,
         SignalingExecutor executor)
     {
-        this.pendingInitialRequestsMap = new Int2ObjectHashMap<>();
         this.scheduler = scheduler;
         this.correlations = correlations;
         this.writer = new Writer(supplyTypeId, writeBuffer);
@@ -128,17 +121,6 @@ public class DefaultCache
         return defaultCacheEntry;
     }
 
-    public void signalForUpdatedCacheEntry(int requestHash)
-    {
-       this.sendSignalToPendingInitialRequestsSubscribers(requestHash, CACHE_ENTRY_UPDATED_SIGNAL);
-    }
-
-    public void signalAbortAllSubscribers(
-        int requestHash)
-    {
-        this.sendSignalToPendingInitialRequestsSubscribers(requestHash, ABORT_SIGNAL);
-    }
-
     public boolean matchCacheableRequest(
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope,
@@ -156,79 +138,6 @@ public class DefaultCache
         return canHandleRequest;
     }
 
-    public void sendPendingInitialRequests(
-        int requestHash)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
-        if (pendingInitialRequests != null)
-        {
-            final PendingInitialRequests newPendingInitialRequests = pendingInitialRequests.withNextInitialRequest();
-            if (newPendingInitialRequests != null)
-            {
-                pendingInitialRequestsMap.put(requestHash, newPendingInitialRequests);
-                sendPendingInitialRequest(newPendingInitialRequests.initialRequest());
-            }
-        }
-    }
-
-    public void send304ToPendingInitialRequests(
-        int requestHash)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
-        if (pendingInitialRequests != null)
-        {
-            DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
-            pendingInitialRequests.subcribers().forEach(request ->
-            {
-                send304(cacheEntry, request);
-                request.purge();
-            });
-            pendingInitialRequests.removeAllSubscribers();
-        }
-    }
-
-    public void removeAllPendingInitialRequests(
-        int requestHash)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
-        if (pendingInitialRequests != null)
-        {
-            pendingInitialRequests.removeAllSubscribers();
-        }
-    }
-
-    public void addPendingRequest(
-        HttpCacheProxyCacheableRequest initialRequest)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestHash());
-        pendingInitialRequests.subscribe(initialRequest);
-    }
-
-    public void createPendingInitialRequests(
-        HttpCacheProxyCacheableRequest initialRequest)
-    {
-        pendingInitialRequestsMap.put(initialRequest.requestHash(), new PendingInitialRequests(initialRequest));
-    }
-
-    public void removePendingInitialRequest(
-        HttpCacheProxyCacheableRequest request)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(request.requestHash());
-        if (pendingInitialRequests != null)
-        {
-            pendingInitialRequests.removeSubscriber(request);
-            if(pendingInitialRequests.numberOfSubscribers() == 0)
-            {
-                pendingInitialRequestsMap.remove(request.requestHash());
-            }
-        }
-    }
-
-    public void serveNextPendingInitialRequest(HttpCacheProxyCacheableRequest request)
-    {
-        removePendingInitialRequest(request);
-        sendPendingInitialRequests(request.requestHash());
-    }
 
     public void purge(
         int requestHash)
@@ -240,41 +149,23 @@ public class DefaultCache
         }
     }
 
-    public boolean hasPendingInitialRequests(
-        int requestHash)
-    {
-        return pendingInitialRequestsMap.containsKey(requestHash);
-    }
-
-
-    public void purgeEntriesForNonPendingRequests()
-    {
-        cachedEntries.getCachedEntries().forEach((i, cacheEntry)  ->
-        {
-             if (!hasPendingInitialRequests(cacheEntry.requestHash()))
-             {
-                 this.purge(cacheEntry.requestHash());
-             }
-        });
-    }
 
     public boolean isUpdatedByEtagToRetry(
-        HttpCacheProxyCacheableRequest request,
+        ListFW<HttpHeaderFW> requestHeaders,
+        String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
         if (isPreferWait(requestHeaders)
             && !isPreferenceApplied(responseHeaders))
         {
             String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-            String etag = request.etag();
             String newEtag = cacheEntry.etag();
             assert status != null;
 
-            if (etag != null && newEtag != null)
+            if (ifNoneMatch != null && newEtag != null)
             {
-                return !(status.equals(HttpStatus.OK_200) && etag.equals(newEtag));
+                return !(status.equals(HttpStatus.OK_200) && ifNoneMatch.equals(newEtag));
             }
         }
 
@@ -282,28 +173,27 @@ public class DefaultCache
     }
 
     public boolean isUpdatedByResponseHeadersToRetry(
-        HttpCacheProxyCacheableRequest request,
-        ListFW<HttpHeaderFW> responseHeaders)
+        ListFW<HttpHeaderFW> requestHeaders,
+        ListFW<HttpHeaderFW> responseHeaders,
+        String ifNoneMatch,
+        int requestHash)
     {
-        ListFW<HttpHeaderFW> requestHeaders = null;
-        requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
         if (isPreferWait(requestHeaders)
             && !isPreferenceApplied(responseHeaders))
         {
             String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-            String etag = request.etag();
             String newEtag = getHeader(responseHeaders, ETAG);
             boolean etagMatches = false;
             assert status != null;
 
-            if (etag != null && newEtag != null)
+            if (ifNoneMatch != null && newEtag != null)
             {
-                etagMatches = status.equals(HttpStatus.OK_200) && etag.equals(newEtag);
+                etagMatches = status.equals(HttpStatus.OK_200) && ifNoneMatch.equals(newEtag);
 
                 if (etagMatches)
                 {
-                    DefaultCacheEntry cacheEntry = cachedEntries.get(request.requestHash());
+                    DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
                     cacheEntry.updateResponseHeader(responseHeaders);
                 }
             }
@@ -361,65 +251,4 @@ public class DefaultCache
         cachedEntries.put(requestHash, cacheEntry);
     }
 
-    private void sendPendingInitialRequest(
-        final HttpCacheProxyCacheableRequest request)
-    {
-        long connectRouteId = request.connectRouteId;
-        long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
-        MessageConsumer connectInitial = request.supplyReceiver.apply(connectInitialId);
-        long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [sent pending request]\n",
-                currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-        }
-
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
-            builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
-        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
-    }
-
-    private void send504(
-        HttpCacheProxyCacheableRequest request)
-    {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), request.acceptReplyId, "504");
-        }
-
-        writer.doHttpResponse(request.acceptReply,
-                              request.acceptRouteId,
-                              request.acceptReplyId,
-                              supplyTrace.getAsLong(), e ->
-                                                    e.item(h -> h.name(STATUS)
-                                                                 .value("504")));
-        writer.doAbort(request.acceptReply,
-                       request.acceptRouteId,
-                       request.acceptReplyId,
-                       supplyTrace.getAsLong());
-        request.purge();
-
-        // count all responses
-        counters.responses.getAsLong();
-    }
-
-    private void sendSignalToPendingInitialRequestsSubscribers(
-        int requestHash,
-        long signal)
-    {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(requestHash);
-        if (pendingInitialRequests != null)
-        {
-            pendingInitialRequests.subcribers().forEach(request ->
-            {
-                writer.doSignal(request.signaler,
-                                request.acceptRouteId,
-                                request.acceptReplyId,
-                                supplyTrace.getAsLong(),
-                                signal);
-            });
-        }
-    }
 }

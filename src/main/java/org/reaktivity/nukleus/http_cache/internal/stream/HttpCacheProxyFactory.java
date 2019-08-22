@@ -76,8 +76,10 @@ public class HttpCacheProxyFactory implements StreamFactory
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
-    public final RouteManager router;
+    final RouteManager router;
+    final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     final BudgetManager budgetManager;
+    HttpProxyCacheableRequestGroup requestGroup;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
@@ -85,7 +87,6 @@ public class HttpCacheProxyFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> requestCorrelations;
-    public final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
 
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
@@ -151,6 +152,11 @@ public class HttpCacheProxyFactory implements StreamFactory
 
         if ((streamId & 0x0000_0000_0000_0001L) != 0L)
         {
+            if (this.requestGroup == null)
+            {
+                this.requestGroup = new HttpProxyCacheableRequestGroup(writer, this, streamId);
+            }
+
             newStream = newInitialStream(begin, source);
         }
         else
@@ -206,10 +212,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                         acceptReply,
                                                         acceptRouteId,
                                                         acceptReplyId,
-                                                        acceptInitialId,
-                                                        connectReply,
-                                                        connectReplyId,
-                                                        connectRouteId);
+                                                        acceptInitialId);
                     newStream = cachedRequest::onRequestMessage;
                     router.setThrottle(acceptReplyId, cachedRequest::onResponseMessage);
                 }
@@ -217,6 +220,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                 {
                     final HttpCacheProxyCacheableRequest cacheableRequest =
                         new HttpCacheProxyCacheableRequest(this,
+                                                           requestGroup,
                                                            acceptReply,
                                                            acceptRouteId,
                                                            acceptInitialId,

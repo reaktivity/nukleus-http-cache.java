@@ -26,8 +26,8 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.CAN_REFRESH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState.REFRESHING;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntryState.CAN_REFRESH;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntryState.REFRESHING;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateFreshnessExtension;
@@ -51,7 +51,6 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntryState;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;

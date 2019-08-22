@@ -90,6 +90,11 @@ public final class DefaultCacheEntry
         return responseSlots;
     }
 
+    public ListFW<HttpHeaderFW> getRequestHeaders()
+    {
+        return getRequestHeaders(cache.requestHeadersRO);
+    }
+
     public ListFW<HttpHeaderFW> getRequestHeaders(
         ListFW<HttpHeaderFW> requestHeadersRO)
     {
@@ -106,7 +111,6 @@ public final class DefaultCacheEntry
         int requestHeaderSlot = requestPool.acquire(requestHash);
         if (requestHeaderSlot == Slab.NO_SLOT)
         {
-            this.cache.purgeEntriesForNonPendingRequests();
             requestHeaderSlot = requestPool.acquire(requestHash);
             if (requestHeaderSlot == Slab.NO_SLOT)
             {
@@ -151,7 +155,6 @@ public final class DefaultCacheEntry
         int headerSlot = responsePool.acquire(requestHash);
         if (headerSlot == NO_SLOT)
         {
-            this.cache.purgeEntriesForNonPendingRequests();
             headerSlot = responsePool.acquire(requestHash);
             if (headerSlot == NO_SLOT)
             {
@@ -322,7 +325,6 @@ public final class DefaultCacheEntry
             int newSlot = bp.acquire(requestHash);
             if (newSlot == NO_SLOT)
             {
-                this.cache.purgeEntriesForNonPendingRequests();
                 newSlot = bp.acquire(requestHash);
                 if (newSlot == NO_SLOT)
                 {
