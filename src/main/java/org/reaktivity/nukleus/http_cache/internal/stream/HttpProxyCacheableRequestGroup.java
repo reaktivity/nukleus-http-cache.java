@@ -20,24 +20,26 @@ import org.agrona.collections.Long2LongHashMap;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import java.util.Map;
 
-public class HttpProxyCacheableRequestGroup
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
+
+final class HttpProxyCacheableRequestGroup
 {
     private final Int2ObjectHashMap<Long2LongHashMap> requestGroups;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
     private final MessageConsumer signaler;
 
-    public HttpProxyCacheableRequestGroup(
+    HttpProxyCacheableRequestGroup(
         Writer writer,
-        HttpCacheProxyFactory factory,
-        long acceptInitialId)
+        HttpCacheProxyFactory factory)
      {
          this.writer = writer;
          this.factory = factory;
-         this.signaler = factory.router.supplyReceiver(acceptInitialId);
+         this.signaler = factory.router.supplyReceiver(0L);
          this.requestGroups = new Int2ObjectHashMap<>();
      }
 
@@ -48,10 +50,10 @@ public class HttpProxyCacheableRequestGroup
      {
          Long2LongHashMap groupStreams = requestGroups.computeIfAbsent(requestHash,
                                                                        streams -> new Long2LongHashMap(0L));
-         boolean isAlreadyQueued = !groupStreams.isEmpty();
-
+         boolean queueExists = !groupStreams.isEmpty();
          groupStreams.put(acceptReplyId, acceptRouteId);
-         return isAlreadyQueued;
+
+         return queueExists;
      }
 
      void unqueue(
@@ -67,25 +69,34 @@ public class HttpProxyCacheableRequestGroup
          }
      }
 
-     public void serveNext(
+     void serveNextIfPossible(
          int requestHash,
          long acceptReplyId)
      {
          Long2LongHashMap groupStreams = requestGroups.get(requestHash);
-         assert groupStreams != null;
-         groupStreams.remove(acceptReplyId);
-         if (groupStreams.isEmpty())
+         if (groupStreams != null)
          {
-             requestGroups.remove(requestHash);
+             groupStreams.remove(acceptReplyId);
+             if (groupStreams.isEmpty())
+             {
+                 requestGroups.remove(requestHash);
+             }
+             else
+             {
+                Map.Entry<Long, Long> stream = groupStreams.entrySet().iterator().next();
+                sendSignalToSubscriber(stream.getKey(),
+                                       stream.getValue(),
+                                       INITIATE_REQUEST_SIGNAL);
+             }
          }
      }
 
-    public void signalForUpdatedCacheEntry(int requestHash)
+    void signalCacheUpdate(int requestHash)
     {
         this.sendSignalToQueuedInitialRequestSubscribers(requestHash, CACHE_ENTRY_UPDATED_SIGNAL);
     }
 
-    public void signalAbortAllSubscribers(
+    void signalAbort(
         int requestHash)
     {
         this.sendSignalToQueuedInitialRequestSubscribers(requestHash, ABORT_SIGNAL);
@@ -100,14 +111,25 @@ public class HttpProxyCacheableRequestGroup
         if (groupStreams != null)
         {
             groupStreams.forEach((acceptReplyId, acceptRouteId) ->
-                                {
-
-                                    writer.doSignal(signaler,
-                                                    acceptRouteId,
-                                                    acceptReplyId,
-                                                    factory.supplyTrace.getAsLong(),
-                                                    signal);
-                                });
+            {
+                writer.doSignal(signaler,
+                                acceptRouteId,
+                                acceptReplyId,
+                                factory.supplyTrace.getAsLong(),
+                                signal);
+            });
         }
+    }
+
+    private void sendSignalToSubscriber(
+        long acceptReplyId,
+        long acceptRouteId,
+        long signalId)
+    {
+         writer.doSignal(signaler,
+                         acceptRouteId,
+                         acceptReplyId,
+                         factory.supplyTrace.getAsLong(),
+                         signalId);
     }
 }

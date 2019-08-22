@@ -139,8 +139,7 @@ final class HttpCacheProxyNonCacheableResponse
                 acceptRouteId,
                 acceptReplyId,
                 traceId,
-                builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))
-                                                  ));
+                builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
 
             // count all responses
             httpCacheProxyFactory.counters.responses.getAsLong();

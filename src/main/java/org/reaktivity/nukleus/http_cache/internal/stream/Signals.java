@@ -13,9 +13,9 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.stream;
 
-public final class Signals
+final class Signals
 {
     public static final long CACHE_ENTRY_UPDATED_SIGNAL = 1L;
     public static final long CACHE_ENTRY_SIGNAL = 2L;

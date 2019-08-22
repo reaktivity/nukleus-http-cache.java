@@ -79,7 +79,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     final BudgetManager budgetManager;
-    HttpProxyCacheableRequestGroup requestGroup;
+    final HttpProxyCacheableRequestGroup requestGroup;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
@@ -132,6 +132,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.defaultCache = defaultCache;
 
         this.writer = new Writer(supplyTypeId, writeBuffer);
+        this.requestGroup = new HttpProxyCacheableRequestGroup(writer, this);
         this.counters = counters;
         this.executor = executor;
         this.scheduler = scheduler;
@@ -152,11 +153,6 @@ public class HttpCacheProxyFactory implements StreamFactory
 
         if ((streamId & 0x0000_0000_0000_0001L) != 0L)
         {
-            if (this.requestGroup == null)
-            {
-                this.requestGroup = new HttpProxyCacheableRequestGroup(writer, this, streamId);
-            }
-
             newStream = newInitialStream(begin, source);
         }
         else

@@ -39,11 +39,9 @@ import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.ABORT_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.Signals.CACHE_ENTRY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -64,7 +62,6 @@ final class HttpCacheProxyCachedRequest
 
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
-    private boolean etagSent;
     private boolean etagMatched;
 
     HttpCacheProxyCachedRequest(
@@ -171,14 +168,14 @@ final class HttpCacheProxyCachedRequest
                                     acceptReplyId,
                                     factory.supplyTrace.getAsLong(),
                                     CACHE_ENTRY_SIGNAL);
-            factory.defaultCache.counters.responsesCached.getAsLong();
         }
+        factory.defaultCache.counters.responsesCached.getAsLong();
     }
 
     private void onData(
         final DataFW data)
     {
-           //NOOP
+        //NOOP
     }
 
     private void onEnd(
@@ -255,32 +252,6 @@ final class HttpCacheProxyCachedRequest
                                      this.factory.supplyTrace.getAsLong());
     }
 
-    private void send503RetryAfter()
-    {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(),
-                              acceptReplyId, "503");
-        }
-
-        factory.writer.doHttpResponse(acceptReply,
-                                      acceptRouteId,
-                                      acceptReplyId,
-                                      factory.supplyTrace.getAsLong(), e ->
-                                            e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
-                                            .item(h -> h.name("retry-after").value("0")));
-        factory.writer.doHttpEnd(acceptReply,
-                                 acceptRouteId,
-                                 acceptReplyId,
-                                 factory.supplyTrace.getAsLong());
-
-        // count all responses
-        factory.counters.responses.getAsLong();
-
-        // count retry responses
-        factory.counters.responsesRetry.getAsLong();
-    }
-
     private void handleCacheUpdateSignal(
         SignalFW signal)
     {
@@ -310,11 +281,6 @@ final class HttpCacheProxyCachedRequest
             isStale = cacheEntry.isStale();
         }
 
-        if (cacheEntry.etag() != null)
-        {
-            etagSent = true;
-        }
-
         factory.writer.doHttpResponseWithUpdatedHeaders(
             acceptReply,
             acceptRouteId,
@@ -340,21 +306,10 @@ final class HttpCacheProxyCachedRequest
         if (payloadWritten == cacheEntry.responseSize()
             && ackedBudget)
         {
-            if (!etagSent && cacheEntry.etag() != null)
-            {
-                factory.writer.doHttpEnd(acceptReply,
-                                         acceptRouteId,
-                                         acceptReplyId,
-                                         traceId,
-                                         cacheEntry.etag());
-            }
-            else
-            {
-                factory.writer.doHttpEnd(acceptReply,
-                                         acceptRouteId,
-                                         acceptReplyId,
-                                         traceId);
-            }
+            factory.writer.doHttpEnd(acceptReply,
+                                     acceptRouteId,
+                                     acceptReplyId,
+                                     traceId);
 
             factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                                                    groupId,
