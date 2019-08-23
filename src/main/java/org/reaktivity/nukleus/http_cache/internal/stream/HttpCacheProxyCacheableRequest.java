@@ -182,7 +182,7 @@ final class HttpCacheProxyCacheableRequest
             newStream = nonCacheableResponse::onResponseMessage;
             resetRequestTimeoutIfNecessary();
             cleanupRequestIfNecessary();
-            requestGroup.serveNextIfPossible(requestHash, acceptReplyId);
+            requestGroup.serveNextIfPossible(acceptReplyId);
         }
 
         return newStream;
@@ -322,7 +322,7 @@ final class HttpCacheProxyCacheableRequest
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        if (requestGroup.queue(requestHash, acceptReplyId, acceptRouteId))
+        if (requestGroup.queue(acceptReplyId, acceptRouteId))
         {
             requestQueued =  true;
             return;
@@ -379,7 +379,7 @@ final class HttpCacheProxyCacheableRequest
             preferWaitExpired.cancel(true);
         }
 
-        requestGroup.unqueue(requestHash, acceptReplyId);
+        requestGroup.unqueue(acceptReplyId);
     }
 
     private void schedulePreferWaitIfNoneMatchIfNecessary(
@@ -499,7 +499,7 @@ final class HttpCacheProxyCacheableRequest
                                        acceptRouteId,
                                        acceptReplyId,
                                        signal.trace());
-                 requestGroup.unqueue(requestHash, acceptReplyId);
+                 requestGroup.unqueue(acceptReplyId);
                 cleanupRequestIfNecessary();
             }
             else
@@ -574,7 +574,7 @@ final class HttpCacheProxyCacheableRequest
 
     private void cleanupRequestIfNecessary()
     {
-        requestGroup.unqueue(requestHash, acceptReplyId);
+        requestGroup.unqueue(acceptReplyId);
         purge();
     }
 

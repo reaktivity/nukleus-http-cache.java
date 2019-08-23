@@ -15,12 +15,12 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2LongHashMap;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
@@ -28,91 +28,79 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE
 
 final class HttpProxyCacheableRequestGroup
 {
-    private final Int2ObjectHashMap<Long2LongHashMap> requestGroups;
+    private final Long2LongHashMap streamsGroup;
+    private final int requestHash;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
     private final MessageConsumer signaler;
+    private final Consumer<Integer> cleaner;
+
 
     HttpProxyCacheableRequestGroup(
+        int requestHash,
         Writer writer,
-        HttpCacheProxyFactory factory)
-     {
-         this.writer = writer;
-         this.factory = factory;
-         this.signaler = factory.router.supplyReceiver(0L);
-         this.requestGroups = new Int2ObjectHashMap<>();
-     }
+        HttpCacheProxyFactory factory,
+        Consumer<Integer> cleaner)
+    {
+        this.requestHash = requestHash;
+        this.writer = writer;
+        this.factory = factory;
+        this.signaler = factory.router.supplyReceiver(0L);
+        this.cleaner = cleaner;
+        this.streamsGroup = new Long2LongHashMap(0L);
+    }
 
-     boolean queue(
-         int requestHash,
+    boolean queue(
          long acceptReplyId,
          long acceptRouteId)
      {
-         Long2LongHashMap groupStreams = requestGroups.computeIfAbsent(requestHash,
-                                                                       streams -> new Long2LongHashMap(0L));
-         boolean queueExists = !groupStreams.isEmpty();
-         groupStreams.put(acceptReplyId, acceptRouteId);
+         boolean queueExists = !streamsGroup.isEmpty();
+         streamsGroup.put(acceptReplyId, acceptRouteId);
 
          return queueExists;
      }
 
      void unqueue(
-         int requestHash,
          long acceptReplyId)
      {
-         Long2LongHashMap groupStreams = requestGroups.get(requestHash);
-         if (groupStreams != null)
+         streamsGroup.remove(acceptReplyId);
+         if (streamsGroup.isEmpty())
          {
-             groupStreams.remove(acceptReplyId);
-             if (groupStreams.isEmpty())
-             {
-                 requestGroups.remove(requestHash);
-             }
+             cleaner.accept(requestHash);
          }
      }
 
      void serveNextIfPossible(
-         int requestHash,
          long acceptReplyId)
      {
-         Long2LongHashMap groupStreams = requestGroups.get(requestHash);
-         if (groupStreams != null)
+         streamsGroup.remove(acceptReplyId);
+         if (streamsGroup.isEmpty())
          {
-             groupStreams.remove(acceptReplyId);
-             if (groupStreams.isEmpty())
-             {
-                 requestGroups.remove(requestHash);
-             }
-             else
-             {
-                Map.Entry<Long, Long> stream = groupStreams.entrySet().iterator().next();
-                sendSignalToSubscriber(stream.getKey(),
-                                       stream.getValue(),
-                                       INITIATE_REQUEST_SIGNAL);
-             }
+             cleaner.accept(requestHash);
+         }
+         else
+         {
+            Map.Entry<Long, Long> stream = streamsGroup.entrySet().iterator().next();
+            sendSignalToSubscriber(stream.getKey(),
+                                   stream.getValue(),
+                                   INITIATE_REQUEST_SIGNAL);
          }
      }
 
-    void signalCacheUpdate(int requestHash)
+    void signalCacheUpdate()
     {
-        this.sendSignalToQueuedInitialRequestSubscribers(requestHash, CACHE_ENTRY_UPDATED_SIGNAL);
+        this.sendSignalToQueuedInitialRequestSubscribers(CACHE_ENTRY_UPDATED_SIGNAL);
     }
 
-    void signalAbort(
-        int requestHash)
+    void signalAbort()
     {
-        this.sendSignalToQueuedInitialRequestSubscribers(requestHash, ABORT_SIGNAL);
+        this.sendSignalToQueuedInitialRequestSubscribers(ABORT_SIGNAL);
     }
 
     private void sendSignalToQueuedInitialRequestSubscribers(
-        int requestHash,
         long signal)
     {
-
-        Long2LongHashMap groupStreams = requestGroups.get(requestHash);
-        if (groupStreams != null)
-        {
-            groupStreams.forEach((acceptReplyId, acceptRouteId) ->
+            streamsGroup.forEach((acceptReplyId, acceptRouteId) ->
             {
                 writer.doSignal(signaler,
                                 acceptRouteId,
@@ -120,7 +108,6 @@ final class HttpProxyCacheableRequestGroup
                                 factory.supplyTrace.getAsLong(),
                                 signal);
             });
-        }
     }
 
     private void sendSignalToSubscriber(

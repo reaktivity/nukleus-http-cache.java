@@ -41,7 +41,7 @@ final class HttpCacheProxyNonCacheableRequest
     private final MessageConsumer acceptReply;
 
     private final MessageConsumer connectInitial;
-    private MessageConsumer connectReply;
+    private final MessageConsumer connectReply;
     private final long connectRouteId;
     private final long connectReplyId;
     private final long connectInitialId;

@@ -19,7 +19,6 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
@@ -41,7 +40,6 @@ import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -51,8 +49,8 @@ final class HttpCacheProxyCachedRequest
     private final MessageConsumer acceptReply;
     private final long acceptRouteId;
     private final long acceptReplyId;
+    private final long acceptInitialId;
     private final MessageConsumer signaler;
-    private final Function<Long, MessageConsumer> supplyReceiver;
 
     private final int requestHash;
 
@@ -62,7 +60,6 @@ final class HttpCacheProxyCachedRequest
 
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
-    private boolean etagMatched;
 
     HttpCacheProxyCachedRequest(
         HttpCacheProxyFactory factory,
@@ -77,7 +74,8 @@ final class HttpCacheProxyCachedRequest
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
-        this.supplyReceiver = factory.router::supplyReceiver;
+        this.acceptInitialId = acceptInitialId;
+        Function<Long, MessageConsumer> supplyReceiver = factory.router::supplyReceiver;
         this.signaler = supplyReceiver.apply(acceptInitialId);
     }
 
@@ -136,7 +134,6 @@ final class HttpCacheProxyCachedRequest
     {
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -148,70 +145,46 @@ final class HttpCacheProxyCachedRequest
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-        DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
-        final String requestAuthorizationHeader = getHeader(requestHeaders, AUTHORIZATION);
-        cacheEntry.recentAuthorizationHeader(requestAuthorizationHeader);
 
-        etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
-        if (etagMatched)
+        if (DEBUG)
         {
-            if (DEBUG)
-            {
-                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                                  currentTimeMillis(), acceptReplyId, "304");
-            }
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
+                              currentTimeMillis(), acceptReplyId, "304");
+        }
 
-            factory.writer.do304(acceptReply,
-                                 acceptRouteId,
-                                 acceptReplyId,
-                                 factory.supplyTrace.getAsLong());
-        }
-        else
-        {
-            factory.writer.doSignal(signaler,
-                                    acceptRouteId,
-                                    acceptReplyId,
-                                    factory.supplyTrace.getAsLong(),
-                                    CACHE_ENTRY_SIGNAL);
-        }
+        factory.writer.doSignal(signaler,
+                                acceptRouteId,
+                                acceptReplyId,
+                                factory.supplyTrace.getAsLong(),
+                                CACHE_ENTRY_SIGNAL);
     }
 
     private void onData(
         final DataFW data)
     {
-        //NOOP
+        factory.writer.doWindow(acceptReply,
+                                acceptRouteId,
+                                acceptInitialId,
+                                data.trace(),
+                                data.sizeof(),
+                                data.padding(),
+                                data.groupId());
     }
 
     private void onEnd(
         final EndFW end)
     {
-        if(etagMatched)
-        {
-            factory.writer.doHttpEnd(acceptReply,
-                                     acceptRouteId,
-                                     acceptReplyId,
-                                     factory.supplyTrace.getAsLong());
-        }
+        //NOOP
     }
 
     private void onAbort(
         final AbortFW abort)
     {
-        if(etagMatched)
-        {
-            factory.writer.doAbort(acceptReply,
-                                   acceptRouteId,
-                                   acceptReplyId,
-                                   factory.supplyTrace.getAsLong());
-        }
-        else
-        {
-            factory.writer.doSignal(signaler,
-                                    acceptRouteId,
-                                    acceptReplyId,
-                                    factory.supplyTrace.getAsLong(),
-                                    ABORT_SIGNAL);
-        }
+        factory.writer.doSignal(signaler,
+                                acceptRouteId,
+                                acceptReplyId,
+                                factory.supplyTrace.getAsLong(),
+                                ABORT_SIGNAL);
     }
 
     private void onSignal(

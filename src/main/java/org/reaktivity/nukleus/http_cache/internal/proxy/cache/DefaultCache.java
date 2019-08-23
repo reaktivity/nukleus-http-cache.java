@@ -35,6 +35,7 @@ import java.util.function.ToIntFunction;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isMatchByEtag;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
@@ -116,16 +117,11 @@ public class DefaultCache
         short authScope,
         int requestHash)
     {
-        boolean canHandleRequest = false;
         final DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
+        return satisfiedByCache(requestHeaders) &&
+                cacheEntry != null &&
+                cacheEntry.canServeRequest(requestHeaders, authScope);
 
-        if (satisfiedByCache(requestHeaders) &&
-            cacheEntry != null &&
-            cacheEntry.canServeRequest(requestHeaders, authScope))
-        {
-            canHandleRequest = true;
-        }
-        return canHandleRequest;
     }
 
 
@@ -156,7 +152,7 @@ public class DefaultCache
 
             if (ifNoneMatch != null && newEtag != null)
             {
-                return !(status.equals(HttpStatus.OK_200) && ifNoneMatch.equals(newEtag));
+                return !(status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag));
             }
         }
 
@@ -180,7 +176,7 @@ public class DefaultCache
 
             if (ifNoneMatch != null && newEtag != null)
             {
-                etagMatches = status.equals(HttpStatus.OK_200) && ifNoneMatch.equals(newEtag);
+                etagMatches = status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag);
 
                 if (etagMatches)
                 {

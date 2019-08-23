@@ -170,7 +170,7 @@ final class HttpCacheProxyCacheableResponse
 
         if(!isResponseBuffering)
         {
-            requestGroup.signalCacheUpdate(requestHash);
+            requestGroup.signalCacheUpdate();
         }
 
         sendWindow(initialWindow, traceId);
@@ -189,7 +189,7 @@ final class HttpCacheProxyCacheableResponse
         sendWindow(data.length() + data.padding(), data.trace());
         if (!isResponseBuffering)
         {
-            requestGroup.signalCacheUpdate(requestHash);
+            requestGroup.signalCacheUpdate();
         }
     }
 
@@ -208,7 +208,7 @@ final class HttpCacheProxyCacheableResponse
         }
         else
         {
-            requestGroup.signalCacheUpdate(requestHash);
+            requestGroup.signalCacheUpdate();
         }
     }
 
@@ -222,11 +222,11 @@ final class HttpCacheProxyCacheableResponse
                                          acceptReplyId,
                                          abort.trace(),
                                          0L);
-            requestGroup.serveNextIfPossible(requestHash, acceptReplyId);
+            requestGroup.serveNextIfPossible(acceptReplyId);
         }
         else
         {
-            requestGroup.signalAbort(requestHash);
+            requestGroup.signalAbort();
         }
 
         purgeRequest();
