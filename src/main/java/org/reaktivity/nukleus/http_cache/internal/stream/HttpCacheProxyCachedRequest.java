@@ -253,7 +253,7 @@ final class HttpCacheProxyCachedRequest
         }
 
         boolean isStale = false;
-        if(signalId == CACHE_ENTRY_SIGNAL)
+        if (signalId == CACHE_ENTRY_SIGNAL)
         {
             isStale = cacheEntry.isStale();
         }

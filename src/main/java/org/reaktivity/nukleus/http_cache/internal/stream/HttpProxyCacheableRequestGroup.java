@@ -35,7 +35,6 @@ final class HttpProxyCacheableRequestGroup
     private final MessageConsumer signaler;
     private final Consumer<Integer> cleaner;
 
-
     HttpProxyCacheableRequestGroup(
         int requestHash,
         Writer writer,
@@ -70,7 +69,7 @@ final class HttpProxyCacheableRequestGroup
          }
      }
 
-     void removeRequestAndResumeNextRequest(
+     void onNonCacheableResponse(
          long acceptReplyId)
      {
          streamsGroup.remove(acceptReplyId);

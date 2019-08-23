@@ -24,6 +24,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
@@ -58,7 +59,14 @@ final class HttpCacheProxyCachedNotModifiedRequest
         int index,
         int length)
     {
-        //NOOP
+        switch (msgTypeId)
+        {
+            case ResetFW.TYPE_ID:
+                factory.writer.doReset(acceptReply,
+                                       acceptRouteId,
+                                       acceptInitialId,
+                                       factory.supplyTrace.getAsLong());
+        }
     }
 
     void onRequestMessage(

@@ -182,7 +182,7 @@ final class HttpCacheProxyCacheableRequest
             newStream = nonCacheableResponse::onResponseMessage;
             resetRequestTimeoutIfNecessary();
             cleanupRequestIfNecessary();
-            requestGroup.removeRequestAndResumeNextRequest(acceptReplyId);
+            requestGroup.onNonCacheableResponse(acceptReplyId);
         }
 
         return newStream;
