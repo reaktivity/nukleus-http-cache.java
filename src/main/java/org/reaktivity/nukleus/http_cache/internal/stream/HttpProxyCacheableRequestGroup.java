@@ -77,12 +77,12 @@ final class HttpProxyCacheableRequestGroup
          serveNextRequestIfPossible();
      }
 
-    void signalCacheUpdate()
+    void onCacheableResponseUpdated()
     {
         this.sendSignalToQueuedInitialRequestSubscribers(CACHE_ENTRY_UPDATED_SIGNAL);
     }
 
-    void signalAbort()
+    void onCacheableResponseAborted()
     {
         this.sendSignalToQueuedInitialRequestSubscribers(ABORT_SIGNAL);
     }

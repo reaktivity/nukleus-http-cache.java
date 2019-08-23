@@ -209,23 +209,22 @@ public class DefaultCache
         if (isPreferIfNoneMatch(requestHeaders))
         {
             String preferWait = getHeader(requestHeaders, PREFER);
-            String ifNonMatch = getHeader(requestHeaders, IF_NONE_MATCH);
             writer.doHttpResponse(acceptReply,
-                                          acceptRouteId,
-                                          acceptReplyId,
-                                          supplyTrace.getAsLong(),
-                                          e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                                                .item(h -> h.name(ETAG).value(ifNonMatch))
-                                                .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
+                                  acceptRouteId,
+                                  acceptReplyId,
+                                  supplyTrace.getAsLong(),
+                                  e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
+                                        .item(h -> h.name(ETAG).value(entry.etag()))
+                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
         }
         else
         {
             writer.doHttpResponse(acceptReply,
-                                          acceptRouteId,
-                                          acceptReplyId,
-                                          supplyTrace.getAsLong(),
-                                          e -> e.item(h -> h.name(STATUS).value("304"))
-                                                .item(h -> h.name(ETAG).value(entry.etag())));
+                                  acceptRouteId,
+                                  acceptReplyId,
+                                  supplyTrace.getAsLong(),
+                                  e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
+                                        .item(h -> h.name(ETAG).value(entry.etag())));
         }
         // count all responses
         counters.responses.getAsLong();
