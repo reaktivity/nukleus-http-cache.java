@@ -16,21 +16,18 @@
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.concurrent.SignalingExecutor;
+import org.agrona.collections.Int2ObjectHashMap;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
-import java.util.function.Function;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -58,31 +55,25 @@ public class DefaultCache
     final CacheControl responseCacheControlFW = new CacheControl();
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
 
-    final BufferPool cachedRequestBufferPool;
-    final BufferPool cachedResponseBufferPool;
+    private final BufferPool cachedRequestBufferPool;
+    private final BufferPool cachedResponseBufferPool;
 
-    final Writer writer;
-    final Int2CacheHashMapWithLRUEviction cachedEntries;
+    private final Writer writer;
+    private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntries;
 
-    final LongObjectBiConsumer<Runnable> scheduler;
-    final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
-    final LongSupplier supplyTrace;
-    final SignalingExecutor executor;
+    private final LongConsumer entryCount;
+    private final LongSupplier supplyTrace;
     public final HttpCacheCounters counters;
 
     public DefaultCache(
-        LongObjectBiConsumer<Runnable> scheduler,
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
-        Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
-        ToIntFunction<String> supplyTypeId,
-        SignalingExecutor executor)
+        ToIntFunction<String> supplyTypeId)
     {
-        this.scheduler = scheduler;
-        this.correlations = correlations;
+        this.entryCount = entryCount;
         this.writer = new Writer(supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
@@ -92,10 +83,9 @@ public class DefaultCache
                 cacheBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.cached.response.acquires"),
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
-        this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
+        this.cachedEntries = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
-        this.executor = executor;
     }
 
     public DefaultCacheEntry get(
@@ -107,18 +97,7 @@ public class DefaultCache
     public DefaultCacheEntry supply(
         int requestHash)
     {
-        DefaultCacheEntry defaultCacheEntry = cachedEntries.get(requestHash);
-        if (defaultCacheEntry == null)
-        {
-            defaultCacheEntry = new DefaultCacheEntry(
-                    this,
-                    requestHash,
-                    cachedRequestBufferPool,
-                    cachedResponseBufferPool);
-            updateCache(requestHash, defaultCacheEntry);
-        }
-
-        return defaultCacheEntry;
+        return cachedEntries.computeIfAbsent(requestHash, this::newCacheEntry);
     }
 
     public boolean matchCacheableResponse(
@@ -154,6 +133,7 @@ public class DefaultCache
         int requestHash)
     {
         DefaultCacheEntry cacheEntry = this.cachedEntries.remove(requestHash);
+        entryCount.accept(-1);
         if (cacheEntry != null)
         {
             cacheEntry.purge();
@@ -255,11 +235,14 @@ public class DefaultCache
         counters.responses.getAsLong();
     }
 
-    private void updateCache(
-        int requestHash,
-        DefaultCacheEntry cacheEntry)
+    private DefaultCacheEntry newCacheEntry(
+        int requestHash)
     {
-        cachedEntries.put(requestHash, cacheEntry);
+        entryCount.accept(1);
+        return new DefaultCacheEntry(
+            this,
+            requestHash,
+            cachedRequestBufferPool,
+            cachedResponseBufferPool);
     }
-
 }

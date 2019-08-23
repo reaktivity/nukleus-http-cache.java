@@ -45,9 +45,9 @@ final class HttpCacheProxyNotModifiedResponse
     private final long acceptRouteId;
     private final long acceptReplyId;
 
-    private MessageConsumer connectReply;
-    private long connectRouteId;
-    private long connectReplyId;
+    private final MessageConsumer connectReply;
+    private final long connectRouteId;
+    private final long connectReplyId;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,

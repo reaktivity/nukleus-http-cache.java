@@ -40,11 +40,11 @@ final class HttpCacheProxyNonCacheableRequest
     private final long acceptReplyId;
     private final MessageConsumer acceptReply;
 
-    private MessageConsumer connectInitial;
+    private final MessageConsumer connectInitial;
     private MessageConsumer connectReply;
-    private long connectRouteId;
-    private long connectReplyId;
-    private long connectInitialId;
+    private final long connectRouteId;
+    private final long connectReplyId;
+    private final long connectInitialId;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory streamFactory,

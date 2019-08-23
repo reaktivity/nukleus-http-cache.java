@@ -114,36 +114,33 @@ final class HttpCacheProxyNonCacheableResponse
         final long connectReplyId = begin.streamId();
         final long traceId = begin.trace();
 
-        final OctetsFW extension = httpCacheProxyFactory.beginRO.extension();
+        final OctetsFW extension = begin.extension();
+        final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::tryWrap);
+        assert httpBeginFW != null;
+        final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-        if (extension.sizeof() > 0)
+        if (DEBUG)
         {
-            final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::wrap);
-            final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
-
-            if (DEBUG)
-            {
-                System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
-                                  getHeader(responseHeaders, ":status"));
-            }
-
-
-            if (DEBUG)
-            {
-                System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), acceptReplyId,
-                                  getHeader(responseHeaders, ":status"));
-            }
-
-            httpCacheProxyFactory.writer.doHttpResponse(
-                acceptReply,
-                acceptRouteId,
-                acceptReplyId,
-                traceId,
-                builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
-
-            // count all responses
-            httpCacheProxyFactory.counters.responses.getAsLong();
+            System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
+                              getHeader(responseHeaders, ":status"));
         }
+
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), acceptReplyId,
+                              getHeader(responseHeaders, ":status"));
+        }
+
+        httpCacheProxyFactory.writer.doHttpResponse(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            traceId,
+            builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
+
+        // count all responses
+        httpCacheProxyFactory.counters.responses.getAsLong();
     }
 
     private void onData(

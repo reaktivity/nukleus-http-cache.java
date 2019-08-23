@@ -205,15 +205,14 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         if (defaultCache == null)
         {
-            this.defaultCache = new DefaultCache(scheduler,
-                                                writeBuffer,
+            this.defaultCache = new DefaultCache(
+                writeBuffer,
                                                 cacheBufferPool,
-                                                correlations,
-                                                counters,
+                counters,
                                                 cacheEntries,
                                                 supplyTrace,
-                                                supplyTypeId,
-                                                executor);
+                                                supplyTypeId
+            );
         }
 
         return new HttpCacheProxyFactory(router,
