@@ -70,21 +70,11 @@ final class HttpProxyCacheableRequestGroup
          }
      }
 
-     void serveNextIfPossible(
+     void removeRequestAndResumeNextRequest(
          long acceptReplyId)
      {
          streamsGroup.remove(acceptReplyId);
-         if (streamsGroup.isEmpty())
-         {
-             cleaner.accept(requestHash);
-         }
-         else
-         {
-            Map.Entry<Long, Long> stream = streamsGroup.entrySet().iterator().next();
-            sendSignalToSubscriber(stream.getKey(),
-                                   stream.getValue(),
-                                   INITIATE_REQUEST_SIGNAL);
-         }
+         serveNextRequestIfPossible();
      }
 
     void signalCacheUpdate()
@@ -120,5 +110,20 @@ final class HttpProxyCacheableRequestGroup
                          acceptReplyId,
                          factory.supplyTrace.getAsLong(),
                          signalId);
+    }
+
+    private void serveNextRequestIfPossible()
+    {
+        if (streamsGroup.isEmpty())
+        {
+            cleaner.accept(requestHash);
+        }
+        else
+        {
+            Map.Entry<Long, Long> stream = streamsGroup.entrySet().iterator().next();
+            sendSignalToSubscriber(stream.getKey(),
+                                   stream.getValue(),
+                                   INITIATE_REQUEST_SIGNAL);
+        }
     }
 }

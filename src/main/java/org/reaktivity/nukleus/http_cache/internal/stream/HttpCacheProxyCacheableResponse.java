@@ -222,7 +222,7 @@ final class HttpCacheProxyCacheableResponse
                                          acceptReplyId,
                                          abort.trace(),
                                          0L);
-            requestGroup.serveNextIfPossible(acceptReplyId);
+            requestGroup.removeRequestAndResumeNextRequest(acceptReplyId);
         }
         else
         {
