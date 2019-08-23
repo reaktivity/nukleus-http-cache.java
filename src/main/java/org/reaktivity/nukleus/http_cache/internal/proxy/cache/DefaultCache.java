@@ -39,10 +39,12 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -207,7 +209,7 @@ public class DefaultCache
                 }
             }
 
-            boolean notModified = status.equals(HttpStatus.NOT_MODIFIED_304) || etagMatches;
+            boolean notModified = status.equals(NOT_MODIFIED_304) || etagMatches;
 
             return !notModified;
         }
@@ -231,12 +233,13 @@ public class DefaultCache
         if (isPreferIfNoneMatch(requestHeaders))
         {
             String preferWait = getHeader(requestHeaders, PREFER);
+            String ifNonMatch = getHeader(requestHeaders, IF_NONE_MATCH);
             writer.doHttpResponse(acceptReply,
                                           acceptRouteId,
                                           acceptReplyId,
                                           supplyTrace.getAsLong(),
-                                          e -> e.item(h -> h.name(STATUS).value("304"))
-                                                .item(h -> h.name(ETAG).value(entry.etag()))
+                                          e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
+                                                .item(h -> h.name(ETAG).value(ifNonMatch))
                                                 .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
         }
         else

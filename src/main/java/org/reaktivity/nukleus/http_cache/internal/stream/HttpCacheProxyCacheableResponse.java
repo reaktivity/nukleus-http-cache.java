@@ -216,6 +216,7 @@ final class HttpCacheProxyCacheableResponse
     {
         if (isResponseBuffering)
         {
+            factory.counters.responses.getAsLong();
             factory.writer.do503AndAbort(acceptReply,
                                          acceptRouteId,
                                          acceptReplyId,

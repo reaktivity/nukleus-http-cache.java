@@ -61,11 +61,13 @@ final class HttpProxyCacheableRequestGroup
          long acceptReplyId)
      {
          Long2LongHashMap groupStreams = requestGroups.get(requestHash);
-         assert groupStreams != null;
-         groupStreams.remove(acceptReplyId);
-         if (groupStreams.isEmpty())
+         if (groupStreams != null)
          {
-             requestGroups.remove(requestHash);
+             groupStreams.remove(acceptReplyId);
+             if (groupStreams.isEmpty())
+             {
+                 requestGroups.remove(requestHash);
+             }
          }
      }
 

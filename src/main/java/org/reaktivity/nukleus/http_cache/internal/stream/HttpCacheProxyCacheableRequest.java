@@ -315,11 +315,11 @@ final class HttpCacheProxyCacheableRequest
         final String requestURL = getRequestURL(requestHeaders);
         this.requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
 
-        HttpHeaderFW ifNoneMatch = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
-        if (ifNoneMatch != null)
+        HttpHeaderFW ifNoneMatchHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
+        if (ifNoneMatchHeader != null)
         {
+            this.ifNoneMatch = ifNoneMatchHeader.value().asString();
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
-            this.ifNoneMatch = ifNoneMatch.value().asString();
         }
 
         if (requestGroup.queue(requestHash, acceptReplyId, acceptRouteId))
@@ -489,6 +489,7 @@ final class HttpCacheProxyCacheableRequest
                                          acceptRouteId,
                                          acceptReplyId);
             factory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId, factory.supplyTrace.getAsLong());
+            cleanupRequestIfNecessary();
         }
         else if (signalId == ABORT_SIGNAL)
         {
