@@ -96,8 +96,7 @@ final class HttpCacheProxyCacheableResponse
     public String toString()
     {
         return String.format("%s[connectRouteId=%016x, connectReplyStreamId=%d, " +
-                "connectReplyBudget=%d]", getClass().getSimpleName(),
-            connectRouteId, connectReplyId, connectReplyBudget);
+                "connectReplyBudget=%d]", getClass().getSimpleName(), connectRouteId, connectReplyId, connectReplyBudget);
     }
 
     void onResponseMessage(
@@ -155,7 +154,7 @@ final class HttpCacheProxyCacheableResponse
             {
                 //TODO: Better handle if there is no slot available, For example, release response payload
                 // which requests are in flight
-//                request.purge();
+                purgeRequest();
             }
         }
         else
@@ -211,6 +210,7 @@ final class HttpCacheProxyCacheableResponse
         {
             requestGroup.signalCacheUpdate(requestHash);
         }
+        factory.defaultCache.counters.responsesCached.getAsLong();
     }
 
     private void onAbort(AbortFW abort)

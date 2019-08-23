@@ -330,7 +330,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(0);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
@@ -346,7 +346,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(0);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
@@ -415,7 +415,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(1);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
@@ -478,7 +478,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(1);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);

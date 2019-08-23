@@ -15,8 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isRequestCacheable;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
@@ -35,6 +38,7 @@ import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
@@ -212,6 +216,12 @@ public class HttpCacheProxyFactory implements StreamFactory
                     newStream = cachedRequest::onRequestMessage;
                     router.setThrottle(acceptReplyId, cachedRequest::onResponseMessage);
                 }
+                else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+                {
+                    counters.requestsCacheable.getAsLong();
+                    counters.requests.getAsLong();
+                    send504(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+                }
                 else if (isRequestCacheable(requestHeaders))
                 {
                     final HttpCacheProxyCacheableRequest cacheableRequest =
@@ -296,4 +306,23 @@ public class HttpCacheProxyFactory implements StreamFactory
         return routeRO.wrap(buffer, index, index + length);
     }
 
+    private void send504(
+        MessageConsumer acceptReply,
+        long acceptRouteId,
+        long acceptReplyId,
+        long trace)
+    {
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "504");
+        }
+
+        writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e ->
+            e.item(h -> h.name(STATUS)
+                         .value("504")));
+        writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, trace);
+
+        // count all responses
+        counters.responses.getAsLong();
+    }
 }

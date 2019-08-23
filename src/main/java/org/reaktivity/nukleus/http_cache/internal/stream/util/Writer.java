@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.RESPONSE_IS_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
@@ -36,7 +37,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
@@ -194,7 +195,7 @@ public class Writer
 
         if (isStale)
         {
-            builder.item(header -> header.name(WARNING).value(DefaultCache.RESPONSE_IS_STALE));
+            builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
         }
     }
 
@@ -591,6 +592,16 @@ public class Writer
     {
         this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value("503")));
         this.doAbort(receiver, routeId, streamId, traceId);
+    }
+
+    public void do304(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long traceId)
+    {
+        this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value(
+            HttpStatus.NOT_MODIFIED_304)));
     }
 
 }

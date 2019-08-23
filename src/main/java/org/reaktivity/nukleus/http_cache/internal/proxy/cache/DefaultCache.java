@@ -50,8 +50,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 public class DefaultCache
 {
-    public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
-
     final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
@@ -59,7 +57,7 @@ public class DefaultCache
     final CacheControl cachedRequestCacheControlFW = new CacheControl();
 
     final BufferPool cachedRequestBufferPool;
-     final BufferPool cachedResponseBufferPool;
+    final BufferPool cachedResponseBufferPool;
 
     final Writer writer;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
@@ -119,6 +117,17 @@ public class DefaultCache
         }
 
         return defaultCacheEntry;
+    }
+
+    public boolean matchCacheableResponse(
+        int requestHash,
+        String newEtag)
+    {
+        DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
+        return cacheEntry != null &&
+               cacheEntry.etag() != null &&
+               cacheEntry.etag().equals(newEtag) &&
+               cacheEntry.recentAuthorizationHeader() != null;
     }
 
     public boolean matchCacheableRequest(
@@ -223,23 +232,22 @@ public class DefaultCache
         {
             String preferWait = getHeader(requestHeaders, PREFER);
             writer.doHttpResponse(acceptReply,
-                                  acceptRouteId,
-                                  acceptReplyId,
-                                  supplyTrace.getAsLong(),
-                                  e -> e.item(h -> h.name(STATUS).value("304"))
-                                        .item(h -> h.name(ETAG).value(entry.etag()))
-                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
+                                          acceptRouteId,
+                                          acceptReplyId,
+                                          supplyTrace.getAsLong(),
+                                          e -> e.item(h -> h.name(STATUS).value("304"))
+                                                .item(h -> h.name(ETAG).value(entry.etag()))
+                                                .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
         }
         else
         {
             writer.doHttpResponse(acceptReply,
-                                  acceptRouteId,
-                                  acceptReplyId,
-                                  supplyTrace.getAsLong(),
-                                  e -> e.item(h -> h.name(STATUS).value("304"))
-                                        .item(h -> h.name(ETAG).value(entry.etag())));
+                                          acceptRouteId,
+                                          acceptReplyId,
+                                          supplyTrace.getAsLong(),
+                                          e -> e.item(h -> h.name(STATUS).value("304"))
+                                                .item(h -> h.name(ETAG).value(entry.etag())));
         }
-
         // count all responses
         counters.responses.getAsLong();
     }

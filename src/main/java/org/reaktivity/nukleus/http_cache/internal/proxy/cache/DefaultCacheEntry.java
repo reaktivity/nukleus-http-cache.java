@@ -109,10 +109,10 @@ public final class DefaultCacheEntry
             return false;
         }
         int requestHeaderSlot = requestPool.acquire(requestHash);
-        if (requestHeaderSlot == Slab.NO_SLOT)
+        if (requestHeaderSlot == NO_SLOT)
         {
             requestHeaderSlot = requestPool.acquire(requestHash);
-            if (requestHeaderSlot == Slab.NO_SLOT)
+            if (requestHeaderSlot == NO_SLOT)
             {
                 return false;
             }

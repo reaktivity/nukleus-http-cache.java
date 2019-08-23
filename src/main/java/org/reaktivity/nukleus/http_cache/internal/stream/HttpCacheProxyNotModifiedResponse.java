@@ -30,6 +30,11 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 final class HttpCacheProxyNotModifiedResponse

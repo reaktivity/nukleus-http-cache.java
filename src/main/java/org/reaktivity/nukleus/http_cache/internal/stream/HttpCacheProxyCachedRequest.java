@@ -39,9 +39,11 @@ import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
@@ -155,11 +157,16 @@ final class HttpCacheProxyCachedRequest
         etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
         if (etagMatched)
         {
-            factory.defaultCache.send304(cacheEntry,
-                                         requestHeaders,
-                                         acceptReply,
-                                         acceptRouteId,
-                                         acceptReplyId);
+            if (DEBUG)
+            {
+                System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
+                                  currentTimeMillis(), acceptReplyId, "304");
+            }
+
+            factory.writer.do304(acceptReply,
+                                 acceptRouteId,
+                                 acceptReplyId,
+                                 factory.supplyTrace.getAsLong());
         }
         else
         {
@@ -169,7 +176,6 @@ final class HttpCacheProxyCachedRequest
                                     factory.supplyTrace.getAsLong(),
                                     CACHE_ENTRY_SIGNAL);
         }
-        factory.defaultCache.counters.responsesCached.getAsLong();
     }
 
     private void onData(
