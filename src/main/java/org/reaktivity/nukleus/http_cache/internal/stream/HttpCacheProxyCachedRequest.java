@@ -301,6 +301,7 @@ final class HttpCacheProxyCachedRequest
         payloadWritten = 0;
 
         factory.counters.responses.getAsLong();
+        factory.defaultCache.counters.responsesCached.getAsLong();
     }
 
     private void sendEndIfNecessary(

@@ -210,7 +210,6 @@ final class HttpCacheProxyCacheableResponse
         {
             requestGroup.signalCacheUpdate(requestHash);
         }
-        factory.defaultCache.counters.responsesCached.getAsLong();
     }
 
     private void onAbort(AbortFW abort)
