@@ -42,7 +42,6 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
