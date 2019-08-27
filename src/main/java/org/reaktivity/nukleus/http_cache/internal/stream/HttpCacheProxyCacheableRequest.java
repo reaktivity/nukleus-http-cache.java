@@ -483,6 +483,7 @@ final class HttpCacheProxyCacheableRequest
         }
         else if (signalId == REQUEST_EXPIRED_SIGNAL)
         {
+            DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
             factory.defaultCache.send304(cacheEntry,
                                          getRequestHeaders(),
                                          acceptReply,

@@ -144,7 +144,8 @@ final class HttpCacheProxyCacheableResponse
         final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
         cacheEntry = factory.defaultCache.supply(requestHash);
-        isResponseBuffering = getHeader(responseHeaders, ETAG) == null;
+        String etag = getHeader(responseHeaders, ETAG);
+        isResponseBuffering = etag == null;
 
         //Initial cache entry
         if(cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
@@ -167,7 +168,7 @@ final class HttpCacheProxyCacheableResponse
                 purgeRequest();
             }
         }
-
+        cacheEntry.setEtag(etag);
         if(!isResponseBuffering)
         {
             requestGroup.onCacheableResponseUpdated();
