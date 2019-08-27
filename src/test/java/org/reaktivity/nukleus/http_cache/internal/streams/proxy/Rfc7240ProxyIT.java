@@ -122,19 +122,4 @@ public class Rfc7240ProxyIT
         k3po.finish();
     }
 
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/multiple.parallel.requests.with.prefer.wait/accept/client",
-        "${streams}/multiple.parallel.requests.with.prefer.wait/connect/server",
-    })
-    public void shouldHandleMultipleParallelRequestWithPreferWait() throws Exception
-    {
-        k3po.finish();
-        counters.assertRequests(2);
-        counters.assertRequestsCacheable(2);
-        counters.assertResponses(2);
-        counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(1);
-    }
 }
