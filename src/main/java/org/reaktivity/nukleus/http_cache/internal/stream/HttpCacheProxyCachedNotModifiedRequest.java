@@ -38,7 +38,6 @@ final class HttpCacheProxyCachedNotModifiedRequest
     private final long acceptReplyId;
     private final long acceptInitialId;
 
-
     HttpCacheProxyCachedNotModifiedRequest(
         HttpCacheProxyFactory factory,
         MessageConsumer acceptReply,
@@ -112,16 +111,15 @@ final class HttpCacheProxyCachedNotModifiedRequest
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
+        factory.writer.do304(acceptReply,
+                             acceptRouteId,
+                             acceptReplyId,
+                             factory.supplyTrace.getAsLong());
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
                               currentTimeMillis(), acceptReplyId, "304");
         }
-
-        factory.writer.do304(acceptReply,
-                             acceptRouteId,
-                             acceptReplyId,
-                             factory.supplyTrace.getAsLong());
 
     }
 

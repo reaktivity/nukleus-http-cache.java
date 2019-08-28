@@ -16,23 +16,21 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.collections.Long2LongHashMap;
-import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
 import java.util.Map;
 import java.util.function.Consumer;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 
 final class HttpProxyCacheableRequestGroup
 {
-    private final Long2LongHashMap streamsGroup;
+    private final Long2LongHashMap routeIdsByReplyId;
     private final int requestHash;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
-    private final MessageConsumer signaler;
     private final Consumer<Integer> cleaner;
 
     HttpProxyCacheableRequestGroup(
@@ -44,17 +42,16 @@ final class HttpProxyCacheableRequestGroup
         this.requestHash = requestHash;
         this.writer = writer;
         this.factory = factory;
-        this.signaler = factory.router.supplyReceiver(0L);
         this.cleaner = cleaner;
-        this.streamsGroup = new Long2LongHashMap(0L);
+        this.routeIdsByReplyId = new Long2LongHashMap(-1L);
     }
 
     boolean queue(
-         long acceptReplyId,
-         long acceptRouteId)
+        long acceptRouteId,
+        long acceptReplyId)
      {
-         boolean queueExists = !streamsGroup.isEmpty();
-         streamsGroup.put(acceptReplyId, acceptRouteId);
+         boolean queueExists = !routeIdsByReplyId.isEmpty();
+         routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
 
          return queueExists;
      }
@@ -62,8 +59,8 @@ final class HttpProxyCacheableRequestGroup
      void unqueue(
          long acceptReplyId)
      {
-         streamsGroup.remove(acceptReplyId);
-         if (streamsGroup.isEmpty())
+         routeIdsByReplyId.remove(acceptReplyId);
+         if (routeIdsByReplyId.isEmpty())
          {
              cleaner.accept(requestHash);
          }
@@ -72,7 +69,7 @@ final class HttpProxyCacheableRequestGroup
      void onNonCacheableResponse(
          long acceptReplyId)
      {
-         streamsGroup.remove(acceptReplyId);
+         routeIdsByReplyId.remove(acceptReplyId);
          serveNextRequestIfPossible();
      }
 
@@ -83,16 +80,15 @@ final class HttpProxyCacheableRequestGroup
 
     void onCacheableResponseAborted()
     {
-        this.sendSignalToQueuedInitialRequestSubscribers(ABORT_SIGNAL);
+        this.sendSignalToQueuedInitialRequestSubscribers(CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
     private void sendSignalToQueuedInitialRequestSubscribers(
         long signal)
     {
-            streamsGroup.forEach((acceptReplyId, acceptRouteId) ->
+            routeIdsByReplyId.forEach((acceptReplyId, acceptRouteId) ->
             {
-                writer.doSignal(signaler,
-                                acceptRouteId,
+                writer.doSignal(acceptRouteId,
                                 acceptReplyId,
                                 factory.supplyTrace.getAsLong(),
                                 signal);
@@ -104,8 +100,7 @@ final class HttpProxyCacheableRequestGroup
         long acceptRouteId,
         long signalId)
     {
-         writer.doSignal(signaler,
-                         acceptRouteId,
+         writer.doSignal(acceptRouteId,
                          acceptReplyId,
                          factory.supplyTrace.getAsLong(),
                          signalId);
@@ -113,13 +108,13 @@ final class HttpProxyCacheableRequestGroup
 
     private void serveNextRequestIfPossible()
     {
-        if (streamsGroup.isEmpty())
+        if (routeIdsByReplyId.isEmpty())
         {
             cleaner.accept(requestHash);
         }
         else
         {
-            Map.Entry<Long, Long> stream = streamsGroup.entrySet().iterator().next();
+            Map.Entry<Long, Long> stream = routeIdsByReplyId.entrySet().iterator().next();
             sendSignalToSubscriber(stream.getKey(),
                                    stream.getValue(),
                                    INITIATE_REQUEST_SIGNAL);

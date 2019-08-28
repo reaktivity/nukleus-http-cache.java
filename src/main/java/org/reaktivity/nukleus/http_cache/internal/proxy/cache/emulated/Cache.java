@@ -43,6 +43,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.route.RouteManager;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
@@ -91,6 +92,7 @@ public class Cache
     final HttpCacheCounters counters;
 
     public Cache(
+        RouteManager router,
         LongObjectBiConsumer<Runnable> scheduler,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
@@ -105,7 +107,7 @@ public class Cache
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
         this.correlations = correlations;
-        this.writer = new Writer(supplyTypeId, writeBuffer);
+        this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
                 requestBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.refresh.request.acquires"),

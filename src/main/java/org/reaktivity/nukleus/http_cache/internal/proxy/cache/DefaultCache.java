@@ -27,6 +27,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.route.RouteManager;
+import org.reaktivity.reaktor.internal.router.Router;
 
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
@@ -41,6 +43,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
@@ -66,6 +69,7 @@ public class DefaultCache
     public final HttpCacheCounters counters;
 
     public DefaultCache(
+        RouteManager router,
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
         HttpCacheCounters counters,
@@ -74,7 +78,7 @@ public class DefaultCache
         ToIntFunction<String> supplyTypeId)
     {
         this.entryCount = entryCount;
-        this.writer = new Writer(supplyTypeId, writeBuffer);
+        this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
                 counters.supplyCounter.apply("http-cache.cached.request.acquires"),
@@ -107,8 +111,7 @@ public class DefaultCache
         DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
         return cacheEntry != null &&
                cacheEntry.etag() != null &&
-               cacheEntry.etag().equals(newEtag) &&
-               cacheEntry.recentAuthorizationHeader() != null;
+               cacheEntry.etag().equals(newEtag);
     }
 
     public boolean matchCacheableRequest(
@@ -214,7 +217,8 @@ public class DefaultCache
                                   supplyTrace.getAsLong(),
                                   e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                                         .item(h -> h.name(ETAG).value(entry.etag()))
-                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait)));
+                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
+                                        .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED)));
         }
         else
         {

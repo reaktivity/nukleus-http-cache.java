@@ -44,7 +44,7 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
@@ -150,6 +150,7 @@ final class HttpCacheProxyCacheableRequest
                                                       connectReplyId,
                                                       connectRouteId);
             newStream = notModifiedResponse::onResponseMessage;
+            requestGroup.onNonCacheableResponse(acceptReplyId);
         }
         else if (isCacheableResponse(responseHeaders))
         {
@@ -180,11 +181,10 @@ final class HttpCacheProxyCacheableRequest
                                                            acceptReplyId);
             factory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
             newStream = nonCacheableResponse::onResponseMessage;
-            resetRequestTimeoutIfNecessary();
-            cleanupRequestIfNecessary();
             requestGroup.onNonCacheableResponse(acceptReplyId);
+            cleanupRequestIfNecessary();
         }
-
+        resetRequestTimeoutIfNecessary();
         return newStream;
     }
 
@@ -322,7 +322,7 @@ final class HttpCacheProxyCacheableRequest
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        if (requestGroup.queue(acceptReplyId, acceptRouteId))
+        if (requestGroup.queue(acceptRouteId, acceptReplyId))
         {
             requestQueued =  true;
             return;
@@ -492,7 +492,7 @@ final class HttpCacheProxyCacheableRequest
             factory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId, factory.supplyTrace.getAsLong());
             cleanupRequestIfNecessary();
         }
-        else if (signalId == ABORT_SIGNAL)
+        else if (signalId == CACHE_ENTRY_ABORTED_SIGNAL)
         {
             if (this.payloadWritten >= 0)
             {
@@ -585,6 +585,8 @@ final class HttpCacheProxyCacheableRequest
         cacheEntry = factory.defaultCache.get(requestHash);
         if (cacheEntry == null)
         {
+            cleanupRequestIfNecessary();
+            send503RetryAfter();
             return;
         }
         if(payloadWritten == -1)

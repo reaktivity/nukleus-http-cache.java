@@ -190,7 +190,8 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         if (emulatedCache == null)
         {
-            this.emulatedCache = new Cache(scheduler,
+            this.emulatedCache = new Cache(router,
+                                           scheduler,
                                            emulatedBudgetManager,
                                            writeBuffer,
                                            requestBufferPool,
@@ -204,7 +205,8 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         if (defaultCache == null)
         {
-            this.defaultCache = new DefaultCache(writeBuffer,
+            this.defaultCache = new DefaultCache(router,
+                                                 writeBuffer,
                                                  cacheBufferPool,
                                                  counters,
                                                  cacheEntries,

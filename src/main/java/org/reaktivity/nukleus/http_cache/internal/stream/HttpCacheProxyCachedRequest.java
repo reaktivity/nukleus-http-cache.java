@@ -38,7 +38,7 @@ import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -152,8 +152,7 @@ final class HttpCacheProxyCachedRequest
                               currentTimeMillis(), acceptReplyId, "304");
         }
 
-        factory.writer.doSignal(signaler,
-                                acceptRouteId,
+        factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
                                 factory.supplyTrace.getAsLong(),
                                 CACHE_ENTRY_SIGNAL);
@@ -180,11 +179,10 @@ final class HttpCacheProxyCachedRequest
     private void onAbort(
         final AbortFW abort)
     {
-        factory.writer.doSignal(signaler,
-                                acceptRouteId,
+        factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
                                 factory.supplyTrace.getAsLong(),
-                                ABORT_SIGNAL);
+                                CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
     private void onSignal(
@@ -196,7 +194,7 @@ final class HttpCacheProxyCachedRequest
         {
             handleCacheUpdateSignal(signal);
         }
-        else if (signalId == ABORT_SIGNAL)
+        else if (signalId == CACHE_ENTRY_ABORTED_SIGNAL)
         {
             factory.writer.doAbort(acceptReply,
                                    acceptRouteId,
@@ -205,7 +203,8 @@ final class HttpCacheProxyCachedRequest
         }
     }
 
-    private void onWindow(WindowFW window)
+    private void onWindow(
+        WindowFW window)
     {
         groupId = window.groupId();
         padding = window.padding();
@@ -221,7 +220,8 @@ final class HttpCacheProxyCachedRequest
         sendEndIfNecessary(window.trace());
     }
 
-    private void onReset(ResetFW reset)
+    private void onReset(
+        ResetFW reset)
     {
         factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                                      groupId,

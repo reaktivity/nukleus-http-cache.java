@@ -19,6 +19,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
@@ -57,6 +58,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.route.RouteManager;
 
 public class Writer
 {
@@ -72,13 +74,16 @@ public class Writer
 
     final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
+    private final RouteManager router;
     private final MutableDirectBuffer writeBuffer;
     private final int httpTypeId;
 
     public Writer(
+        RouteManager router,
         ToIntFunction<String> supplyTypeId,
         MutableDirectBuffer writeBuffer)
     {
+        this.router = router;
         this.writeBuffer = writeBuffer;
         this.httpTypeId = supplyTypeId.applyAsInt("http");
     }
@@ -191,6 +196,12 @@ public class Writer
         {
             builder.item(header -> header.name(PREFERENCE_APPLIED)
                                          .value("wait=" + getPreferWait(requestHeaders)));
+        }
+
+        if (isPreferWait(requestHeaders))
+        {
+            builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
+                                         .value(PREFERENCE_APPLIED));
         }
 
         if (isStale)
@@ -407,12 +418,13 @@ public class Writer
     }
 
     public void doSignal(
-        MessageConsumer receiver,
         long routeId,
         long streamId,
         long traceId,
         long signalId)
     {
+        long acceptInitialId = streamId | 0x01;
+        MessageConsumer receiver = router.supplyReceiver(acceptInitialId);
         final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .routeId(routeId)
             .streamId(streamId)

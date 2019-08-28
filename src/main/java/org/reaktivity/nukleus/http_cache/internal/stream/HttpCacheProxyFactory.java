@@ -140,7 +140,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.emulatedCache = emulatedCache;
         this.defaultCache = defaultCache;
 
-        this.writer = new Writer(supplyTypeId, writeBuffer);
+        this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.executor = executor;
