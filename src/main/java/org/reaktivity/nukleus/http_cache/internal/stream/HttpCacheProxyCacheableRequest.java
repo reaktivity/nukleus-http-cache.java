@@ -49,6 +49,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_EN
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
@@ -190,21 +191,6 @@ final class HttpCacheProxyCacheableRequest
         return newStream;
     }
 
-    boolean scheduleRequest(long retryAfter)
-    {
-        if (retryAfter <= 0L)
-        {
-            retryCacheableRequest();
-        }
-        else
-        {
-            long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
-            this.factory.scheduler.accept(requestAt, this::retryCacheableRequest);
-        }
-        return true;
-    }
-
-
     void onResponseMessage(
         int msgTypeId,
         DirectBuffer buffer,
@@ -301,6 +287,12 @@ final class HttpCacheProxyCacheableRequest
         {
             this.ifNoneMatch = ifNoneMatchHeader.value().asString();
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
+        }
+
+        HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
+        if (authorizationHeader != null)
+        {
+            requestGroup.setRecentAuthorizationToken(authorizationHeader.value().asString());
         }
 
         if (requestGroup.queue(acceptRouteId, acceptReplyId))
@@ -401,6 +393,20 @@ final class HttpCacheProxyCacheableRequest
         }
     }
 
+    private boolean scheduleRequest(long retryAfter)
+    {
+        if (retryAfter <= 0L)
+        {
+            retryCacheableRequest();
+        }
+        else
+        {
+            long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
+            this.factory.scheduler.accept(requestAt, this::retryCacheableRequest);
+        }
+        return true;
+    }
+
     private void retryCacheableRequest()
     {
         if (isRequestPurged)
@@ -473,15 +479,25 @@ final class HttpCacheProxyCacheableRequest
     private Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        return builder -> requestHeaders.forEach(h ->
+        return (ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder) ->
         {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            if(!CONTENT_LENGTH.equalsIgnoreCase(name))
+           requestHeaders.forEach(h ->
+           {
+               final String name = h.name().asString();
+               final String value = h.value().asString();
+               if(!CONTENT_LENGTH.equalsIgnoreCase(name) &&
+                  !AUTHORIZATION.equals(name))
+               {
+                   builder.item(item -> item.name(name).value(value));
+               }
+           });
+
+            final String authorizationToken = requestGroup.getRecentAuthorizationToken();
+            if (authorizationToken != null)
             {
-                builder.item(item -> item.name(name).value(value));
+                builder.item(item -> item.name(AUTHORIZATION).value(authorizationToken));
             }
-        });
+        };
     }
 
     private void onResponseSignal(

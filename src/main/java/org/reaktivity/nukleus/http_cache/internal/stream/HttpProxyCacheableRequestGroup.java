@@ -32,6 +32,7 @@ final class HttpProxyCacheableRequestGroup
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
     private final Consumer<Integer> cleaner;
+    private String recentAuthorizationToken;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
@@ -44,6 +45,16 @@ final class HttpProxyCacheableRequestGroup
         this.factory = factory;
         this.cleaner = cleaner;
         this.routeIdsByReplyId = new Long2LongHashMap(-1L);
+    }
+
+    public String getRecentAuthorizationToken()
+    {
+        return recentAuthorizationToken;
+    }
+
+    public void setRecentAuthorizationToken(String recentAuthorizationToken)
+    {
+        this.recentAuthorizationToken = recentAuthorizationToken;
     }
 
     boolean queue(
