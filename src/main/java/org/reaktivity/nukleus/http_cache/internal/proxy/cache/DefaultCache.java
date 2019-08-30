@@ -28,7 +28,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
-import org.reaktivity.reaktor.internal.router.Router;
 
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
