@@ -36,6 +36,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 import java.time.Instant;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
@@ -48,6 +49,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_EN
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -226,27 +228,6 @@ final class HttpCacheProxyCacheableRequest
         }
     }
 
-    private void doHttpRequest()
-    {
-        long connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
-        ListFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [sent initial request]\n",
-                              currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-        }
-
-        factory.writer.doHttpRequest(
-            connectInitial,
-            connectRouteId,
-            connectInitialId,
-            factory.supplyTrace.getAsLong(),
-            builder -> requestHeaders.forEach(
-                h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
-
-        factory.router.setThrottle(connectInitialId, this::onRequestMessage);
-    }
-
     void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
@@ -328,13 +309,34 @@ final class HttpCacheProxyCacheableRequest
             return;
         }
 
-        doHttpRequest();
+        long connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
+
+        factory.writer.doHttpRequest(
+            connectInitial,
+            connectRouteId,
+            connectInitialId,
+            factory.supplyTrace.getAsLong(),
+            mutateRequestHeaders(requestHeaders));
+
+        factory.router.setThrottle(connectInitialId, this::onRequestMessage);
+
+        if (DEBUG)
+        {
+            System.out.printf("[%016x] CONNECT %016x %s [sent initial request]\n",
+                              currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
+        }
     }
 
     private void onData(
         final DataFW data)
     {
-        //NOOP
+        factory.writer.doWindow(acceptReply,
+                                acceptRouteId,
+                                acceptInitialId,
+                                data.trace(),
+                                data.sizeof(),
+                                data.padding(),
+                                data.groupId());
     }
 
     private void onEnd(
@@ -425,11 +427,7 @@ final class HttpCacheProxyCacheableRequest
                                      connectRouteId,
                                      connectInitialId,
                                      factory.supplyTrace.getAsLong(),
-                                     builder ->
-                                     {
-                                        requestHeaders.forEach(
-                                            h -> builder.item(item -> item.name(h.name()).value(h.value())));
-                                     });
+                                     mutateRequestHeaders(requestHeaders));
         factory.writer.doHttpEnd(connectInitial,
                                  connectRouteId,
                                  connectInitialId,
@@ -472,6 +470,20 @@ final class HttpCacheProxyCacheableRequest
         attempts++;
     }
 
+    private Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(
+        ListFW<HttpHeaderFW> requestHeaders)
+    {
+        return builder -> requestHeaders.forEach(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            if(!CONTENT_LENGTH.equalsIgnoreCase(name))
+            {
+                builder.item(item -> item.name(name).value(value));
+            }
+        });
+    }
+
     private void onResponseSignal(
         SignalFW signal)
     {
@@ -501,12 +513,12 @@ final class HttpCacheProxyCacheableRequest
                                        acceptReplyId,
                                        signal.trace());
                  requestGroup.unqueue(acceptReplyId);
-                cleanupRequestIfNecessary();
             }
             else
             {
                 send503RetryAfter();
             }
+            cleanupRequestIfNecessary();
         }
     }
 

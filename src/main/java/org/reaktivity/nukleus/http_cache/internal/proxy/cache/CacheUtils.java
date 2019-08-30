@@ -112,8 +112,6 @@ public final class CacheUtils
                     return value.contains(CacheDirectives.NO_STORE);
                 case METHOD:
                     return !HttpMethods.GET.equalsIgnoreCase(value);
-                case CONTENT_LENGTH:
-                    return true;
                 case TRANSFER_ENCODING:
                     return true;
                 default:

@@ -29,6 +29,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
 import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -40,7 +41,7 @@ final class HttpCacheProxyNotModifiedResponse
 
     private final int initialWindow;
     private final int requestHash;
-    private final int requestSlot;
+    private int requestSlot;
     private final MessageConsumer acceptReply;
     private final long acceptRouteId;
     private final long acceptReplyId;
@@ -126,6 +127,7 @@ final class HttpCacheProxyNotModifiedResponse
                                      acceptRouteId,
                                      acceptReplyId);
         sendWindow(initialWindow, begin.trace());
+        purgeRequest();
     }
 
     private void onData(
@@ -140,6 +142,7 @@ final class HttpCacheProxyNotModifiedResponse
                                  acceptRouteId,
                                  acceptReplyId,
                                  end.trace());
+
     }
 
     private void onAbort(AbortFW abort)
@@ -171,5 +174,14 @@ final class HttpCacheProxyNotModifiedResponse
     {
         final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot);
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
+    }
+
+    private void purgeRequest()
+    {
+        if (requestSlot != NO_SLOT)
+        {
+            factory.requestBufferPool.release(requestSlot);
+            this.requestSlot = NO_SLOT;
+        }
     }
 }

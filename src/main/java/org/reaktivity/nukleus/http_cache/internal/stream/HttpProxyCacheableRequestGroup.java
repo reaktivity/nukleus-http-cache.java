@@ -50,10 +50,8 @@ final class HttpProxyCacheableRequestGroup
         long acceptRouteId,
         long acceptReplyId)
      {
-         boolean queueExists = !routeIdsByReplyId.isEmpty();
          routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
-
-         return queueExists;
+         return routeIdsByReplyId.size() > 1;
      }
 
      void unqueue(
@@ -80,7 +78,15 @@ final class HttpProxyCacheableRequestGroup
 
     void onCacheableResponseAborted()
     {
-        this.sendSignalToQueuedInitialRequestSubscribers(CACHE_ENTRY_ABORTED_SIGNAL);
+        this.routeIdsByReplyId.forEach(this::doSignalCacheEntryAborted);
+    }
+
+    private void doSignalCacheEntryAborted(long acceptReplyId, long acceptRouteId)
+    {
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTrace.getAsLong(),
+                        CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
     private void sendSignalToQueuedInitialRequestSubscribers(

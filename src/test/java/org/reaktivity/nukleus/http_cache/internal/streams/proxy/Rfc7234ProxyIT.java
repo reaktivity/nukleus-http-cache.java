@@ -81,10 +81,10 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(1);
-        counters.assertRequestsCacheable(0);
+        counters.assertRequestsCacheable(1);
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
