@@ -47,14 +47,19 @@ final class HttpProxyCacheableRequestGroup
         this.routeIdsByReplyId = new Long2LongHashMap(-1L);
     }
 
-    public String getRecentAuthorizationToken()
+    String getRecentAuthorizationToken()
     {
         return recentAuthorizationToken;
     }
 
-    public void setRecentAuthorizationToken(String recentAuthorizationToken)
+    void setRecentAuthorizationToken(String recentAuthorizationToken)
     {
         this.recentAuthorizationToken = recentAuthorizationToken;
+    }
+
+    int getNumberOfRequests()
+    {
+        return routeIdsByReplyId.size();
     }
 
     boolean queue(

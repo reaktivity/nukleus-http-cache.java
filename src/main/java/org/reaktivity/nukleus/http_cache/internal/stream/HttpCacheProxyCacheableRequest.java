@@ -367,13 +367,8 @@ final class HttpCacheProxyCacheableRequest
     {
         final long traceId = reset.trace();
         factory.writer.doReset(acceptReply, acceptRouteId, acceptInitialId, traceId);
-
-        if (preferWaitExpired != null)
-        {
-            preferWaitExpired.cancel(true);
-        }
-
-        requestGroup.unqueue(acceptReplyId);
+        resetRequestTimeoutIfNecessary();
+        cleanupRequestIfNecessary();
     }
 
     private void schedulePreferWaitIfNoneMatchIfNecessary(
@@ -535,6 +530,7 @@ final class HttpCacheProxyCacheableRequest
                 send503RetryAfter();
             }
             cleanupRequestIfNecessary();
+            cacheEntry.setSubscribers(-1);
         }
     }
 
@@ -546,11 +542,11 @@ final class HttpCacheProxyCacheableRequest
         int credit = window.credit();
         acceptReplyBudget += credit;
         factory.budgetManager.window(BudgetManager.StreamKind.CACHE,
-                                                   groupId,
-                                                   streamId,
-                                                   credit,
-                                                   this::writePayload,
-                                                   window.trace());
+                                     groupId,
+                                     streamId,
+                                     credit,
+                                     this::writePayload,
+                                     window.trace());
         sendEndIfNecessary(window.trace());
     }
 
@@ -565,6 +561,7 @@ final class HttpCacheProxyCacheableRequest
                                acceptRouteId,
                                acceptInitialId,
                                factory.supplyTrace.getAsLong());
+        cacheEntry.setSubscribers(-1);
     }
 
     private void send503RetryAfter()
@@ -683,24 +680,25 @@ final class HttpCacheProxyCacheableRequest
             if (!etagSent && cacheEntry.etag() != null)
             {
                 factory.writer.doHttpEnd(acceptReply,
-                                                       acceptRouteId,
-                                                       acceptReplyId,
-                                                       traceId,
-                                                       cacheEntry.etag());
+                                         acceptRouteId,
+                                         acceptReplyId,
+                                         traceId,
+                                         cacheEntry.etag());
             }
             else
             {
                 factory.writer.doHttpEnd(acceptReply,
-                                                       acceptRouteId,
-                                                       acceptReplyId,
-                                                       traceId);
+                                         acceptRouteId,
+                                         acceptReplyId,
+                                         traceId);
             }
 
             factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                                       groupId,
-                                                       acceptReplyId,
-                                                       traceId);
+                                         groupId,
+                                         acceptReplyId,
+                                         traceId);
             cleanupRequestIfNecessary();
+            cacheEntry.setSubscribers(-1);
         }
     }
 
@@ -721,7 +719,7 @@ final class HttpCacheProxyCacheableRequest
                                       p -> buildResponsePayload(payloadWritten,
                                           toWrite,
                                           p,
-                                          cacheEntry.getResponsePool()));
+                                          factory.defaultCache.getResponsePool()));
             payloadWritten += toWrite;
             budget -= (toWrite + padding);
             acceptReplyBudget -= (toWrite + padding);

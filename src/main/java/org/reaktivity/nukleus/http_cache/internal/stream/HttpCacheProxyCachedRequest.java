@@ -32,8 +32,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
-import java.util.function.Function;
-
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
@@ -50,7 +48,6 @@ final class HttpCacheProxyCachedRequest
     private final long acceptRouteId;
     private final long acceptReplyId;
     private final long acceptInitialId;
-    private final MessageConsumer signaler;
 
     private final int requestHash;
 
@@ -75,8 +72,6 @@ final class HttpCacheProxyCachedRequest
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
         this.acceptInitialId = acceptInitialId;
-        Function<Long, MessageConsumer> supplyReceiver = factory.router::supplyReceiver;
-        this.signaler = supplyReceiver.apply(acceptInitialId);
     }
 
    void onRequestMessage(
@@ -135,6 +130,8 @@ final class HttpCacheProxyCachedRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
 
+        cacheEntry = factory.defaultCache.get(requestHash);
+        cacheEntry.setSubscribers(1);
         // count all requests
         factory.counters.requests.getAsLong();
         factory.counters.requestsCacheable.getAsLong();
@@ -200,6 +197,7 @@ final class HttpCacheProxyCachedRequest
                                    acceptRouteId,
                                    acceptReplyId,
                                    signal.trace());
+            cacheEntry.setSubscribers(-1);
         }
     }
 
@@ -227,6 +225,7 @@ final class HttpCacheProxyCachedRequest
                                      groupId,
                                      acceptReplyId,
                                      this.factory.supplyTrace.getAsLong());
+        cacheEntry.setSubscribers(-1);
     }
 
     private void handleCacheUpdateSignal(
@@ -293,6 +292,7 @@ final class HttpCacheProxyCachedRequest
                                                    groupId,
                                                    acceptReplyId,
                                                    traceId);
+            cacheEntry.setSubscribers(-1);
         }
     }
 
@@ -313,7 +313,7 @@ final class HttpCacheProxyCachedRequest
                                       p -> buildResponsePayload(payloadWritten,
                                                               toWrite,
                                                               p,
-                                                              cacheEntry.getResponsePool()));
+                                                             factory.defaultCache.getResponsePool()));
             payloadWritten += toWrite;
             budget -= (toWrite + padding);
             acceptReplyBudget -= (toWrite + padding);

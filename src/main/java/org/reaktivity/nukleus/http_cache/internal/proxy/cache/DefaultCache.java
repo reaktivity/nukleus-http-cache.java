@@ -91,6 +91,11 @@ public class DefaultCache
         this.supplyTrace = requireNonNull(supplyTrace);
     }
 
+    public BufferPool getResponsePool()
+    {
+        return cachedResponseBufferPool;
+    }
+
     public DefaultCacheEntry get(
         int requestHash)
     {
@@ -230,6 +235,17 @@ public class DefaultCache
         }
         // count all responses
         counters.responses.getAsLong();
+    }
+
+    void purgeEntriesForNonPendingRequests()
+    {
+        cachedEntries.forEach((requestHash, cacheEntry) ->
+        {
+             if (cacheEntry.getSubscribers() == 0)
+             {
+                 this.purge(requestHash);
+             }
+        });
     }
 
     private DefaultCacheEntry newCacheEntry(

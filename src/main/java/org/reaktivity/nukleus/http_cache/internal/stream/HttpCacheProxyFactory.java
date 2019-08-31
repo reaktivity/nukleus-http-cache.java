@@ -212,9 +212,6 @@ public class HttpCacheProxyFactory implements StreamFactory
                 if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
                 {
                     DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
-                    final String requestAuthorizationHeader = getHeader(requestHeaders, AUTHORIZATION);
-                    cacheEntry.recentAuthorizationHeader(requestAuthorizationHeader);
-
                     boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
                     if (etagMatched)
                     {

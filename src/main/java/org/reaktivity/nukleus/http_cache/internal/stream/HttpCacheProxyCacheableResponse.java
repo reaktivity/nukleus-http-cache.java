@@ -144,14 +144,15 @@ final class HttpCacheProxyCacheableResponse
         final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
         cacheEntry = factory.defaultCache.supply(requestHash);
+        cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
         String etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;
 
         //Initial cache entry
         if(cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
         {
-            if (!cacheEntry.storeRequestHeaders(getRequestHeaders())
-                || !cacheEntry.storeResponseHeaders(responseHeaders))
+            if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
+                !cacheEntry.storeResponseHeaders(responseHeaders))
             {
                 //TODO: Better handle if there is no slot available, For example, release response payload
                 // which requests are in flight
