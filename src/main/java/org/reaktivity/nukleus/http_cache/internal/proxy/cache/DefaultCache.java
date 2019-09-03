@@ -286,7 +286,7 @@ public class DefaultCache
     {
         int availableSlot = totalSlots - cacheBufferPool.acquiredSlots();
         int availableCacheCapacityInPercentage = (availableSlot * 100) / totalSlots;
-        return allowedCachePercentage >= availableCacheCapacityInPercentage;
+        return allowedCachePercentage <= availableCacheCapacityInPercentage;
     }
 
     private DefaultCacheEntry newCacheEntry(
