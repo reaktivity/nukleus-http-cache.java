@@ -36,8 +36,8 @@ import java.util.function.ToIntFunction;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isMatchByEtag;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.satisfiedByCache;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
@@ -287,6 +287,24 @@ public class DefaultCache
         int availableSlot = totalSlots - cacheBufferPool.acquiredSlots();
         int availableCacheCapacityInPercentage = (availableSlot * 100) / totalSlots;
         return allowedCachePercentage <= availableCacheCapacityInPercentage;
+    }
+
+    private boolean satisfiedByCache(
+        ListFW<HttpHeaderFW> headers)
+    {
+        return !headers.anyMatch(h ->
+         {
+             final String name = h.name().asString();
+             final String value = h.value().asString();
+             switch (name)
+             {
+                 case CACHE_CONTROL:
+                     // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
+                     return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
+                 default:
+                     return false;
+             }
+         });
     }
 
     private DefaultCacheEntry newCacheEntry(
