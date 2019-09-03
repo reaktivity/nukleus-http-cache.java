@@ -137,6 +137,14 @@ final class EmulatedProxyAcceptStream
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
+        streamFactory.writer.doWindow(acceptReply,
+                                      acceptRouteId,
+                                      acceptStreamId,
+                                      begin.trace(),
+                                      0,
+                                      0,
+                                      0L);
+
         if (isPreferIfNoneMatch(requestHeaders))
         {
             streamFactory.counters.requestsPreferWait.getAsLong();

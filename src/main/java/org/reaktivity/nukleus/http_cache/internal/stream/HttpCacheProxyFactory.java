@@ -239,6 +239,13 @@ public class HttpCacheProxyFactory implements StreamFactory
                 {
                     counters.requestsCacheable.getAsLong();
                     counters.requests.getAsLong();
+                    writer.doWindow(acceptReply,
+                                            acceptRouteId,
+                                            acceptInitialId,
+                                            begin.trace(),
+                                            0,
+                                            0,
+                                            0L);
                     send504(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
                 }
                 else if (isRequestCacheable(requestHeaders))

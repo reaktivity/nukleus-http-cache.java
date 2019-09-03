@@ -69,6 +69,7 @@ final class HttpCacheProxyCacheableRequest
     private final long acceptRouteId;
     private final long acceptInitialId;
     private final long acceptReplyId;
+    private final int initialWindow;
 
     private MessageConsumer connectInitial;
     private MessageConsumer connectReply;
@@ -115,6 +116,7 @@ final class HttpCacheProxyCacheableRequest
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
+        this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
     MessageConsumer newResponse(
@@ -297,6 +299,13 @@ final class HttpCacheProxyCacheableRequest
 
         if (requestGroup.queue(acceptRouteId, acceptReplyId))
         {
+            factory.writer.doWindow(acceptReply,
+                                    acceptRouteId,
+                                    acceptInitialId,
+                                    begin.trace(),
+                                    initialWindow,
+                                    0,
+                                    0L);
             requestQueued =  true;
             return;
         }

@@ -222,8 +222,7 @@ final class HttpCacheProxyCacheableResponse
             factory.writer.do503AndAbort(acceptReply,
                                          acceptRouteId,
                                          acceptReplyId,
-                                         abort.trace(),
-                                         0L);
+                                         abort.trace());
             requestGroup.onNonCacheableResponse(acceptReplyId);
         }
         else

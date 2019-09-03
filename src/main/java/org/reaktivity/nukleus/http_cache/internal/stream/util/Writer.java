@@ -599,8 +599,7 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long traceId,
-        long correlationId)
+        long traceId)
     {
         this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value("503")));
         this.doAbort(receiver, routeId, streamId, traceId);

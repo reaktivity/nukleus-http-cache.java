@@ -178,8 +178,7 @@ public class Cache
                         this.writer.do503AndAbort(acceptReply,
                                                 acceptRouteId,
                                                 acceptReplyId,
-                                                supplyTrace.getAsLong(),
-                                                acceptReplyId);
+                                                supplyTrace.getAsLong());
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -334,7 +333,7 @@ public class Cache
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -357,7 +356,7 @@ public class Cache
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -439,7 +438,7 @@ public class Cache
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyId = subscriber.acceptReplyId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
 
                 // count all responses
                 counters.responses.getAsLong();

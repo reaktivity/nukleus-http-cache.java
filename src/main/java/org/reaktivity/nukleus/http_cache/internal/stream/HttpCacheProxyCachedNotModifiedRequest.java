@@ -37,6 +37,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
     private final long acceptRouteId;
     private final long acceptReplyId;
     private final long acceptInitialId;
+    private final int initialWindow;
 
     HttpCacheProxyCachedNotModifiedRequest(
         HttpCacheProxyFactory factory,
@@ -50,6 +51,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
         this.acceptInitialId = acceptInitialId;
+        this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
     void onResponseMessage(
@@ -104,6 +106,14 @@ final class HttpCacheProxyCachedNotModifiedRequest
         // count all requests
         factory.counters.requests.getAsLong();
         factory.counters.requestsCacheable.getAsLong();
+
+        factory.writer.doWindow(acceptReply,
+                                acceptRouteId,
+                                acceptInitialId,
+                                begin.trace(),
+                                initialWindow,
+                                0,
+                                0L);
 
         if (DEBUG)
         {

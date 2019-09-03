@@ -48,8 +48,8 @@ final class HttpCacheProxyCachedRequest
     private final long acceptRouteId;
     private final long acceptReplyId;
     private final long acceptInitialId;
-
     private final int requestHash;
+    private final int initialWindow;
 
     private int acceptReplyBudget;
     private long groupId;
@@ -72,6 +72,7 @@ final class HttpCacheProxyCachedRequest
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
         this.acceptInitialId = acceptInitialId;
+        this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
    void onRequestMessage(
@@ -142,12 +143,13 @@ final class HttpCacheProxyCachedRequest
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
         }
 
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                              currentTimeMillis(), acceptReplyId, "304");
-        }
+        factory.writer.doWindow(acceptReply,
+                                acceptRouteId,
+                                acceptInitialId,
+                                begin.trace(),
+                                initialWindow,
+                                0,
+                                0L);
 
         factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
