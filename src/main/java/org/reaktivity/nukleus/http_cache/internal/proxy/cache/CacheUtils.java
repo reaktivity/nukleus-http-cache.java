@@ -99,27 +99,6 @@ public final class CacheUtils
         });
     }
 
-    public static boolean isRequestCacheable(
-        ListFW<HttpHeaderFW> headers)
-    {
-        return !headers.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            switch (name)
-            {
-                case CACHE_CONTROL:
-                    return value.contains(CacheDirectives.NO_STORE);
-                case METHOD:
-                    return !HttpMethods.GET.equalsIgnoreCase(value);
-                case TRANSFER_ENCODING:
-                    return true;
-                default:
-                    return false;
-            }
-        });
-    }
-
     public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)
     {
         if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())

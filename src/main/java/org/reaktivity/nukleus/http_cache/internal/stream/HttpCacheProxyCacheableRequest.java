@@ -584,9 +584,9 @@ final class HttpCacheProxyCacheableRequest
         factory.writer.doHttpResponse(acceptReply,
                                       acceptRouteId,
                                       acceptReplyId,
-                                      factory.supplyTrace.getAsLong(), e ->
-                                                        e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
-                                                         .item(h -> h.name("retry-after").value("0")));
+                                      factory.supplyTrace.getAsLong(),
+                                      e -> e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
+                                            .item(h -> h.name("retry-after").value("0")));
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
@@ -738,7 +738,7 @@ final class HttpCacheProxyCacheableRequest
         return budget;
     }
 
-    public void buildResponsePayload(
+    private void buildResponsePayload(
         int index,
         int length,
         OctetsFW.Builder p,
@@ -749,7 +749,7 @@ final class HttpCacheProxyCacheableRequest
         buildResponsePayload(index, length, p, bp, startSlot);
     }
 
-    public void buildResponsePayload(
+    private void buildResponsePayload(
         int index,
         int length,
         OctetsFW.Builder builder,

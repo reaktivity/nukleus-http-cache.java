@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isRequestCacheable;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -248,7 +247,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                             0L);
                     send504(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
                 }
-                else if (isRequestCacheable(requestHeaders))
+                else if (defaultCache.isRequestCacheable(requestHeaders))
                 {
                     HttpProxyCacheableRequestGroup group =
                         requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);

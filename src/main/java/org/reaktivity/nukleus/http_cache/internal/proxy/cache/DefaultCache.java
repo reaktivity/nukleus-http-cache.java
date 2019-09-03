@@ -43,10 +43,13 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 public class DefaultCache
@@ -59,6 +62,7 @@ public class DefaultCache
 
     private final BufferPool cachedRequestBufferPool;
     private final BufferPool cachedResponseBufferPool;
+    private final BufferPool cacheBufferPool;
 
     private final Writer writer;
     private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntries;
@@ -66,6 +70,8 @@ public class DefaultCache
     private final LongConsumer entryCount;
     private final LongSupplier supplyTrace;
     public final HttpCacheCounters counters;
+    private final int allowedCachePercentage;
+    private final int totalSlots;
 
     public DefaultCache(
         RouteManager router,
@@ -74,9 +80,14 @@ public class DefaultCache
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
-        ToIntFunction<String> supplyTypeId)
+        ToIntFunction<String> supplyTypeId,
+        int allowedCachePercentage,
+        int cacheCapacity)
     {
+        assert allowedCachePercentage >= 0 && allowedCachePercentage <= 100;
+        this.cacheBufferPool = cacheBufferPool;
         this.entryCount = entryCount;
+        this.allowedCachePercentage = allowedCachePercentage;
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
@@ -89,6 +100,7 @@ public class DefaultCache
         this.cachedEntries = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
+        totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
     }
 
     public BufferPool getResponsePool()
@@ -237,7 +249,29 @@ public class DefaultCache
         counters.responses.getAsLong();
     }
 
-    void purgeEntriesForNonPendingRequests()
+    public boolean isRequestCacheable(
+        ListFW<HttpHeaderFW> headers)
+    {
+        return canRequestBeStored() &&
+               !headers.anyMatch(h ->
+                                 {
+                                     final String name = h.name().asString();
+                                     final String value = h.value().asString();
+                                     switch (name)
+                                     {
+                                         case CACHE_CONTROL:
+                                             return value.contains(CacheDirectives.NO_STORE);
+                                         case METHOD:
+                                             return !HttpMethods.GET.equalsIgnoreCase(value);
+                                         case TRANSFER_ENCODING:
+                                             return true;
+                                         default:
+                                             return false;
+                                     }
+                                 });
+    }
+
+    public void purgeEntriesForNonPendingRequests()
     {
         cachedEntries.forEach((requestHash, cacheEntry) ->
         {
@@ -246,6 +280,13 @@ public class DefaultCache
                  this.purge(requestHash);
              }
         });
+    }
+
+    private boolean canRequestBeStored()
+    {
+        int availableSlot = totalSlots - cacheBufferPool.acquiredSlots();
+        int availableCacheCapacityInPercentage = (availableSlot * 100) / totalSlots;
+        return allowedCachePercentage >= availableCacheCapacityInPercentage;
     }
 
     private DefaultCacheEntry newCacheEntry(

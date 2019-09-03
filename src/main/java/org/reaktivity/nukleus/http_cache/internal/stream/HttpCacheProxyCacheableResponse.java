@@ -154,9 +154,8 @@ final class HttpCacheProxyCacheableResponse
             if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
                 !cacheEntry.storeResponseHeaders(responseHeaders))
             {
-                //TODO: Better handle if there is no slot available, For example, release response payload
-                // which requests are in flight
-                purgeRequest();
+                //This should never happen.
+                assert false;
             }
         }
         else
@@ -164,9 +163,8 @@ final class HttpCacheProxyCacheableResponse
             cacheEntry.evictResponse();
             if (!cacheEntry.storeResponseHeaders(responseHeaders))
             {
-                //TODO: Better handle if there is no slot available, For example, release response payload
-                // which requests are in flight
-                purgeRequest();
+                //This should never happen.
+                assert false;
             }
         }
         cacheEntry.setEtag(etag);
@@ -184,9 +182,8 @@ final class HttpCacheProxyCacheableResponse
         boolean stored = cacheEntry.storeResponseData(data);
         if (!stored)
         {
-            //TODO: Better handle if there is no slot available, For example, release response payload
-            // which requests are in flight
-            purgeRequest();
+            //This should never happen.
+            assert false;
         }
         sendWindow(data.length() + data.padding(), data.trace());
         if (!isResponseBuffering)
