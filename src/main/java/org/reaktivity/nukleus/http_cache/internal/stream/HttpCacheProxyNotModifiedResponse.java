@@ -37,11 +37,8 @@ final class HttpCacheProxyNotModifiedResponse
 {
     private final HttpCacheProxyFactory factory;
 
-    private int connectReplyBudget;
-
     private final int initialWindow;
     private final int requestHash;
-    private int requestSlot;
     private final MessageConsumer acceptReply;
     private final long acceptRouteId;
     private final long acceptReplyId;
@@ -49,6 +46,9 @@ final class HttpCacheProxyNotModifiedResponse
     private final MessageConsumer connectReply;
     private final long connectRouteId;
     private final long connectReplyId;
+
+    private int connectReplyBudget;
+    private int requestSlot;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,

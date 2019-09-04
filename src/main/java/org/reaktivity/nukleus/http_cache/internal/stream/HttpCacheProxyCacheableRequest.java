@@ -25,6 +25,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
+import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
+import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -44,7 +46,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
@@ -53,7 +54,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
@@ -63,6 +63,9 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil
 
 final class HttpCacheProxyCacheableRequest
 {
+    private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
+    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW("503");
+
     private final HttpCacheProxyFactory factory;
     private final HttpProxyCacheableRequestGroup requestGroup;
     private final MessageConsumer acceptReply;
@@ -397,7 +400,8 @@ final class HttpCacheProxyCacheableRequest
         }
     }
 
-    private boolean scheduleRequest(long retryAfter)
+    private boolean scheduleRequest(
+        long retryAfter)
     {
         if (retryAfter <= 0L)
         {
@@ -487,10 +491,10 @@ final class HttpCacheProxyCacheableRequest
         {
            requestHeaders.forEach(h ->
            {
-               final String name = h.name().asString();
-               final String value = h.value().asString();
-               if(!CONTENT_LENGTH.equalsIgnoreCase(name) &&
-                  !AUTHORIZATION.equals(name))
+               final StringFW name = h.name();
+               final String16FW value = h.value();
+               if(!name.equals(CONTENT_LENGTH) &&
+                  !name.equals(AUTHORIZATION))
                {
                    builder.item(item -> item.name(name).value(value));
                }
@@ -559,7 +563,8 @@ final class HttpCacheProxyCacheableRequest
         sendEndIfNecessary(window.trace());
     }
 
-    private void onResponseReset(ResetFW reset)
+    private void onResponseReset(
+        ResetFW reset)
     {
         factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
                                      groupId,
@@ -585,7 +590,7 @@ final class HttpCacheProxyCacheableRequest
                                       acceptRouteId,
                                       acceptReplyId,
                                       factory.supplyTrace.getAsLong(),
-                                      e -> e.item(h -> h.name(STATUS).value(SERVICE_UNAVAILABLE_503))
+                                      e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
                                             .item(h -> h.name("retry-after").value("0")));
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,

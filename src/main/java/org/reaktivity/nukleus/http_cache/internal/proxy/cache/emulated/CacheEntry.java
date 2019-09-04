@@ -369,8 +369,8 @@ public final class CacheEntry
                     long acceptReplyId = s.acceptReplyId();
                     cache.writer.do503AndAbort(acceptReply,
                                                acceptRouteId,
-                                                acceptReplyId,
-                                                supplyTrace.getAsLong());
+                                               acceptReplyId,
+                                               supplyTrace.getAsLong());
                     s.purge();
 
                     // count all responses

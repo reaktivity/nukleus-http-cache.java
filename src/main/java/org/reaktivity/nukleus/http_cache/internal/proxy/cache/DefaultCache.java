@@ -70,8 +70,7 @@ public class DefaultCache
     private final LongConsumer entryCount;
     private final LongSupplier supplyTrace;
     public final HttpCacheCounters counters;
-    private final int allowedCachePercentage;
-    private final int totalSlots;
+    private final int allowedSlots;
 
     public DefaultCache(
         RouteManager router,
@@ -87,7 +86,6 @@ public class DefaultCache
         assert allowedCachePercentage >= 0 && allowedCachePercentage <= 100;
         this.cacheBufferPool = cacheBufferPool;
         this.entryCount = entryCount;
-        this.allowedCachePercentage = allowedCachePercentage;
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
@@ -100,7 +98,8 @@ public class DefaultCache
         this.cachedEntries = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
-        totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
+        int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
+        this.allowedSlots = (totalSlots * allowedCachePercentage) / 100;
     }
 
     public BufferPool getResponsePool()
@@ -252,7 +251,7 @@ public class DefaultCache
     public boolean isRequestCacheable(
         ListFW<HttpHeaderFW> headers)
     {
-        return canRequestBeStored() &&
+        return cacheBufferPool.acquiredSlots() <= allowedSlots &&
                !headers.anyMatch(h ->
                                  {
                                      final String name = h.name().asString();
@@ -280,13 +279,6 @@ public class DefaultCache
                  this.purge(requestHash);
              }
         });
-    }
-
-    private boolean canRequestBeStored()
-    {
-        int availableSlot = totalSlots - cacheBufferPool.acquiredSlots();
-        int availableCacheCapacityInPercentage = (availableSlot * 100) / totalSlots;
-        return allowedCachePercentage <= availableCacheCapacityInPercentage;
     }
 
     private boolean satisfiedByCache(
