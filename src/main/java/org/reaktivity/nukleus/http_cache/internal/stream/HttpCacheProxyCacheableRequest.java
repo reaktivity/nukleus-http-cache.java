@@ -159,6 +159,7 @@ final class HttpCacheProxyCacheableRequest
                                                       connectRouteId);
             newStream = notModifiedResponse::onResponseMessage;
             requestGroup.onNonCacheableResponse(acceptReplyId);
+            resetRequestTimeoutIfNecessary();
         }
         else if (isCacheableResponse(responseHeaders))
         {
@@ -191,8 +192,9 @@ final class HttpCacheProxyCacheableRequest
             newStream = nonCacheableResponse::onResponseMessage;
             requestGroup.onNonCacheableResponse(acceptReplyId);
             cleanupRequestIfNecessary();
+            resetRequestTimeoutIfNecessary();
         }
-        resetRequestTimeoutIfNecessary();
+
         return newStream;
     }
 
@@ -393,7 +395,7 @@ final class HttpCacheProxyCacheableRequest
             {
                 preferWaitExpired = this.factory.executor.schedule(preferWait,
                                                                    SECONDS,
-                                                                   acceptRouteId,
+                                                                   this.acceptRouteId,
                                                                    this.acceptReplyId,
                                                                    REQUEST_EXPIRED_SIGNAL);
             }
@@ -630,10 +632,7 @@ final class HttpCacheProxyCacheableRequest
         }
         if(payloadWritten == -1)
         {
-            if (preferWaitExpired != null)
-            {
-                preferWaitExpired.cancel(true);
-            }
+            resetRequestTimeoutIfNecessary();
             sendHttpResponseHeaders(cacheEntry, signal.signalId());
         }
         else
