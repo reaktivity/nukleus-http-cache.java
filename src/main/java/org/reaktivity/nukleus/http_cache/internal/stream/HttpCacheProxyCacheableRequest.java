@@ -491,10 +491,10 @@ final class HttpCacheProxyCacheableRequest
         {
            requestHeaders.forEach(h ->
            {
-               final StringFW name = h.name();
-               final String16FW value = h.value();
-               if(!name.equals(CONTENT_LENGTH) &&
-                  !name.equals(AUTHORIZATION))
+               final String name = h.name().asString();
+               final String value = h.value().asString();
+               if(!CONTENT_LENGTH.equals(name) &&
+                  !AUTHORIZATION.equals(name))
                {
                    builder.item(item -> item.name(name).value(value));
                }
