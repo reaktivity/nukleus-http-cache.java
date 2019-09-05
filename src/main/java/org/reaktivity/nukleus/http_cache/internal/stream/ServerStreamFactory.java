@@ -64,7 +64,7 @@ public class ServerStreamFactory implements StreamFactory
         this.supplyTrace = requireNonNull(supplyTrace);
         this.router = requireNonNull(router);
         this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.writer = new Writer(supplyTypeId, writeBuffer);
+        this.writer = new Writer(router, supplyTypeId, writeBuffer);
     }
 
     @Override

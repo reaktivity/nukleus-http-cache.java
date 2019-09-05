@@ -13,14 +13,14 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import java.util.function.LongFunction;
 import java.util.function.LongUnaryOperator;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -39,14 +39,15 @@ public class InitialRequest extends CacheableRequest
             LongUnaryOperator supplyInitialId,
             LongUnaryOperator supplyReplyId,
             LongFunction<MessageConsumer> supplyReceiver,
-            int requestURLHash,
+            int requestHash,
             BufferPool bufferPool,
             int requestSlot,
             RouteManager router,
             boolean authorizationHeader,
             long authorization,
             short authScope,
-            String etag)
+            String etag,
+            boolean isEmulated)
     {
         super(acceptReply,
               acceptRouteId,
@@ -55,14 +56,15 @@ public class InitialRequest extends CacheableRequest
               supplyInitialId,
               supplyReplyId,
               supplyReceiver,
-              requestURLHash,
+              requestHash,
               bufferPool,
               requestSlot,
               router,
               authorizationHeader,
               authorization,
               authScope,
-              etag);
+              etag,
+              isEmulated);
         this.cache = cache;
     }
 
@@ -90,14 +92,14 @@ public class InitialRequest extends CacheableRequest
     {
         super.purge();
         cache.removeUncommitted(this);
-        cache.sendPendingInitialRequests(requestURLHash());
+        cache.sendPendingInitialRequests(requestHash());
     }
 
     @Override
     public boolean cache(EndFW end, Cache cache)
     {
         boolean cached = super.cache(end, cache);
-        cache.servePendingInitialRequests(requestURLHash());
+        cache.servePendingInitialRequests(requestHash());
         return cached;
     }
 

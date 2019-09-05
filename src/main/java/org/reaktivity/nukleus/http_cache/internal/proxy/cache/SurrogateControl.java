@@ -84,13 +84,9 @@ public final class SurrogateControl
                     if (maxAge.contains("+"))
                     {
                         // TODO change to matcher
-                        final String value = maxAge.split("\\+")[0];
-                        return Integer.parseInt(value);
+                        maxAge = maxAge.split("\\+")[0];
                     }
-                    else
-                    {
-                        return -1;
-                    }
+                    return Integer.parseInt(maxAge);
                 }
             }
         }

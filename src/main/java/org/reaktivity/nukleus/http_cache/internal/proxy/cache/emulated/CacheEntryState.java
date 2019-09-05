@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
 public enum CacheEntryState
 {
@@ -21,6 +21,5 @@ public enum CacheEntryState
     CAN_REFRESH,
     CANT_REFRESH,
     REFRESHING,
-    WAITING_ON_UNCOMMITED,
     PURGED
 }

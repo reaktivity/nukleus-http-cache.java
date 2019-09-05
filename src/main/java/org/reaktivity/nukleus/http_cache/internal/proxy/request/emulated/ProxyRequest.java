@@ -13,45 +13,32 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
 
-public class PreferWaitIfNoneMatchRequest extends AnswerableByCacheRequest
+public class ProxyRequest extends Request
 {
-    public PreferWaitIfNoneMatchRequest(
+    public ProxyRequest(
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyStreamId,
         RouteManager router,
-        int requestURLHash,
-        boolean authorizationHeader,
-        long authorization,
-        short authScope,
-        String etag)
+        boolean isEmulated)
     {
-        super(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyStreamId,
-            router,
-            requestURLHash,
-            authorizationHeader,
-            authorization,
-            authScope,
-            etag);
+        super(acceptReply, acceptRouteId, acceptReplyStreamId, router, isEmulated);
     }
 
     @Override
     public Type getType()
     {
-        return Type.PREFER_WAIT;
+        return Type.PROXY;
     }
 
     @Override
     public void purge()
     {
-        // no-op
+        // NOOP, can't purge non cache-able request, TODO clean up interfaces?
     }
 }

@@ -19,13 +19,16 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.stream;
 import static java.util.Collections.unmodifiableList;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_CACHE;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.PUBLIC;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.SURROGATE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -45,6 +48,7 @@ public final class CacheUtils
 
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
+    public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     public static final String LAST_MODIFIED = "last-modified";
 
@@ -53,7 +57,7 @@ public final class CacheUtils
         // utility class
     }
 
-    public static boolean canBeServedByCache(
+    public static boolean canBeServedByEmulatedCache(
         ListFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
@@ -64,7 +68,7 @@ public final class CacheUtils
             {
                 case CACHE_CONTROL:
                     // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(CacheDirectives.MAX_AGE_0);
+                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
                 case METHOD:
                     return !HttpMethods.GET.equalsIgnoreCase(value);
                 case CONTENT_LENGTH:
@@ -79,12 +83,14 @@ public final class CacheUtils
 
     public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)
     {
-        if (response.anyMatch(h ->
-                CACHE_CONTROL.equals(h.name().asString())
-                && h.value().asString().contains(CacheDirectives.PRIVATE)))
+        if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())
+                             && h.value().asString().contains(CacheDirectives.PRIVATE))
+            || response.anyMatch(h -> SURROGATE_CONTROL.equals(h.name().asString())
+                              && h.value().asString().contains(MAX_AGE_0)))
         {
             return false;
         }
+
         return isPrivatelyCacheable(response);
     }
 
@@ -102,12 +108,11 @@ public final class CacheUtils
                 switch(directive)
                 {
                     // TODO expires
+                    case NO_STORE:
                     case NO_CACHE:
                         return false;
                     case PUBLIC:
-                        return true;
                     case MAX_AGE:
-                        return true;
                     case S_MAXAGE:
                         return true;
                     default:
