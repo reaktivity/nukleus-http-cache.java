@@ -34,7 +34,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyNonCacheableRequest
 {
-    private final HttpCacheProxyFactory streamFactory;
+    private final HttpCacheProxyFactory factory;
     private final long acceptRouteId;
     private final long acceptStreamId;
     private final long acceptReplyId;
@@ -47,7 +47,7 @@ final class HttpCacheProxyNonCacheableRequest
     private final long connectInitialId;
 
     HttpCacheProxyNonCacheableRequest(
-        HttpCacheProxyFactory streamFactory,
+        HttpCacheProxyFactory factory,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId,
@@ -58,7 +58,7 @@ final class HttpCacheProxyNonCacheableRequest
         long connectReplyId,
         long connectRouteId)
     {
-        this.streamFactory = streamFactory;
+        this.factory = factory;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
@@ -74,14 +74,14 @@ final class HttpCacheProxyNonCacheableRequest
         HttpBeginExFW beginEx)
     {
         final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
-            new HttpCacheProxyNonCacheableResponse(streamFactory,
+            new HttpCacheProxyNonCacheableResponse(factory,
                                                    connectReply,
                                                    connectRouteId,
                                                    connectReplyId,
                                                    acceptReply,
                                                    acceptRouteId,
                                                    acceptReplyId);
-        streamFactory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
+        factory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
         return nonCacheableResponse::onResponseMessage;
     }
 
@@ -94,10 +94,11 @@ final class HttpCacheProxyNonCacheableRequest
         switch(msgTypeId)
         {
             case ResetFW.TYPE_ID:
-                streamFactory.writer.doReset(acceptReply,
-                                             acceptRouteId,
-                                             acceptStreamId,
-                                             streamFactory.supplyTrace.getAsLong());
+                factory.writer.doReset(acceptReply,
+                                       acceptRouteId,
+                                       acceptStreamId,
+                                       factory.supplyTrace.getAsLong());
+                factory.correlations.remove(connectReplyId);
                 break;
         }
     }
@@ -111,27 +112,27 @@ final class HttpCacheProxyNonCacheableRequest
         switch (msgTypeId)
         {
             case BeginFW.TYPE_ID:
-                final BeginFW begin = streamFactory.beginRO.wrap(buffer, index, index + length);
+                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
                 onBegin(begin);
                 break;
             case DataFW.TYPE_ID:
-                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
+                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
                 onData(data);
                 break;
             case EndFW.TYPE_ID:
-                final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
                 onEnd(end);
                 break;
             case AbortFW.TYPE_ID:
-                final AbortFW abort = streamFactory.abortRO.wrap(buffer, index, index + length);
+                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
                 onAbort(abort);
                 break;
             case WindowFW.TYPE_ID:
-                final WindowFW window = streamFactory.windowRO.wrap(buffer, index, index + length);
+                final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
                 onWindow(window);
                 break;
             case ResetFW.TYPE_ID:
-                final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
+                final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
                 onReset(reset);
                 break;
             default:
@@ -143,12 +144,12 @@ final class HttpCacheProxyNonCacheableRequest
         BeginFW begin)
     {
         final OctetsFW extension = begin.extension();
-        final HttpBeginExFW httpBeginEx = extension.get(streamFactory.httpBeginExRO::tryWrap);
+        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
         assert httpBeginEx != null;
         final ListFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
 
         // count all requests
-        streamFactory.counters.requests.getAsLong();
+        factory.counters.requests.getAsLong();
 
         if (DEBUG)
         {
@@ -156,7 +157,7 @@ final class HttpCacheProxyNonCacheableRequest
                     currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginEx.headers()));
         }
 
-        long connectReplyId = streamFactory.supplyReplyId.applyAsLong(connectInitialId);
+        long connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
 
         if (DEBUG)
         {
@@ -164,16 +165,16 @@ final class HttpCacheProxyNonCacheableRequest
                               currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(
+        factory.writer.doHttpRequest(
             connectInitial,
             connectRouteId,
             connectInitialId,
-            streamFactory.supplyTrace.getAsLong(),
+            factory.supplyTrace.getAsLong(),
             builder -> requestHeaders.forEach(
                 h ->  builder.item(item -> item.name(h.name()).value(h.value()))
                                              ));
 
-        streamFactory.router.setThrottle(connectInitialId, this::onRequestMessage);
+        factory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }
 
     private void onData(
@@ -183,29 +184,29 @@ final class HttpCacheProxyNonCacheableRequest
             final int padding = data.padding();
             final OctetsFW payload = data.payload();
 
-            streamFactory.writer.doHttpData(connectInitial,
-                                            connectRouteId,
-                                            connectInitialId,
-                                            data.trace(),
-                                            groupId,
-                                            payload.buffer(),
-                                            payload.offset(),
-                                            payload.sizeof(),
-                                            padding);
+            factory.writer.doHttpData(connectInitial,
+                                      connectRouteId,
+                                      connectInitialId,
+                                      data.trace(),
+                                      groupId,
+                                      payload.buffer(),
+                                      payload.offset(),
+                                      payload.sizeof(),
+                                      padding);
     }
 
     private void onEnd(
         final EndFW end)
     {
         final long traceId = end.trace();
-        streamFactory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
+        factory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onAbort(
         final AbortFW abort)
     {
         final long traceId = abort.trace();
-        streamFactory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
+        factory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onWindow(
@@ -215,14 +216,14 @@ final class HttpCacheProxyNonCacheableRequest
         final int padding = window.padding();
         final long groupId = window.groupId();
         final long traceId = window.trace();
-        streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+        factory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
     }
 
     private void onReset(
         final ResetFW reset)
     {
         final long traceId = reset.trace();
-        streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
+        factory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
     }
 
 }

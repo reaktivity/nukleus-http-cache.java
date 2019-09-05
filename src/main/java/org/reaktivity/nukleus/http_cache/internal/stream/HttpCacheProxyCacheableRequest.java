@@ -578,6 +578,7 @@ final class HttpCacheProxyCacheableRequest
                                acceptInitialId,
                                factory.supplyTrace.getAsLong());
         cacheEntry.setSubscribers(-1);
+        factory.correlations.remove(connectReplyId);
     }
 
     private void send503RetryAfter()
