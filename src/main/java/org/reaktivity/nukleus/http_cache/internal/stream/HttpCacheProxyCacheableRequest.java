@@ -576,7 +576,7 @@ final class HttpCacheProxyCacheableRequest
                                acceptRouteId,
                                acceptInitialId,
                                factory.supplyTrace.getAsLong());
-        purge();
+        cleanupRequestIfNecessary();
         if (cacheEntry != null)
         {
             cacheEntry.setSubscribers(-1);
