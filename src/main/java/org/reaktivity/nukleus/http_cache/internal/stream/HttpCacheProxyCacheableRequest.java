@@ -572,13 +572,17 @@ final class HttpCacheProxyCacheableRequest
                                      groupId,
                                      acceptReplyId,
                                      factory.supplyTrace.getAsLong());
-        purge();
         factory.writer.doReset(acceptReply,
                                acceptRouteId,
                                acceptInitialId,
                                factory.supplyTrace.getAsLong());
-        cacheEntry.setSubscribers(-1);
+        purge();
+        if (cacheEntry != null)
+        {
+            cacheEntry.setSubscribers(-1);
+        }
         factory.correlations.remove(connectReplyId);
+        resetRequestTimeoutIfNecessary();
     }
 
     private void send503RetryAfter()

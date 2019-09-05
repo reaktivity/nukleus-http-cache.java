@@ -160,8 +160,9 @@ public class DefaultCache
         DefaultCacheEntry cacheEntry)
     {
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
-        if (isPreferWait(requestHeaders)
-            && !isPreferenceApplied(responseHeaders))
+        if (isPreferWait(requestHeaders) &&
+            !isPreferenceApplied(responseHeaders) &&
+            requestHeaders.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) && h.value().asString().contains(MAX_AGE_0)))
         {
             String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
             String newEtag = cacheEntry.etag();
@@ -183,8 +184,10 @@ public class DefaultCache
         int requestHash)
     {
 
-        if (isPreferWait(requestHeaders)
-            && !isPreferenceApplied(responseHeaders))
+        if (isPreferWait(requestHeaders) &&
+            !isPreferenceApplied(responseHeaders) &&
+            requestHeaders.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
+                                         h.value().asString().contains(MAX_AGE_0)))
         {
             String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
             String newEtag = getHeader(responseHeaders, ETAG);
