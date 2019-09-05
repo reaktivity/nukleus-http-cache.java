@@ -13,11 +13,11 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
-import java.util.function.Supplier;
+
 import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
@@ -26,12 +26,13 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.AnswerableByCacheRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.CacheableRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.PreferWaitIfNoneMatchRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request.Type;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -42,6 +43,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
+import org.reaktivity.nukleus.route.RouteManager;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
@@ -84,20 +86,19 @@ public class Cache
 
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
-    final Supplier<String> etagSupplier;
     final LongSupplier supplyTrace;
-    final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests = new Int2ObjectHashMap<>();
-    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap = new Int2ObjectHashMap<>();
+    final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests;
+    final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
 
     public Cache(
+        RouteManager router,
         LongObjectBiConsumer<Runnable> scheduler,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
         BufferPool cacheBufferPool,
         Long2ObjectHashMap<Request> correlations,
-        Supplier<String> etagSupplier,
         HttpCacheCounters counters,
         LongConsumer entryCount,
         LongSupplier supplyTrace,
@@ -106,7 +107,7 @@ public class Cache
         this.scheduler = scheduler;
         this.budgetManager = budgetManager;
         this.correlations = correlations;
-        this.writer = new Writer(supplyTypeId, writeBuffer);
+        this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.refreshBufferPool = new CountingBufferPool(
                 requestBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.refresh.request.acquires"),
@@ -124,16 +125,17 @@ public class Cache
         this.requestBufferPool = requestBufferPool.duplicate();
         this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
-        this.etagSupplier = etagSupplier;
         this.counters = counters;
         this.supplyTrace = requireNonNull(supplyTrace);
+        this.uncommittedRequests = new Int2ObjectHashMap<>();
+        this.pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     }
 
     public void put(
-        int requestUrlHash,
+        int requestHash,
         CacheableRequest request)
     {
-        CacheEntry oldCacheEntry = cachedEntries.get(requestUrlHash);
+        CacheEntry oldCacheEntry = cachedEntries.get(requestHash);
         if (oldCacheEntry == null)
         {
             CacheEntry cacheEntry = new CacheEntry(
@@ -141,11 +143,12 @@ public class Cache
                     request,
                     true,
                     supplyTrace);
-            updateCache(requestUrlHash, cacheEntry);
+            updateCache(requestHash, cacheEntry);
+            cacheEntry.sendHttpPushPromise(request);
         }
         else
         {
-            boolean expectSubscribers = (request.getType() == Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
+            boolean expectSubscribers = (request.getType() == Request.Type.INITIAL_REQUEST) || oldCacheEntry.expectSubscribers();
             CacheEntry cacheEntry = new CacheEntry(
                     this,
                     request,
@@ -158,7 +161,7 @@ public class Cache
             }
             else if (oldCacheEntry.isUpdatedBy(request))
             {
-                updateCache(requestUrlHash, cacheEntry);
+                updateCache(requestHash, cacheEntry);
 
                 boolean notVaries = oldCacheEntry.doesNotVaryBy(cacheEntry);
                 if (notVaries)
@@ -175,8 +178,7 @@ public class Cache
                         this.writer.do503AndAbort(acceptReply,
                                                 acceptRouteId,
                                                 acceptReplyId,
-                                                supplyTrace.getAsLong(),
-                                                acceptReplyId);
+                                                supplyTrace.getAsLong());
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -200,12 +202,12 @@ public class Cache
     }
 
     private void updateCache(
-            int requestUrlHash,
+            int requestHash,
             CacheEntry cacheEntry)
     {
         cacheEntry.commit();
-        cachedEntries.put(requestUrlHash, cacheEntry);
-        PendingCacheEntries result = this.uncommittedRequests.remove(requestUrlHash);
+        cachedEntries.put(requestHash, cacheEntry);
+        PendingCacheEntries result = this.uncommittedRequests.remove(requestHash);
         if (result != null)
         {
             result.addSubscribers(cacheEntry);
@@ -213,12 +215,12 @@ public class Cache
     }
 
     public boolean handleInitialRequest(
-        int requestURLHash,
+        int requestHash,
         ListFW<HttpHeaderFW> request,
         short authScope,
         CacheableRequest cacheableRequest)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestHash);
         if (cacheEntry != null)
         {
             return serveRequest(cacheEntry, request, authScope, cacheableRequest);
@@ -230,10 +232,10 @@ public class Cache
     }
 
     public void servePendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
         if (pendingInitialRequests != null)
         {
             pendingInitialRequests.removeSubscribers(s ->
@@ -255,15 +257,15 @@ public class Cache
     }
 
     public void sendPendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestURLHash);
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.remove(requestHash);
         if (pendingInitialRequests != null)
         {
             final PendingInitialRequests newPendingInitialRequests = pendingInitialRequests.withNextInitialRequest();
             if (newPendingInitialRequests != null)
             {
-                pendingInitialRequestsMap.put(requestURLHash, newPendingInitialRequests);
+                pendingInitialRequestsMap.put(requestHash, newPendingInitialRequests);
                 sendPendingInitialRequest(newPendingInitialRequests.initialRequest());
             }
         }
@@ -292,32 +294,32 @@ public class Cache
     }
 
     public boolean hasPendingInitialRequests(
-        int requestURLHash)
+        int requestHash)
     {
-        return pendingInitialRequestsMap.containsKey(requestURLHash);
+        return pendingInitialRequestsMap.containsKey(requestHash);
     }
 
     public void addPendingRequest(
         InitialRequest initialRequest)
     {
-        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestURLHash());
+        PendingInitialRequests pendingInitialRequests = pendingInitialRequestsMap.get(initialRequest.requestHash());
         pendingInitialRequests.subscribe(initialRequest);
     }
 
     public void createPendingInitialRequests(
         InitialRequest initialRequest)
     {
-        pendingInitialRequestsMap.put(initialRequest.requestURLHash(), new PendingInitialRequests(initialRequest));
+        pendingInitialRequestsMap.put(initialRequest.requestHash(), new PendingInitialRequests(initialRequest));
     }
 
     public void handlePreferWaitIfNoneMatchRequest(
-        int requestURLHash,
+        int requestHash,
         PreferWaitIfNoneMatchRequest preferWaitRequest,
         ListFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
-        final CacheEntry cacheEntry = cachedEntries.get(requestURLHash);
-        PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestURLHash);
+        final CacheEntry cacheEntry = cachedEntries.get(requestHash);
+        PendingCacheEntries uncommittedRequest = this.uncommittedRequests.get(requestHash);
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
@@ -331,7 +333,7 @@ public class Cache
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -354,7 +356,7 @@ public class Cache
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -423,20 +425,20 @@ public class Cache
     public void notifyUncommitted(
         InitialRequest request)
     {
-        this.uncommittedRequests.computeIfAbsent(request.requestURLHash(), p -> new PendingCacheEntries(request));
+        this.uncommittedRequests.computeIfAbsent(request.requestHash(), p -> new PendingCacheEntries(request));
     }
 
     public void removeUncommitted(
         InitialRequest request)
     {
-        this.uncommittedRequests.computeIfPresent(request.requestURLHash(), (k, v) ->
+        this.uncommittedRequests.computeIfPresent(request.requestHash(), (k, v) ->
         {
             v.removeSubscribers(subscriber ->
             {
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyId = subscriber.acceptReplyId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong(), acceptReplyId);
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
 
                 // count all responses
                 counters.responses.getAsLong();
@@ -458,11 +460,6 @@ public class Cache
     public boolean purgeOld()
     {
         return this.cachedEntries.purgeLRU();
-    }
-
-    public Supplier<String> getEtagSupplier()
-    {
-        return etagSupplier;
     }
 
 }

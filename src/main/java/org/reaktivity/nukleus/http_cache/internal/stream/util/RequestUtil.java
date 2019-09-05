@@ -13,11 +13,20 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-public final class HttpStatus
+public final class RequestUtil
 {
-    public static final String OK_200 = "200";
-    public static final String NOT_MODIFIED_304 = "304";
-    public static final String SERVICE_UNAVAILABLE_503 = "503";
+    public static short authorizationScope(
+        long authorization)
+    {
+        return (short) (authorization >>> 48);
+    }
+
+    public static int requestHash(
+        short authorizationScope,
+        int requestUrlHash)
+    {
+        return 31 * authorizationScope + requestUrlHash;
+    }
 }

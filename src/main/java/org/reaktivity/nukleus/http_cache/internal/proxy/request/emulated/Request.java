@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -22,24 +22,28 @@ public abstract class Request
 {
     public enum Type
     {
-        PREFER_WAIT, PROXY, INITIAL_REQUEST, CACHE_REFRESH
+        PREFER_WAIT, PROXY, INITIAL_REQUEST, CACHE_REFRESH, DEFAULT_REQUEST
     }
 
-    final MessageConsumer acceptReply;
-    final long acceptRouteId;
-    final long acceptReplyStreamId;
-    final RouteManager router;
+    public final MessageConsumer acceptReply;
+    public final long acceptRouteId;
+    public final long acceptReplyId;
+    public final RouteManager router;
+
+    private final boolean isEmulated;
 
     public Request(
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptReplyStreamId,
-        RouteManager router)
+        long acceptReplyId,
+        RouteManager router,
+        boolean isEmulated)
     {
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
-        this.acceptReplyStreamId = acceptReplyStreamId;
+        this.acceptReplyId = acceptReplyId;
         this.router = router;
+        this.isEmulated = isEmulated;
     }
 
     public abstract Type getType();
@@ -56,13 +60,18 @@ public abstract class Request
 
     public long acceptReplyId()
     {
-        return acceptReplyStreamId;
+        return acceptReplyId;
     }
 
     public void setThrottle(MessageConsumer throttle)
     {
-        this.router.setThrottle(acceptReplyStreamId, throttle);
+        this.router.setThrottle(acceptReplyId, throttle);
     }
 
     public abstract void purge();
+
+    public boolean isEmulated()
+    {
+        return isEmulated;
+    }
 }

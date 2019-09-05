@@ -13,18 +13,15 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 import java.util.Objects;
-
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeaderOrDefault;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
@@ -42,19 +39,20 @@ public class CacheRefreshRequest extends CacheableRequest
         // TODO eliminate reference /GC duplication (Flyweight pattern?)
         super(req.acceptReply,
               req.acceptRouteId,
-              req.acceptReplyStreamId,
+              req.acceptReplyId,
               req.connectRouteId,
               req.supplyInitialId,
               req.supplyReplyId,
               req.supplyReceiver,
-              req.requestURLHash(),
+              req.requestHash(),
               bufferPool,
               requestSlot,
               req.router,
               req.authorizationHeader(),
               req.authorization(),
               req.authScope(),
-              etag);
+              etag,
+              true);
         this.updatingEntry = cacheEntry;
         this.cache = cache;
     }
@@ -70,12 +68,6 @@ public class CacheRefreshRequest extends CacheableRequest
                         (Objects.requireNonNull(h.value().asString()).startsWith("2") ||
                                 Objects.requireNonNull(h.value().asString()).equals("304")))))
         {
-            if(responseHeaders.anyMatch(h ->
-                    (":status".equals(h.name().asString())
-                            && Objects.requireNonNull(h.value().asString()).startsWith("2"))))
-            {
-                etag(getHeaderOrDefault(responseHeaders, ETAG, cache.getEtagSupplier().get()));
-            }
 
             boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
             if (!noError)
@@ -92,9 +84,9 @@ public class CacheRefreshRequest extends CacheableRequest
 }
 
     @Override
-    public Type getType()
+    public Request.Type getType()
     {
-        return Type.CACHE_REFRESH;
+        return Request.Type.CACHE_REFRESH;
     }
 
     @Override
