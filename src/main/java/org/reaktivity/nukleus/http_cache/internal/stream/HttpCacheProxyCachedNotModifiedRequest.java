@@ -21,6 +21,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -102,6 +104,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
     {
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
+        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -118,13 +121,14 @@ final class HttpCacheProxyCachedNotModifiedRequest
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
+                    currentTimeMillis(), acceptReplyId, getRequestURL(requestHeaders));
         }
 
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
-                             factory.supplyTrace.getAsLong());
+                             factory.supplyTrace.getAsLong(),
+                             requestHeaders);
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",

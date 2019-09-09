@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORITY;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.EMULATED_PROTOCOL_STACK;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 
@@ -34,8 +35,15 @@ public final class HttpHeadersUtil
 
     public static final Predicate<? super HttpHeaderFW> HAS_CACHE_CONTROL = h ->
     {
+
         String name = h.name().asString();
         return "cache-control".equalsIgnoreCase(name);
+    };
+
+    public static final Predicate<? super HttpHeaderFW> HAS_IF_NONE_MATCH = h ->
+    {
+        String name = h.name().asString();
+        return IF_NONE_MATCH.equalsIgnoreCase(name);
     };
 
     public static final Predicate<? super HttpHeaderFW> HAS_AUTHORIZATION = h ->
