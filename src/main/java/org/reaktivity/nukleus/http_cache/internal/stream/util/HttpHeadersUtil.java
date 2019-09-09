@@ -15,6 +15,12 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORITY;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.EMULATED_PROTOCOL_STACK;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
@@ -23,19 +29,21 @@ import java.util.function.Predicate;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORITY;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.EMULATED_PROTOCOL_STACK;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-
 public final class HttpHeadersUtil
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     public static final Predicate<? super HttpHeaderFW> HAS_CACHE_CONTROL = h ->
     {
+
         String name = h.name().asString();
         return "cache-control".equalsIgnoreCase(name);
+    };
+
+    public static final Predicate<? super HttpHeaderFW> HAS_IF_NONE_MATCH = h ->
+    {
+        String name = h.name().asString();
+        return IF_NONE_MATCH.equalsIgnoreCase(name);
     };
 
     public static final Predicate<? super HttpHeaderFW> HAS_AUTHORIZATION = h ->
@@ -67,18 +75,18 @@ public final class HttpHeadersUtil
         {
             switch (h.name().asString())
             {
-                case AUTHORITY:
-                    authority.append(h.value().asString());
-                    break;
-                case HttpHeaders.PATH:
-                    path.append(h.value().asString());
-                    break;
-                case HttpHeaders.SCHEME:
-                    scheme.append(h.value().asString());
-                    break;
-                default:
-                    break;
-                }
+            case AUTHORITY:
+                authority.append(h.value().asString());
+                break;
+            case HttpHeaders.PATH:
+                path.append(h.value().asString());
+                break;
+            case HttpHeaders.SCHEME:
+                scheme.append(h.value().asString());
+                break;
+            default:
+                break;
+            }
         });
         return scheme.append("://").append(authority.toString()).append(path.toString()).toString();
     }
@@ -111,8 +119,8 @@ public final class HttpHeadersUtil
         ListFW<HttpHeaderFW> responseHeaders,
         int statusCode)
     {
-        return  (responseHeaders.anyMatch(h ->
-                STATUS.equals(h.name().asString()) && (Integer.toString(statusCode)).equals(h.value().asString())));
+        return responseHeaders.anyMatch(h ->
+                STATUS.equals(h.name().asString()) && (Integer.toString(statusCode)).equals(h.value().asString()));
     }
 
     public static boolean retry(
@@ -160,5 +168,10 @@ public final class HttpHeadersUtil
             // ignore
         }
         return 0L;
+    }
+
+    private HttpHeadersUtil()
+    {
+        // utility
     }
 }

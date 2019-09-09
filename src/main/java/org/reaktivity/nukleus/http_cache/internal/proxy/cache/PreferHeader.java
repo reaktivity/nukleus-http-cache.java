@@ -30,15 +30,15 @@ public final class PreferHeader
     public static boolean isPreferIfNoneMatch(
         ListFW<HttpHeaderFW> headers)
     {
-        return getHeader(headers, IF_NONE_MATCH) != null
-               && headers.anyMatch(PREFER_HEADER_NAME);
+        return getHeader(headers, IF_NONE_MATCH) != null &&
+               headers.anyMatch(PREFER_HEADER_NAME);
     }
 
     public static boolean isPreferWait(
         ListFW<HttpHeaderFW> headers)
     {
         String prefer = getHeader(headers, PREFER);
-        return (prefer != null && prefer.toLowerCase().startsWith("wait="));
+        return prefer != null && prefer.toLowerCase().startsWith("wait=");
     }
 
     public static boolean isPreferenceApplied(
@@ -64,4 +64,8 @@ public final class PreferHeader
         return 0;
     }
 
+    private PreferHeader()
+    {
+        // utility
+    }
 }

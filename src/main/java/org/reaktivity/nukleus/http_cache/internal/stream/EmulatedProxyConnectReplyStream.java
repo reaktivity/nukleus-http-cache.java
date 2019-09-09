@@ -15,12 +15,18 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -35,12 +41,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 
 final class EmulatedProxyConnectReplyStream
@@ -134,17 +134,17 @@ final class EmulatedProxyConnectReplyStream
 
             switch(streamCorrelation.getType())
             {
-                case PROXY:
-                    doProxyBegin(traceId, responseHeaders);
-                    break;
-                case INITIAL_REQUEST:
-                    handleInitialRequest(traceId, responseHeaders);
-                    break;
-                case CACHE_REFRESH:
-                    handleCacheRefresh(traceId, responseHeaders);
-                    break;
-                default:
-                    throw new RuntimeException("Not implemented");
+            case PROXY:
+                doProxyBegin(traceId, responseHeaders);
+                break;
+            case INITIAL_REQUEST:
+                handleInitialRequest(traceId, responseHeaders);
+                break;
+            case CACHE_REFRESH:
+                handleCacheRefresh(traceId, responseHeaders);
+                break;
+            default:
+                throw new RuntimeException("Not implemented");
             }
         }
         else
@@ -198,31 +198,31 @@ final class EmulatedProxyConnectReplyStream
 
         switch (msgTypeId)
         {
-            case DataFW.TYPE_ID:
-                final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
-                boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
-                if (!stored)
-                {
-                    request.purge();
-                    this.streamState = this::reset;
-                    streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                            streamFactory.supplyTrace.getAsLong());
-                }
-                else
-                {
-                    streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
-                        streamFactory.supplyTrace.getAsLong(), length, 0, 0L);
-                }
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
-                checkEtag(end, request);
-                cached = request.cache(end, streamFactory.emulatedCache);
-                break;
-            case AbortFW.TYPE_ID:
-            default:
+        case DataFW.TYPE_ID:
+            final DataFW data = streamFactory.dataRO.wrap(buffer, index, index + length);
+            boolean stored = request.storeResponseData(data, streamFactory.responseBufferPool);
+            if (!stored)
+            {
                 request.purge();
-                break;
+                this.streamState = this::reset;
+                streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                        streamFactory.supplyTrace.getAsLong());
+            }
+            else
+            {
+                streamFactory.writer.doWindow(connectReplyThrottle, connectRouteId, connectReplyStreamId,
+                    streamFactory.supplyTrace.getAsLong(), length, 0, 0L);
+            }
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = streamFactory.endRO.wrap(buffer, index, index + length);
+            checkEtag(end, request);
+            cached = request.cache(end, streamFactory.emulatedCache);
+            break;
+        case AbortFW.TYPE_ID:
+        default:
+            request.purge();
+            break;
         }
     }
 
@@ -283,8 +283,7 @@ final class EmulatedProxyConnectReplyStream
                     freshnessExtension,
                     request.etag(),
                     false,
-                    traceId
-                    );
+                    traceId);
 
             // count all responses
             streamFactory.counters.responses.getAsLong();
@@ -322,8 +321,7 @@ final class EmulatedProxyConnectReplyStream
 
         streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, builder ->
         {
-            requestHeaders.forEach(
-                    h ->  builder.item(item -> item.name(h.name()).value(h.value())));
+            requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value())));
             if (request instanceof CacheRefreshRequest)
             {
                 builder.item(item -> item.name(HttpHeaders.IF_NONE_MATCH).value(etag));
@@ -393,12 +391,11 @@ final class EmulatedProxyConnectReplyStream
 
         streamCorrelation.setThrottle(this::onThrottleMessageWhenProxying);
         streamFactory.writer.doHttpResponse(
-                acceptReply,
-                acceptRouteId,
-                acceptReplyId,
-                traceId,
-                builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))
-            ));
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            traceId,
+            builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
 
         // count all responses
         streamFactory.counters.responses.getAsLong();

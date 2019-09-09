@@ -15,15 +15,15 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import org.agrona.collections.Long2LongHashMap;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 
 import java.util.Map;
 import java.util.function.Consumer;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
+import org.agrona.collections.Long2LongHashMap;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
 final class HttpProxyCacheableRequestGroup
 {
@@ -65,31 +65,31 @@ final class HttpProxyCacheableRequestGroup
     boolean queue(
         long acceptRouteId,
         long acceptReplyId)
-     {
-         routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
-         return routeIdsByReplyId.size() > 1;
-     }
+    {
+        routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
+        return routeIdsByReplyId.size() > 1;
+    }
 
-     void unqueue(
-         long acceptReplyId)
-     {
-         routeIdsByReplyId.remove(acceptReplyId);
-         if (routeIdsByReplyId.isEmpty())
-         {
-             cleaner.accept(requestHash);
-         }
-     }
+    void unqueue(
+        long acceptReplyId)
+    {
+        routeIdsByReplyId.remove(acceptReplyId);
+        if (routeIdsByReplyId.isEmpty())
+        {
+            cleaner.accept(requestHash);
+        }
+    }
 
-     void onNonCacheableResponse(
-         long acceptReplyId)
-     {
-         routeIdsByReplyId.remove(acceptReplyId);
-         serveNextRequestIfPossible();
-     }
+    void onNonCacheableResponse(
+        long acceptReplyId)
+    {
+        routeIdsByReplyId.remove(acceptReplyId);
+        serveNextRequestIfPossible();
+    }
 
     void onCacheableResponseUpdated()
     {
-        this.sendSignalToQueuedInitialRequestSubscribers(CACHE_ENTRY_UPDATED_SIGNAL);
+        routeIdsByReplyId.forEach(this::doSignalCacheEntryUpdated);
     }
 
     void onCacheableResponseAborted()
@@ -97,7 +97,9 @@ final class HttpProxyCacheableRequestGroup
         this.routeIdsByReplyId.forEach(this::doSignalCacheEntryAborted);
     }
 
-    private void doSignalCacheEntryAborted(long acceptReplyId, long acceptRouteId)
+    private void doSignalCacheEntryAborted(
+        long acceptReplyId,
+        long acceptRouteId)
     {
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
@@ -105,16 +107,15 @@ final class HttpProxyCacheableRequestGroup
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
-    private void sendSignalToQueuedInitialRequestSubscribers(
-        long signal)
+    private void doSignalCacheEntryUpdated(
+        long acceptReplyId,
+        long acceptRouteId)
     {
-            routeIdsByReplyId.forEach((acceptReplyId, acceptRouteId) ->
-            {
-                writer.doSignal(acceptRouteId,
-                                acceptReplyId,
-                                factory.supplyTrace.getAsLong(),
-                                signal);
-            });
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTrace.getAsLong(),
+                        CACHE_ENTRY_UPDATED_SIGNAL);
+
     }
 
     private void sendSignalToSubscriber(
@@ -122,10 +123,10 @@ final class HttpProxyCacheableRequestGroup
         long acceptRouteId,
         long signalId)
     {
-         writer.doSignal(acceptRouteId,
-                         acceptReplyId,
-                         factory.supplyTrace.getAsLong(),
-                         signalId);
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTrace.getAsLong(),
+                        signalId);
     }
 
     private void serveNextRequestIfPossible()

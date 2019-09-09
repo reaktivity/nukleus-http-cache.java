@@ -73,6 +73,9 @@ public abstract class AnswerableByCacheRequest extends Request
 
     public void etag(String etag)
     {
-        this.etag = etag;
+        if (etag != null)
+        {
+            this.etag = etag;
+        }
     }
 }

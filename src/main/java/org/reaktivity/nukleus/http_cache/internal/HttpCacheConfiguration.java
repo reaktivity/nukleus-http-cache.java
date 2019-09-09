@@ -15,9 +15,9 @@
  */
 package org.reaktivity.nukleus.http_cache.internal;
 
-import org.reaktivity.nukleus.Configuration;
-
 import java.util.Random;
+
+import org.reaktivity.nukleus.Configuration;
 
 public class HttpCacheConfiguration extends Configuration
 {

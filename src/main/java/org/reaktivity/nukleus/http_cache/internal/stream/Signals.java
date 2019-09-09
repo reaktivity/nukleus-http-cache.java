@@ -22,4 +22,9 @@ final class Signals
     public static final long CACHE_ENTRY_ABORTED_SIGNAL = 3L;
     public static final long REQUEST_EXPIRED_SIGNAL = 4L;
     public static final long INITIATE_REQUEST_SIGNAL = 5L;
+
+    private Signals()
+    {
+        // utility
+    }
 }

@@ -23,6 +23,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 
@@ -178,6 +179,7 @@ public final class DefaultCacheEntry
     }
 
     public void updateResponseHeader(
+        String status,
         ListFW<HttpHeaderFW> newHeaders)
     {
         final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
@@ -191,6 +193,18 @@ public final class DefaultCacheEntry
         newHeaders.forEach(h ->
             newHeadersMap.put(h.name().asString(), h.value().asString()));
         newHeadersMap.put(":status", statusCode);
+
+        if (NOT_MODIFIED_304.equals(status))
+        {
+            try
+            {
+                newHeadersMap.put(":date", DATE_FORMAT.format(Date.from(Instant.now())));
+            }
+            catch (Exception e)
+            {
+                //NOOP
+            }
+        }
 
         Integer firstResponseSlot = responseSlots.get(0);
         MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
@@ -320,7 +334,7 @@ public final class DefaultCacheEntry
                 {
                     return false;
                 }
-              }
+            }
             responseSlots.add(newSlot);
         }
 
@@ -354,6 +368,7 @@ public final class DefaultCacheEntry
     {
         return Instant.now().isAfter(staleAt());
     }
+
 
     private CacheControl responseCacheControl()
     {

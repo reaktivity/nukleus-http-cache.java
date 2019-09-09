@@ -15,6 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
+import static java.lang.Thread.sleep;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -24,11 +29,6 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
-
-import static java.lang.Thread.sleep;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.rules.RuleChain.outerRule;
-import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 public class Rfc7240ProxyIT
 {
@@ -138,4 +138,33 @@ public class Rfc7240ProxyIT
         counters.assertExpectedCacheEntries(1);
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/server.next.request.if.current.request.expired/accept/client",
+        "${streams}/server.next.request.if.current.request.expired/connect/server",
+    })
+    public void shouldServeNextRequestIfCurrentRequestExpired() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("SECOND_REQUEST_SENT");
+        sleep(2000);
+        k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/update.cache.while.polling/accept/client",
+        "${streams}/update.cache.while.polling/connect/server",
+    })
+    public void shouldUpdateCacheWhilePolling() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("SECOND_REQUEST_SENT");
+        sleep(2000);
+        k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
+        k3po.finish();
+    }
 }

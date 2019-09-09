@@ -15,9 +15,14 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -25,10 +30,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
-
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 final class HttpCacheProxyCachedNotModifiedRequest
 {
@@ -62,11 +63,12 @@ final class HttpCacheProxyCachedNotModifiedRequest
     {
         switch (msgTypeId)
         {
-            case ResetFW.TYPE_ID:
-                factory.writer.doReset(acceptReply,
-                                       acceptRouteId,
-                                       acceptInitialId,
-                                       factory.supplyTrace.getAsLong());
+        case ResetFW.TYPE_ID:
+            factory.writer.doReset(acceptReply,
+                                   acceptRouteId,
+                                   acceptInitialId,
+                                   factory.supplyTrace.getAsLong());
+            break;
         }
     }
 
@@ -78,22 +80,22 @@ final class HttpCacheProxyCachedNotModifiedRequest
     {
         switch (msgTypeId)
         {
-            case BeginFW.TYPE_ID:
-                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-                onBegin(begin);
-                break;
-            case DataFW.TYPE_ID:
-                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-                onData(data);
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-                onEnd(end);
-                break;
-            case AbortFW.TYPE_ID:
-                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-                onAbort(abort);
-                break;
+        case BeginFW.TYPE_ID:
+            final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
+            break;
+        case DataFW.TYPE_ID:
+            final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
+            onData(data);
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = factory.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
+            break;
         }
     }
 
@@ -102,6 +104,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
     {
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
+        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -118,13 +121,14 @@ final class HttpCacheProxyCachedNotModifiedRequest
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
+                    currentTimeMillis(), acceptReplyId, getRequestURL(requestHeaders));
         }
 
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
-                             factory.supplyTrace.getAsLong());
+                             factory.supplyTrace.getAsLong(),
+                             requestHeaders);
         if (DEBUG)
         {
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
