@@ -26,7 +26,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class SurrogateControl
 {
-    public static final String MAX_AGE = "max-age";
+    private static final String MAX_AGE = "max-age";
     private static final Pattern CACHE_PATTERN = Pattern
         .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\d+|\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\")?\\s*");
     private static final String X_PROTECTED = "x-protected";
