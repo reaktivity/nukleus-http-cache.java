@@ -133,8 +133,7 @@ final class HttpCacheProxyCacheableRequest
         MessageConsumer newStream;
 
         if (!isRequestPurged &&
-            ((retry  &&
-             attempts < 3) ||
+            ((retry && attempts < 3) ||
              !this.factory.defaultCache.isUpdatedByResponseHeadersToRetry(getRequestHeaders(),
                                                                          responseHeaders,
                                                                          ifNoneMatch,

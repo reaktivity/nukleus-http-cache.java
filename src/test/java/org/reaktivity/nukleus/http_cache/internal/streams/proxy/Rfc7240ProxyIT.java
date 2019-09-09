@@ -144,12 +144,12 @@ public class Rfc7240ProxyIT
         "${streams}/server.next.request.if.current.request.expired/accept/client",
         "${streams}/server.next.request.if.current.request.expired/connect/server",
     })
-    public void shouldServerNextRequestIfCurrentRequestExpired() throws Exception
+    public void shouldServeNextRequestIfCurrentRequestExpired() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("WAIT_CACHE_TO_EXPIRY");
+        k3po.awaitBarrier("SECOND_REQUEST_SENT");
         sleep(2000);
-        k3po.notifyBarrier("REQUEST_EXPIRED");
+        k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
         k3po.finish();
     }
 
@@ -162,9 +162,9 @@ public class Rfc7240ProxyIT
     public void shouldUpdateCacheWhilePolling() throws Exception
     {
         k3po.start();
-        k3po.awaitBarrier("WAIT_CACHE_TO_EXPIRY");
+        k3po.awaitBarrier("SECOND_REQUEST_SENT");
         sleep(2000);
-        k3po.notifyBarrier("REQUEST_EXPIRED");
+        k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
         k3po.finish();
     }
 }

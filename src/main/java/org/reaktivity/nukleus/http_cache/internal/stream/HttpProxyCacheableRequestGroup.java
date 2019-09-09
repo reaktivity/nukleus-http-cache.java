@@ -89,7 +89,7 @@ final class HttpProxyCacheableRequestGroup
 
     void onCacheableResponseUpdated()
     {
-        routeIdsByReplyId.forEach(this::doSignalQueuedInitialRequestSubscribers);
+        routeIdsByReplyId.forEach(this::doSignalCacheEntryUpdated);
     }
 
     void onCacheableResponseAborted()
@@ -107,7 +107,7 @@ final class HttpProxyCacheableRequestGroup
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
-    private void doSignalQueuedInitialRequestSubscribers(
+    private void doSignalCacheEntryUpdated(
         long acceptReplyId,
         long acceptRouteId)
     {
