@@ -612,22 +612,18 @@ public class Writer
         long traceId,
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        this.doHttpResponse(receiver,
-                            routeId,
-                            streamId,
-                            traceId,
-                            builder ->
-                            {
-                                if (isPreferWait(requestHeaders))
-                                {
-                                    builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
-                                                                 .value(PREFERENCE_APPLIED));
-                                    builder.item(header -> header.name(PREFERENCE_APPLIED)
-                                                                 .value("wait=" + getPreferWait(requestHeaders)));
-                                }
+        this.doHttpResponse(receiver, routeId, streamId, traceId, builder ->
+        {
+            if (isPreferWait(requestHeaders))
+            {
+                builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
+                                             .value(PREFERENCE_APPLIED));
+                builder.item(header -> header.name(PREFERENCE_APPLIED)
+                                             .value("wait=" + getPreferWait(requestHeaders)));
+            }
 
-                                builder.item(h -> h.name(STATUS).value(HttpStatus.NOT_MODIFIED_304));
-                            });
+            builder.item(h -> h.name(STATUS).value(HttpStatus.NOT_MODIFIED_304));
+        });
     }
 
 }

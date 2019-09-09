@@ -27,11 +27,13 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
@@ -60,10 +62,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_IF_NONE_MATCH;
-
 
 final class HttpCacheProxyCacheableRequest
 {

@@ -258,22 +258,22 @@ public class DefaultCache
         ListFW<HttpHeaderFW> headers)
     {
         return cacheBufferPool.acquiredSlots() <= allowedSlots &&
-               !headers.anyMatch(h ->
-               {
-                   final String name = h.name().asString();
-                   final String value = h.value().asString();
-                   switch (name)
-                   {
-                   case CACHE_CONTROL:
-                       return value.contains(CacheDirectives.NO_STORE);
-                   case METHOD:
-                       return !HttpMethods.GET.equalsIgnoreCase(value);
-                   case TRANSFER_ENCODING:
-                       return true;
-                   default:
-                       return false;
-                   }
-               });
+            !headers.anyMatch(h ->
+            {
+                final String name = h.name().asString();
+                final String value = h.value().asString();
+                switch (name)
+                {
+                case CACHE_CONTROL:
+                    return value.contains(CacheDirectives.NO_STORE);
+                case METHOD:
+                    return !HttpMethods.GET.equalsIgnoreCase(value);
+                case TRANSFER_ENCODING:
+                    return true;
+                default:
+                    return false;
+                }
+            });
     }
 
     public void purgeEntriesForNonPendingRequests()
@@ -292,7 +292,7 @@ public class DefaultCache
         ListFW<HttpHeaderFW> responseHeaders)
     {
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
-        boolean isSelectedForUpdate = (NOT_MODIFIED_304.equals(status) || OK_200.equals(status));
+        boolean isSelectedForUpdate = NOT_MODIFIED_304.equals(status) || OK_200.equals(status);
 
         if (isSelectedForUpdate)
         {

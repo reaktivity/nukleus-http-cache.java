@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORITY;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.EMULATED_PROTOCOL_STACK;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 
@@ -28,14 +29,13 @@ import java.util.function.Predicate;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-
 public final class HttpHeadersUtil
 {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
 
     public static final Predicate<? super HttpHeaderFW> HAS_CACHE_CONTROL = h ->
     {
+
         String name = h.name().asString();
         return "cache-control".equalsIgnoreCase(name);
     };
