@@ -459,7 +459,6 @@ public final class CacheEntry
 
             final int minBudget = min(budget, acceptReplyBudget);
             final int toWrite = min(minBudget - padding, this.cachedRequest.responseSize() - payloadWritten);
-            int written = 0;
             if (toWrite > 0)
             {
                 cache.writer.doHttpData(
@@ -472,12 +471,12 @@ public final class CacheEntry
                     p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
-                written = toWrite + padding;
-                acceptReplyBudget -= written;
+                budget -= toWrite + padding;
+                acceptReplyBudget -= toWrite + padding;
                 assert acceptReplyBudget >= 0;
             }
 
-            return budget - written;
+            return budget;
         }
     }
 
