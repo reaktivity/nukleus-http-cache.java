@@ -15,11 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.util.Objects.requireNonNull;
+
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CheckingBudgetAvailability;
-
-
-import static java.util.Objects.requireNonNull;
 
 public class BudgetManager
 {

@@ -15,13 +15,13 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
+import java.util.Objects;
+
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-
-import java.util.Objects;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
@@ -64,9 +64,9 @@ public class CacheRefreshRequest extends CacheableRequest
         BufferPool bufferPool)
     {
         if (responseHeaders.anyMatch(h ->
-                (":status".equals(h.name().asString()) &&
+                ":status".equals(h.name().asString()) &&
                         (Objects.requireNonNull(h.value().asString()).startsWith("2") ||
-                                Objects.requireNonNull(h.value().asString()).equals("304")))))
+                                Objects.requireNonNull(h.value().asString()).equals("304"))))
         {
 
             boolean noError = super.storeResponseHeaders(responseHeaders, cache, bufferPool);
@@ -81,7 +81,7 @@ public class CacheRefreshRequest extends CacheableRequest
             this.purge();
             return false;
         }
-}
+    }
 
     @Override
     public Request.Type getType()

@@ -15,15 +15,15 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import org.agrona.collections.Long2LongHashMap;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 
 import java.util.Map;
 import java.util.function.Consumer;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
+import org.agrona.collections.Long2LongHashMap;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
 final class HttpProxyCacheableRequestGroup
 {
@@ -65,27 +65,27 @@ final class HttpProxyCacheableRequestGroup
     boolean queue(
         long acceptRouteId,
         long acceptReplyId)
-     {
-         routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
-         return routeIdsByReplyId.size() > 1;
-     }
+    {
+        routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
+        return routeIdsByReplyId.size() > 1;
+    }
 
-     void unqueue(
-         long acceptReplyId)
-     {
-         routeIdsByReplyId.remove(acceptReplyId);
-         if (routeIdsByReplyId.isEmpty())
-         {
-             cleaner.accept(requestHash);
-         }
-     }
+    void unqueue(
+        long acceptReplyId)
+    {
+        routeIdsByReplyId.remove(acceptReplyId);
+        if (routeIdsByReplyId.isEmpty())
+        {
+            cleaner.accept(requestHash);
+        }
+    }
 
-     void onNonCacheableResponse(
-         long acceptReplyId)
-     {
-         routeIdsByReplyId.remove(acceptReplyId);
-         serveNextRequestIfPossible();
-     }
+    void onNonCacheableResponse(
+        long acceptReplyId)
+    {
+        routeIdsByReplyId.remove(acceptReplyId);
+        serveNextRequestIfPossible();
+    }
 
     void onCacheableResponseUpdated()
     {
@@ -108,13 +108,13 @@ final class HttpProxyCacheableRequestGroup
     private void sendSignalToQueuedInitialRequestSubscribers(
         long signal)
     {
-            routeIdsByReplyId.forEach((acceptReplyId, acceptRouteId) ->
-            {
-                writer.doSignal(acceptRouteId,
-                                acceptReplyId,
-                                factory.supplyTrace.getAsLong(),
-                                signal);
-            });
+        routeIdsByReplyId.forEach((acceptReplyId, acceptRouteId) ->
+        {
+            writer.doSignal(acceptRouteId,
+                            acceptReplyId,
+                            factory.supplyTrace.getAsLong(),
+                            signal);
+        });
     }
 
     private void sendSignalToSubscriber(
@@ -122,10 +122,10 @@ final class HttpProxyCacheableRequestGroup
         long acceptRouteId,
         long signalId)
     {
-         writer.doSignal(acceptRouteId,
-                         acceptReplyId,
-                         factory.supplyTrace.getAsLong(),
-                         signalId);
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTrace.getAsLong(),
+                        signalId);
     }
 
     private void serveNextRequestIfPossible()

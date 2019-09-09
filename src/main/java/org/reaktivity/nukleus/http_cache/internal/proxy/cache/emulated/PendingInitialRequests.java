@@ -15,11 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
 
 public class PendingInitialRequests
 {

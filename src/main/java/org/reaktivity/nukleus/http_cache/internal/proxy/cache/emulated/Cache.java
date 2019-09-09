@@ -15,9 +15,17 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
+import static java.lang.System.currentTimeMillis;
+import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
-
 import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
@@ -28,11 +36,11 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
@@ -44,15 +52,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
-
-import static java.lang.System.currentTimeMillis;
-import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 public class Cache
 {
@@ -289,7 +288,7 @@ public class Cache
         }
 
         writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
-                builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
+            builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
         writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
     }
 
@@ -323,8 +322,8 @@ public class Cache
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
-        if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag())
-                && doesNotVary(requestHeaders, uncommittedRequest.request))
+        if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag()) &&
+                doesNotVary(requestHeaders, uncommittedRequest.request))
         {
             uncommittedRequest.subscribe(preferWaitRequest);
         }

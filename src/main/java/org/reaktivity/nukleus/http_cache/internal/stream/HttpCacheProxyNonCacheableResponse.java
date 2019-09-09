@@ -15,6 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -27,10 +31,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 final class HttpCacheProxyNonCacheableResponse
 {
@@ -81,30 +81,30 @@ final class HttpCacheProxyNonCacheableResponse
     {
         switch (msgTypeId)
         {
-            case BeginFW.TYPE_ID:
-                final BeginFW begin = httpCacheProxyFactory.beginRO.wrap(buffer, index, index + length);
-                onBegin(begin);
-                break;
-            case DataFW.TYPE_ID:
-                final DataFW data = httpCacheProxyFactory.dataRO.wrap(buffer, index, index + length);
-                onData(data);
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = httpCacheProxyFactory.endRO.wrap(buffer, index, index + length);
-                onEnd(end);
-                break;
-            case AbortFW.TYPE_ID:
-                final AbortFW abort = httpCacheProxyFactory.abortRO.wrap(buffer, index, index + length);
-                onAbort(abort);
-                break;
-            case WindowFW.TYPE_ID:
-                final WindowFW window = httpCacheProxyFactory.windowRO.wrap(buffer, index, index + length);
-                onWindow(window);
-                break;
-            case ResetFW.TYPE_ID:
-                final ResetFW reset = httpCacheProxyFactory.resetRO.wrap(buffer, index, index + length);
-                onReset(reset);
-                break;
+        case BeginFW.TYPE_ID:
+            final BeginFW begin = httpCacheProxyFactory.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
+            break;
+        case DataFW.TYPE_ID:
+            final DataFW data = httpCacheProxyFactory.dataRO.wrap(buffer, index, index + length);
+            onData(data);
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = httpCacheProxyFactory.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = httpCacheProxyFactory.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
+            break;
+        case WindowFW.TYPE_ID:
+            final WindowFW window = httpCacheProxyFactory.windowRO.wrap(buffer, index, index + length);
+            onWindow(window);
+            break;
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = httpCacheProxyFactory.resetRO.wrap(buffer, index, index + length);
+            onReset(reset);
+            break;
         }
     }
 

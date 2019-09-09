@@ -15,6 +15,31 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.Math.min;
+import static java.lang.System.currentTimeMillis;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
+
+import java.time.Instant;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
+
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -35,31 +60,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-
-import java.time.Instant;
-import java.util.concurrent.Future;
-import java.util.function.Consumer;
-
-import static java.lang.Math.min;
-import static java.lang.System.currentTimeMillis;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 final class HttpCacheProxyCacheableRequest
 {
@@ -206,18 +206,18 @@ final class HttpCacheProxyCacheableRequest
     {
         switch(msgTypeId)
         {
-            case WindowFW.TYPE_ID:
-                final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-                onResponseWindow(window);
-                break;
-            case SignalFW.TYPE_ID:
-                final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
-                onResponseSignal(signal);
-                break;
-            case ResetFW.TYPE_ID:
-                final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-                onResponseReset(reset);
-                break;
+        case WindowFW.TYPE_ID:
+            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+            onResponseWindow(window);
+            break;
+        case SignalFW.TYPE_ID:
+            final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
+            onResponseSignal(signal);
+            break;
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onResponseReset(reset);
+            break;
         }
     }
 
@@ -229,32 +229,32 @@ final class HttpCacheProxyCacheableRequest
     {
         switch (msgTypeId)
         {
-            case BeginFW.TYPE_ID:
-                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-                onBegin(begin);
-                break;
-            case DataFW.TYPE_ID:
-                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-                onData(data);
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-                onEnd(end);
-                break;
-            case AbortFW.TYPE_ID:
-                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-                onAbort(abort);
-                break;
-            case WindowFW.TYPE_ID:
-                final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-                onRequestWindow(window);
-                break;
-            case ResetFW.TYPE_ID:
-                final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-                onRequestReset(reset);
-                break;
-            default:
-                break;
+        case BeginFW.TYPE_ID:
+            final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
+            break;
+        case DataFW.TYPE_ID:
+            final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
+            onData(data);
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = factory.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
+            break;
+        case WindowFW.TYPE_ID:
+            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+            onRequestWindow(window);
+            break;
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onRequestReset(reset);
+            break;
+        default:
+            break;
         }
     }
 
@@ -491,16 +491,16 @@ final class HttpCacheProxyCacheableRequest
     {
         return (ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder) ->
         {
-           requestHeaders.forEach(h ->
-           {
-               final String name = h.name().asString();
-               final String value = h.value().asString();
-               if(!CONTENT_LENGTH.equals(name) &&
-                  !AUTHORIZATION.equals(name))
-               {
-                   builder.item(item -> item.name(name).value(value));
-               }
-           });
+            requestHeaders.forEach(h ->
+            {
+                final String name = h.name().asString();
+                final String value = h.value().asString();
+                if(!CONTENT_LENGTH.equals(name) &&
+                    !AUTHORIZATION.equals(name))
+                {
+                    builder.item(item -> item.name(name).value(value));
+                }
+            });
 
             final String authorizationToken = requestGroup.getRecentAuthorizationToken();
             if (authorizationToken != null)
@@ -538,7 +538,7 @@ final class HttpCacheProxyCacheableRequest
                                        acceptRouteId,
                                        acceptReplyId,
                                        signal.trace());
-                 requestGroup.unqueue(acceptReplyId);
+                requestGroup.unqueue(acceptReplyId);
             }
             else
             {
@@ -593,16 +593,19 @@ final class HttpCacheProxyCacheableRequest
                               acceptReplyId, "503");
         }
 
-        factory.writer.doHttpResponse(acceptReply,
-                                      acceptRouteId,
-                                      acceptReplyId,
-                                      factory.supplyTrace.getAsLong(),
-                                      e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
-                                            .item(h -> h.name("retry-after").value("0")));
-        factory.writer.doHttpEnd(acceptReply,
-                                 acceptRouteId,
-                                 acceptReplyId,
-                                 factory.supplyTrace.getAsLong());
+        factory.writer.doHttpResponse(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            factory.supplyTrace.getAsLong(),
+            e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
+                  .item(h -> h.name("retry-after").value("0")));
+
+        factory.writer.doHttpEnd(
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            factory.supplyTrace.getAsLong());
 
         // count all responses
         factory.counters.responses.getAsLong();
@@ -677,8 +680,7 @@ final class HttpCacheProxyCacheableRequest
                                                         cacheEntry.getRequestHeaders(),
                                                         cacheEntry.etag(),
                                                         isStale,
-
-        factory.supplyTrace.getAsLong());
+                                                        factory.supplyTrace.getAsLong());
 
         payloadWritten = 0;
 
@@ -691,9 +693,9 @@ final class HttpCacheProxyCacheableRequest
 
         boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(groupId, acceptReplyId);
 
-        if (payloadWritten == cacheEntry.responseSize()
-            && ackedBudget
-            && cacheEntry.isResponseCompleted())
+        if (payloadWritten == cacheEntry.responseSize() &&
+            ackedBudget &&
+            cacheEntry.isResponseCompleted())
         {
             if (!etagSent && cacheEntry.etag() != null)
             {
@@ -728,19 +730,20 @@ final class HttpCacheProxyCacheableRequest
         final int toWrite = min(minBudget - padding, cacheEntry.responseSize() - payloadWritten);
         if (toWrite > 0)
         {
-            factory.writer.doHttpData(acceptReply,
-                                      acceptRouteId,
-                                      acceptReplyId,
-                                      trace,
-                                      groupId,
-                                      padding,
-                                      p -> buildResponsePayload(payloadWritten,
+            factory.writer.doHttpData(
+                acceptReply,
+                acceptRouteId,
+                acceptReplyId,
+                trace,
+                groupId,
+                padding,
+                p -> buildResponsePayload(payloadWritten,
                                           toWrite,
                                           p,
                                           factory.defaultCache.getResponsePool()));
             payloadWritten += toWrite;
-            budget -= (toWrite + padding);
-            acceptReplyBudget -= (toWrite + padding);
+            budget -= toWrite + padding;
+            acceptReplyBudget -= toWrite + padding;
             assert acceptReplyBudget >= 0;
         }
 

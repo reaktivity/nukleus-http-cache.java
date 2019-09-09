@@ -26,11 +26,11 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MIN_FRESH;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntryState.CAN_REFRESH;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntryState.REFRESHING;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateFreshnessExtension;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntryState.CAN_REFRESH;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntryState.REFRESHING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
@@ -195,14 +195,14 @@ public final class CacheEntry
                 {
                     switch (h.name().asString())
                     {
-                        case AUTHORIZATION:
-                            String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
-                            String value = recentAuthorizationHeader != null
-                                ? recentAuthorizationHeader : h.value().asString();
-                            builder.item(item -> item.name(h.name()).value(value));
-                            break;
-                        default:
-                            builder.item(item -> item.name(h.name()).value(h.value()));
+                    case AUTHORIZATION:
+                        String recentAuthorizationHeader = cachedRequest.recentAuthorizationHeader();
+                        String value = recentAuthorizationHeader != null
+                            ? recentAuthorizationHeader : h.value().asString();
+                        builder.item(item -> item.name(h.name()).value(value));
+                        break;
+                    default:
+                        builder.item(item -> item.name(h.name()).value(h.value()));
                     }
                 });
                 if (etag != null)
@@ -242,11 +242,11 @@ public final class CacheEntry
     {
         switch (this.state)
         {
-            case PURGED:
-                throw new IllegalStateException("Can not serve client when entry is purged");
-            default:
-                sendResponseToClient(streamCorrelation, true);
-                break;
+        case PURGED:
+            throw new IllegalStateException("Can not serve client when entry is purged");
+        default:
+            sendResponseToClient(streamCorrelation, true);
+            break;
         }
         streamCorrelation.purge();
     }
@@ -354,33 +354,33 @@ public final class CacheEntry
     {
         switch (this.state)
         {
-            case PURGED:
-                break;
-            default:
-                this.state = CacheEntryState.PURGED;
-                if (clientCount == 0)
-                {
-                    cachedRequest.purge();
-                }
-                subscribers.stream().forEach(s ->
-                {
-                    MessageConsumer acceptReply = s.acceptReply();
-                    final long acceptRouteId = s.acceptRouteId();
-                    long acceptReplyId = s.acceptReplyId();
-                    cache.writer.do503AndAbort(acceptReply,
-                                               acceptRouteId,
-                                               acceptReplyId,
-                                               supplyTrace.getAsLong());
-                    s.purge();
+        case PURGED:
+            break;
+        default:
+            this.state = CacheEntryState.PURGED;
+            if (clientCount == 0)
+            {
+                cachedRequest.purge();
+            }
+            subscribers.stream().forEach(s ->
+            {
+                MessageConsumer acceptReply = s.acceptReply();
+                final long acceptRouteId = s.acceptRouteId();
+                long acceptReplyId = s.acceptReplyId();
+                cache.writer.do503AndAbort(acceptReply,
+                                           acceptRouteId,
+                                           acceptReplyId,
+                                           supplyTrace.getAsLong());
+                s.purge();
 
-                    // count all responses
-                    cache.counters.responses.getAsLong();
+                // count all responses
+                cache.counters.responses.getAsLong();
 
-                    // count ABORTed responses
-                    cache.counters.responsesAbortedPurge.getAsLong();
-                });
-                subscribers.clear();
-                break;
+                // count ABORTed responses
+                cache.counters.responsesAbortedPurge.getAsLong();
+            });
+            subscribers.clear();
+            break;
         }
     }
 
@@ -421,33 +421,33 @@ public final class CacheEntry
         {
             switch(msgTypeId)
             {
-                case WindowFW.TYPE_ID:
-                    final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
-                    groupId = window.groupId();
-                    padding = window.padding();
-                    long streamId = window.streamId();
-                    int credit = window.credit();
-                    acceptReplyBudget += credit;
-                    cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
-                        this::writePayload, window.trace());
+            case WindowFW.TYPE_ID:
+                final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
+                groupId = window.groupId();
+                padding = window.padding();
+                long streamId = window.streamId();
+                int credit = window.credit();
+                acceptReplyBudget += credit;
+                cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
+                    this::writePayload, window.trace());
 
-                    boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
-                    if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
-                    {
-                        final MessageConsumer acceptReply = request.acceptReply();
-                        final long acceptRouteId = request.acceptRouteId();
-                        final long acceptReplyStreamId = request.acceptReplyId();
-                        CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
-                        this.onEnd.run();
-                        cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
-                    }
-                    break;
-                case ResetFW.TYPE_ID:
-                default:
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
-                        supplyTrace.getAsLong());
+                boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
+                if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
+                {
+                    final MessageConsumer acceptReply = request.acceptReply();
+                    final long acceptRouteId = request.acceptRouteId();
+                    final long acceptReplyStreamId = request.acceptReplyId();
+                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
                     this.onEnd.run();
-                    break;
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
+                }
+                break;
+            case ResetFW.TYPE_ID:
+            default:
+                cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
+                    supplyTrace.getAsLong());
+                this.onEnd.run();
+                break;
             }
         }
 
@@ -459,6 +459,7 @@ public final class CacheEntry
 
             final int minBudget = min(budget, acceptReplyBudget);
             final int toWrite = min(minBudget - padding, this.cachedRequest.responseSize() - payloadWritten);
+            int written = 0;
             if (toWrite > 0)
             {
                 cache.writer.doHttpData(
@@ -471,12 +472,12 @@ public final class CacheEntry
                     p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
-                budget -= (toWrite + padding);
-                acceptReplyBudget -= (toWrite + padding);
+                written = toWrite + padding;
+                acceptReplyBudget -= written;
                 assert acceptReplyBudget >= 0;
             }
 
-            return budget;
+            return budget - written;
         }
     }
 
@@ -674,8 +675,8 @@ public final class CacheEntry
         final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
         final boolean doesNotVaryBy = doesNotVaryBy(request);
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now)
-            || (expectSubscribers() && this.state == REFRESHING);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now) ||
+            (expectSubscribers() && this.state == REFRESHING);
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
             doesNotVaryBy &&

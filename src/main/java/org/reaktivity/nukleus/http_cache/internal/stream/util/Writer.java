@@ -134,7 +134,7 @@ public class Writer
         long traceId)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
+            builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
                         etag, cacheControlPrivate);
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
@@ -227,26 +227,27 @@ public class Writer
 
             switch(name)
             {
-                case HttpHeaders.CACHE_CONTROL:
-                    cacheControlFW.parse(value);
-                    cacheControlFW.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
-                    if (cacheControlPrivate && !(cacheControlFW.contains("private") || cacheControlFW.contains("public")))
+            case HttpHeaders.CACHE_CONTROL:
+                cacheControlFW.parse(value);
+                cacheControlFW.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
+                if (cacheControlPrivate && !(cacheControlFW.contains("private") || cacheControlFW.contains("public")))
+                {
+                    cacheControlFW.getValues().put("private", null);
+                }
+                StringBuilder cacheControlDirectives = new StringBuilder();
+                cacheControlFW.getValues().forEach((k, v) ->
+                {
+                    cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
+                    cacheControlDirectives.append(k);
+                    if (v != null)
                     {
-                        cacheControlFW.getValues().put("private", null);
+                        cacheControlDirectives.append('=').append(v);
                     }
-                    StringBuilder cacheControlDirectives = new StringBuilder();
-                    cacheControlFW.getValues().forEach((k, v) ->
-                    {
-                        cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
-                        cacheControlDirectives.append(k);
-                        if (v != null)
-                        {
-                            cacheControlDirectives.append('=').append(v);
-                        }
-                    });
-                    builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
-                    break;
-                default: builder.item(header -> header.name(nameFW).value(valueFW));
+                });
+                builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
+                break;
+            default:
+                builder.item(header -> header.name(nameFW).value(valueFW));
             }
         });
         if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL))
@@ -483,7 +484,7 @@ public class Writer
         String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
-                builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
+            builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
 
         return result;
     }
@@ -495,82 +496,81 @@ public class Writer
         int freshnessExtension,
         String etag)
     {
-        requestHeadersFW
-           .forEach(h ->
-           {
-               final StringFW nameFW = h.name();
-               final String name = nameFW.asString();
-               final String16FW valueFW = h.value();
-               final String value = valueFW.asString();
+        requestHeadersFW.forEach(h ->
+        {
+            final StringFW nameFW = h.name();
+            final String name = nameFW.asString();
+            final String16FW valueFW = h.value();
+            final String value = valueFW.asString();
 
-               switch(name)
-               {
-                   case HttpHeaders.METHOD:
-                   case HttpHeaders.AUTHORITY:
-                   case HttpHeaders.SCHEME:
-                   case HttpHeaders.PATH:
-                       builder.item(header -> header.name(nameFW).value(valueFW));
-                       break;
-                   case HttpHeaders.CACHE_CONTROL:
-                       if (value.contains(CacheDirectives.NO_CACHE))
-                       {
-                           builder.item(header -> header.name(nameFW)
-                                                        .value(valueFW));
-                       }
-                       else
-                       {
-                           builder.item(header -> header.name(nameFW)
-                                                        .value(value + ", no-cache"));
-                       }
-                       break;
-                   case HttpHeaders.IF_MODIFIED_SINCE:
-                       if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
-                       {
-                           final String newValue = getHeader(responseHeadersFW, "last-modified");
-                           builder.item(header -> header.name(nameFW)
-                                                        .value(newValue));
-                       }
-                       break;
-                   case HttpHeaders.IF_NONE_MATCH:
-                       String result = etag;
-                       if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
-                       {
-                           final String existingIfNoneMatch = getHeader(responseHeadersFW, "etag");
-                           if (!existingIfNoneMatch.contains(etag))
-                           {
-                               result += ", " + existingIfNoneMatch;
-                           }
-                           else
-                           {
-                               result = existingIfNoneMatch;
-                           }
-                       }
-                       final String finalEtag = result;
-                       builder.item(header -> header.name(nameFW)
-                               .value(finalEtag));
-                       break;
-                   case HttpHeaders.IF_MATCH:
-                   case HttpHeaders.IF_UNMODIFIED_SINCE:
-                        break;
-                   default:
-                       if (CacheUtils.isVaryHeader(name, responseHeadersFW))
-                       {
-                           builder.item(header -> header.name(nameFW).value(valueFW));
-                       }
-               }
-           });
-           if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
-           {
-               builder.item(header -> header.name("cache-control").value("no-cache"));
-           }
-           if (!requestHeadersFW.anyMatch(PreferHeader.PREFER_HEADER_NAME))
-           {
-               builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
-           }
-           if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
-           {
-               builder.item(header -> header.name(IF_NONE_MATCH).value(etag));
-           }
+            switch(name)
+            {
+            case HttpHeaders.METHOD:
+            case HttpHeaders.AUTHORITY:
+            case HttpHeaders.SCHEME:
+            case HttpHeaders.PATH:
+                builder.item(header -> header.name(nameFW).value(valueFW));
+                break;
+            case HttpHeaders.CACHE_CONTROL:
+                if (value.contains(CacheDirectives.NO_CACHE))
+                {
+                    builder.item(header -> header.name(nameFW)
+                                                 .value(valueFW));
+                }
+                else
+                {
+                    builder.item(header -> header.name(nameFW)
+                                                 .value(value + ", no-cache"));
+                }
+                break;
+            case HttpHeaders.IF_MODIFIED_SINCE:
+                if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
+                {
+                    final String newValue = getHeader(responseHeadersFW, "last-modified");
+                    builder.item(header -> header.name(nameFW)
+                                                 .value(newValue));
+                }
+                break;
+            case HttpHeaders.IF_NONE_MATCH:
+                String result = etag;
+                if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
+                {
+                    final String existingIfNoneMatch = getHeader(responseHeadersFW, "etag");
+                    if (!existingIfNoneMatch.contains(etag))
+                    {
+                        result += ", " + existingIfNoneMatch;
+                    }
+                    else
+                    {
+                        result = existingIfNoneMatch;
+                    }
+                }
+                final String finalEtag = result;
+                builder.item(header -> header.name(nameFW)
+                                             .value(finalEtag));
+                break;
+            case HttpHeaders.IF_MATCH:
+            case HttpHeaders.IF_UNMODIFIED_SINCE:
+                break;
+            default:
+                if (CacheUtils.isVaryHeader(name, responseHeadersFW))
+                {
+                    builder.item(header -> header.name(nameFW).value(valueFW));
+                }
+            }
+        });
+        if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
+        {
+            builder.item(header -> header.name("cache-control").value("no-cache"));
+        }
+        if (!requestHeadersFW.anyMatch(PreferHeader.PREFER_HEADER_NAME))
+        {
+            builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
+        }
+        if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
+        {
+            builder.item(header -> header.name(IF_NONE_MATCH).value(etag));
+        }
     }
 
     private void doH2PushPromise(

@@ -17,16 +17,15 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import org.agrona.DirectBuffer;
 
-public class DirectBufferUtil
+public final class DirectBufferUtil
 {
-
-    public static final boolean equals(
-            DirectBuffer buffer1,
-            int offset1,
-            int length1,
-            DirectBuffer buffer2,
-            int offset2,
-            int length2)
+    public static boolean equals(
+        DirectBuffer buffer1,
+        int offset1,
+        int length1,
+        DirectBuffer buffer2,
+        int offset2,
+        int length2)
     {
         boolean result = length1 == length2;
         for (int i = 0; i < length1 && result; i++)
@@ -34,5 +33,10 @@ public class DirectBufferUtil
             result = buffer1.getByte(offset1 + i) == buffer2.getByte(offset2 + i);
         }
         return result;
+    }
+
+    private DirectBufferUtil()
+    {
+        // utility
     }
 }
