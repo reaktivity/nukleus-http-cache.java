@@ -36,12 +36,13 @@ import java.util.function.Function;
 
 final class HttpCacheProxyRetryResponse
 {
-    private final HttpCacheProxyFactory httpCacheProxyFactory;
+    private final HttpCacheProxyFactory factory;
 
     private final int initialWindow;
     private int connectReplyBudget;
     private long retryAfter;
 
+    private final int requestHash;
     private final MessageConsumer connectReply;
     private final long connectRouteId;
     private final long connectReplyId;
@@ -49,18 +50,20 @@ final class HttpCacheProxyRetryResponse
 
 
     HttpCacheProxyRetryResponse(
-        HttpCacheProxyFactory httpCacheProxyFactory,
+        HttpCacheProxyFactory factory,
+        int requestHash,
         MessageConsumer connectReply,
         long connectRouteId,
         long connectReplyId,
         Function<Long, Boolean> scheduleRequest)
     {
-        this.httpCacheProxyFactory = httpCacheProxyFactory;
+        this.factory = factory;
+        this.requestHash = requestHash;
         this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.scheduleRequest = scheduleRequest;
-        this.initialWindow = httpCacheProxyFactory.responseBufferPool.slotCapacity();
+        this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
     @Override
@@ -79,19 +82,19 @@ final class HttpCacheProxyRetryResponse
         switch (msgTypeId)
         {
             case BeginFW.TYPE_ID:
-                final BeginFW begin = httpCacheProxyFactory.beginRO.wrap(buffer, index, index + length);
+                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
                 onBegin(begin);
                 break;
             case DataFW.TYPE_ID:
-                final DataFW data = httpCacheProxyFactory.dataRO.wrap(buffer, index, index + length);
+                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
                 onData(data);
                 break;
             case EndFW.TYPE_ID:
-                final EndFW end = httpCacheProxyFactory.endRO.wrap(buffer, index, index + length);
+                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
                 onEnd(end);
                 break;
             case AbortFW.TYPE_ID:
-                final AbortFW abort = httpCacheProxyFactory.abortRO.wrap(buffer, index, index + length);
+                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
                 onAbort(abort);
                 break;
         }
@@ -102,7 +105,7 @@ final class HttpCacheProxyRetryResponse
     {
         final long connectReplyId = begin.streamId();
         final OctetsFW extension = begin.extension();
-        final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::wrap);
+        final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
 
         if (DEBUG)
         {
@@ -114,6 +117,8 @@ final class HttpCacheProxyRetryResponse
         String status = getHeader(responseHeaders, STATUS);
         retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
         assert status != null;
+
+        factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
 
         sendWindow(initialWindow, begin.trace());
     }
@@ -141,13 +146,13 @@ final class HttpCacheProxyRetryResponse
         connectReplyBudget += credit;
         if (connectReplyBudget > 0)
         {
-            httpCacheProxyFactory.writer.doWindow(connectReply,
-                                                  connectRouteId,
-                                                  connectReplyId,
-                                                  traceId,
-                                                  credit,
-                                                  0,
-                                                  0L);
+            factory.writer.doWindow(connectReply,
+                                    connectRouteId,
+                                    connectReplyId,
+                                    traceId,
+                                    credit,
+                                    0,
+                                    0L);
         }
     }
 

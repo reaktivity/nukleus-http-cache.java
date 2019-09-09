@@ -39,7 +39,7 @@ import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isMatchByEtag;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.OK_200;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
@@ -121,10 +121,12 @@ public class DefaultCache
 
     public boolean matchCacheableResponse(
         int requestHash,
-        String newEtag)
+        String newEtag,
+        boolean hasIfNoneMatch)
     {
         DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
-        return cacheEntry != null &&
+        return hasIfNoneMatch &&
+               cacheEntry != null &&
                cacheEntry.etag() != null &&
                cacheEntry.etag().equals(newEtag);
     }
@@ -183,7 +185,6 @@ public class DefaultCache
         String ifNoneMatch,
         int requestHash)
     {
-
         if (isPreferWait(requestHeaders) &&
             !isPreferenceApplied(responseHeaders) &&
             requestHeaders.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
@@ -201,7 +202,7 @@ public class DefaultCache
                 if (etagMatches)
                 {
                     DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
-                    cacheEntry.updateResponseHeader(responseHeaders);
+                    cacheEntry.updateResponseHeader(status, responseHeaders);
                 }
             }
 
@@ -226,7 +227,7 @@ public class DefaultCache
                               currentTimeMillis(), acceptReplyId, "304");
         }
 
-        if (isPreferIfNoneMatch(requestHeaders))
+        if (isPreferWait(requestHeaders))
         {
             String preferWait = getHeader(requestHeaders, PREFER);
             writer.doHttpResponse(acceptReply,
@@ -283,6 +284,25 @@ public class DefaultCache
              }
         });
     }
+
+    public boolean updateResponseHeaderIfNecessary(
+        int requestHash,
+        ListFW<HttpHeaderFW> responseHeaders)
+    {
+        String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
+        boolean isSelectedForUpdate = (NOT_MODIFIED_304.equals(status) || OK_200.equals(status));
+
+        if (isSelectedForUpdate)
+        {
+            DefaultCacheEntry cacheEntry =  get(requestHash);
+            if (cacheEntry != null)
+            {
+                cacheEntry.updateResponseHeader(status, responseHeaders);
+            }
+        }
+        return isSelectedForUpdate;
+    }
+
 
     private boolean satisfiedByCache(
         ListFW<HttpHeaderFW> headers)

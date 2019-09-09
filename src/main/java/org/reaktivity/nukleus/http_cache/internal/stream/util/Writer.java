@@ -162,11 +162,11 @@ public class Writer
                                              etag,
                                              isStale);
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .routeId(routeId)
-            .streamId(streamId)
-            .trace(traceId)
-            .extension(e -> e.set(visitHttpBeginEx(mutator)))
-            .build();
+                                     .routeId(routeId)
+                                     .streamId(streamId)
+                                     .trace(traceId)
+                                     .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                                     .build();
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
@@ -609,10 +609,25 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long traceId)
+        long traceId,
+        ListFW<HttpHeaderFW> requestHeaders)
     {
-        this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value(
-            HttpStatus.NOT_MODIFIED_304)));
+        this.doHttpResponse(receiver,
+                            routeId,
+                            streamId,
+                            traceId,
+                            builder ->
+                            {
+                                if (isPreferWait(requestHeaders))
+                                {
+                                    builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
+                                                                 .value(PREFERENCE_APPLIED));
+                                    builder.item(header -> header.name(PREFERENCE_APPLIED)
+                                                                 .value("wait=" + getPreferWait(requestHeaders)));
+                                }
+
+                                builder.item(h -> h.name(STATUS).value(HttpStatus.NOT_MODIFIED_304));
+                            });
     }
 
 }

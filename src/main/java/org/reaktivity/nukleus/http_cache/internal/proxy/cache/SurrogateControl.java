@@ -28,7 +28,9 @@ public final class SurrogateControl
 {
     public static final String MAX_AGE = "max-age";
     private static final Pattern CACHE_PATTERN = Pattern
-            .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")?\\s*");
+            .compile("\\s*([\\w\\-]+)\\s*(=\\s*)?(\\d+\\+?\\d+|\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")\\s*");
+    private static final Pattern CACHE_PATTERN_X_PROTECTED = Pattern
+        .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")?\\s*");
     private static final String X_PROTECTED = "x-protected";
 
     public static int getSurrogateFreshnessExtension(
@@ -48,7 +50,8 @@ public final class SurrogateControl
                 if (MAX_AGE.equals(matcher.group(1)))
                 {
                     String maxAge = matcher.group(3);
-                    if (maxAge.contains("+"))
+                    if (maxAge != null &&
+                        maxAge.contains("+"))
                     {
                         // TODO change to matcher
                         final String value = maxAge.split("\\+")[1];
@@ -81,7 +84,8 @@ public final class SurrogateControl
                 if (MAX_AGE.equals(matcher.group(1)))
                 {
                     String maxAge = matcher.group(3);
-                    if (maxAge.contains("+"))
+                    if (maxAge != null &&
+                        maxAge.contains("+"))
                     {
                         // TODO change to matcher
                         maxAge = maxAge.split("\\+")[0];
@@ -98,7 +102,7 @@ public final class SurrogateControl
         String surrogateControl = getHeader(response, SURROGATE_CONTROL);
         if (surrogateControl != null)
         {
-            Matcher matcher = CACHE_PATTERN.matcher(surrogateControl);
+            Matcher matcher = CACHE_PATTERN_X_PROTECTED.matcher(surrogateControl);
             while (matcher.find())
             {
                 if (X_PROTECTED.equals(matcher.group(1)))

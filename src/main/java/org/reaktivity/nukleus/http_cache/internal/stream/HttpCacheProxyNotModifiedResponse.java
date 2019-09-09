@@ -27,6 +27,8 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
@@ -104,6 +106,14 @@ final class HttpCacheProxyNotModifiedResponse
                 final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
                 onAbort(abort);
                 break;
+            case WindowFW.TYPE_ID:
+                final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+                onWindow(window);
+                break;
+            case ResetFW.TYPE_ID:
+                final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+                onReset(reset);
+                break;
         }
     }
 
@@ -128,6 +138,7 @@ final class HttpCacheProxyNotModifiedResponse
                                      acceptReplyId);
         sendWindow(initialWindow, begin.trace());
         purgeRequest();
+        factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
     }
 
     private void onData(
@@ -151,6 +162,16 @@ final class HttpCacheProxyNotModifiedResponse
                                acceptRouteId,
                                acceptReplyId,
                                abort.trace());
+    }
+
+    private void onReset(ResetFW reset)
+    {
+        //NOOP
+    }
+
+    private void onWindow(WindowFW window)
+    {
+        //NOOP
     }
 
     private void sendWindow(

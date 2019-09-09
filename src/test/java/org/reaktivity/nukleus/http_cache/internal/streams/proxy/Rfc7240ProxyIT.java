@@ -138,4 +138,33 @@ public class Rfc7240ProxyIT
         counters.assertExpectedCacheEntries(1);
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/server.next.request.if.current.request.expired/accept/client",
+        "${streams}/server.next.request.if.current.request.expired/connect/server",
+    })
+    public void shouldServerNextRequestIfCurrentRequestExpired() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("WAIT_CACHE_TO_EXPIRY");
+        sleep(2000);
+        k3po.notifyBarrier("REQUEST_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/update.cache.while.polling/accept/client",
+        "${streams}/update.cache.while.polling/connect/server",
+    })
+    public void shouldUpdateCacheWhilePolling() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("WAIT_CACHE_TO_EXPIRY");
+        sleep(2000);
+        k3po.notifyBarrier("REQUEST_EXPIRED");
+        k3po.finish();
+    }
 }

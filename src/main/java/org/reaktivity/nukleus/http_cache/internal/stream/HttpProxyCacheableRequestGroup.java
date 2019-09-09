@@ -89,7 +89,7 @@ final class HttpProxyCacheableRequestGroup
 
     void onCacheableResponseUpdated()
     {
-        this.sendSignalToQueuedInitialRequestSubscribers(CACHE_ENTRY_UPDATED_SIGNAL);
+        routeIdsByReplyId.forEach(this::doSignalQueuedInitialRequestSubscribers);
     }
 
     void onCacheableResponseAborted()
@@ -97,7 +97,9 @@ final class HttpProxyCacheableRequestGroup
         this.routeIdsByReplyId.forEach(this::doSignalCacheEntryAborted);
     }
 
-    private void doSignalCacheEntryAborted(long acceptReplyId, long acceptRouteId)
+    private void doSignalCacheEntryAborted(
+        long acceptReplyId,
+        long acceptRouteId)
     {
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
@@ -105,16 +107,14 @@ final class HttpProxyCacheableRequestGroup
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
-    private void sendSignalToQueuedInitialRequestSubscribers(
-        long signal)
+    private void doSignalQueuedInitialRequestSubscribers(
+        long acceptReplyId,
+        long acceptRouteId)
     {
-            routeIdsByReplyId.forEach((acceptReplyId, acceptRouteId) ->
-            {
-                writer.doSignal(acceptRouteId,
-                                acceptReplyId,
-                                factory.supplyTrace.getAsLong(),
-                                signal);
-            });
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTrace.getAsLong(),
+                        CACHE_ENTRY_UPDATED_SIGNAL);
     }
 
     private void sendSignalToSubscriber(
