@@ -15,24 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.Int2ObjectHashMap;
-import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
-import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.route.RouteManager;
-
-import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
-import java.util.function.ToIntFunction;
-
 import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
@@ -51,6 +33,24 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+
+import java.util.function.LongConsumer;
+import java.util.function.LongSupplier;
+import java.util.function.ToIntFunction;
+
+import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.Int2ObjectHashMap;
+import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
+import org.reaktivity.nukleus.route.RouteManager;
 
 public class DefaultCache
 {
@@ -230,23 +230,25 @@ public class DefaultCache
         if (isPreferWait(requestHeaders))
         {
             String preferWait = getHeader(requestHeaders, PREFER);
-            writer.doHttpResponse(acceptReply,
-                                  acceptRouteId,
-                                  acceptReplyId,
-                                  supplyTrace.getAsLong(),
-                                  e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                                        .item(h -> h.name(ETAG).value(entry.etag()))
-                                        .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
-                                        .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED)));
+            writer.doHttpResponse(
+                acceptReply,
+                acceptRouteId,
+                acceptReplyId,
+                supplyTrace.getAsLong(),
+                e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
+                      .item(h -> h.name(ETAG).value(entry.etag()))
+                      .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
+                      .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED)));
         }
         else
         {
-            writer.doHttpResponse(acceptReply,
-                                  acceptRouteId,
-                                  acceptReplyId,
-                                  supplyTrace.getAsLong(),
-                                  e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                                        .item(h -> h.name(ETAG).value(entry.etag())));
+            writer.doHttpResponse(
+                acceptReply,
+                acceptRouteId,
+                acceptReplyId,
+                supplyTrace.getAsLong(),
+                e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
+                      .item(h -> h.name(ETAG).value(entry.etag())));
         }
         // count all responses
         counters.responses.getAsLong();
@@ -257,31 +259,31 @@ public class DefaultCache
     {
         return cacheBufferPool.acquiredSlots() <= allowedSlots &&
                !headers.anyMatch(h ->
-                                 {
-                                     final String name = h.name().asString();
-                                     final String value = h.value().asString();
-                                     switch (name)
-                                     {
-                                         case CACHE_CONTROL:
-                                             return value.contains(CacheDirectives.NO_STORE);
-                                         case METHOD:
-                                             return !HttpMethods.GET.equalsIgnoreCase(value);
-                                         case TRANSFER_ENCODING:
-                                             return true;
-                                         default:
-                                             return false;
-                                     }
-                                 });
+               {
+                   final String name = h.name().asString();
+                   final String value = h.value().asString();
+                   switch (name)
+                   {
+                   case CACHE_CONTROL:
+                       return value.contains(CacheDirectives.NO_STORE);
+                   case METHOD:
+                       return !HttpMethods.GET.equalsIgnoreCase(value);
+                   case TRANSFER_ENCODING:
+                       return true;
+                   default:
+                       return false;
+                   }
+               });
     }
 
     public void purgeEntriesForNonPendingRequests()
     {
         cachedEntries.forEach((requestHash, cacheEntry) ->
         {
-             if (cacheEntry.getSubscribers() == 0)
-             {
-                 this.purge(requestHash);
-             }
+            if (cacheEntry.getSubscribers() == 0)
+            {
+                this.purge(requestHash);
+            }
         });
     }
 
@@ -308,18 +310,18 @@ public class DefaultCache
         ListFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
-         {
-             final String name = h.name().asString();
-             final String value = h.value().asString();
-             switch (name)
-             {
-                 case CACHE_CONTROL:
-                     // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                     return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
-                 default:
-                     return false;
-             }
-         });
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            switch (name)
+            {
+            case CACHE_CONTROL:
+                // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
+                return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
+            default:
+                return false;
+            }
+        });
     }
 
     private DefaultCacheEntry newCacheEntry(

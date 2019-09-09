@@ -138,8 +138,7 @@ public class ProxyExceptionsIT
     public void shouldAcceptAbortOnScheduledPoll() throws Exception
     {
         k3po.finish();
-//        counters.assertExpectedCacheEntries(0); // TODO, fix. Sporadically failing today,
-                                                  // won't happen with current h2 nukleus implementation
+        //counters.assertExpectedCacheEntries(0); // TODO, fix. Sporadically failing today,
     }
 
 }

@@ -15,6 +15,15 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.Math.min;
+import static java.lang.System.currentTimeMillis;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
@@ -31,15 +40,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-
-import static java.lang.Math.min;
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 final class HttpCacheProxyCachedRequest
 {
@@ -75,32 +75,32 @@ final class HttpCacheProxyCachedRequest
         this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
-   void onRequestMessage(
+    void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
         int length)
-   {
+    {
         switch (msgTypeId)
         {
-            case BeginFW.TYPE_ID:
-                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-                onBegin(begin);
-                break;
-            case DataFW.TYPE_ID:
-                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-                onData(data);
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-                onEnd(end);
-                break;
-            case AbortFW.TYPE_ID:
-                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-                onAbort(abort);
-                break;
+        case BeginFW.TYPE_ID:
+            final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
+            break;
+        case DataFW.TYPE_ID:
+            final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
+            onData(data);
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = factory.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
+            break;
         }
-   }
+    }
 
     void onResponseMessage(
         int msgTypeId,
@@ -110,18 +110,18 @@ final class HttpCacheProxyCachedRequest
     {
         switch(msgTypeId)
         {
-            case WindowFW.TYPE_ID:
-                final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-                onWindow(window);
-                break;
-            case SignalFW.TYPE_ID:
-                final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
-                onSignal(signal);
-                break;
-            case ResetFW.TYPE_ID:
-                final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-                onReset(reset);
-                break;
+        case WindowFW.TYPE_ID:
+            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+            onWindow(window);
+            break;
+        case SignalFW.TYPE_ID:
+            final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
+            onSignal(signal);
+            break;
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onReset(reset);
+            break;
         }
     }
 
@@ -282,8 +282,8 @@ final class HttpCacheProxyCachedRequest
 
         boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(groupId, acceptReplyId);
 
-        if (payloadWritten == cacheEntry.responseSize()
-            && ackedBudget)
+        if (payloadWritten == cacheEntry.responseSize() &&
+            ackedBudget)
         {
             factory.writer.doHttpEnd(acceptReply,
                                      acceptRouteId,
@@ -306,19 +306,20 @@ final class HttpCacheProxyCachedRequest
         final int toWrite = min(minBudget - padding, cacheEntry.responseSize() - payloadWritten);
         if (toWrite > 0)
         {
-            factory.writer.doHttpData(acceptReply,
-                                      acceptRouteId,
-                                      acceptReplyId,
-                                      trace,
-                                      groupId,
-                                      padding,
-                                      p -> buildResponsePayload(payloadWritten,
-                                                              toWrite,
-                                                              p,
-                                                             factory.defaultCache.getResponsePool()));
+            factory.writer.doHttpData(
+                acceptReply,
+                acceptRouteId,
+                acceptReplyId,
+                trace,
+                groupId,
+                padding,
+                p -> buildResponsePayload(payloadWritten,
+                                          toWrite,
+                                          p,
+                                          factory.defaultCache.getResponsePool()));
             payloadWritten += toWrite;
-            budget -= (toWrite + padding);
-            acceptReplyBudget -= (toWrite + padding);
+            budget -= toWrite + padding;
+            acceptReplyBudget -= toWrite + padding;
             assert acceptReplyBudget >= 0;
         }
 

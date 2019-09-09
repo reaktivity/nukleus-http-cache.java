@@ -20,6 +20,8 @@ import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.util.function.Function;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -31,8 +33,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-
-import java.util.function.Function;
 
 final class HttpCacheProxyRetryResponse
 {
@@ -81,22 +81,22 @@ final class HttpCacheProxyRetryResponse
     {
         switch (msgTypeId)
         {
-            case BeginFW.TYPE_ID:
-                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-                onBegin(begin);
-                break;
-            case DataFW.TYPE_ID:
-                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-                onData(data);
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-                onEnd(end);
-                break;
-            case AbortFW.TYPE_ID:
-                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-                onAbort(abort);
-                break;
+        case BeginFW.TYPE_ID:
+            final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
+            break;
+        case DataFW.TYPE_ID:
+            final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
+            onData(data);
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = factory.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
+            break;
         }
     }
 
@@ -155,5 +155,4 @@ final class HttpCacheProxyRetryResponse
                                     0L);
         }
     }
-
 }

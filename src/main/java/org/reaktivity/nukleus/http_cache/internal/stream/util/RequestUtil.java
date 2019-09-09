@@ -29,4 +29,9 @@ public final class RequestUtil
     {
         return 31 * authorizationScope + requestUrlHash;
     }
+
+    private RequestUtil()
+    {
+        // utility
+    }
 }

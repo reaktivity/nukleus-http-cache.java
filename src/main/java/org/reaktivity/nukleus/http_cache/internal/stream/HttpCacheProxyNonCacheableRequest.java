@@ -93,17 +93,17 @@ final class HttpCacheProxyNonCacheableRequest
     {
         switch(msgTypeId)
         {
-            case ResetFW.TYPE_ID:
-                factory.writer.doReset(acceptReply,
-                                       acceptRouteId,
-                                       acceptStreamId,
-                                       factory.supplyTrace.getAsLong());
-                factory.correlations.remove(connectReplyId);
-                break;
+        case ResetFW.TYPE_ID:
+            factory.writer.doReset(acceptReply,
+                                   acceptRouteId,
+                                   acceptStreamId,
+                                   factory.supplyTrace.getAsLong());
+            factory.correlations.remove(connectReplyId);
+            break;
         }
     }
 
-   void onRequestMessage(
+    void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -111,32 +111,32 @@ final class HttpCacheProxyNonCacheableRequest
     {
         switch (msgTypeId)
         {
-            case BeginFW.TYPE_ID:
-                final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-                onBegin(begin);
-                break;
-            case DataFW.TYPE_ID:
-                final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-                onData(data);
-                break;
-            case EndFW.TYPE_ID:
-                final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-                onEnd(end);
-                break;
-            case AbortFW.TYPE_ID:
-                final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-                onAbort(abort);
-                break;
-            case WindowFW.TYPE_ID:
-                final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-                onWindow(window);
-                break;
-            case ResetFW.TYPE_ID:
-                final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-                onReset(reset);
-                break;
-            default:
-                break;
+        case BeginFW.TYPE_ID:
+            final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
+            onBegin(begin);
+            break;
+        case DataFW.TYPE_ID:
+            final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
+            onData(data);
+            break;
+        case EndFW.TYPE_ID:
+            final EndFW end = factory.endRO.wrap(buffer, index, index + length);
+            onEnd(end);
+            break;
+        case AbortFW.TYPE_ID:
+            final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
+            onAbort(abort);
+            break;
+        case WindowFW.TYPE_ID:
+            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+            onWindow(window);
+            break;
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onReset(reset);
+            break;
+        default:
+            break;
         }
     }
 
@@ -180,19 +180,19 @@ final class HttpCacheProxyNonCacheableRequest
     private void onData(
         final DataFW data)
     {
-            final long groupId = data.groupId();
-            final int padding = data.padding();
-            final OctetsFW payload = data.payload();
+        final long groupId = data.groupId();
+        final int padding = data.padding();
+        final OctetsFW payload = data.payload();
 
-            factory.writer.doHttpData(connectInitial,
-                                      connectRouteId,
-                                      connectInitialId,
-                                      data.trace(),
-                                      groupId,
-                                      payload.buffer(),
-                                      payload.offset(),
-                                      payload.sizeof(),
-                                      padding);
+        factory.writer.doHttpData(connectInitial,
+                                  connectRouteId,
+                                  connectInitialId,
+                                  data.trace(),
+                                  groupId,
+                                  payload.buffer(),
+                                  payload.offset(),
+                                  payload.sizeof(),
+                                  padding);
     }
 
     private void onEnd(

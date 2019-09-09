@@ -17,7 +17,10 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 public final class HttpMethods
 {
-
     public static final String GET = "GET";
 
+    private HttpMethods()
+    {
+        // utility
+    }
 }

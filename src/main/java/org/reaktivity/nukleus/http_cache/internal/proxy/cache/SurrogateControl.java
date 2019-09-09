@@ -114,4 +114,8 @@ public final class SurrogateControl
         return false;
     }
 
+    private SurrogateControl()
+    {
+        // utility
+    }
 }

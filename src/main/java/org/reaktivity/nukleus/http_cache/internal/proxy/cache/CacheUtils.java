@@ -66,27 +66,27 @@ public final class CacheUtils
             final String value = h.value().asString();
             switch (name)
             {
-                case CACHE_CONTROL:
-                    // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                    return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
-                case METHOD:
-                    return !HttpMethods.GET.equalsIgnoreCase(value);
-                case CONTENT_LENGTH:
-                    return true;
-                case TRANSFER_ENCODING:
-                    return true;
-                default:
-                    return false;
-                }
+            case CACHE_CONTROL:
+                // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
+                return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
+            case METHOD:
+                return !HttpMethods.GET.equalsIgnoreCase(value);
+            case CONTENT_LENGTH:
+                return true;
+            case TRANSFER_ENCODING:
+                return true;
+            default:
+                return false;
+            }
         });
     }
 
     public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)
     {
-        if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString())
-                             && h.value().asString().contains(CacheDirectives.PRIVATE))
-            || response.anyMatch(h -> SURROGATE_CONTROL.equals(h.name().asString())
-                              && h.value().asString().contains(MAX_AGE_0)))
+        if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
+                              h.value().asString().contains(CacheDirectives.PRIVATE)) ||
+            response.anyMatch(h -> SURROGATE_CONTROL.equals(h.name().asString()) &&
+                              h.value().asString().contains(MAX_AGE_0)))
         {
             return false;
         }
@@ -107,16 +107,16 @@ public final class CacheUtils
                 String directive = iter.next();
                 switch(directive)
                 {
-                    // TODO expires
-                    case NO_STORE:
-                    case NO_CACHE:
-                        return false;
-                    case PUBLIC:
-                    case MAX_AGE:
-                    case S_MAXAGE:
-                        return true;
-                    default:
-                        break;
+                // TODO expires
+                case NO_STORE:
+                case NO_CACHE:
+                    return false;
+                case PUBLIC:
+                case MAX_AGE:
+                case S_MAXAGE:
+                    return true;
+                default:
+                    break;
                 }
             }
         }

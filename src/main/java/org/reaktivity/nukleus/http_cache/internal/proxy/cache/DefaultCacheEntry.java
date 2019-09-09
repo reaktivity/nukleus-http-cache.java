@@ -334,7 +334,7 @@ public final class DefaultCacheEntry
                 {
                     return false;
                 }
-              }
+            }
             responseSlots.add(newSlot);
         }
 
