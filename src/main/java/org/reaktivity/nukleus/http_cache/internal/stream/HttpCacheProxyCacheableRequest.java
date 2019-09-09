@@ -134,7 +134,7 @@ final class HttpCacheProxyCacheableRequest
 
         if (!isRequestPurged &&
             ((retry && attempts < 3) ||
-             !this.factory.defaultCache.isUpdatedByResponseHeadersToRetry(getRequestHeaders(),
+            !this.factory.defaultCache.isUpdatedByResponseHeadersToRetry(getRequestHeaders(),
                                                                          responseHeaders,
                                                                          ifNoneMatch,
                                                                          requestHash)))
