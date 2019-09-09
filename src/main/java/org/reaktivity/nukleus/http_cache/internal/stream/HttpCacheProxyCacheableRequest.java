@@ -393,12 +393,11 @@ final class HttpCacheProxyCacheableRequest
     {
         long connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
 
-        factory.writer.doHttpRequest(
-            connectInitial,
-            connectRouteId,
-            connectInitialId,
-            factory.supplyTrace.getAsLong(),
-            mutateRequestHeaders(requestHeaders));
+        factory.writer.doHttpRequest(connectInitial,
+                                     connectRouteId,
+                                     connectInitialId,
+                                     factory.supplyTrace.getAsLong(),
+                                     mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onRequestMessage);
 
         if (DEBUG)

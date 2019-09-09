@@ -28,9 +28,7 @@ public final class SurrogateControl
 {
     public static final String MAX_AGE = "max-age";
     private static final Pattern CACHE_PATTERN = Pattern
-            .compile("\\s*([\\w\\-]+)\\s*(=\\s*)?(\\d+\\+?\\d+|\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")\\s*");
-    private static final Pattern CACHE_PATTERN_X_PROTECTED = Pattern
-        .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")?\\s*");
+        .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\d+|\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\")?\\s*");
     private static final String X_PROTECTED = "x-protected";
 
     public static int getSurrogateFreshnessExtension(
@@ -102,7 +100,7 @@ public final class SurrogateControl
         String surrogateControl = getHeader(response, SURROGATE_CONTROL);
         if (surrogateControl != null)
         {
-            Matcher matcher = CACHE_PATTERN_X_PROTECTED.matcher(surrogateControl);
+            Matcher matcher = CACHE_PATTERN.matcher(surrogateControl);
             while (matcher.find())
             {
                 if (X_PROTECTED.equals(matcher.group(1)))
