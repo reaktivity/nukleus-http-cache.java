@@ -148,7 +148,7 @@ final class HttpCacheProxyCacheableResponse
         isResponseBuffering = etag == null;
 
         //Initial cache entry
-        if(cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
+        if (cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
         {
             if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
                 !cacheEntry.storeResponseHeaders(responseHeaders))
@@ -167,7 +167,7 @@ final class HttpCacheProxyCacheableResponse
             }
         }
         cacheEntry.setEtag(etag);
-        if(!isResponseBuffering)
+        if (!isResponseBuffering)
         {
             requestGroup.onCacheableResponseUpdated();
         }

@@ -514,7 +514,7 @@ final class HttpCacheProxyCacheableRequest
             {
                 final String name = h.name().asString();
                 final String value = h.value().asString();
-                if(!CONTENT_LENGTH.equals(name) &&
+                if (!CONTENT_LENGTH.equals(name) &&
                     !AUTHORIZATION.equals(name))
                 {
                     builder.item(item -> item.name(name).value(value));
@@ -671,7 +671,7 @@ final class HttpCacheProxyCacheableRequest
             send503RetryAfter();
             return;
         }
-        if(payloadWritten == -1)
+        if (payloadWritten == -1)
         {
             resetRequestTimeoutIfNecessary();
             sendHttpResponseHeaders(cacheEntry, signal.signalId());
@@ -696,7 +696,7 @@ final class HttpCacheProxyCacheableRequest
         }
 
         boolean isStale = false;
-        if(signalId == CACHE_ENTRY_SIGNAL)
+        if (signalId == CACHE_ENTRY_SIGNAL)
         {
             isStale = cacheEntry.isStale();
         }

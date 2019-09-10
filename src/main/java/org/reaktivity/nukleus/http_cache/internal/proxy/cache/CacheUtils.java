@@ -102,7 +102,7 @@ public final class CacheUtils
         {
             CacheControl parser = new CacheControl().parse(cacheControl);
             Iterator<String> iter = parser.iterator();
-            while(iter.hasNext())
+            while (iter.hasNext())
             {
                 String directive = iter.next();
                 switch(directive)
