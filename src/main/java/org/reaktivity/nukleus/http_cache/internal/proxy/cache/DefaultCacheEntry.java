@@ -57,7 +57,6 @@ public final class DefaultCacheEntry
 
     private BufferPool requestPool;
     private int requestSlot = NO_SLOT;
-    private int requestHeadersSize = 0;
 
     private BufferPool responsePool;
     private IntArrayList responseSlots = new IntArrayList();
@@ -108,6 +107,7 @@ public final class DefaultCacheEntry
     public boolean storeRequestHeaders(
         ListFW<HttpHeaderFW> requestHeaders)
     {
+        evictRequestIfNecessary();
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < requestHeaders.sizeof())
         {
@@ -127,7 +127,6 @@ public final class DefaultCacheEntry
 
         MutableDirectBuffer buffer = requestPool.buffer(requestSlot);
         buffer.putBytes(0, requestHeaders.buffer(), requestHeaders.offset(), requestHeaders.sizeof());
-        this.requestHeadersSize = requestHeaders.sizeof();
         return true;
     }
 
@@ -153,6 +152,7 @@ public final class DefaultCacheEntry
     public boolean storeResponseHeaders(
         ListFW<HttpHeaderFW> responseHeaders)
     {
+        evictResponseIfNecessary();
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
         {
@@ -229,11 +229,6 @@ public final class DefaultCacheEntry
         return storeResponseData(data.payload());
     }
 
-    public int requestHeadersSize()
-    {
-        return requestHeadersSize;
-    }
-
     public int responseSize()
     {
         return responseSize;
@@ -241,8 +236,8 @@ public final class DefaultCacheEntry
 
     public void purge()
     {
-        this.evictRequest();
-        this.evictResponse();
+        this.evictRequestIfNecessary();
+        this.evictResponseIfNecessary();
     }
 
     public String etag()
@@ -283,19 +278,24 @@ public final class DefaultCacheEntry
             satisfiesAgeRequirements;
     }
 
-    public void evictRequest()
+    public void evictRequestIfNecessary()
     {
-        this.requestPool.release(requestSlot);
-        this.requestSlot = NO_SLOT;
-        this.requestPool = null;
+        if (requestSlot != NO_SLOT)
+        {
+            this.requestPool.release(requestSlot);
+            this.requestSlot = NO_SLOT;
+        }
     }
 
-    public void evictResponse()
+    public void evictResponseIfNecessary()
     {
-        this.responseSlots.forEach(i -> responsePool.release(i));
-        this.responseSlots.clear();
-        this.responseSize = 0;
-        this.setResponseCompleted(false);
+        if (!responseSlots.isEmpty())
+        {
+            this.responseSlots.forEach(i -> responsePool.release(i));
+            this.responseSlots.clear();
+            this.responseSize = 0;
+            this.setResponseCompleted(false);
+        }
     }
 
     public int requestHash()

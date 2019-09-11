@@ -33,6 +33,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -41,9 +42,11 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil
 import java.time.Instant;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
@@ -82,7 +85,7 @@ final class HttpCacheProxyCacheableRequest
     private long connectReplyId;
     private long connectInitialId;
 
-    private int requestSlot = NO_SLOT;
+    private final MutableInteger requestSlot;
     private int requestHash;
     private boolean isRequestPurged;
     private String ifNoneMatch;
@@ -123,21 +126,23 @@ final class HttpCacheProxyCacheableRequest
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
         this.initialWindow = factory.responseBufferPool.slotCapacity();
+        this.requestSlot =  new MutableInteger(NO_SLOT);
     }
 
     MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
+        assert !isRequestPurged;
+
+        MessageConsumer newStream;
         ListFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        MessageConsumer newStream;
 
-        if (!isRequestPurged &&
-            ((retry && attempts < 3) ||
+        if ((retry && attempts < 3) ||
             !this.factory.defaultCache.isUpdatedByResponseHeadersToRetry(getRequestHeaders(),
                                                                          responseHeaders,
                                                                          ifNoneMatch,
-                                                                         requestHash)))
+                                                                         requestHash))
         {
             final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
                 new HttpCacheProxyRetryResponse(factory,
@@ -156,7 +161,7 @@ final class HttpCacheProxyCacheableRequest
             final HttpCacheProxyNotModifiedResponse notModifiedResponse =
                 new HttpCacheProxyNotModifiedResponse(factory,
                                                       requestHash,
-                                                      requestSlot,
+                                                      getHeader(getRequestHeaders(), PREFER),
                                                       acceptReply,
                                                       acceptRouteId,
                                                       acceptReplyId,
@@ -165,6 +170,7 @@ final class HttpCacheProxyCacheableRequest
                                                       connectRouteId);
             factory.router.setThrottle(acceptReplyId, notModifiedResponse::onResponseMessage);
             newStream = notModifiedResponse::onResponseMessage;
+            cleanupRequestIfNecessary();
             requestGroup.onNonCacheableResponse(acceptReplyId);
             resetRequestTimeoutIfNecessary();
         }
@@ -473,29 +479,29 @@ final class HttpCacheProxyCacheableRequest
     private boolean storeRequest(
         final ListFW<HttpHeaderFW> headers)
     {
-        this.requestSlot = factory.requestBufferPool.acquire(acceptInitialId);
-        if (requestSlot == NO_SLOT)
+        this.requestSlot.value = factory.requestBufferPool.acquire(acceptInitialId);
+        if (requestSlot.value == NO_SLOT)
         {
             return false;
         }
-        MutableDirectBuffer requestCacheBuffer = factory.requestBufferPool.buffer(requestSlot);
+        MutableDirectBuffer requestCacheBuffer = factory.requestBufferPool.buffer(requestSlot.value);
         requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
         return true;
     }
 
     private ListFW<HttpHeaderFW> getRequestHeaders()
     {
-        final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot);
+        final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot.value);
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
 
     private void purge()
     {
-        if (requestSlot != NO_SLOT)
+        if (requestSlot.value != NO_SLOT)
         {
-            factory.requestBufferPool.release(requestSlot);
-            this.requestSlot = NO_SLOT;
+            factory.requestBufferPool.release(requestSlot.value);
+            this.requestSlot.value = NO_SLOT;
         }
         this.isRequestPurged = true;
     }
@@ -542,11 +548,17 @@ final class HttpCacheProxyCacheableRequest
         {
             DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
             factory.defaultCache.send304(cacheEntry,
-                                         getRequestHeaders(),
+                                         getHeader(getRequestHeaders(), PREFER),
                                          acceptReply,
                                          acceptRouteId,
                                          acceptReplyId);
             cleanupRequestIfNecessary();
+            Function<HttpBeginExFW, MessageConsumer> correlation = factory.correlations.remove(connectReplyId);
+            if (correlation != null)
+            {
+                factory.router.clearThrottle(connectReplyId);
+            }
+
             requestGroup.onNonCacheableResponse(acceptReplyId);
             requestExpired = true;
         }

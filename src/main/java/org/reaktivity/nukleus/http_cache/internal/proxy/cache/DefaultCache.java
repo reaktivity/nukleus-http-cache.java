@@ -157,10 +157,10 @@ public class DefaultCache
 
 
     public boolean isUpdatedByEtagToRetry(
-        ListFW<HttpHeaderFW> requestHeaders,
         String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
+        ListFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
         if (isPreferWait(requestHeaders) &&
             !isPreferenceApplied(responseHeaders) &&
@@ -216,7 +216,7 @@ public class DefaultCache
 
     public void send304(
         DefaultCacheEntry entry,
-        ListFW<HttpHeaderFW> requestHeaders,
+        String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId)
@@ -227,9 +227,8 @@ public class DefaultCache
                               currentTimeMillis(), acceptReplyId, "304");
         }
 
-        if (isPreferWait(requestHeaders))
+        if (preferWait != null)
         {
-            String preferWait = getHeader(requestHeaders, PREFER);
             writer.doHttpResponse(
                 acceptReply,
                 acceptRouteId,
