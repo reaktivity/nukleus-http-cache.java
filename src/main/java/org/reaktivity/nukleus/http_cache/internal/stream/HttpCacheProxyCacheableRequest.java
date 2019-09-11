@@ -479,11 +479,13 @@ final class HttpCacheProxyCacheableRequest
     private boolean storeRequest(
         final ListFW<HttpHeaderFW> headers)
     {
-        this.requestSlot.value = factory.requestBufferPool.acquire(acceptInitialId);
-        if (requestSlot.value == NO_SLOT)
+        assert requestSlot.value == NO_SLOT;
+        int newRequestSlot = factory.requestBufferPool.acquire(acceptInitialId);
+        if (newRequestSlot == NO_SLOT)
         {
             return false;
         }
+        requestSlot.value = newRequestSlot;
         MutableDirectBuffer requestCacheBuffer = factory.requestBufferPool.buffer(requestSlot.value);
         requestCacheBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
         return true;
@@ -501,9 +503,9 @@ final class HttpCacheProxyCacheableRequest
         if (requestSlot.value != NO_SLOT)
         {
             factory.requestBufferPool.release(requestSlot.value);
-            this.requestSlot.value = NO_SLOT;
+            requestSlot.value = NO_SLOT;
         }
-        this.isRequestPurged = true;
+        isRequestPurged = true;
     }
 
     private void incAttempts()
