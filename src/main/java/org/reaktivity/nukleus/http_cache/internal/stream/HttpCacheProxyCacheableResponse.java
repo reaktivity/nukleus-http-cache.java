@@ -156,7 +156,7 @@ final class HttpCacheProxyCacheableResponse
         }
 
         cacheEntry.setEtag(etag);
-        if(!isResponseBuffering)
+        if (!isResponseBuffering)
         {
             requestGroup.onCacheableResponseUpdated();
         }

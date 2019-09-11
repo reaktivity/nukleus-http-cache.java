@@ -258,7 +258,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.responseHeadersSize = responseBuffer.capacity();
         headersRW.wrap(responseBuffer, 0, responseHeadersSize);
 
-        for(Map.Entry<String, String> entry : newHeadersMap.entrySet())
+        for (Map.Entry<String, String> entry : newHeadersMap.entrySet())
         {
             headersRW.item(y -> y.name(entry.getKey()).value(entry.getValue()));
         }

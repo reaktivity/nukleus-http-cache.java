@@ -110,7 +110,7 @@ public final class CacheEntry
         final int freshnessExtension = getSurrogateFreshnessExtension(getCachedResponseHeaders());
         if (freshnessExtension > 0)
         {
-            if(this.state != REFRESHING && this.state != CAN_REFRESH)
+            if (this.state != REFRESHING && this.state != CAN_REFRESH)
             {
                 this.state = CAN_REFRESH;
                 pollBackend();
@@ -128,7 +128,7 @@ public final class CacheEntry
         {
             if (this.state == REFRESHING && sendRequestRefreshCompleted)
             {
-                if(!sendRefreshRequest())
+                if (!sendRefreshRequest())
                 {
                     return;
                 }
