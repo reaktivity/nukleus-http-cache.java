@@ -28,7 +28,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
@@ -157,10 +156,10 @@ public class DefaultCache
 
 
     public boolean isUpdatedByEtagToRetry(
-        ListFW<HttpHeaderFW> requestHeaders,
         String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
+        ListFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
         ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
         if (isPreferWait(requestHeaders) &&
             !isPreferenceApplied(responseHeaders) &&
@@ -216,7 +215,7 @@ public class DefaultCache
 
     public void send304(
         DefaultCacheEntry entry,
-        ListFW<HttpHeaderFW> requestHeaders,
+        String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId)
@@ -227,9 +226,8 @@ public class DefaultCache
                               currentTimeMillis(), acceptReplyId, "304");
         }
 
-        if (isPreferWait(requestHeaders))
+        if (preferWait != null)
         {
-            String preferWait = getHeader(requestHeaders, PREFER);
             writer.doHttpResponse(
                 acceptReply,
                 acceptRouteId,

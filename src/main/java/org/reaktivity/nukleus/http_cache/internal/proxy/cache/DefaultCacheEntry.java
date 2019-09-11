@@ -46,26 +46,26 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
 public final class DefaultCacheEntry
 {
+    public static final int NUM_OF_HEADER_SLOTS = 1;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+
+    private final BufferPool requestPool;
+    private final BufferPool responsePool;
+    private final IntArrayList responseSlots;
 
     private final DefaultCache cache;
     private final int requestHash;
-    private String etag;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
-    private BufferPool requestPool;
+    private String etag;
     private int requestSlot = NO_SLOT;
-    private int requestHeadersSize = 0;
-
-    private BufferPool responsePool;
-    private IntArrayList responseSlots = new IntArrayList();
-    public static final int NUM_OF_HEADER_SLOTS = 1;
     private int responseHeadersSize = 0;
     private int responseSize = 0;
-    private boolean responseCompleted = false;
     private int subscribers;
+    private boolean responseCompleted = false;
+
 
     DefaultCacheEntry(
         DefaultCache cache,
@@ -77,6 +77,7 @@ public final class DefaultCacheEntry
         this.requestHash = requestHash;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
+        responseSlots = new IntArrayList();
     }
 
     public void setSubscribers(int numberOfSubscribers)
@@ -108,6 +109,7 @@ public final class DefaultCacheEntry
     public boolean storeRequestHeaders(
         ListFW<HttpHeaderFW> requestHeaders)
     {
+        evictRequestIfNecessary();
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < requestHeaders.sizeof())
         {
@@ -127,7 +129,6 @@ public final class DefaultCacheEntry
 
         MutableDirectBuffer buffer = requestPool.buffer(requestSlot);
         buffer.putBytes(0, requestHeaders.buffer(), requestHeaders.offset(), requestHeaders.sizeof());
-        this.requestHeadersSize = requestHeaders.sizeof();
         return true;
     }
 
@@ -153,6 +154,7 @@ public final class DefaultCacheEntry
     public boolean storeResponseHeaders(
         ListFW<HttpHeaderFW> responseHeaders)
     {
+        evictResponseIfNecessary();
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
         {
@@ -185,13 +187,13 @@ public final class DefaultCacheEntry
         final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
         ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
         String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
-            .toLowerCase().equals(":status"))).value().asString();
+                                                   .toLowerCase().equals(":status"))).value().asString();
 
         final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
         oldHeaders.forEach(h ->
-            newHeadersMap.put(h.name().asString(), h.value().asString()));
+                               newHeadersMap.put(h.name().asString(), h.value().asString()));
         newHeaders.forEach(h ->
-            newHeadersMap.put(h.name().asString(), h.value().asString()));
+                               newHeadersMap.put(h.name().asString(), h.value().asString()));
         newHeadersMap.put(":status", statusCode);
 
         if (NOT_MODIFIED_304.equals(status))
@@ -229,11 +231,6 @@ public final class DefaultCacheEntry
         return storeResponseData(data.payload());
     }
 
-    public int requestHeadersSize()
-    {
-        return requestHeadersSize;
-    }
-
     public int responseSize()
     {
         return responseSize;
@@ -241,8 +238,8 @@ public final class DefaultCacheEntry
 
     public void purge()
     {
-        this.evictRequest();
-        this.evictResponse();
+        this.evictRequestIfNecessary();
+        this.evictResponseIfNecessary();
     }
 
     public String etag()
@@ -277,25 +274,30 @@ public final class DefaultCacheEntry
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now);
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
         return canBeServedToAuthorized &&
-            doesNotVaryBy &&
-            satisfiesFreshnessRequirements &&
-            satisfiesStalenessRequirements &&
-            satisfiesAgeRequirements;
+               doesNotVaryBy &&
+               satisfiesFreshnessRequirements &&
+               satisfiesStalenessRequirements &&
+               satisfiesAgeRequirements;
     }
 
-    public void evictRequest()
+    public void evictRequestIfNecessary()
     {
-        this.requestPool.release(requestSlot);
-        this.requestSlot = NO_SLOT;
-        this.requestPool = null;
+        if (requestSlot != NO_SLOT)
+        {
+            this.requestPool.release(requestSlot);
+            this.requestSlot = NO_SLOT;
+        }
     }
 
-    public void evictResponse()
+    public void evictResponseIfNecessary()
     {
-        this.responseSlots.forEach(i -> responsePool.release(i));
-        this.responseSlots.clear();
-        this.responseSize = 0;
-        this.setResponseCompleted(false);
+        if (!responseSlots.isEmpty())
+        {
+            this.responseSlots.forEach(i -> responsePool.release(i));
+            this.responseSlots.clear();
+            this.responseSize = 0;
+            this.setResponseCompleted(false);
+        }
     }
 
     public int requestHash()
@@ -306,30 +308,28 @@ public final class DefaultCacheEntry
     private boolean storeResponseData(
         Flyweight data)
     {
-        return this.storeResponseData(responsePool, data, 0);
+        return this.storeResponseData(data, 0);
     }
 
     private boolean storeResponseData(
-        BufferPool bp,
         Flyweight data,
         int written)
     {
-        responsePool = bp;
         if (data.sizeof() - written == 0)
         {
             return true;
         }
 
-        final int slotCapacity = bp.slotCapacity();
+        final int slotCapacity = responsePool.slotCapacity();
         int slotSpaceRemaining = (slotCapacity * (responseSlots.size() - NUM_OF_HEADER_SLOTS)) - responseSize;
         if (slotSpaceRemaining == 0)
         {
             slotSpaceRemaining = slotCapacity;
-            int newSlot = bp.acquire(requestHash);
+            int newSlot = responsePool.acquire(requestHash);
             if (newSlot == NO_SLOT)
             {
                 this.cache.purgeEntriesForNonPendingRequests();
-                newSlot = bp.acquire(requestHash);
+                newSlot = responsePool.acquire(requestHash);
                 if (newSlot == NO_SLOT)
                 {
                     return false;
@@ -342,11 +342,11 @@ public final class DefaultCacheEntry
 
         int slot = responseSlots.get(responseSlots.size() - NUM_OF_HEADER_SLOTS);
 
-        MutableDirectBuffer buffer = bp.buffer(slot);
+        MutableDirectBuffer buffer = responsePool.buffer(slot);
         buffer.putBytes(slotCapacity - slotSpaceRemaining, data.buffer(), data.offset() + written, toWrite);
         written += toWrite;
         responseSize += toWrite;
-        return storeResponseData(bp, data, written);
+        return storeResponseData(data, written);
     }
 
     private static String getHeader(ListFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)

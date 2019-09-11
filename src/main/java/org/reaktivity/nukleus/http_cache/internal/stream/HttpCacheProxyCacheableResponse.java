@@ -25,6 +25,7 @@ import java.util.function.Function;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -43,11 +44,10 @@ final class HttpCacheProxyCacheableResponse
     private final HttpCacheProxyFactory factory;
 
     private int connectReplyBudget;
-    private long traceId;
     private boolean isResponseBuffering;
     private int requestHash;
 
-    private int requestSlot;
+    private final MutableInteger requestSlot;
     private final int initialWindow;
     private String ifNoneMatch;
     private final Function<Long, Boolean> retryRequest;
@@ -66,7 +66,7 @@ final class HttpCacheProxyCacheableResponse
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
         int requestHash,
-        int requestSlot,
+        MutableInteger requestSlot,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId,
@@ -89,6 +89,7 @@ final class HttpCacheProxyCacheableResponse
         this.initialWindow = factory.responseBufferPool.slotCapacity();
         this.ifNoneMatch = ifNoneMatch;
         this.retryRequest = retryRequest;
+        assert requestSlot.value != NO_SLOT;
     }
 
     @Override
@@ -129,7 +130,7 @@ final class HttpCacheProxyCacheableResponse
         BeginFW begin)
     {
         final long connectReplyId = begin.streamId();
-        traceId = begin.trace();
+        long traceId = begin.trace();
 
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
@@ -147,25 +148,13 @@ final class HttpCacheProxyCacheableResponse
         String etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;
 
-        //Initial cache entry
-        if (cacheEntry.etag() == null && cacheEntry.requestHeadersSize() == 0)
+        if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
+            !cacheEntry.storeResponseHeaders(responseHeaders))
         {
-            if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
-                !cacheEntry.storeResponseHeaders(responseHeaders))
-            {
-                //This should never happen.
-                assert false;
-            }
+            //This should never happen.
+            assert false;
         }
-        else
-        {
-            cacheEntry.evictResponse();
-            if (!cacheEntry.storeResponseHeaders(responseHeaders))
-            {
-                //This should never happen.
-                assert false;
-            }
-        }
+
         cacheEntry.setEtag(etag);
         if (!isResponseBuffering)
         {
@@ -178,13 +167,10 @@ final class HttpCacheProxyCacheableResponse
     private void onData(
         DataFW data)
     {
-        boolean stored = cacheEntry.storeResponseData(data);
-        if (!stored)
-        {
-            //This should never happen.
-            assert false;
-        }
         sendWindow(data.length() + data.padding(), data.trace());
+        assert requestSlot.value != NO_SLOT;
+        boolean stored = cacheEntry.storeResponseData(data);
+        assert stored;
         if (!isResponseBuffering)
         {
             requestGroup.onCacheableResponseUpdated();
@@ -194,11 +180,11 @@ final class HttpCacheProxyCacheableResponse
     private void onEnd(
         EndFW end)
     {
+        assert requestSlot.value != NO_SLOT;
         checkEtag(end, cacheEntry);
         cacheEntry.setResponseCompleted(true);
 
-        if (!factory.defaultCache.isUpdatedByEtagToRetry(getRequestHeaders(),
-                                                         ifNoneMatch,
+        if (!factory.defaultCache.isUpdatedByEtagToRetry(ifNoneMatch,
                                                          cacheEntry))
         {
             long retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
@@ -212,6 +198,7 @@ final class HttpCacheProxyCacheableResponse
 
     private void onAbort(AbortFW abort)
     {
+        assert requestSlot.value != NO_SLOT;
         if (isResponseBuffering)
         {
             factory.counters.responses.getAsLong();
@@ -267,16 +254,16 @@ final class HttpCacheProxyCacheableResponse
 
     private ListFW<HttpHeaderFW> getRequestHeaders()
     {
-        final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot);
+        final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot.value);
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
     private void purgeRequest()
     {
-        if (requestSlot != NO_SLOT)
+        if (requestSlot.value != NO_SLOT)
         {
-            factory.requestBufferPool.release(requestSlot);
-            this.requestSlot = NO_SLOT;
+            factory.requestBufferPool.release(requestSlot.value);
+            requestSlot.value = NO_SLOT;
         }
     }
 }
