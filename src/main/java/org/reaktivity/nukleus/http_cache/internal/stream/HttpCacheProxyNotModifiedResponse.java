@@ -16,12 +16,10 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -50,12 +48,12 @@ final class HttpCacheProxyNotModifiedResponse
     private final long connectReplyId;
 
     private int connectReplyBudget;
-    private int requestSlot;
+    private final String preferWait;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,
         int requestHash,
-        int requestSlot,
+        String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId,
@@ -65,7 +63,7 @@ final class HttpCacheProxyNotModifiedResponse
     {
         this.factory = factory;
         this.requestHash = requestHash;
-        this.requestSlot = requestSlot;
+        this.preferWait = preferWait;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
@@ -132,12 +130,11 @@ final class HttpCacheProxyNotModifiedResponse
         }
         DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash);
         factory.defaultCache.send304(cacheEntry,
-                                     getRequestHeaders(),
+                                     preferWait,
                                      acceptReply,
                                      acceptRouteId,
                                      acceptReplyId);
         sendWindow(initialWindow, begin.trace());
-        purgeRequest();
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
     }
 
@@ -188,21 +185,6 @@ final class HttpCacheProxyNotModifiedResponse
                                     credit,
                                     0,
                                     0L);
-        }
-    }
-
-    private ListFW<HttpHeaderFW> getRequestHeaders()
-    {
-        final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot);
-        return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
-    }
-
-    private void purgeRequest()
-    {
-        if (requestSlot != NO_SLOT)
-        {
-            factory.requestBufferPool.release(requestSlot);
-            this.requestSlot = NO_SLOT;
         }
     }
 }

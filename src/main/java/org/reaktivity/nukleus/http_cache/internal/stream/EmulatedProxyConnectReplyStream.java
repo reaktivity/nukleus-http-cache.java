@@ -243,7 +243,7 @@ final class EmulatedProxyConnectReplyStream
         {
             handleEdgeArchSync(responseHeaders, freshnessExtension, traceId);
         }
-        else if(isCacheableResponse)
+        else if (isCacheableResponse)
         {
             handleCacheableResponse(responseHeaders, traceId);
         }

@@ -192,7 +192,7 @@ public class HttpCacheProxyFactory implements StreamFactory
             final short authorizationScope = authorizationScope(authorization);
             final int requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
 
-            if(requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
+            if (requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
             {
                 newStream = new EmulatedProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
                     connectRouteId)::handleStream;
@@ -299,7 +299,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         Request request = requestCorrelations.get(sourceId);
         MessageConsumer newStream = null;
 
-        if(request != null && request.isEmulated())
+        if (request != null && request.isEmulated())
         {
             return new EmulatedProxyConnectReplyStream(this,
                                                         connectInitial,

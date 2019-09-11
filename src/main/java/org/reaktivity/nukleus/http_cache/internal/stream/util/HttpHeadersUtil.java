@@ -141,7 +141,7 @@ public final class HttpHeadersUtil
     {
         HttpHeaderFW header = responseHeaders.matchFirst(HAS_RETRY_AFTER);
 
-        if(header == null)
+        if (header == null)
         {
             return 0L;
         }
