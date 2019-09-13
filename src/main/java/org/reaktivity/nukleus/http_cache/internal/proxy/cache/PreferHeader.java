@@ -15,6 +15,8 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
@@ -32,6 +34,14 @@ public final class PreferHeader
     {
         return getHeader(headers, IF_NONE_MATCH) != null &&
                headers.anyMatch(PREFER_HEADER_NAME);
+    }
+
+    public static boolean isPreferMaxAgeZero(
+        ListFW<HttpHeaderFW> headers)
+    {
+        String cacheControl = getHeader(headers, CACHE_CONTROL);
+        return headers.anyMatch(PREFER_HEADER_NAME) &&
+               cacheControl != null && cacheControl.contains(MAX_AGE_0);
     }
 
     public static boolean isPreferWait(

@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferMaxAgeZero;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
@@ -34,6 +35,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
@@ -306,8 +308,8 @@ final class HttpCacheProxyCacheableRequest
         if (ifNoneMatchHeader != null)
         {
             this.ifNoneMatch = ifNoneMatchHeader.value().asString();
-            schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
+        schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
 
         HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
         if (authorizationHeader != null)
@@ -415,7 +417,7 @@ final class HttpCacheProxyCacheableRequest
     private void schedulePreferWaitIfNoneMatchIfNecessary(
         ListFW<HttpHeaderFW> requestHeaders)
     {
-        if (isPreferIfNoneMatch(requestHeaders))
+        if (isPreferMaxAgeZero(requestHeaders))
         {
             int preferWait = getPreferWait(requestHeaders);
             if (preferWait > 0)
@@ -548,12 +550,27 @@ final class HttpCacheProxyCacheableRequest
         }
         else if (signalId == REQUEST_EXPIRED_SIGNAL)
         {
-            DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
-            factory.defaultCache.send304(cacheEntry,
-                                         getHeader(getRequestHeaders(), PREFER),
-                                         acceptReply,
-                                         acceptRouteId,
-                                         acceptReplyId);
+            if (isPreferIfNoneMatch(getRequestHeaders()))
+            {
+                DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
+                factory.defaultCache.send304(cacheEntry,
+                                             getHeader(getRequestHeaders(), PREFER),
+                                             acceptReply,
+                                             acceptRouteId,
+                                             acceptReplyId);
+            }
+            else
+            {
+                factory.writer.doHttpResponse(
+                    acceptReply,
+                    acceptRouteId,
+                    acceptReplyId,
+                    factory.supplyTrace.getAsLong(),
+                    e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
+                          .item(h -> h.name("retry-after").value("0"))
+                          .item(h -> h.name(PREFERENCE_APPLIED).value(getHeader(getRequestHeaders(), PREFER))));
+            }
+
             cleanupRequestIfNecessary();
             Function<HttpBeginExFW, MessageConsumer> correlation = factory.correlations.remove(connectReplyId);
             if (correlation != null)
@@ -561,7 +578,6 @@ final class HttpCacheProxyCacheableRequest
                 factory.router.clearThrottle(connectReplyId);
             }
 
-            requestGroup.onNonCacheableResponse(acceptReplyId);
             requestExpired = true;
         }
         else if (signalId == CACHE_ENTRY_ABORTED_SIGNAL)
