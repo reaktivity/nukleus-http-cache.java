@@ -167,4 +167,19 @@ public class Rfc7240ProxyIT
         k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/serve.immediately.when.if-none-match.missing.while.polling/client",
+        "${streams}/serve.immediately.when.if-none-match.missing.while.polling/connect/server",
+    })
+    public void shouldServeImmediatelyWhenIfNoneMatchMissingWhilePolling() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("SECOND_REQUEST_SENT");
+        sleep(2000);
+        k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
+        k3po.finish();
+    }
 }
