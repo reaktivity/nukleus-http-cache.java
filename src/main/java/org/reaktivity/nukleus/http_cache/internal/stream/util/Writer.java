@@ -225,7 +225,7 @@ public class Writer
             final String16FW valueFW = h.value();
             final String value = valueFW.asString();
 
-            switch(name)
+            switch (name)
             {
             case HttpHeaders.CACHE_CONTROL:
                 cacheControlFW.parse(value);
@@ -503,7 +503,7 @@ public class Writer
             final String16FW valueFW = h.value();
             final String value = valueFW.asString();
 
-            switch(name)
+            switch (name)
             {
             case HttpHeaders.METHOD:
             case HttpHeaders.AUTHORITY:

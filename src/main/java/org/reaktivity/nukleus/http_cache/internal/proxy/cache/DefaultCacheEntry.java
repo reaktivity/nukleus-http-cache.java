@@ -431,7 +431,7 @@ public final class DefaultCacheEntry
         if (requestCacheControl.contains(MAX_STALE))
         {
             final String maxStale = requestCacheControl.getValue(MAX_STALE);
-            final int maxStaleSec = (maxStale != null) ? parseInt(maxStale): MAX_VALUE;
+            final int maxStaleSec = (maxStale != null) ? parseInt(maxStale) : MAX_VALUE;
             final Instant acceptable = staleAt.plusSeconds(maxStaleSec);
             if (now.isAfter(acceptable))
             {

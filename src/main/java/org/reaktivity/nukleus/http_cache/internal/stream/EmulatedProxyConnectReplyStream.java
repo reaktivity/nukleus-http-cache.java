@@ -132,7 +132,7 @@ final class EmulatedProxyConnectReplyStream
 
             final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-            switch(streamCorrelation.getType())
+            switch (streamCorrelation.getType())
             {
             case PROXY:
                 doProxyBegin(traceId, responseHeaders);

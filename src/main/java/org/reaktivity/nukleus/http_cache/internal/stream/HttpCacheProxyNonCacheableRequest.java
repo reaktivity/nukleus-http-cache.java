@@ -91,7 +91,7 @@ final class HttpCacheProxyNonCacheableRequest
         int index,
         int length)
     {
-        switch(msgTypeId)
+        switch (msgTypeId)
         {
         case ResetFW.TYPE_ID:
             factory.writer.doReset(acceptReply,
