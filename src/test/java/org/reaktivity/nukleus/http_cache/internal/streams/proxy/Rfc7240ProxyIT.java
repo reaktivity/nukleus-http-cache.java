@@ -171,15 +171,11 @@ public class Rfc7240ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/serve.immediately.when.if-none-match.missing.while.polling/accept/client",
-        "${streams}/serve.immediately.when.if-none-match.missing.while.polling/connect/server",
+        "${streams}/serve.immediately.when.if.none.match.missing.while.polling/accept/client",
+        "${streams}/serve.immediately.when.if.none.match.missing.while.polling/connect/server",
     })
     public void shouldServeImmediatelyWhenIfNoneMatchMissingWhilePolling() throws Exception
     {
-        k3po.start();
-        k3po.awaitBarrier("SECOND_REQUEST_SENT");
-        sleep(1000);
-        k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
         k3po.finish();
     }
 }

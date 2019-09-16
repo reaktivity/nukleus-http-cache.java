@@ -188,7 +188,6 @@ public final class DefaultCacheEntry
         ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
         String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
                                                    .toLowerCase().equals(":status"))).value().asString();
-        boolean hasDate =  newHeaders.anyMatch(h -> "date".equalsIgnoreCase(h.name().asString()));
 
         final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
         oldHeaders.forEach(h ->
@@ -197,8 +196,8 @@ public final class DefaultCacheEntry
                                newHeadersMap.put(h.name().asString(), h.value().asString()));
         newHeadersMap.put(":status", statusCode);
 
-        if (!hasDate &&
-            NOT_MODIFIED_304.equals(status))
+        if (NOT_MODIFIED_304.equals(status) &&
+            !newHeaders.anyMatch(h -> "date".equalsIgnoreCase(h.name().asString())))
         {
             try
             {

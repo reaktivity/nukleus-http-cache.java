@@ -197,13 +197,13 @@ public class HttpCacheProxyFactory implements StreamFactory
             }
             else
             {
-                newStream = handleAcceptStream(requestHeaders,
-                                               acceptReply,
-                                               authorization,
-                                               connectRouteId,
-                                               acceptInitialId,
-                                               acceptRouteId,
-                                               begin.trace());
+                newStream = newNativeInitialStream(requestHeaders,
+                                                   acceptReply,
+                                                   authorization,
+                                                   connectRouteId,
+                                                   acceptInitialId,
+                                                   acceptRouteId,
+                                                   begin.trace());
             }
         }
 
@@ -244,7 +244,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         return newStream;
     }
 
-    private MessageConsumer handleAcceptStream(
+    private MessageConsumer newNativeInitialStream(
         ListFW<HttpHeaderFW> requestHeaders,
         MessageConsumer acceptReply,
         long authorization,
@@ -256,11 +256,11 @@ public class HttpCacheProxyFactory implements StreamFactory
         final String requestURL = getRequestURL(requestHeaders);
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
-        long connectInitialId = supplyInitialId.applyAsLong(connectRouteId);
-        MessageConsumer connectInitial = router.supplyReceiver(connectInitialId);
-        long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
-        long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
-        MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
+        final long connectInitialId = supplyInitialId.applyAsLong(connectRouteId);
+        final MessageConsumer connectInitial = router.supplyReceiver(connectInitialId);
+        final long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
+        final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
+        final MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
         MessageConsumer newStream = null;
 
         if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
@@ -315,7 +315,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                 group.setRecentAuthorizationToken(authorizationHeader.value().asString());
             }
 
-            if (defaultCache.hasCacheEntry(requestHash)&&
+            if (defaultCache.hasCacheEntry(requestHash) &&
                 !requestHeaders.anyMatch(h -> IF_NONE_MATCH.equals(h.name().asString())) &&
                 group.getNumberOfRequests() > 0)
             {
