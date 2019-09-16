@@ -217,7 +217,7 @@ final class HttpCacheProxyCacheableRequest
         int index,
         int length)
     {
-        switch(msgTypeId)
+        switch (msgTypeId)
         {
         case WindowFW.TYPE_ID:
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);

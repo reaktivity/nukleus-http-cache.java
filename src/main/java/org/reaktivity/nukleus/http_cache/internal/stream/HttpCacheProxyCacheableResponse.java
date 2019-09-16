@@ -105,7 +105,7 @@ final class HttpCacheProxyCacheableResponse
         int index,
         int length)
     {
-        switch(msgTypeId)
+        switch (msgTypeId)
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
