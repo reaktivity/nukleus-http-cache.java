@@ -201,7 +201,7 @@ public class Writer
         if (isPreferWait(requestHeaders))
         {
             builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
-                                         .value("*"));
+                                         .value(PREFERENCE_APPLIED));
         }
 
         if (isStale)
