@@ -554,7 +554,7 @@ final class HttpCacheProxyCacheableRequest
             {
                 factory.router.clearThrottle(connectReplyId);
             }
-
+            requestGroup.onNonCacheableResponse(acceptReplyId);
             requestExpired = true;
         }
         else if (signalId == CACHE_ENTRY_ABORTED_SIGNAL)
