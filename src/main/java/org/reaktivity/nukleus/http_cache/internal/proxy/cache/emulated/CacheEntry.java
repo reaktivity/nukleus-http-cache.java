@@ -419,7 +419,7 @@ public final class CacheEntry
             int index,
             int length)
         {
-            switch(msgTypeId)
+            switch (msgTypeId)
             {
             case WindowFW.TYPE_ID:
                 final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
@@ -582,7 +582,7 @@ public final class CacheEntry
         if (requestCacheControl.contains(MAX_STALE))
         {
             final String maxStale = requestCacheControl.getValue(MAX_STALE);
-            final int maxStaleSec = (maxStale != null) ? parseInt(maxStale): MAX_VALUE;
+            final int maxStaleSec = (maxStale != null) ? parseInt(maxStale) : MAX_VALUE;
             final Instant acceptable = staleAt.plusSeconds(maxStaleSec);
             if (now.isAfter(acceptable))
             {

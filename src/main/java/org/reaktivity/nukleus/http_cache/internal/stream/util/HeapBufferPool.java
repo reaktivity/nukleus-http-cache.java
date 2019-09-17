@@ -51,7 +51,7 @@ public class HeapBufferPool implements BufferPool
     @Override
     public int acquire(long streamId)
     {
-        for (int i=0; i < buffers.length; i++)
+        for (int i = 0; i < buffers.length; i++)
         {
             if (buffers[i] == null)
             {

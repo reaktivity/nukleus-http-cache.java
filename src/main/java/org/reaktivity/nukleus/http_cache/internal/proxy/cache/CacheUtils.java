@@ -105,7 +105,7 @@ public final class CacheUtils
             while (iter.hasNext())
             {
                 String directive = iter.next();
-                switch(directive)
+                switch (directive)
                 {
                 // TODO expires
                 case NO_STORE:

@@ -201,7 +201,9 @@ public class Writer
         if (isPreferWait(requestHeaders))
         {
             builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
-                                         .value(PREFERENCE_APPLIED));
+                                         .value(PREFERENCE_APPLIED))
+                   .item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
+                                         .value(ETAG));
         }
 
         if (isStale)
@@ -225,7 +227,7 @@ public class Writer
             final String16FW valueFW = h.value();
             final String value = valueFW.asString();
 
-            switch(name)
+            switch (name)
             {
             case HttpHeaders.CACHE_CONTROL:
                 cacheControlFW.parse(value);
@@ -503,7 +505,7 @@ public class Writer
             final String16FW valueFW = h.value();
             final String value = valueFW.asString();
 
-            switch(name)
+            switch (name)
             {
             case HttpHeaders.METHOD:
             case HttpHeaders.AUTHORITY:

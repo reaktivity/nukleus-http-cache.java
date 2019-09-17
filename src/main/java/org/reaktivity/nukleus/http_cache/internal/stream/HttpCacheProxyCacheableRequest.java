@@ -217,7 +217,7 @@ final class HttpCacheProxyCacheableRequest
         int index,
         int length)
     {
-        switch(msgTypeId)
+        switch (msgTypeId)
         {
         case WindowFW.TYPE_ID:
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
@@ -307,12 +307,6 @@ final class HttpCacheProxyCacheableRequest
         {
             this.ifNoneMatch = ifNoneMatchHeader.value().asString();
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
-        }
-
-        HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
-        if (authorizationHeader != null)
-        {
-            requestGroup.setRecentAuthorizationToken(authorizationHeader.value().asString());
         }
 
         if (requestGroup.queue(acceptRouteId, acceptReplyId))
@@ -560,7 +554,6 @@ final class HttpCacheProxyCacheableRequest
             {
                 factory.router.clearThrottle(connectReplyId);
             }
-
             requestGroup.onNonCacheableResponse(acceptReplyId);
             requestExpired = true;
         }
