@@ -414,7 +414,7 @@ final class HttpCacheProxyCacheableRequest
             int preferWait = getPreferWait(requestHeaders);
             if (preferWait > 0)
             {
-                preferWaitExpired = this.factory.executor.schedule(preferWait,
+                preferWaitExpired = this.factory.executor.schedule(Math.min(preferWait, factory.preferWaitMaximum),
                                                                    SECONDS,
                                                                    this.acceptRouteId,
                                                                    this.acceptReplyId,
@@ -517,8 +517,7 @@ final class HttpCacheProxyCacheableRequest
                 final String name = h.name().asString();
                 final String value = h.value().asString();
                 if (!CONTENT_LENGTH.equalsIgnoreCase(name) &&
-                    !AUTHORIZATION.equalsIgnoreCase(name) &&
-                    !PREFER.equalsIgnoreCase(name))
+                    !AUTHORIZATION.equalsIgnoreCase(name))
                 {
                     builder.item(item -> item.name(name).value(value));
                 }
@@ -529,13 +528,6 @@ final class HttpCacheProxyCacheableRequest
             {
                 builder.item(item -> item.name(AUTHORIZATION).value(authorizationToken));
             }
-
-            final int preferWait = getPreferWait(requestHeaders);
-            if (preferWait > 0)
-            {
-                builder.item(item -> item.name(PREFER).value("wait=" + Math.max(preferWait, factory.defaultPreferWait)));
-            }
-
         };
     }
 

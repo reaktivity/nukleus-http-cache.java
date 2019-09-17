@@ -231,7 +231,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          supplyTypeId,
                                          executor,
                                          scheduler,
-                                         config.defaultPreferWait());
+                                         config.preferWaitMaximum());
     }
 
 }

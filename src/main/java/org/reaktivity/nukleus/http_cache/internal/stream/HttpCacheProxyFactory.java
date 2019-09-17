@@ -94,7 +94,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> requestCorrelations;
 
-    final int defaultPreferWait;
+    final int preferWaitMaximum;
     final Writer writer;
     final CacheControl cacheControlParser = new CacheControl();
     final Cache emulatedCache;
@@ -120,14 +120,14 @@ public class HttpCacheProxyFactory implements StreamFactory
         ToIntFunction<String> supplyTypeId,
         SignalingExecutor executor,
         LongObjectBiConsumer<Runnable> scheduler,
-        int defaultPreferWait)
+        int preferWaitMaximum)
     {
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyTrace = requireNonNull(supplyTrace);
         this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.defaultPreferWait = defaultPreferWait;
+        this.preferWaitMaximum = preferWaitMaximum;
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.request.acquires"),
