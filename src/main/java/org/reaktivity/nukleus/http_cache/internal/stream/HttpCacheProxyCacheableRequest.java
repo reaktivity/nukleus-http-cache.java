@@ -309,12 +309,6 @@ final class HttpCacheProxyCacheableRequest
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
-        if (authorizationHeader != null)
-        {
-            requestGroup.setRecentAuthorizationToken(authorizationHeader.value().asString());
-        }
-
         if (requestGroup.queue(acceptRouteId, acceptReplyId))
         {
             factory.writer.doWindow(acceptReply,
@@ -560,7 +554,6 @@ final class HttpCacheProxyCacheableRequest
             {
                 factory.router.clearThrottle(connectReplyId);
             }
-
             requestGroup.onNonCacheableResponse(acceptReplyId);
             requestExpired = true;
         }

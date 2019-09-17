@@ -134,7 +134,7 @@ public class Rfc7240ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
     }
 
@@ -165,6 +165,17 @@ public class Rfc7240ProxyIT
         k3po.awaitBarrier("SECOND_REQUEST_SENT");
         sleep(2000);
         k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/serve.immediately.when.if.none.match.missing.while.polling/accept/client",
+        "${streams}/serve.immediately.when.if.none.match.missing.while.polling/connect/server",
+    })
+    public void shouldServeImmediatelyWhenIfNoneMatchMissingWhilePolling() throws Exception
+    {
         k3po.finish();
     }
 }

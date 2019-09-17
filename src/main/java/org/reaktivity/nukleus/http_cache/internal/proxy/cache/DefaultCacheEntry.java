@@ -196,11 +196,12 @@ public final class DefaultCacheEntry
                                newHeadersMap.put(h.name().asString(), h.value().asString()));
         newHeadersMap.put(":status", statusCode);
 
-        if (NOT_MODIFIED_304.equals(status))
+        if (NOT_MODIFIED_304.equals(status) &&
+            !newHeaders.anyMatch(h -> "date".equalsIgnoreCase(h.name().asString())))
         {
             try
             {
-                newHeadersMap.put(":date", DATE_FORMAT.format(Date.from(Instant.now())));
+                newHeadersMap.put("date", DATE_FORMAT.format(Date.from(Instant.now())));
             }
             catch (Exception e)
             {

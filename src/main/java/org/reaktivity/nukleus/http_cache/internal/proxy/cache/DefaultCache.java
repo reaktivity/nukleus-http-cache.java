@@ -112,6 +112,12 @@ public class DefaultCache
         return cachedEntries.get(requestHash);
     }
 
+    public boolean hasCacheEntry(
+        int requestHash)
+    {
+        return cachedEntries.containsKey(requestHash);
+    }
+
     public DefaultCacheEntry supply(
         int requestHash)
     {
@@ -236,7 +242,8 @@ public class DefaultCache
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(entry.etag()))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
-                      .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED)));
+                      .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED))
+                      .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG)));
         }
         else
         {
