@@ -28,6 +28,7 @@ public class HttpCacheConfiguration extends Configuration
     public static final IntPropertyDef HTTP_CACHE_MAXIMUM_REQUESTS;
     public static final IntPropertyDef HTTP_CACHE_ETAG_PREFIX;
     public static final IntPropertyDef HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE;
+    public static final IntPropertyDef HTTP_CACHE_DEFAULT_PREFER_WAIT;
 
     private static final ConfigurationDef HTTP_CACHE_CONFIG;
 
@@ -39,6 +40,7 @@ public class HttpCacheConfiguration extends Configuration
         HTTP_CACHE_MAXIMUM_REQUESTS = config.property("maximum.requests", 64 * 1024);
         HTTP_CACHE_ETAG_PREFIX = config.property("etag.prefix", new Random().nextInt(99999));
         HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE = config.property("allowed.cache.percentage", 95);
+        HTTP_CACHE_DEFAULT_PREFER_WAIT = config.property("default.prefer.wait", Integer.MAX_VALUE);
         HTTP_CACHE_CONFIG = config;
     }
 
@@ -68,8 +70,8 @@ public class HttpCacheConfiguration extends Configuration
         return HTTP_CACHE_MAXIMUM_REQUESTS.getAsInt(this);
     }
 
-    public int cacheEtagPrefix()
+    public int defaultPreferWait()
     {
-        return HTTP_CACHE_ETAG_PREFIX.getAsInt(this);
+        return HTTP_CACHE_DEFAULT_PREFER_WAIT.getAsInt(this);
     }
 }

@@ -230,7 +230,8 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          supplyTrace,
                                          supplyTypeId,
                                          executor,
-                                         scheduler);
+                                         scheduler,
+                                         config.defaultPreferWait());
     }
 
 }
