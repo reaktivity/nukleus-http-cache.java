@@ -13,13 +13,13 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
-
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.InitialRequest;
+package org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
 
 public class PendingInitialRequests
 {

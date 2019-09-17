@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.request;
+package org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated;
 
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
@@ -30,8 +30,8 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -73,24 +73,26 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
         LongFunction<MessageConsumer> supplyReceiver,
-        int requestURLHash,
+        int requestHash,
         BufferPool bufferPool,
         int requestSlot,
         RouteManager router,
         boolean authorizationHeader,
         long authorization,
         short authScope,
-        String etag)
+        String etag,
+        boolean isEmulated)
     {
         super(acceptReply,
               acceptRouteId,
               acceptReplyStreamId,
               router,
-              requestURLHash,
+              requestHash,
               authorizationHeader,
               authorization,
               authScope,
-              etag);
+              etag,
+              isEmulated);
         this.connectRouteId = connectRouteId;
         this.state = CacheState.COMMITING;
         this.supplyReplyId = supplyReplyId;
@@ -125,7 +127,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         {
             return false;
         }
-        int headerSlot = bp.acquire(requestURLHash());
+        int headerSlot = bp.acquire(requestHash());
         if (headerSlot == Slab.NO_SLOT)
         {
             return false;
@@ -158,7 +160,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
             if (copied)
             {
                 state = CacheState.COMMITTED;
-                cache.put(requestURLHash(), this);
+                cache.put(requestHash(), this);
             }
             else
             {
@@ -256,7 +258,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         this.responseHeadersSize = responseBuffer.capacity();
         headersRW.wrap(responseBuffer, 0, responseHeadersSize);
 
-        for(Map.Entry<String, String> entry : newHeadersMap.entrySet())
+        for (Map.Entry<String, String> entry : newHeadersMap.entrySet())
         {
             headersRW.item(y -> y.name(entry.getKey()).value(entry.getValue()));
         }
@@ -287,7 +289,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         if (slotSpaceRemaining == 0)
         {
             slotSpaceRemaining = slotCapacity;
-            int newSlot = bp.acquire(requestURLHash());
+            int newSlot = bp.acquire(requestHash());
             if (newSlot == Slab.NO_SLOT)
             {
                 return false;

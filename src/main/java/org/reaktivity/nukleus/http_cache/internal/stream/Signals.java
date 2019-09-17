@@ -13,14 +13,18 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
+package org.reaktivity.nukleus.http_cache.internal.stream;
 
-public enum CacheEntryState
+final class Signals
 {
-    INITIALIZED,
-    CAN_REFRESH,
-    CANT_REFRESH,
-    REFRESHING,
-    WAITING_ON_UNCOMMITED,
-    PURGED
+    public static final long CACHE_ENTRY_UPDATED_SIGNAL = 1L;
+    public static final long CACHE_ENTRY_SIGNAL = 2L;
+    public static final long CACHE_ENTRY_ABORTED_SIGNAL = 3L;
+    public static final long REQUEST_EXPIRED_SIGNAL = 4L;
+    public static final long INITIATE_REQUEST_SIGNAL = 5L;
+
+    private Signals()
+    {
+        // utility
+    }
 }

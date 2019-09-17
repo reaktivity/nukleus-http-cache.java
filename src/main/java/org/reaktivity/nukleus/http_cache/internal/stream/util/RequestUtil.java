@@ -15,29 +15,23 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import java.util.Objects;
-import java.util.function.BiConsumer;
-
-@FunctionalInterface
-public interface LongObjectBiConsumer<T> extends BiConsumer<Long, T>
+public final class RequestUtil
 {
-    void accept(long value, T t);
-
-    @Override
-    default void accept(Long value, T t)
+    public static short authorizationScope(
+        long authorization)
     {
-        this.accept(value.longValue(), t);
+        return (short) (authorization >>> 48);
     }
 
-    default LongObjectBiConsumer<T> andThen(
-        LongObjectBiConsumer<? super T> after)
+    public static int requestHash(
+        short authorizationScope,
+        int requestUrlHash)
     {
-        Objects.requireNonNull(after);
+        return 31 * authorizationScope + requestUrlHash;
+    }
 
-        return (l, r) ->
-        {
-            accept(l, r);
-            after.accept(l, r);
-        };
+    private RequestUtil()
+    {
+        // utility
     }
 }

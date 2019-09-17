@@ -17,10 +17,11 @@ package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Predicate;
 
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
@@ -29,8 +30,22 @@ public final class PreferHeader
     public static boolean isPreferIfNoneMatch(
         ListFW<HttpHeaderFW> headers)
     {
-        return HttpHeadersUtil.getHeader(headers, IF_NONE_MATCH) != null &&
+        return getHeader(headers, IF_NONE_MATCH) != null &&
                headers.anyMatch(PREFER_HEADER_NAME);
+    }
+
+    public static boolean isPreferWait(
+        ListFW<HttpHeaderFW> headers)
+    {
+        String prefer = getHeader(headers, PREFER);
+        return prefer != null && prefer.toLowerCase().startsWith("wait=");
+    }
+
+    public static boolean isPreferenceApplied(
+        ListFW<HttpHeaderFW> headers)
+    {
+        String preferecenceApplied = getHeader(headers, PREFERENCE_APPLIED);
+        return preferecenceApplied != null;
     }
 
     public static final Predicate<? super HttpHeaderFW> PREFER_HEADER_NAME = h ->
@@ -38,4 +53,19 @@ public final class PreferHeader
         final String name = h.name().asString();
         return PREFER.equals(name);
     };
+
+    public static int getPreferWait(ListFW<HttpHeaderFW> headers)
+    {
+        String wait = getHeader(headers, PREFER);
+        if (wait != null)
+        {
+            return wait.toLowerCase().startsWith("wait=") ? Integer.parseInt(wait.split("=")[1]) : 0;
+        }
+        return 0;
+    }
+
+    private PreferHeader()
+    {
+        // utility
+    }
 }

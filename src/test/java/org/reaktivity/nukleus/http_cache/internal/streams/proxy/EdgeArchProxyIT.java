@@ -436,7 +436,7 @@ public class EdgeArchProxyIT
     // as there is no buffer slot for headers)
     // Second request gets 503 + retry-after
     @Test
-    @Configure(name=HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value="1")       // 1 buffer slot
+    @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "1")       // 1 buffer slot
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.sends.503.retry-after/accept/client",
@@ -459,8 +459,8 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 2 buffer slots
-    @Configure(name="nukleus.http_cache.slot.capacity", value="4096")
+    @Configure(name = "nukleus.http_cache.capacity", value = "8192")       // 2 buffer slots
+    @Configure(name = "nukleus.http_cache.slot.capacity", value = "4096")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/push.promise.after.cache.full/accept/client",
@@ -472,8 +472,8 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 4 buffer slots
-    @Configure(name="nukleus.http_cache.slot.capacity", value="2048")
+    @Configure(name = "nukleus.http_cache.capacity", value = "8192")       // 4 buffer slots
+    @Configure(name = "nukleus.http_cache.slot.capacity", value = "2048")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/polling.updates.after.cache.full/accept/client",
@@ -559,8 +559,8 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Configure(name="nukleus.http_cache.capacity", value="8192")       // 4 buffer slots
-    @Configure(name="nukleus.http_cache.slot.capacity", value="2048")
+    @Configure(name = "nukleus.http_cache.capacity", value = "8192")       // 4 buffer slots
+    @Configure(name = "nukleus.http_cache.slot.capacity", value = "2048")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/accept/client",

@@ -27,23 +27,28 @@ import java.util.function.ToIntFunction;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.concurrent.SignalingExecutor;
+import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.Request;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
+import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HeapBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
 import org.reaktivity.nukleus.stream.StreamFactory;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 
-public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
+public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 {
 
     private final HttpCacheConfiguration config;
     private final LongObjectBiConsumer<Runnable> scheduler;
-    private final Long2ObjectHashMap<Request> correlations;
+    private final Long2ObjectHashMap<Request> requestCorrelations;
+    private final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
 
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
@@ -53,24 +58,28 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     private LongUnaryOperator supplyReplyId;
     private Slab cacheBufferPool;
     private HeapBufferPool requestBufferPool;
-    private Cache cache;
-    private BudgetManager budgetManager;
+    private Cache emulatedCache;
+    private DefaultCache defaultCache;
+    private BudgetManager emulatedBudgetManager;
+    private BudgetManager defaultBudgetManager;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
+    private SignalingExecutor executor;
 
-    private int etagCnt = 0;
+    private LongConsumer cacheEntries;
 
-    public ProxyStreamFactoryBuilder(
+    public HttpCacheProxyFactoryBuilder(
             HttpCacheConfiguration config,
             LongObjectBiConsumer<Runnable> scheduler)
     {
         this.config = config;
+        this.requestCorrelations = new Long2ObjectHashMap<>();
         this.correlations = new Long2ObjectHashMap<>();
         this.scheduler = scheduler;
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setRouteManager(
+    public HttpCacheProxyFactoryBuilder setRouteManager(
         RouteManager router)
     {
         this.router = router;
@@ -78,7 +87,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setWriteBuffer(
+    public HttpCacheProxyFactoryBuilder setWriteBuffer(
         MutableDirectBuffer writeBuffer)
     {
         this.writeBuffer = writeBuffer;
@@ -86,7 +95,7 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setInitialIdSupplier(
+    public HttpCacheProxyFactoryBuilder setInitialIdSupplier(
         LongUnaryOperator supplyInitialId)
     {
         this.supplyInitialId = supplyInitialId;
@@ -118,14 +127,14 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setGroupBudgetClaimer(
+    public HttpCacheProxyFactoryBuilder setGroupBudgetClaimer(
         LongFunction<IntUnaryOperator> groupBudgetClaimer)
     {
         return this;
     }
 
     @Override
-    public ProxyStreamFactoryBuilder setGroupBudgetReleaser(
+    public HttpCacheProxyFactoryBuilder setGroupBudgetReleaser(
         LongFunction<IntUnaryOperator> groupBudgetReleaser)
     {
         return this;
@@ -155,48 +164,73 @@ public class ProxyStreamFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
+    public StreamFactoryBuilder setExecutor(
+        SignalingExecutor executor)
+    {
+        this.executor = executor;
+        return this;
+    }
+
+    @Override
     public StreamFactory build()
     {
         final HttpCacheCounters counters = new HttpCacheCounters(supplyCounter, supplyAccumulator);
 
-        if (cache == null)
+        if (emulatedBudgetManager == null && defaultBudgetManager == null)
         {
-            budgetManager = new BudgetManager();
+            emulatedBudgetManager = new BudgetManager();
+            defaultBudgetManager =  new BudgetManager();
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
             this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
-
-            LongConsumer cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
-            this.cache = new Cache(
-                    scheduler,
-                    budgetManager,
-                    writeBuffer,
-                    requestBufferPool,
-                    cacheBufferPool,
-                    correlations,
-                    counters,
-                    cacheEntries,
-                    supplyTrace,
-                    supplyTypeId);
         }
 
-        return new ProxyStreamFactory(
-                router,
-                budgetManager,
-                writeBuffer,
-                requestBufferPool,
-                supplyInitialId,
-                supplyReplyId,
-                correlations,
-                cache,
-                counters,
-                supplyTrace,
-                supplyTypeId);
+        cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
+
+        if (emulatedCache == null)
+        {
+            this.emulatedCache = new Cache(router,
+                                           scheduler,
+                                           emulatedBudgetManager,
+                                           writeBuffer,
+                                           requestBufferPool,
+                                           cacheBufferPool,
+                                           requestCorrelations,
+                                           counters,
+                                           cacheEntries,
+                                           supplyTrace,
+                                           supplyTypeId);
+        }
+
+        if (defaultCache == null)
+        {
+            this.defaultCache = new DefaultCache(router,
+                                                 writeBuffer,
+                                                 cacheBufferPool,
+                                                 counters,
+                                                 cacheEntries,
+                                                 supplyTrace,
+                                                 supplyTypeId,
+                                                 config.allowedCachePercentage(),
+                                                 config.cacheCapacity());
+        }
+
+        return new HttpCacheProxyFactory(router,
+                                         defaultBudgetManager,
+                                         writeBuffer,
+                                         requestBufferPool,
+                                         supplyInitialId,
+                                         supplyReplyId,
+                                         requestCorrelations,
+                                         correlations,
+                                         emulatedCache,
+                                         defaultCache,
+                                         counters,
+                                         supplyTrace,
+                                         supplyTypeId,
+                                         executor,
+                                         scheduler);
     }
 
-    private String getEtagSupply()
-    {
-        return "\"" + config.cacheEtagPrefix() + "a" + etagCnt++ + "\"";
-    }
 }

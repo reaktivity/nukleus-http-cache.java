@@ -26,9 +26,9 @@ import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class SurrogateControl
 {
-    public static final String MAX_AGE = "max-age";
+    private static final String MAX_AGE = "max-age";
     private static final Pattern CACHE_PATTERN = Pattern
-            .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\\\")?\\s*");
+        .compile("\\s*([\\w\\-]+)\\s*(=)?\\s*(\\d+\\+?\\d+|\\d+|\"([^\"\\\\]*(\\\\.[^\"\\\\]*)*)+\")?\\s*");
     private static final String X_PROTECTED = "x-protected";
 
     public static int getSurrogateFreshnessExtension(
@@ -48,7 +48,8 @@ public final class SurrogateControl
                 if (MAX_AGE.equals(matcher.group(1)))
                 {
                     String maxAge = matcher.group(3);
-                    if (maxAge.contains("+"))
+                    if (maxAge != null &&
+                        maxAge.contains("+"))
                     {
                         // TODO change to matcher
                         final String value = maxAge.split("\\+")[1];
@@ -81,16 +82,13 @@ public final class SurrogateControl
                 if (MAX_AGE.equals(matcher.group(1)))
                 {
                     String maxAge = matcher.group(3);
-                    if (maxAge.contains("+"))
+                    if (maxAge != null &&
+                        maxAge.contains("+"))
                     {
                         // TODO change to matcher
-                        final String value = maxAge.split("\\+")[0];
-                        return Integer.parseInt(value);
+                        maxAge = maxAge.split("\\+")[0];
                     }
-                    else
-                    {
-                        return -1;
-                    }
+                    return Integer.parseInt(maxAge);
                 }
             }
         }
@@ -114,4 +112,8 @@ public final class SurrogateControl
         return false;
     }
 
+    private SurrogateControl()
+    {
+        // utility
+    }
 }

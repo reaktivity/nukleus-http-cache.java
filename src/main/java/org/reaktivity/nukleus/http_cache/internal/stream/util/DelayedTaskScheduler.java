@@ -75,7 +75,7 @@ public class DelayedTaskScheduler
             long c = System.currentTimeMillis();
             SortedSet<Long> past = scheduledTimes.headSet(c);
             Iterator<Long> iter = past.iterator();
-            while(iter.hasNext())
+            while (iter.hasNext())
             {
                 Long time = iter.next();
                 iter.remove();

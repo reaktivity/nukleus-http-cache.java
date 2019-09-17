@@ -81,10 +81,10 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(1);
-        counters.assertRequestsCacheable(0);
+        counters.assertRequestsCacheable(1);
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -330,10 +330,10 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(0);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(0); // In future this can change if we cache the entry
+        counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
     }
 
     @Test
@@ -346,10 +346,10 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(0);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(0); // In future this can change if we cache the entry
+        counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
     }
 
     @Test
@@ -362,7 +362,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(2);
+        counters.assertRequestsCacheable(1);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
@@ -370,13 +370,13 @@ public class Rfc7234ProxyIT
 
     @Test
     @Ignore("no-store is not implemented, need fix in ProxyAcceptStreamHandle begin" +
-            "(can be served by cache but is not CacheableRequest)")
+            "(can be served by cache but is not CacheableRequestOld)")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/accept/client",
         "${streams}/cache.get.request.with.no-store.and.response.marked.cacheable/connect/server",
     })
-    public void shouldCacheGetRequestWithNoStoreAndResponeMarkedCacheable() throws Exception
+    public void shouldCacheGetRequestWithNoStoreAndResponseMarkedCacheable() throws Exception
     {
         k3po.start();
         counters.assertRequests(2);
@@ -415,7 +415,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(1);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
@@ -478,7 +478,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertRequests(2);
-        counters.assertRequestsCacheable(1);
+        counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
@@ -788,6 +788,7 @@ public class Rfc7234ProxyIT
         "${streams}/response.no-cache.with.max-stale/accept/client",
         "${streams}/response.no-cache.with.max-stale/connect/server",
     })
+    @Ignore("Requires further review")
     public void shouldRevalidateOnResponseNoCacheWithStaleResponseConfigured() throws Exception
     {
         k3po.start();
@@ -847,6 +848,18 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/use.etag.from.trailer.on.200.response/accept/client",
+        "${streams}/use.etag.from.trailer.on.200.response/connect/server",
+    })
+    public void shouldUseEtagFromTrailerOn200Response() throws Exception
+    {
+        k3po.finish();
         counters.assertExpectedCacheEntries(1);
     }
 }

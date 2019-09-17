@@ -44,7 +44,9 @@ public class Slab implements BufferPool
     private final BitSet used;
     private final int[] availableSlots;
 
-    public Slab(int totalCapacity, int slotCapacity)
+    public Slab(
+        int totalCapacity,
+        int slotCapacity)
     {
         if (!isZeroOrPowerOfTwo(totalCapacity))
         {
@@ -80,7 +82,8 @@ public class Slab implements BufferPool
     }
 
     @Override
-    public int acquire(long streamId)
+    public int acquire(
+        long streamId)
     {
         if (availableSlots[0] == 0)
         {
@@ -98,7 +101,8 @@ public class Slab implements BufferPool
     }
 
     @Override
-    public MutableDirectBuffer buffer(int slot)
+    public MutableDirectBuffer buffer(
+        int slot)
     {
         assert used.get(slot);
         final long slotAddressOffset = slabBuffer.addressOffset() + (slot << bitsPerSlot);
@@ -107,7 +111,8 @@ public class Slab implements BufferPool
     }
 
     @Override
-    public ByteBuffer byteBuffer(int slot)
+    public ByteBuffer byteBuffer(
+        int slot)
     {
         assert used.get(slot);
         final int slotOffset = slot << bitsPerSlot;
@@ -118,7 +123,9 @@ public class Slab implements BufferPool
     }
 
     @Override
-    public MutableDirectBuffer buffer(int slot, int offset)
+    public MutableDirectBuffer buffer(
+        int slot,
+        int offset)
     {
         assert used.get(slot);
         final long slotAddressOffset = slabBuffer.addressOffset() + (slot << bitsPerSlot);
@@ -131,7 +138,8 @@ public class Slab implements BufferPool
      * @param slot - Id of a previously acquired slot
      */
     @Override
-    public void release(int slot)
+    public void release(
+        int slot)
     {
         assert used.get(slot);
         used.clear(slot);

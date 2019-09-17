@@ -15,11 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import java.nio.ByteBuffer;
+
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
-
-import java.nio.ByteBuffer;
 
 public class HeapBufferPool implements BufferPool
 {
@@ -51,7 +51,7 @@ public class HeapBufferPool implements BufferPool
     @Override
     public int acquire(long streamId)
     {
-        for(int i=0; i < buffers.length; i++)
+        for (int i = 0; i < buffers.length; i++)
         {
             if (buffers[i] == null)
             {
