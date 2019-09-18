@@ -216,7 +216,8 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                                  config.cacheCapacity());
         }
 
-        return new HttpCacheProxyFactory(router,
+        return new HttpCacheProxyFactory(config,
+                                         router,
                                          defaultBudgetManager,
                                          writeBuffer,
                                          requestBufferPool,
@@ -230,8 +231,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          supplyTrace,
                                          supplyTypeId,
                                          executor,
-                                         scheduler,
-                                         config.preferWaitMaximum());
+                                         scheduler);
     }
 
 }

@@ -38,6 +38,7 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
+import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
@@ -105,6 +106,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     private final Int2ObjectHashMap<HttpProxyCacheableRequestGroup> requestGroups;
 
     public HttpCacheProxyFactory(
+        HttpCacheConfiguration config,
         RouteManager router,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
@@ -119,15 +121,14 @@ public class HttpCacheProxyFactory implements StreamFactory
         LongSupplier supplyTrace,
         ToIntFunction<String> supplyTypeId,
         SignalingExecutor executor,
-        LongObjectBiConsumer<Runnable> scheduler,
-        int preferWaitMaximum)
+        LongObjectBiConsumer<Runnable> scheduler)
     {
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyTrace = requireNonNull(supplyTrace);
         this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.preferWaitMaximum = preferWaitMaximum;
+        this.preferWaitMaximum = config.preferWaitMaximum();
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.request.acquires"),
