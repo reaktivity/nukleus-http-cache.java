@@ -414,7 +414,7 @@ final class HttpCacheProxyCacheableRequest
             int preferWait = getPreferWait(requestHeaders);
             if (preferWait > 0)
             {
-                preferWaitExpired = this.factory.executor.schedule(preferWait,
+                preferWaitExpired = this.factory.executor.schedule(Math.min(preferWait, factory.preferWaitMaximum),
                                                                    SECONDS,
                                                                    this.acceptRouteId,
                                                                    this.acceptReplyId,
