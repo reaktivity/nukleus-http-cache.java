@@ -516,8 +516,8 @@ final class HttpCacheProxyCacheableRequest
             {
                 final String name = h.name().asString();
                 final String value = h.value().asString();
-                if (!CONTENT_LENGTH.equalsIgnoreCase(name) &&
-                    !AUTHORIZATION.equalsIgnoreCase(name))
+                if (!CONTENT_LENGTH.equals(name) &&
+                    !AUTHORIZATION.equals(name))
                 {
                     builder.item(item -> item.name(name).value(value));
                 }
