@@ -29,8 +29,8 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -245,7 +245,7 @@ final class HttpCacheProxyCachedRequest
         DefaultCacheEntry cacheEntry,
         long signalId)
     {
-        ListFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+        ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
         if (DEBUG)
         {

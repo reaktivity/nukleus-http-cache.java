@@ -40,8 +40,8 @@ import java.util.stream.Collectors;
 
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public final class CacheUtils
 {
@@ -58,7 +58,7 @@ public final class CacheUtils
     }
 
     public static boolean canBeServedByEmulatedCache(
-        ListFW<HttpHeaderFW> headers)
+        ArrayFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
         {
@@ -81,7 +81,7 @@ public final class CacheUtils
         });
     }
 
-    public static boolean isCacheableResponse(ListFW<HttpHeaderFW> response)
+    public static boolean isCacheableResponse(ArrayFW<HttpHeaderFW> response)
     {
         if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
                               h.value().asString().contains(CacheDirectives.PRIVATE)) ||
@@ -94,7 +94,7 @@ public final class CacheUtils
         return isPrivatelyCacheable(response);
     }
 
-    public static boolean isPrivatelyCacheable(ListFW<HttpHeaderFW> response)
+    public static boolean isPrivatelyCacheable(ArrayFW<HttpHeaderFW> response)
     {
         // TODO force passing of CacheControl as FW
         String cacheControl = getHeader(response, HttpHeaders.CACHE_CONTROL);
@@ -133,8 +133,8 @@ public final class CacheUtils
     }
 
     public static boolean sameAuthorizationScope(
-        ListFW<HttpHeaderFW> request,
-        ListFW<HttpHeaderFW> cachedRequest,
+        ArrayFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> cachedRequest,
         CacheControl cachedResponse)
     {
         assert request.buffer() != cachedRequest.buffer();
@@ -163,9 +163,9 @@ public final class CacheUtils
     }
 
     public static boolean doesNotVary(
-        ListFW<HttpHeaderFW> request,
-        ListFW<HttpHeaderFW> cachedResponse,
-        ListFW<HttpHeaderFW> cachedRequest)
+        ArrayFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> cachedResponse,
+        ArrayFW<HttpHeaderFW> cachedRequest)
     {
         assert request != cachedRequest;
         assert request.buffer() != cachedRequest.buffer();
@@ -212,7 +212,7 @@ public final class CacheUtils
 
     public static boolean isVaryHeader(
             String header,
-            ListFW<HttpHeaderFW> cachedResponse)
+            ArrayFW<HttpHeaderFW> cachedResponse)
     {
         final String cachedVaryHeader = getHeader(cachedResponse, "vary");
         if (cachedVaryHeader == null)
@@ -224,7 +224,7 @@ public final class CacheUtils
     }
 
     public static boolean isMatchByEtag(
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         String etag)
     {
         String ifMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
