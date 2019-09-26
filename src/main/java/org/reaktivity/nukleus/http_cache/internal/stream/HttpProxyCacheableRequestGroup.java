@@ -52,7 +52,8 @@ final class HttpProxyCacheableRequestGroup
         return recentAuthorizationToken;
     }
 
-    void setRecentAuthorizationToken(String recentAuthorizationToken)
+    void setRecentAuthorizationToken(
+        String recentAuthorizationToken)
     {
         this.recentAuthorizationToken = recentAuthorizationToken;
     }

@@ -45,8 +45,6 @@ final class HttpCacheProxyNonCacheableResponse
     private final long acceptReplyId;
 
     private int acceptReplyBudget;
-    private long groupId;
-    private int padding;
 
     HttpCacheProxyNonCacheableResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
@@ -69,8 +67,8 @@ final class HttpCacheProxyNonCacheableResponse
     @Override
     public String toString()
     {
-        return String.format("%s[connectRouteId=%016x, connectReplyStreamId=%d, padding=%d]",
-                             getClass().getSimpleName(), connectRouteId, connectReplyId,  padding);
+        return String.format("%s[connectRouteId=%016x, connectReplyStreamId=%d]",
+                             getClass().getSimpleName(), connectRouteId, connectReplyId);
     }
 
     void onResponseMessage(
@@ -177,11 +175,15 @@ final class HttpCacheProxyNonCacheableResponse
         final WindowFW window)
     {
         final int credit = window.credit();
-        padding = window.padding();
-        groupId = window.groupId();
+        final int padding = window.padding();
+        final long groupId = window.groupId();
         acceptReplyBudget += credit;
-        httpCacheProxyFactory.writer.doWindow(connectReplyThrottle, connectRouteId,
-                                              connectReplyId, window.trace(), credit, padding, groupId);
+        httpCacheProxyFactory.writer.doWindow(connectReplyThrottle,
+                                              connectRouteId,
+                                              connectReplyId,
+                                              window.trace(),
+                                              credit, padding,
+                                              groupId);
     }
 
     private void onReset(

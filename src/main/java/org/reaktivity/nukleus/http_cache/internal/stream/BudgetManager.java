@@ -66,8 +66,8 @@ public class BudgetManager
     private class GroupBudget
     {
         final long groupId;
-        final int initialBudget;
         final Long2ObjectHashMap<StreamBudget> streamMap;  // stream id -> BudgetEnty
+        int initialBudget;
         int budget;
 
         GroupBudget(long groupId, int initialBudget)
@@ -105,6 +105,10 @@ public class BudgetManager
         private void moreBudget(int credit, long trace)
         {
             budget += credit;
+            if (budget > initialBudget)
+            {
+                initialBudget = budget;
+            }
             assert budget <= initialBudget;
 
             streamMap.forEach((k, stream) ->
@@ -118,6 +122,10 @@ public class BudgetManager
                     int remaining = stream.budgetAvailable.checkBudget(slice, trace);
                     budget += remaining;
                     stream.unackedBudget -= remaining;
+                    if (stream.unackedBudget < 0)
+                    {
+                        stream.unackedBudget = 0;
+                    }
                 }
             });
         }
@@ -146,6 +154,10 @@ public class BudgetManager
             GroupBudget groupBudget = groups.get(groupId);
             StreamBudget streamBudget = groupBudget.get(streamId);
             streamBudget.unackedBudget -= credit;
+            if (streamBudget.unackedBudget < 0)
+            {
+                streamBudget.unackedBudget = 0;
+            }
             streamBudget.closing = true;
             if (credit > 0)
             {
@@ -203,7 +215,10 @@ public class BudgetManager
             else
             {
                 streamBudget.unackedBudget -= credit;
-                assert streamBudget.unackedBudget >= 0;
+                if (streamBudget.unackedBudget < 0)
+                {
+                    streamBudget.unackedBudget = 0;
+                }
                 gotBudget = true;
             }
 
