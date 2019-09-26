@@ -25,8 +25,8 @@ import java.util.function.Function;
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -113,7 +113,7 @@ final class HttpCacheProxyRetryResponse
                               getHeader(httpBeginFW.headers(), ":status"));
         }
 
-        final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
         String status = getHeader(responseHeaders, STATUS);
         retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
         assert status != null;

@@ -47,8 +47,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -57,13 +57,13 @@ public class Cache
 {
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
-    final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedResponse1HeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedResponse1HeadersRO = new HttpBeginExFW().headers();
 
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
 
     final WindowFW windowRO = new WindowFW();
 
@@ -215,7 +215,7 @@ public class Cache
 
     public boolean handleInitialRequest(
         int requestHash,
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short authScope,
         CacheableRequest cacheableRequest)
     {
@@ -277,7 +277,7 @@ public class Cache
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
         MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+        ArrayFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
         correlations.put(connectReplyId, request);
 
@@ -314,7 +314,7 @@ public class Cache
     public void handlePreferWaitIfNoneMatchRequest(
         int requestHash,
         PreferWaitIfNoneMatchRequest preferWaitRequest,
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestHash);
@@ -366,17 +366,17 @@ public class Cache
     }
 
     private boolean doesNotVary(
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         InitialRequest request)
     {
-        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
-        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
+        ArrayFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
+        ArrayFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
         return CacheUtils.doesNotVary(requestHeaders, cachedResponseHeaders, cachedRequestHeaders);
     }
 
     private boolean serveRequest(
         CacheEntry entry,
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short authScope,
         AnswerableByCacheRequest cacheableRequest)
     {

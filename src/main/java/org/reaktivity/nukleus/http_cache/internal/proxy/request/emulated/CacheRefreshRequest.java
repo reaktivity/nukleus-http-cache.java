@@ -20,8 +20,8 @@ import java.util.Objects;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.CacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 
 public class CacheRefreshRequest extends CacheableRequest
 {
@@ -59,7 +59,7 @@ public class CacheRefreshRequest extends CacheableRequest
 
     @Override
     public boolean storeResponseHeaders(
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         Cache cache,
         BufferPool bufferPool)
     {

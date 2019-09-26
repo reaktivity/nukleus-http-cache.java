@@ -21,8 +21,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -104,7 +104,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
     {
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // count all requests
         factory.counters.requests.getAsLong();

@@ -33,9 +33,9 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DirectBufferUtil;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
@@ -116,7 +116,7 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
     }
 
     public boolean storeResponseHeaders(
-            ListFW<HttpHeaderFW> responseHeaders,
+            ArrayFW<HttpHeaderFW> responseHeaders,
             Cache cache,
             BufferPool bp)
     {
@@ -206,28 +206,28 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return requestSlot;
     }
 
-    public final ListFW<HttpHeaderFW> getRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeadersRO)
+    public final ArrayFW<HttpHeaderFW> getRequestHeaders(
+        ArrayFW<HttpHeaderFW> requestHeadersRO)
     {
         return getRequestHeaders(requestHeadersRO, requestPool);
     }
 
-    public final ListFW<HttpHeaderFW> getRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeadersRO,
+    public final ArrayFW<HttpHeaderFW> getRequestHeaders(
+        ArrayFW<HttpHeaderFW> requestHeadersRO,
         BufferPool bp)
     {
         final MutableDirectBuffer buffer = bp.buffer(requestSlot);
         return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
-    public ListFW<HttpHeaderFW> getResponseHeaders(
-        ListFW<HttpHeaderFW> responseHeadersRO)
+    public ArrayFW<HttpHeaderFW> getResponseHeaders(
+        ArrayFW<HttpHeaderFW> responseHeadersRO)
     {
         return getResponseHeaders(responseHeadersRO, responsePool);
     }
 
-    public ListFW<HttpHeaderFW> getResponseHeaders(
-        ListFW<HttpHeaderFW> responseHeadersRO,
+    public ArrayFW<HttpHeaderFW> getResponseHeaders(
+        ArrayFW<HttpHeaderFW> responseHeadersRO,
         BufferPool bp)
     {
         Integer firstResponseSlot = responseSlots.get(0);
@@ -235,10 +235,10 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         return responseHeadersRO.wrap(responseBuffer, 0, responseHeadersSize);
     }
 
-    public void updateResponseHeader(ListFW<HttpHeaderFW> newHeaders)
+    public void updateResponseHeader(ArrayFW<HttpHeaderFW> newHeaders)
     {
-        final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
-        ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
+        final ArrayFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
+        ArrayFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
         String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
                 .toLowerCase().equals(":status"))).value().asString();
 
@@ -252,8 +252,8 @@ public abstract class CacheableRequest extends AnswerableByCacheRequest
         Integer firstResponseSlot = responseSlots.get(0);
         MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
 
-        final ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
-                new ListFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
+        final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
+                new ArrayFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
 
         this.responseHeadersSize = responseBuffer.capacity();
         headersRW.wrap(responseBuffer, 0, responseHeadersSize);

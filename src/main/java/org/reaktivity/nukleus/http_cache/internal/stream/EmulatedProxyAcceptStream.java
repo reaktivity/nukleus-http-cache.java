@@ -34,8 +34,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Initial
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -120,7 +120,7 @@ final class EmulatedProxyAcceptStream
 
         final OctetsFW extension = streamFactory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
         final boolean authorizationHeader = requestHeaders.anyMatch(HAS_AUTHORIZATION);
 
         // Should already be canonicalized in http / http2 nuklei
@@ -175,7 +175,7 @@ final class EmulatedProxyAcceptStream
         boolean authorizationHeader,
         long authorization,
         short authScope,
-        ListFW<HttpHeaderFW> requestHeaders)
+        ArrayFW<HttpHeaderFW> requestHeaders)
     {
         String etag = null;
         HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
@@ -206,7 +206,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private void handleCacheableRequest(
-        final ListFW<HttpHeaderFW> requestHeaders,
+        final ArrayFW<HttpHeaderFW> requestHeaders,
         final String requestURL,
         boolean authorizationHeader,
         long authorization,
@@ -277,7 +277,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private void proxyRequest(
-        final ListFW<HttpHeaderFW> requestHeaders)
+        final ArrayFW<HttpHeaderFW> requestHeaders)
     {
         this.request = new ProxyRequest(
                 acceptReply,
@@ -300,7 +300,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private void sendBeginToConnect(
-        final ListFW<HttpHeaderFW> requestHeaders,
+        final ArrayFW<HttpHeaderFW> requestHeaders,
         long connectCorrelationId)
     {
         streamFactory.requestCorrelations.put(connectCorrelationId, request);
@@ -316,7 +316,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private boolean storeRequest(
-        final ListFW<HttpHeaderFW> headers,
+        final ArrayFW<HttpHeaderFW> headers,
         final BufferPool bufferPool)
     {
         this.requestSlot = bufferPool.acquire(acceptStreamId);
