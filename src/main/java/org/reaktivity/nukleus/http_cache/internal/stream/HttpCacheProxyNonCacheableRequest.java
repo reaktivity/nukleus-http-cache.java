@@ -170,9 +170,7 @@ final class HttpCacheProxyNonCacheableRequest
             connectRouteId,
             connectInitialId,
             factory.supplyTrace.getAsLong(),
-            builder -> requestHeaders.forEach(
-                h ->  builder.item(item -> item.name(h.name()).value(h.value()))
-                                             ));
+            builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
 
         factory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }

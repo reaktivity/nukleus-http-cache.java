@@ -19,6 +19,7 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isMatchByEtag;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.OK_200;
@@ -322,7 +323,9 @@ public class DefaultCache
             {
             case CACHE_CONTROL:
                 // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
+                return value.contains(CacheDirectives.NO_CACHE) ||
+                       value.contains(MAX_AGE_0) ||
+                       value.contains(NO_STORE);
             default:
                 return false;
             }
