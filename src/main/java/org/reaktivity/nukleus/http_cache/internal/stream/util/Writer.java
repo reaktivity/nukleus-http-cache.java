@@ -42,10 +42,10 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
 import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
@@ -72,7 +72,7 @@ public class Writer
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
     private final SignalFW.Builder signalRW = new SignalFW.Builder();
 
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     private final RouteManager router;
     private final MutableDirectBuffer writeBuffer;
@@ -127,7 +127,7 @@ public class Writer
         long routeId,
         long streamId,
         CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
         boolean cacheControlPrivate,
@@ -149,8 +149,8 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        ListFW<HttpHeaderFW> responseHeaders,
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale,
         long traceId)
@@ -172,8 +172,8 @@ public class Writer
 
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-        ListFW<HttpHeaderFW> responseHeaders,
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale)
     {
@@ -215,7 +215,7 @@ public class Writer
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
         boolean cacheControlPrivate)
@@ -439,7 +439,7 @@ public class Writer
     }
 
     private Flyweight.Builder.Visitor visitHttpBeginEx(
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
         return (buffer, offset, limit) ->
                 httpBeginExRW.wrap(buffer, offset, limit)
@@ -450,7 +450,7 @@ public class Writer
     }
 
     private Flyweight.Builder.Visitor visitHttpEndEx(
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
     {
         return (buffer, offset, limit) ->
             httpEndExRW.wrap(buffer, offset, limit)
@@ -463,11 +463,11 @@ public class Writer
     public void doHttpPushPromise(
         AnswerableByCacheRequest request,
         CacheableRequest cachedRequest,
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
-        final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
+        final ArrayFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply;
         final long routeId = request.acceptRouteId;
         final long streamId = request.acceptReplyId;
@@ -480,8 +480,8 @@ public class Writer
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-        ListFW<HttpHeaderFW> requestHeadersRO,
-        ListFW<HttpHeaderFW> responseHeadersRO,
+        ArrayFW<HttpHeaderFW> requestHeadersRO,
+        ArrayFW<HttpHeaderFW> responseHeadersRO,
         int freshnessExtension,
         String etag)
     {
@@ -492,8 +492,8 @@ public class Writer
     }
 
     private void updateRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeadersFW,
-        ListFW<HttpHeaderFW> responseHeadersFW,
+        ArrayFW<HttpHeaderFW> requestHeadersFW,
+        ArrayFW<HttpHeaderFW> responseHeadersFW,
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         int freshnessExtension,
         String etag)
@@ -582,7 +582,7 @@ public class Writer
         long authorization,
         long groupId,
         int padding,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
@@ -612,7 +612,7 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        ListFW<HttpHeaderFW> requestHeaders)
+        ArrayFW<HttpHeaderFW> requestHeaders)
     {
         this.doHttpResponse(receiver, routeId, streamId, traceId, builder ->
         {
