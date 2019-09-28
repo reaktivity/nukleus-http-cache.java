@@ -144,7 +144,7 @@ final class HttpCacheProxyNonCacheableResponse
         final DataFW data)
     {
         final OctetsFW payload = data.payload();
-        acceptReplyBudget -= payload.sizeof() + data.padding();
+        acceptReplyBudget -= data.reserved();
         assert acceptReplyBudget >= 0;
         httpCacheProxyFactory.writer.doHttpData(acceptReply,
                                                 acceptRouteId,
@@ -154,7 +154,7 @@ final class HttpCacheProxyNonCacheableResponse
                                                 payload.buffer(),
                                                 payload.offset(),
                                                 payload.sizeof(),
-                                                data.padding());
+                                                data.reserved());
     }
 
     private void onEnd(

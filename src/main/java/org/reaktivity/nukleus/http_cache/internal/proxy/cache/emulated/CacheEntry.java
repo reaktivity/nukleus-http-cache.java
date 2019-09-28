@@ -467,7 +467,7 @@ public final class CacheEntry
                     acceptReplyStreamId,
                     trace,
                     0L,
-                    padding,
+                    toWrite + padding,
                     p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;

@@ -179,7 +179,6 @@ final class HttpCacheProxyNonCacheableRequest
         final DataFW data)
     {
         final long groupId = data.groupId();
-        final int padding = data.padding();
         final OctetsFW payload = data.payload();
 
         factory.writer.doHttpData(connectInitial,
@@ -190,7 +189,7 @@ final class HttpCacheProxyNonCacheableRequest
                                   payload.buffer(),
                                   payload.offset(),
                                   payload.sizeof(),
-                                  padding);
+                                  data.reserved());
     }
 
     private void onEnd(

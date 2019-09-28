@@ -126,7 +126,7 @@ final class HttpCacheProxyRetryResponse
     private void onData(
         DataFW data)
     {
-        sendWindow(data.length() + data.padding(), data.trace());
+        sendWindow(data.reserved(), data.trace());
     }
 
     private void onEnd(EndFW end)
