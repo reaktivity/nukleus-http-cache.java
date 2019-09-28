@@ -407,7 +407,6 @@ final class EmulatedProxyAcceptStream
         final DataFW data)
     {
         final long groupId = data.groupId();
-        final int padding = data.padding();
         final OctetsFW payload = data.payload();
 
         streamFactory.writer.doHttpData(connect,
@@ -418,7 +417,7 @@ final class EmulatedProxyAcceptStream
                                         payload.buffer(),
                                         payload.offset(),
                                         payload.sizeof(),
-                                        padding);
+                                        data.reserved());
     }
 
     private void onEndWhenProxying(

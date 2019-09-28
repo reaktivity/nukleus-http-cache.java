@@ -144,8 +144,8 @@ final class HttpCacheProxyCachedNotModifiedRequest
                                 acceptRouteId,
                                 acceptInitialId,
                                 data.trace(),
-                                data.sizeof(),
-                                data.padding(),
+                                data.reserved(),
+                                0,
                                 data.groupId());
     }
 

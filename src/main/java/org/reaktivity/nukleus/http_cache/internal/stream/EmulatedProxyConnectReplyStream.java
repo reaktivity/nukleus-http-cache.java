@@ -459,7 +459,7 @@ final class EmulatedProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
-        connectReplyBudget -= data.length() + data.padding();
+        connectReplyBudget -= data.reserved();
         if (connectReplyBudget < 0)
         {
             streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
@@ -468,7 +468,7 @@ final class EmulatedProxyConnectReplyStream
         else
         {
             final OctetsFW payload = data.payload();
-            acceptReplyBudget -= payload.sizeof() + data.padding();
+            acceptReplyBudget -= data.reserved();
             assert acceptReplyBudget >= 0;
             streamFactory.writer.doHttpData(
                     acceptReply,
@@ -479,7 +479,7 @@ final class EmulatedProxyConnectReplyStream
                     payload.buffer(),
                     payload.offset(),
                     payload.sizeof(),
-                    data.padding()
+                    data.reserved()
             );
         }
     }

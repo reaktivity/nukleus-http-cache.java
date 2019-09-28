@@ -274,7 +274,7 @@ public class Writer
         DirectBuffer payload,
         int offset,
         int length,
-        int padding)
+        int reserved)
     {
 
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
@@ -282,7 +282,7 @@ public class Writer
                 .streamId(streamId)
                 .trace(traceId)
                 .groupId(groupId)
-                .padding(padding)
+                .reserved(reserved)
                 .payload(p -> p.set(payload, offset, length))
                 .build();
 
@@ -295,7 +295,7 @@ public class Writer
         long streamId,
         long traceId,
         long groupId,
-        int padding,
+        int reserved,
         Consumer<OctetsFW.Builder> payload)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
@@ -303,7 +303,7 @@ public class Writer
                 .streamId(streamId)
                 .trace(traceId)
                 .groupId(groupId)
-                .padding(padding)
+                .reserved(reserved)
                 .payload(payload)
                 .build();
 
@@ -581,7 +581,7 @@ public class Writer
         long streamId,
         long authorization,
         long groupId,
-        int padding,
+        int reserved,
         Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
@@ -589,7 +589,7 @@ public class Writer
                 .streamId(streamId)
                 .authorization(authorization)
                 .groupId(groupId)
-                .padding(padding)
+                .reserved(reserved)
                 .payload((OctetsFW) null)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();

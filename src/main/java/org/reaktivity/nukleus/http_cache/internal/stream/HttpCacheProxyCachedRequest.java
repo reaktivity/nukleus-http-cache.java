@@ -164,8 +164,8 @@ final class HttpCacheProxyCachedRequest
                                 acceptRouteId,
                                 acceptInitialId,
                                 data.trace(),
-                                data.sizeof(),
-                                data.padding(),
+                                data.reserved(),
+                                0,
                                 data.groupId());
     }
 
@@ -312,7 +312,7 @@ final class HttpCacheProxyCachedRequest
                 acceptReplyId,
                 trace,
                 groupId,
-                padding,
+                toWrite + padding,
                 p -> buildResponsePayload(payloadWritten,
                                           toWrite,
                                           p,

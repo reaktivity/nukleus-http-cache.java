@@ -167,7 +167,7 @@ final class HttpCacheProxyCacheableResponse
     private void onData(
         DataFW data)
     {
-        sendWindow(data.length() + data.padding(), data.trace());
+        sendWindow(data.reserved(), data.trace());
         assert requestSlot.value != NO_SLOT;
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
