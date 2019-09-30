@@ -185,7 +185,7 @@ public class DefaultCache
         return true;
     }
 
-    public boolean isUpdatedByResponseHeadersToRetry(
+    public boolean checkToRetry(
         ListFW<HttpHeaderFW> requestHeaders,
         ListFW<HttpHeaderFW> responseHeaders,
         String ifNoneMatch,
@@ -208,16 +208,17 @@ public class DefaultCache
                 if (etagMatches)
                 {
                     DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
-                    cacheEntry.updateResponseHeader(status, responseHeaders);
+                    if (cacheEntry != null)
+                    {
+                        cacheEntry.updateResponseHeader(status, responseHeaders);
+                    }
                 }
             }
 
-            boolean notModified = status.equals(NOT_MODIFIED_304) || etagMatches;
-
-            return !notModified;
+            return status.equals(NOT_MODIFIED_304) || etagMatches;
         }
 
-        return true;
+        return false;
     }
 
     public void send304(

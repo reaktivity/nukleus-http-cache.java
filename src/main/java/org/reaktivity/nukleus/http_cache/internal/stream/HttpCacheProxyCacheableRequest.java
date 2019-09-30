@@ -139,10 +139,10 @@ final class HttpCacheProxyCacheableRequest
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
 
         if ((retry && attempts < 3) ||
-            !this.factory.defaultCache.isUpdatedByResponseHeadersToRetry(getRequestHeaders(),
-                                                                         responseHeaders,
-                                                                         ifNoneMatch,
-                                                                         requestHash))
+            this.factory.defaultCache.checkToRetry(getRequestHeaders(),
+                                                   responseHeaders,
+                                                   ifNoneMatch,
+                                                   requestHash))
         {
             final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
                 new HttpCacheProxyRetryResponse(factory,
@@ -300,17 +300,19 @@ final class HttpCacheProxyCacheableRequest
 
         // Should already be canonicalized in http / http2 nuklei
         final String requestURL = getRequestURL(requestHeaders);
-        this.requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
+        requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
 
         HttpHeaderFW ifNoneMatchHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
         if (ifNoneMatchHeader != null)
         {
-            this.ifNoneMatch = ifNoneMatchHeader.value().asString();
+            ifNoneMatch = ifNoneMatchHeader.value().asString();
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
         if (requestGroup.queue(acceptRouteId, acceptReplyId))
         {
+            ifNoneMatch = ifNoneMatchHeader.value().asString();
+            schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
             factory.writer.doWindow(acceptReply,
                                     acceptRouteId,
                                     acceptInitialId,
