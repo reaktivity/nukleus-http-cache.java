@@ -22,6 +22,9 @@ final class Signals
     public static final long CACHE_ENTRY_ABORTED_SIGNAL = 3L;
     public static final long REQUEST_EXPIRED_SIGNAL = 4L;
     public static final long INITIATE_REQUEST_SIGNAL = 5L;
+    public static final long REQUEST_IN_FLIGHT_ABORT_SIGNAL = 6L;
+    public static final long REQUEST_RETRY_SIGNAL = 7L;
+    public static final long CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8L;
 
     private Signals()
     {

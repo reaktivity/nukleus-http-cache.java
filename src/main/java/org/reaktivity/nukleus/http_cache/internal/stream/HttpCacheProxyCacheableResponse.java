@@ -61,6 +61,7 @@ final class HttpCacheProxyCacheableResponse
     private long connectRouteId;
     private long connectReplyId;
     private DefaultCacheEntry cacheEntry;
+    private String etag;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
@@ -145,7 +146,7 @@ final class HttpCacheProxyCacheableResponse
 
         cacheEntry = factory.defaultCache.supply(requestHash);
         cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
-        String etag = getHeader(responseHeaders, ETAG);
+        etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;
 
         if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
@@ -158,7 +159,7 @@ final class HttpCacheProxyCacheableResponse
         cacheEntry.setEtag(etag);
         if (!isResponseBuffering)
         {
-            requestGroup.onCacheableResponseUpdated();
+            requestGroup.onCacheableResponseUpdated(etag);
         }
 
         sendWindow(initialWindow, traceId);
@@ -173,7 +174,7 @@ final class HttpCacheProxyCacheableResponse
         assert stored;
         if (!isResponseBuffering)
         {
-            requestGroup.onCacheableResponseUpdated();
+            requestGroup.onCacheableResponseUpdated(etag);
         }
     }
 
@@ -192,7 +193,7 @@ final class HttpCacheProxyCacheableResponse
         }
         else
         {
-            requestGroup.onCacheableResponseUpdated();
+            requestGroup.onCacheableResponseUpdated(etag);
         }
     }
 
@@ -206,7 +207,7 @@ final class HttpCacheProxyCacheableResponse
                                          acceptRouteId,
                                          acceptReplyId,
                                          abort.trace());
-            requestGroup.onNonCacheableResponse(acceptReplyId);
+            requestGroup.onNonCacheableResponse(etag, acceptReplyId);
         }
         else
         {
@@ -229,7 +230,8 @@ final class HttpCacheProxyCacheableResponse
             HttpHeaderFW etag = trailers.matchFirst(h -> ETAG.equals(h.name().asString()));
             if (etag != null)
             {
-                cacheEntry.setEtag(etag.value().asString());
+                this.etag = etag.value().asString();
+                cacheEntry.setEtag(this.etag);
                 isResponseBuffering = false;
             }
         }

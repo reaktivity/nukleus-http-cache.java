@@ -29,6 +29,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_EN
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_IN_FLIGHT_ABORT_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
@@ -90,6 +92,7 @@ final class HttpCacheProxyCacheableRequest
     private boolean isRequestPurged;
     private String ifNoneMatch;
     private Future<?> preferWaitExpired;
+    private Future<?> retryRequest;
     private int attempts;
 
     private int acceptReplyBudget;
@@ -171,7 +174,7 @@ final class HttpCacheProxyCacheableRequest
             factory.router.setThrottle(acceptReplyId, notModifiedResponse::onResponseMessage);
             newStream = notModifiedResponse::onResponseMessage;
             cleanupRequestIfNecessary();
-            requestGroup.onNonCacheableResponse(acceptReplyId);
+            requestGroup.onNonCacheableResponse(ifNoneMatch, acceptReplyId);
             resetRequestTimeoutIfNecessary();
         }
         else if (isCacheableResponse(responseHeaders))
@@ -203,7 +206,7 @@ final class HttpCacheProxyCacheableRequest
                                                            acceptReplyId);
             factory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
             newStream = nonCacheableResponse::onResponseMessage;
-            requestGroup.onNonCacheableResponse(acceptReplyId);
+            requestGroup.onNonCacheableResponse(ifNoneMatch, acceptReplyId);
             cleanupRequestIfNecessary();
             resetRequestTimeoutIfNecessary();
         }
@@ -309,10 +312,8 @@ final class HttpCacheProxyCacheableRequest
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        if (requestGroup.queue(acceptRouteId, acceptReplyId))
+        if (requestGroup.enqueue(ifNoneMatch, acceptRouteId, acceptReplyId))
         {
-            ifNoneMatch = ifNoneMatchHeader.value().asString();
-            schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
             factory.writer.doWindow(acceptReply,
                                     acceptRouteId,
                                     acceptInitialId,
@@ -435,6 +436,11 @@ final class HttpCacheProxyCacheableRequest
         else
         {
             long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
+            retryRequest = this.factory.executor.schedule(requestAt,
+                                                          SECONDS,
+                                                          this.acceptRouteId,
+                                                          this.acceptReplyId,
+                                                          REQUEST_RETRY_SIGNAL);
             this.factory.scheduler.accept(requestAt, this::retryCacheableRequest);
         }
         return true;
@@ -519,7 +525,8 @@ final class HttpCacheProxyCacheableRequest
                 final String name = h.name().asString();
                 final String value = h.value().asString();
                 if (!CONTENT_LENGTH.equals(name) &&
-                    !AUTHORIZATION.equals(name))
+                    !AUTHORIZATION.equals(name) &&
+                    !IF_NONE_MATCH.equals(name))
                 {
                     builder.item(item -> item.name(name).value(value));
                 }
@@ -529,6 +536,11 @@ final class HttpCacheProxyCacheableRequest
             if (authorizationToken != null)
             {
                 builder.item(item -> item.name(AUTHORIZATION).value(authorizationToken));
+            }
+            if (ifNoneMatch != null &&
+                requestGroup.getNumberOfQueues() == 1)
+            {
+                builder.item(item -> item.name(IF_NONE_MATCH).value(ifNoneMatch));
             }
         };
     }
@@ -556,7 +568,7 @@ final class HttpCacheProxyCacheableRequest
             {
                 factory.router.clearThrottle(connectReplyId);
             }
-            requestGroup.onNonCacheableResponse(acceptReplyId);
+            requestGroup.onNonCacheableResponse(ifNoneMatch, acceptReplyId);
             requestExpired = true;
         }
         else if (signalId == CACHE_ENTRY_ABORTED_SIGNAL)
@@ -567,7 +579,7 @@ final class HttpCacheProxyCacheableRequest
                                        acceptRouteId,
                                        acceptReplyId,
                                        signal.trace());
-                requestGroup.unqueue(acceptReplyId);
+                requestGroup.dequeue(ifNoneMatch, acceptReplyId);
             }
             else
             {
@@ -579,6 +591,14 @@ final class HttpCacheProxyCacheableRequest
         else if (signalId == INITIATE_REQUEST_SIGNAL)
         {
             doHttpBegin(getRequestHeaders());
+        }
+        else if (signalId == REQUEST_IN_FLIGHT_ABORT_SIGNAL)
+        {
+            retryRequest.cancel(true);
+        }
+        else if (signalId == REQUEST_RETRY_SIGNAL)
+        {
+            retryCacheableRequest();
         }
     }
 
@@ -618,7 +638,7 @@ final class HttpCacheProxyCacheableRequest
                                acceptInitialId,
                                factory.supplyTrace.getAsLong());
         cleanupRequestIfNecessary();
-        requestGroup.onNonCacheableResponse(acceptReplyId);
+        requestGroup.onNonCacheableResponse(ifNoneMatch, acceptReplyId);
         if (cacheEntry != null)
         {
             cacheEntry.setSubscribers(-1);
@@ -666,7 +686,7 @@ final class HttpCacheProxyCacheableRequest
 
     private void cleanupRequestIfNecessary()
     {
-        requestGroup.unqueue(acceptReplyId);
+        requestGroup.dequeue(ifNoneMatch, acceptReplyId);
         purge();
     }
 
@@ -732,7 +752,6 @@ final class HttpCacheProxyCacheableRequest
     private void sendEndIfNecessary(
         long traceId)
     {
-
         boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(groupId, acceptReplyId);
 
         if (payloadWritten == cacheEntry.responseSize() &&

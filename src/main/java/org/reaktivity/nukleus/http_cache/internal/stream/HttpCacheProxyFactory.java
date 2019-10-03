@@ -22,9 +22,11 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
@@ -310,8 +312,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else if (defaultCache.isRequestCacheable(requestHeaders))
         {
-            HttpProxyCacheableRequestGroup group =
-                requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);
+            String ifNoneMatch = getHeader(requestHeaders, IF_NONE_MATCH);
+            HttpProxyCacheableRequestGroup group = computeCacheableRequestGroupIfAbsent(requestHash, ifNoneMatch);
 
             HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
             if (authorizationHeader != null)
@@ -402,9 +404,17 @@ public class HttpCacheProxyFactory implements StreamFactory
         counters.responses.getAsLong();
     }
 
-    private HttpProxyCacheableRequestGroup newCacheableRequestGroup(int requestHash)
+    private HttpProxyCacheableRequestGroup computeCacheableRequestGroupIfAbsent(
+        int requestHash,
+        String ifNoneMatch)
     {
-        return new HttpProxyCacheableRequestGroup(requestHash, writer, this, requestGroups::remove);
+        HttpProxyCacheableRequestGroup requestGroup = requestGroups.get(requestHash);
+        return Objects.requireNonNullElseGet(requestGroup,
+            () -> new HttpProxyCacheableRequestGroup(requestHash,
+                                                     ifNoneMatch,
+                                                     writer,
+                                                    this,
+                                                     requestGroups::remove));
     }
 
 }
