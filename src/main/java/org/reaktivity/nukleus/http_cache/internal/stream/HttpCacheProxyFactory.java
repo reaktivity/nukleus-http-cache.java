@@ -53,8 +53,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
@@ -84,7 +84,7 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
-    final ListFW<HttpHeaderFW> requestHeadersRO = new ListFW<>(new HttpHeaderFW());
+    final ArrayFW<HttpHeaderFW> requestHeadersRO = new ArrayFW<>(new HttpHeaderFW());
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
@@ -194,7 +194,7 @@ public class HttpCacheProxyFactory implements StreamFactory
             final long connectRouteId = route.correlationId();
             final OctetsFW extension = beginRO.extension();
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
-            final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+            final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
             if (requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
             {
@@ -251,7 +251,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     }
 
     private MessageConsumer newNativeInitialStream(
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         MessageConsumer acceptReply,
         long authorization,
         long connectRouteId,

@@ -30,8 +30,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -130,7 +130,7 @@ final class EmulatedProxyConnectReplyStream
                         getHeader(httpBeginFW.headers(), ":status"));
             }
 
-            final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+            final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
             switch (streamCorrelation.getType())
             {
@@ -155,7 +155,7 @@ final class EmulatedProxyConnectReplyStream
 
     ///////////// CACHE REFRESH
     private void handleCacheRefresh(
-        long traceId, ListFW<HttpHeaderFW> responseHeaders)
+        long traceId, ArrayFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
         if (retry && ((CacheableRequest)streamCorrelation).attempts() < 3)
@@ -228,7 +228,7 @@ final class EmulatedProxyConnectReplyStream
 
     ///////////// INITIAL_REQUEST REQUEST
     private void handleInitialRequest(
-        Long traceId, ListFW<HttpHeaderFW> responseHeaders)
+        Long traceId, ArrayFW<HttpHeaderFW> responseHeaders)
     {
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
         if (retry && ((CacheableRequest)streamCorrelation).attempts() < 3)
@@ -255,7 +255,7 @@ final class EmulatedProxyConnectReplyStream
     }
 
     private void handleEdgeArchSync(
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         long traceId)
     {
@@ -310,7 +310,7 @@ final class EmulatedProxyConnectReplyStream
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
 
         streamFactory.requestCorrelations.put(connectReplyId, request);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
+        ArrayFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(streamFactory.requestHeadersRO);
         final String etag = request.etag();
 
         if (DEBUG)
@@ -332,7 +332,7 @@ final class EmulatedProxyConnectReplyStream
     }
 
     private void handleCacheableResponse(
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         long traceId)
     {
         CacheableRequest request = (CacheableRequest) streamCorrelation;
@@ -377,7 +377,7 @@ final class EmulatedProxyConnectReplyStream
 
     ///////////// PROXY
     private void doProxyBegin(
-        long traceId, ListFW<HttpHeaderFW> responseHeaders)
+        long traceId, ArrayFW<HttpHeaderFW> responseHeaders)
     {
         final MessageConsumer acceptReply = streamCorrelation.acceptReply();
         final long acceptRouteId = streamCorrelation.acceptRouteId();
@@ -459,7 +459,7 @@ final class EmulatedProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
-        connectReplyBudget -= data.length() + data.padding();
+        connectReplyBudget -= data.reserved();
         if (connectReplyBudget < 0)
         {
             streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId,
@@ -468,7 +468,7 @@ final class EmulatedProxyConnectReplyStream
         else
         {
             final OctetsFW payload = data.payload();
-            acceptReplyBudget -= payload.sizeof() + data.padding();
+            acceptReplyBudget -= data.reserved();
             assert acceptReplyBudget >= 0;
             streamFactory.writer.doHttpData(
                     acceptReply,
@@ -479,7 +479,7 @@ final class EmulatedProxyConnectReplyStream
                     payload.buffer(),
                     payload.offset(),
                     payload.sizeof(),
-                    data.padding()
+                    data.reserved()
             );
         }
     }
@@ -584,7 +584,7 @@ final class EmulatedProxyConnectReplyStream
         if (extension.sizeof() > 0)
         {
             final HttpEndExFW httpEndEx = extension.get(streamFactory.httpEndExRO::wrap);
-            ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+            ArrayFW<HttpHeaderFW> trailers = httpEndEx.trailers();
             HttpHeaderFW etag = trailers.matchFirst(h -> "etag".equals(h.name().asString()));
             if (etag != null)
             {

@@ -21,8 +21,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -115,7 +115,7 @@ final class HttpCacheProxyNonCacheableResponse
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::tryWrap);
         assert httpBeginFW != null;
-        final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
         if (DEBUG)
         {
@@ -144,7 +144,7 @@ final class HttpCacheProxyNonCacheableResponse
         final DataFW data)
     {
         final OctetsFW payload = data.payload();
-        acceptReplyBudget -= payload.sizeof() + data.padding();
+        acceptReplyBudget -= data.reserved();
         assert acceptReplyBudget >= 0;
         httpCacheProxyFactory.writer.doHttpData(acceptReply,
                                                 acceptRouteId,
@@ -154,7 +154,7 @@ final class HttpCacheProxyNonCacheableResponse
                                                 payload.buffer(),
                                                 payload.offset(),
                                                 payload.sizeof(),
-                                                data.padding());
+                                                data.reserved());
     }
 
     private void onEnd(

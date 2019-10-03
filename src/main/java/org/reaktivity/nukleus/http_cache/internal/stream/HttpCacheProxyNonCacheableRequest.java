@@ -21,8 +21,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -146,7 +146,7 @@ final class HttpCacheProxyNonCacheableRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
         assert httpBeginEx != null;
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
+        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -179,7 +179,6 @@ final class HttpCacheProxyNonCacheableRequest
         final DataFW data)
     {
         final long groupId = data.groupId();
-        final int padding = data.padding();
         final OctetsFW payload = data.payload();
 
         factory.writer.doHttpData(connectInitial,
@@ -190,7 +189,7 @@ final class HttpCacheProxyNonCacheableRequest
                                   payload.buffer(),
                                   payload.offset(),
                                   payload.sizeof(),
-                                  padding);
+                                  data.reserved());
     }
 
     private void onEnd(

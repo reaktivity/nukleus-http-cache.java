@@ -29,8 +29,8 @@ import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -142,7 +142,7 @@ final class HttpCacheProxyCacheableResponse
                     getHeader(httpBeginFW.headers(), ":status"));
         }
 
-        final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
         cacheEntry = factory.defaultCache.supply(requestHash);
         cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
@@ -168,7 +168,7 @@ final class HttpCacheProxyCacheableResponse
     private void onData(
         DataFW data)
     {
-        sendWindow(data.length() + data.padding(), data.trace());
+        sendWindow(data.reserved(), data.trace());
         assert requestSlot.value != NO_SLOT;
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
@@ -226,7 +226,7 @@ final class HttpCacheProxyCacheableResponse
         if (extension.sizeof() > 0)
         {
             final HttpEndExFW httpEndEx = extension.get(factory.httpEndExRO::wrap);
-            ListFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+            ArrayFW<HttpHeaderFW> trailers = httpEndEx.trailers();
             HttpHeaderFW etag = trailers.matchFirst(h -> ETAG.equals(h.name().asString()));
             if (etag != null)
             {
@@ -254,7 +254,7 @@ final class HttpCacheProxyCacheableResponse
         }
     }
 
-    private ListFW<HttpHeaderFW> getRequestHeaders()
+    private ArrayFW<HttpHeaderFW> getRequestHeaders()
     {
         final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot.value);
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());

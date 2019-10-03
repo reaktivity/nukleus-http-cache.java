@@ -38,9 +38,9 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 
@@ -95,19 +95,19 @@ public final class DefaultCacheEntry
         return responseSlots;
     }
 
-    public ListFW<HttpHeaderFW> getRequestHeaders()
+    public ArrayFW<HttpHeaderFW> getRequestHeaders()
     {
         return getRequestHeaders(cache.requestHeadersRO);
     }
 
-    public ListFW<HttpHeaderFW> getRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeadersRO)
+    public ArrayFW<HttpHeaderFW> getRequestHeaders(
+        ArrayFW<HttpHeaderFW> requestHeadersRO)
     {
         return getRequestHeaders(requestHeadersRO, requestPool);
     }
 
     public boolean storeRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeaders)
+        ArrayFW<HttpHeaderFW> requestHeaders)
     {
         evictRequestIfNecessary();
         final int slotCapacity = responsePool.slotCapacity();
@@ -132,18 +132,18 @@ public final class DefaultCacheEntry
         return true;
     }
 
-    public ListFW<HttpHeaderFW> getCachedResponseHeaders()
+    public ArrayFW<HttpHeaderFW> getCachedResponseHeaders()
     {
         return this.getResponseHeaders(cache.cachedResponseHeadersRO);
     }
 
-    public ListFW<HttpHeaderFW> getResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO)
+    public ArrayFW<HttpHeaderFW> getResponseHeaders(ArrayFW<HttpHeaderFW> responseHeadersRO)
     {
         return getResponseHeaders(responseHeadersRO, responsePool);
     }
 
-    public ListFW<HttpHeaderFW> getResponseHeaders(
-        ListFW<HttpHeaderFW> responseHeadersRO,
+    public ArrayFW<HttpHeaderFW> getResponseHeaders(
+        ArrayFW<HttpHeaderFW> responseHeadersRO,
         BufferPool bp)
     {
         Integer firstResponseSlot = responseSlots.get(0);
@@ -152,7 +152,7 @@ public final class DefaultCacheEntry
     }
 
     public boolean storeResponseHeaders(
-        ListFW<HttpHeaderFW> responseHeaders)
+        ArrayFW<HttpHeaderFW> responseHeaders)
     {
         evictResponseIfNecessary();
         final int slotCapacity = responsePool.slotCapacity();
@@ -182,10 +182,10 @@ public final class DefaultCacheEntry
 
     public void updateResponseHeader(
         String status,
-        ListFW<HttpHeaderFW> newHeaders)
+        ArrayFW<HttpHeaderFW> newHeaders)
     {
-        final ListFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
-        ListFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
+        final ArrayFW<HttpHeaderFW> responseHeadersSO = new HttpBeginExFW().headers();
+        ArrayFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
         String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
                                                    .toLowerCase().equals(":status"))).value().asString();
 
@@ -212,8 +212,8 @@ public final class DefaultCacheEntry
         Integer firstResponseSlot = responseSlots.get(0);
         MutableDirectBuffer responseBuffer = responsePool.buffer(firstResponseSlot);
 
-        final ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
-            new ListFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
+        final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
+            new ArrayFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
 
         this.responseHeadersSize = responseBuffer.capacity();
         headersRW.wrap(responseBuffer, 0, responseHeadersSize);
@@ -264,7 +264,7 @@ public final class DefaultCacheEntry
     }
 
     public boolean canServeRequest(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short authScope)
     {
         Instant now = Instant.now();
@@ -350,7 +350,7 @@ public final class DefaultCacheEntry
         return storeResponseData(data, written);
     }
 
-    private static String getHeader(ListFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
+    private static String getHeader(ArrayFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
     {
         // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
         final StringBuilder header = new StringBuilder();
@@ -373,29 +373,29 @@ public final class DefaultCacheEntry
 
     private CacheControl responseCacheControl()
     {
-        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
         return cache.responseCacheControlFW.parse(cacheControl);
     }
 
-    private boolean doesNotVaryBy(ListFW<HttpHeaderFW> request)
+    private boolean doesNotVaryBy(ArrayFW<HttpHeaderFW> request)
     {
-        final ListFW<HttpHeaderFW> responseHeaders = this.getCachedResponseHeaders();
-        final ListFW<HttpHeaderFW> cachedRequest = getRequestHeaders(this.cache.requestHeadersRO);
+        final ArrayFW<HttpHeaderFW> responseHeaders = this.getCachedResponseHeaders();
+        final ArrayFW<HttpHeaderFW> cachedRequest = getRequestHeaders(this.cache.requestHeadersRO);
         return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
     private boolean canBeServedToAuthorized(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short requestAuthScope)
     {
         final CacheControl responseCacheControl = responseCacheControl();
-        final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getRequestHeaders(this.cache.requestHeadersRO);
+        final ArrayFW<HttpHeaderFW> cachedRequestHeaders = this.getRequestHeaders(this.cache.requestHeadersRO);
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
     }
 
-    private ListFW<HttpHeaderFW> getRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeadersRO,
+    private ArrayFW<HttpHeaderFW> getRequestHeaders(
+        ArrayFW<HttpHeaderFW> requestHeadersRO,
         BufferPool bp)
     {
         final MutableDirectBuffer buffer = bp.buffer(requestSlot);
@@ -403,7 +403,7 @@ public final class DefaultCacheEntry
     }
 
     private boolean satisfiesFreshnessRequirementsOf(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
@@ -422,7 +422,7 @@ public final class DefaultCacheEntry
     }
 
     private boolean satisfiesStalenessRequirementsOf(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
@@ -448,7 +448,7 @@ public final class DefaultCacheEntry
     }
 
     private boolean satisfiesAgeRequirementsOf(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
@@ -486,7 +486,7 @@ public final class DefaultCacheEntry
     {
         if (lazyInitiatedResponseReceivedAt == null)
         {
-            final ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+            final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
             final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
                 getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
             try
