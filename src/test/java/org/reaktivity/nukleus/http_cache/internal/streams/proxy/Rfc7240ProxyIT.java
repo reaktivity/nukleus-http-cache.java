@@ -178,4 +178,38 @@ public class Rfc7240ProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/long.polling.when.cache.is.empty.and.etag.is.latest/accept/client",
+        "${streams}/long.polling.when.cache.is.empty.and.etag.is.latest/connect/server",
+    })
+    public void shouldHandleLongPollingWhenCacheIsEmptyAndEtagIsLatest() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/long.polling.when.cache.is.empty.and.etag.is.not.latest/accept/client",
+        "${streams}/long.polling.when.cache.is.empty.and.etag.is.not.latest/connect/server",
+    })
+    public void shouldHandleLongPollingWhenCacheIsEmptyAndEtagIsNotLatest() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/long.polling.when.cache.is.empty.with.latest.etag.and.missing.etag.in.second.request/accept/client",
+        "${streams}/long.polling.when.cache.is.empty.with.latest.etag.and.missing.etag.in.second.request/connect/server",
+    })
+    public void shouldHandleLongPollingWhenCacheIsEmptyWithLatestEtagAndMissingEtagInSecondRequest() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

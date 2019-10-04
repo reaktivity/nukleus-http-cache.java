@@ -129,7 +129,7 @@ final class HttpCacheProxyNotModifiedResponse
                               getHeader(responseHeaders, ":status"));
         }
         DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash);
-        factory.defaultCache.send304(cacheEntry,
+        factory.defaultCache.send304(cacheEntry.etag(),
                                      preferWait,
                                      acceptReply,
                                      acceptRouteId,

@@ -409,12 +409,20 @@ public class HttpCacheProxyFactory implements StreamFactory
         String ifNoneMatch)
     {
         HttpProxyCacheableRequestGroup requestGroup = requestGroups.get(requestHash);
-        return Objects.requireNonNullElseGet(requestGroup,
-            () -> new HttpProxyCacheableRequestGroup(requestHash,
-                                                     ifNoneMatch,
-                                                     writer,
-                                                    this,
-                                                     requestGroups::remove));
+        if (requestGroup == null)
+        {
+            HttpProxyCacheableRequestGroup newRequestGroup = new HttpProxyCacheableRequestGroup(requestHash,
+                                                                                               ifNoneMatch,
+                                                                                               writer,
+                                                                                               this,
+                                                                                               requestGroups::remove);
+            requestGroups.put(requestHash, newRequestGroup);
+            return newRequestGroup;
+        }
+        else
+        {
+            return requestGroup;
+        }
     }
 
 }

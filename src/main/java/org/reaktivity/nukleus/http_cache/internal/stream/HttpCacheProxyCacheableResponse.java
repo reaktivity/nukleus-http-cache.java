@@ -169,7 +169,6 @@ final class HttpCacheProxyCacheableResponse
         DataFW data)
     {
         sendWindow(data.reserved(), data.trace());
-        assert requestSlot.value != NO_SLOT;
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
         if (!isResponseBuffering)
@@ -181,12 +180,12 @@ final class HttpCacheProxyCacheableResponse
     private void onEnd(
         EndFW end)
     {
-        assert requestSlot.value != NO_SLOT;
         checkEtag(end, cacheEntry);
         cacheEntry.setResponseCompleted(true);
 
-        if (!factory.defaultCache.isUpdatedByEtagToRetry(ifNoneMatch,
-                                                         cacheEntry))
+        if (isResponseBuffering &&
+            factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
+                                                     cacheEntry))
         {
             long retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
             retryRequest.apply(retryAfter);
@@ -232,7 +231,6 @@ final class HttpCacheProxyCacheableResponse
             {
                 this.etag = etag.value().asString();
                 cacheEntry.setEtag(this.etag);
-                isResponseBuffering = false;
             }
         }
     }

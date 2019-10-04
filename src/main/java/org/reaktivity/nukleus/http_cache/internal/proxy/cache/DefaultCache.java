@@ -162,7 +162,7 @@ public class DefaultCache
     }
 
 
-    public boolean isUpdatedByEtagToRetry(
+    public boolean checkTrailerToRetry(
         String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
@@ -178,22 +178,16 @@ public class DefaultCache
 
             if (ifNoneMatch != null && newEtag != null)
             {
-                return !(status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag));
+                return status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag);
             }
         }
 
-        return true;
+        return false;
     }
 
-<<<<<<< HEAD
     public boolean checkToRetry(
-        ListFW<HttpHeaderFW> requestHeaders,
-        ListFW<HttpHeaderFW> responseHeaders,
-=======
-    public boolean isUpdatedByResponseHeadersToRetry(
         ArrayFW<HttpHeaderFW> requestHeaders,
         ArrayFW<HttpHeaderFW> responseHeaders,
->>>>>>> 8633aefad7dd984951fb11573f12a3a1ea810105
         String ifNoneMatch,
         int requestHash)
     {
@@ -228,7 +222,7 @@ public class DefaultCache
     }
 
     public void send304(
-        DefaultCacheEntry entry,
+        String etag,
         String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
@@ -242,13 +236,12 @@ public class DefaultCache
 
         if (preferWait != null)
         {
-            writer.doHttpResponse(
-                acceptReply,
+            writer.doHttpResponse(acceptReply,
                 acceptRouteId,
                 acceptReplyId,
                 supplyTrace.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                      .item(h -> h.name(ETAG).value(entry.etag()))
+                      .item(h -> h.name(ETAG).value(etag))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG)));
@@ -261,7 +254,7 @@ public class DefaultCache
                 acceptReplyId,
                 supplyTrace.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                      .item(h -> h.name(ETAG).value(entry.etag())));
+                      .item(h -> h.name(ETAG).value(etag)));
         }
         // count all responses
         counters.responses.getAsLong();

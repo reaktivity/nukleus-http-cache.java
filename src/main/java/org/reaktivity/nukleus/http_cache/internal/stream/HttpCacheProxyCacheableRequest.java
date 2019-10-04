@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
@@ -25,6 +26,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCach
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
@@ -41,7 +43,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
-import java.time.Instant;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -141,11 +142,21 @@ final class HttpCacheProxyCacheableRequest
         ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
 
+        if (ifNoneMatch != null &&
+            !requestGroup.isItLiveRequest(ifNoneMatch))
+        {
+            factory.writer.doReset(connectReply,
+                                   connectRouteId,
+                                   connectReplyId,
+                                   factory.supplyTrace.getAsLong());
+        }
+
         if ((retry && attempts < 3) ||
-            this.factory.defaultCache.checkToRetry(getRequestHeaders(),
+            (factory.defaultCache.checkToRetry(getRequestHeaders(),
                                                    responseHeaders,
                                                    ifNoneMatch,
-                                                   requestHash))
+                                                   requestHash)) &&
+            !requestGroup.isInFlightRequestAborted())
         {
             final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
                 new HttpCacheProxyRetryResponse(factory,
@@ -435,13 +446,11 @@ final class HttpCacheProxyCacheableRequest
         }
         else
         {
-            long requestAt = Instant.now().plusMillis(retryAfter).toEpochMilli();
-            retryRequest = this.factory.executor.schedule(requestAt,
-                                                          SECONDS,
+            retryRequest = this.factory.executor.schedule(retryAfter,
+                                                          MILLISECONDS,
                                                           this.acceptRouteId,
                                                           this.acceptReplyId,
                                                           REQUEST_RETRY_SIGNAL);
-            this.factory.scheduler.accept(requestAt, this::retryCacheableRequest);
         }
         return true;
     }
@@ -538,7 +547,7 @@ final class HttpCacheProxyCacheableRequest
                 builder.item(item -> item.name(AUTHORIZATION).value(authorizationToken));
             }
             if (ifNoneMatch != null &&
-                requestGroup.getNumberOfQueues() == 1)
+                !requestGroup.isInFlightRequestAborted())
             {
                 builder.item(item -> item.name(IF_NONE_MATCH).value(ifNoneMatch));
             }
@@ -556,8 +565,7 @@ final class HttpCacheProxyCacheableRequest
         }
         else if (signalId == REQUEST_EXPIRED_SIGNAL)
         {
-            DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
-            factory.defaultCache.send304(cacheEntry,
+            factory.defaultCache.send304(getHeader(getRequestHeaders(), IF_NONE_MATCH),
                                          getHeader(getRequestHeaders(), PREFER),
                                          acceptReply,
                                          acceptRouteId,
@@ -594,11 +602,32 @@ final class HttpCacheProxyCacheableRequest
         }
         else if (signalId == REQUEST_IN_FLIGHT_ABORT_SIGNAL)
         {
-            retryRequest.cancel(true);
+            if (retryRequest != null)
+            {
+                retryRequest.cancel(true);
+            }
+            factory.writer.doAbort(connectInitial,
+                                   connectRouteId,
+                                   connectInitialId,
+                                   factory.supplyTrace.getAsLong());
+            factory.writer.doReset(connectReply,
+                                   connectRouteId,
+                                   connectReplyId,
+                                   factory.supplyTrace.getAsLong());
         }
         else if (signalId == REQUEST_RETRY_SIGNAL)
         {
             retryCacheableRequest();
+        }
+        else if (signalId == CACHE_ENTRY_NOT_MODIFIED_SIGNAL)
+        {
+            factory.defaultCache.send304(getHeader(getRequestHeaders(), IF_NONE_MATCH),
+                                         getHeader(getRequestHeaders(), PREFER),
+                                         acceptReply,
+                                         acceptRouteId,
+                                         acceptReplyId);
+            cleanupRequestIfNecessary();
+            requestExpired = true;
         }
     }
 
