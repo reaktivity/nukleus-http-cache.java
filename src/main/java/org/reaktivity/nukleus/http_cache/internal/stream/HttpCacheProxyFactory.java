@@ -266,14 +266,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         final long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
         final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
         final MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
-        final StreamCorrelation correlation = new StreamCorrelation(acceptReply,
-                                                                   acceptRouteId,
-                                                                   acceptInitialId,
-                                                                   acceptReplyId,
-                                                                   connectInitial,
-                                                                   connectRouteId,
-                                                                   connectInitialId,
-                                                                   connectReplyId);
         MessageConsumer newStream = null;
 
         if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))

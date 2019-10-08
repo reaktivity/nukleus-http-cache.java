@@ -102,7 +102,6 @@ final class HttpCacheProxyCacheableRequest
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
-    private boolean requestQueued;
     private boolean requestExpired;
 
     HttpCacheProxyCacheableRequest(
@@ -323,19 +322,15 @@ final class HttpCacheProxyCacheableRequest
             schedulePreferWaitIfNoneMatchIfNecessary(requestHeaders);
         }
 
-        if (requestGroup.enqueue(ifNoneMatch, acceptRouteId, acceptReplyId))
-        {
-            factory.writer.doWindow(acceptReply,
-                                    acceptRouteId,
-                                    acceptInitialId,
-                                    begin.trace(),
-                                    initialWindow,
-                                    0,
-                                    0L);
-            requestQueued =  true;
-            return;
-        }
-        doHttpBegin(requestHeaders);
+        requestGroup.enqueue(ifNoneMatch, acceptRouteId, acceptReplyId);
+        factory.writer.doWindow(acceptReply,
+                                acceptRouteId,
+                                acceptInitialId,
+                                begin.trace(),
+                                initialWindow,
+                                0,
+                                0L);
+
     }
 
     private void onData(

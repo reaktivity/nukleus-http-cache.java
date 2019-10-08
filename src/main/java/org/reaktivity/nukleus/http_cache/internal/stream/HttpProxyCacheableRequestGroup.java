@@ -34,18 +34,11 @@ final class HttpProxyCacheableRequestGroup
 {
     private final HashMap<String, Long2LongHashMap> requestsQueue;
     private final int requestHash;
-    private String etag;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
     private final Consumer<Integer> cleaner;
+    private String etag;
     private String recentAuthorizationToken;
-
-    public boolean isInFlightRequestAborted()
-    {
-        return isInFlightRequestAborted;
-    }
-
-    private boolean isInFlightRequestAborted;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
@@ -60,12 +53,6 @@ final class HttpProxyCacheableRequestGroup
         this.factory = factory;
         this.cleaner = cleaner;
         this.requestsQueue = new HashMap<>();
-    }
-
-    boolean isItLiveRequest(
-        String etag)
-    {
-        return (this.etag == null) || this.etag.equals(etag);
     }
 
     String getRecentAuthorizationToken()
@@ -89,30 +76,13 @@ final class HttpProxyCacheableRequestGroup
         return totalRequests.get();
     }
 
-    boolean enqueue(
+    void enqueue(
         String etag,
         long acceptRouteId,
         long acceptReplyId)
     {
         Long2LongHashMap routeIdsByReplyId = requestsQueue.computeIfAbsent(etag, this::createQueue);
         routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
-        if (this.etag != null &&
-            !this.etag.equals(etag))
-        {
-            isInFlightRequestAborted = true;
-            abortInFlightRequest(this.etag);
-            this.etag = etag;
-            return false;
-        }
-        else
-        {
-            boolean isEnqueued = requestsQueue.size() > 1 || routeIdsByReplyId.size() != 1;
-            if (!isEnqueued)
-            {
-                this.etag = etag;
-            }
-            return isEnqueued;
-        }
     }
 
     void dequeue(
@@ -170,6 +140,20 @@ final class HttpProxyCacheableRequestGroup
         {
             routeIdsByReplyId.forEach(this::doSignalCacheEntryAborted);
         });
+    }
+
+    private void doSignalToInitiateRequestIfNecessary()
+    {
+        if (this.etag != null &&
+            !this.etag.equals(etag))
+        {
+            abortInFlightRequest(this.etag);
+            this.etag = null;
+        }
+        else if (etag == null)
+        {
+            this.etag = etag;
+        }
     }
 
     private void doSignalCacheEntryAborted(
