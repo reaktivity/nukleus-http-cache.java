@@ -149,7 +149,6 @@ public class DefaultCache
 
     }
 
-
     public void purge(
         int requestHash)
     {
@@ -160,7 +159,6 @@ public class DefaultCache
             cacheEntry.purge();
         }
     }
-
 
     public boolean checkTrailerToRetry(
         String ifNoneMatch,

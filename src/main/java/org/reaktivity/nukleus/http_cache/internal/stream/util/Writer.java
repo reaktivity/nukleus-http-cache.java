@@ -53,12 +53,14 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.FrameFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
+import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class Writer
 {
@@ -86,6 +88,29 @@ public class Writer
         this.router = router;
         this.writeBuffer = writeBuffer;
         this.httpTypeId = supplyTypeId.applyAsInt("http");
+    }
+
+    public int writerCapacity()
+    {
+        return writeBuffer.capacity();
+    }
+
+    public MessageConsumer newHttpStream(
+        StreamFactory factory,
+        long routeId,
+        long streamId,
+        long traceId,
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
+        MessageConsumer source)
+    {
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                                     .routeId(routeId)
+                                     .streamId(streamId)
+                                     .trace(traceId)
+                                     .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                                     .build();
+
+        return factory.newStream(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof(), source);
     }
 
     public void doHttpRequest(

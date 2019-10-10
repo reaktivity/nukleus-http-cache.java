@@ -22,12 +22,13 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_IN_FLIGHT_ABORT_SIGNAL;
 
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
+import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2LongHashMap;
+import org.agrona.collections.MutableInteger;
+import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 
 final class HttpProxyCacheableRequestGroup
@@ -38,17 +39,17 @@ final class HttpProxyCacheableRequestGroup
     private final HttpCacheProxyFactory factory;
     private final Consumer<Integer> cleaner;
     private String etag;
+    private long acceptRouteId;
+    private long acceptReplyId;
     private String recentAuthorizationToken;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
-        String etag,
         Writer writer,
         HttpCacheProxyFactory factory,
         Consumer<Integer> cleaner)
     {
         this.requestHash = requestHash;
-        this.etag = etag;
         this.writer = writer;
         this.factory = factory;
         this.cleaner = cleaner;
@@ -60,6 +61,16 @@ final class HttpProxyCacheableRequestGroup
         return recentAuthorizationToken;
     }
 
+    int getRequestHash()
+    {
+        return requestHash;
+    }
+
+    String getEtag()
+    {
+        return etag;
+    }
+
     void setRecentAuthorizationToken(
         String recentAuthorizationToken)
     {
@@ -68,12 +79,9 @@ final class HttpProxyCacheableRequestGroup
 
     int getNumberOfRequests()
     {
-        AtomicInteger totalRequests = new AtomicInteger();
-        requestsQueue.forEach((key, routeIdsByReplyId) ->
-        {
-            totalRequests.addAndGet(routeIdsByReplyId.size());
-        });
-        return totalRequests.get();
+        MutableInteger totalRequests = new MutableInteger();
+        requestsQueue.forEach((key, routeIdsByReplyId) -> totalRequests.value += routeIdsByReplyId.size());
+        return totalRequests.value;
     }
 
     void enqueue(
@@ -81,40 +89,65 @@ final class HttpProxyCacheableRequestGroup
         long acceptRouteId,
         long acceptReplyId)
     {
-        Long2LongHashMap routeIdsByReplyId = requestsQueue.computeIfAbsent(etag, this::createQueue);
+        final boolean requestQueueIsEmpty = requestsQueue.isEmpty();
+        final Long2LongHashMap routeIdsByReplyId = requestsQueue.computeIfAbsent(etag, this::createQueue);
+
         routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
+
+        if (requestQueueIsEmpty)
+        {
+            initiateRequest(etag, acceptRouteId, acceptReplyId);
+        }
+        else if (this.etag != null &&
+                !this.etag.equals(etag))
+        {
+            doSignalInFlightRequestAborted(this.acceptRouteId, this.acceptReplyId);
+            initiateRequest(null, acceptRouteId, acceptReplyId);
+        }
     }
 
     void dequeue(
         String etag,
         long acceptReplyId)
     {
-        Long2LongHashMap routeIdsByReplyId = requestsQueue.get(etag);
-        if (routeIdsByReplyId != null)
+        final Long2LongHashMap routeIdsByReplyId = requestsQueue.get(etag);
+        assert routeIdsByReplyId != null;
+
+        final long acceptRouteId = routeIdsByReplyId.remove(acceptReplyId);
+        assert acceptRouteId != routeIdsByReplyId.missingValue();
+
+        if (routeIdsByReplyId.isEmpty())
         {
-            routeIdsByReplyId.remove(acceptReplyId);
-            if (routeIdsByReplyId.isEmpty())
+            requestsQueue.remove(etag);
+
+            if (requestsQueue.isEmpty())
             {
-                requestsQueue.remove(etag);
+                cleaner.accept(requestHash);
             }
         }
 
-        if (requestsQueue.isEmpty())
+        if (!requestsQueue.isEmpty())
         {
-            cleaner.accept(requestHash);
-        }
-    }
+            Long2LongHashMap.EntryIterator stream;
 
-    void onNonCacheableResponse(
-        String etag,
-        long acceptReplyId)
-    {
-        Long2LongHashMap routeIdsByReplyId = requestsQueue.get(etag);
-        if (routeIdsByReplyId != null)
-        {
-            routeIdsByReplyId.remove(acceptReplyId);
+            if (!routeIdsByReplyId.isEmpty())
+            {
+                stream = routeIdsByReplyId.entrySet().iterator();
+            }
+            else
+            {
+                final Long2LongHashMap newRouteIdsByReplyId = requestsQueue.values().iterator().next();
+                stream = newRouteIdsByReplyId.entrySet().iterator();
+            }
+
+            assert stream.hasNext();
+            stream.next();
+            writer.doSignal(stream.getLongKey(),
+                            stream.getLongValue(),
+                            factory.supplyTrace.getAsLong(),
+                            INITIATE_REQUEST_SIGNAL);
+
         }
-        serveNextRequestIfPossible(etag);
     }
 
     void onCacheableResponseUpdated(
@@ -142,18 +175,31 @@ final class HttpProxyCacheableRequestGroup
         });
     }
 
-    private void doSignalToInitiateRequestIfNecessary()
+    MessageConsumer newRequest(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length,
+        MessageConsumer sender)
     {
-        if (this.etag != null &&
-            !this.etag.equals(etag))
-        {
-            abortInFlightRequest(this.etag);
-            this.etag = null;
-        }
-        else if (etag == null)
-        {
-            this.etag = etag;
-        }
+        return new HttpCacheProxyGroupRequest(factory,
+                                              this,
+                                              acceptReplyId,
+                                              acceptRouteId)::onRequestMessage;
+    }
+
+    private void initiateRequest(
+        String etag,
+        long acceptRouteId,
+        long acceptReplyId)
+    {
+        this.etag = etag;
+        this.acceptRouteId = acceptRouteId;
+        this.acceptReplyId = acceptReplyId;
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTrace.getAsLong(),
+                        INITIATE_REQUEST_SIGNAL);
     }
 
     private void doSignalCacheEntryAborted(
@@ -188,27 +234,6 @@ final class HttpProxyCacheableRequestGroup
 
     }
 
-    private void serveNextRequestIfPossible(
-        String etag)
-    {
-        cleanup(etag);
-
-        if (!requestsQueue.isEmpty())
-        {
-
-            Map.Entry<String, Long2LongHashMap> routeIdsByReplyId = requestsQueue.entrySet().iterator().next();
-            Map.Entry<Long, Long> stream = routeIdsByReplyId.getValue().entrySet().iterator().next();
-            writer.doSignal(stream.getKey(),
-                            stream.getValue(),
-                            factory.supplyTrace.getAsLong(),
-                            INITIATE_REQUEST_SIGNAL);
-        }
-        else
-        {
-            cleaner.accept(requestHash);
-        }
-    }
-
     private Long2LongHashMap createQueue(
         String etag)
     {
@@ -216,12 +241,6 @@ final class HttpProxyCacheableRequestGroup
         return Objects.requireNonNullElseGet(queue, () -> new Long2LongHashMap(-1));
     }
 
-    private void abortInFlightRequest(
-        String etag)
-    {
-        Long2LongHashMap routeIdsByReplyId = requestsQueue.get(etag);
-        routeIdsByReplyId.forEach(this::doSignalInFlightRequestAborted);
-    }
 
     private void doSignalInFlightRequestAborted(
         long acceptReplyId,
@@ -231,28 +250,5 @@ final class HttpProxyCacheableRequestGroup
                         acceptReplyId,
                         factory.supplyTrace.getAsLong(),
                         REQUEST_IN_FLIGHT_ABORT_SIGNAL);
-    }
-
-    private void cleanup(
-        String etag)
-    {
-        Long2LongHashMap routeIdsByReplyId = requestsQueue.get(etag);
-        if (routeIdsByReplyId != null &&
-            routeIdsByReplyId.isEmpty())
-        {
-            requestsQueue.remove(etag);
-            if (requestsQueue.isEmpty())
-            {
-                cleaner.accept(requestHash);
-            }
-        }
-
-        requestsQueue.forEach((key, otherRouteIdsByReplyId) ->
-        {
-            if (otherRouteIdsByReplyId.isEmpty())
-            {
-                requestsQueue.remove(key);
-            }
-        });
     }
 }

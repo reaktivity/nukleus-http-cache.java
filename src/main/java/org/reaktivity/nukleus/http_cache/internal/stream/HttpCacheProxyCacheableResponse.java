@@ -53,10 +53,6 @@ final class HttpCacheProxyCacheableResponse
     private final Function<Long, Boolean> retryRequest;
     private final HttpProxyCacheableRequestGroup requestGroup;
 
-    private final MessageConsumer acceptReply;
-    private final long acceptRouteId;
-    private final long acceptReplyId;
-
     private MessageConsumer connectReply;
     private long connectRouteId;
     private long connectReplyId;
@@ -68,9 +64,6 @@ final class HttpCacheProxyCacheableResponse
         HttpProxyCacheableRequestGroup requestGroup,
         int requestHash,
         MutableInteger requestSlot,
-        MessageConsumer acceptReply,
-        long acceptRouteId,
-        long acceptReplyId,
         MessageConsumer connectReply,
         long connectReplyId,
         long connectRouteId,
@@ -81,9 +74,6 @@ final class HttpCacheProxyCacheableResponse
         this.requestGroup = requestGroup;
         this.requestSlot = requestSlot;
         this.requestHash = requestHash;
-        this.acceptReply = acceptReply;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptReplyId = acceptReplyId;
         this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -199,19 +189,7 @@ final class HttpCacheProxyCacheableResponse
     private void onAbort(AbortFW abort)
     {
         assert requestSlot.value != NO_SLOT;
-        if (isResponseBuffering)
-        {
-            factory.counters.responses.getAsLong();
-            factory.writer.do503AndAbort(acceptReply,
-                                         acceptRouteId,
-                                         acceptReplyId,
-                                         abort.trace());
-            requestGroup.onNonCacheableResponse(etag, acceptReplyId);
-        }
-        else
-        {
-            requestGroup.onCacheableResponseAborted();
-        }
+        requestGroup.onCacheableResponseAborted();
 
         purgeRequest();
         factory.defaultCache.purge(requestHash);

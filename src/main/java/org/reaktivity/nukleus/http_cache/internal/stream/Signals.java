@@ -17,14 +17,14 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 final class Signals
 {
-    public static final long CACHE_ENTRY_UPDATED_SIGNAL = 1L;
-    public static final long CACHE_ENTRY_SIGNAL = 2L;
-    public static final long CACHE_ENTRY_ABORTED_SIGNAL = 3L;
-    public static final long REQUEST_EXPIRED_SIGNAL = 4L;
-    public static final long INITIATE_REQUEST_SIGNAL = 5L;
-    public static final long REQUEST_IN_FLIGHT_ABORT_SIGNAL = 6L;
-    public static final long REQUEST_RETRY_SIGNAL = 7L;
-    public static final long CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8L;
+    public static final int CACHE_ENTRY_UPDATED_SIGNAL = 1;
+    public static final int CACHE_ENTRY_SIGNAL = 2;
+    public static final int CACHE_ENTRY_ABORTED_SIGNAL = 3;
+    public static final int REQUEST_EXPIRED_SIGNAL = 4;
+    public static final int INITIATE_REQUEST_SIGNAL = 5;
+    public static final int REQUEST_IN_FLIGHT_ABORT_SIGNAL = 6;
+    public static final int REQUEST_RETRY_SIGNAL = 7;
+    public static final int CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8;
 
     private Signals()
     {
