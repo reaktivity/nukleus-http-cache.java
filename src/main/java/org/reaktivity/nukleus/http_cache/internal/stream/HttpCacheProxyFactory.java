@@ -316,7 +316,6 @@ public class HttpCacheProxyFactory implements StreamFactory
             {
                 group.setRecentAuthorizationToken(authorizationHeader.value().asString());
             }
-
             final HttpCacheProxyCacheableRequest cacheableRequest =
                 new HttpCacheProxyCacheableRequest(this,
                                                    group,

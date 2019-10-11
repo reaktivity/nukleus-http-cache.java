@@ -62,23 +62,21 @@ final class HttpCacheProxyCacheableResponse
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
-        int requestHash,
         MutableInteger requestSlot,
         MessageConsumer connectReply,
         long connectReplyId,
         long connectRouteId,
-        String ifNoneMatch,
         Function<Long, Boolean> retryRequest)
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
         this.requestSlot = requestSlot;
-        this.requestHash = requestHash;
+        this.requestHash = requestGroup.getRequestHash();
         this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.initialWindow = factory.responseBufferPool.slotCapacity();
-        this.ifNoneMatch = ifNoneMatch;
+        this.ifNoneMatch = requestGroup.getEtag();
         this.retryRequest = retryRequest;
         assert requestSlot.value != NO_SLOT;
     }
@@ -190,7 +188,6 @@ final class HttpCacheProxyCacheableResponse
     {
         assert requestSlot.value != NO_SLOT;
         requestGroup.onCacheableResponseAborted();
-
         purgeRequest();
         factory.defaultCache.purge(requestHash);
     }

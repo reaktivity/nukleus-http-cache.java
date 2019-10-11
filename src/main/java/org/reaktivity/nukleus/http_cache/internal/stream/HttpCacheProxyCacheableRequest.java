@@ -148,7 +148,9 @@ final class HttpCacheProxyCacheableRequest
         }
 
         factory.router.setThrottle(acceptReplyId, newStream);
-        cleanupRequestIfNecessary();
+        purge();
+        resetRequestTimeoutIfNecessary();
+        requestGroup.dequeue(ifNoneMatch, acceptReplyId);
 
         return newStream;
     }
@@ -273,8 +275,8 @@ final class HttpCacheProxyCacheableRequest
             {
                 preferWaitExpired = factory.executor.schedule(Math.min(preferWait, factory.preferWaitMaximum),
                                                                    SECONDS,
-                                                                   this.acceptRouteId,
-                                                                   this.acceptReplyId,
+                                                                   acceptRouteId,
+                                                                   acceptReplyId,
                                                                    REQUEST_EXPIRED_SIGNAL);
             }
         }
@@ -360,7 +362,7 @@ final class HttpCacheProxyCacheableRequest
                                      accept,
                                      acceptRouteId,
                                      acceptReplyId);
-        cleanupRequestIfNecessary();
+        requestExpired = true;
     }
 
     private void onResponseSignalCacheEntryAborted(
@@ -392,19 +394,13 @@ final class HttpCacheProxyCacheableRequest
                                                connectRouteId,
                                                connectInitialId,
                                                factory.supplyTrace.getAsLong(),
-                                               mutator,
-                                               this::onConnectMessage);
+                                               mutator, (t, b, i, l) -> {});
 
         factory.writer.doHttpRequest(connect,
                                      connectRouteId,
                                      connectInitialId,
                                      factory.supplyTrace.getAsLong(),
                                      mutator);
-    }
-
-    private void onConnectMessage(int i, DirectBuffer buffer, int i1, int i2)
-    {
-
     }
 
     private void onResponseSignalCacheEntryNotModified(
@@ -415,7 +411,7 @@ final class HttpCacheProxyCacheableRequest
                                      accept,
                                      acceptRouteId,
                                      acceptReplyId);
-        cleanupRequestIfNecessary();
+        resetRequestTimeoutIfNecessary();
         requestExpired = true;
     }
 
@@ -425,6 +421,7 @@ final class HttpCacheProxyCacheableRequest
         if (requestExpired)
         {
             factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, factory.supplyTrace.getAsLong());
+            cleanupRequestIfNecessary();
         }
         else
         {
@@ -450,10 +447,6 @@ final class HttpCacheProxyCacheableRequest
                                      groupId,
                                      acceptReplyId,
                                      factory.supplyTrace.getAsLong());
-        factory.writer.doReset(accept,
-                               acceptRouteId,
-                               acceptInitialId,
-                               factory.supplyTrace.getAsLong());
         cleanupRequestIfNecessary();
         if (cacheEntry != null)
         {
@@ -488,31 +481,6 @@ final class HttpCacheProxyCacheableRequest
 
         // count retry responses
         factory.counters.responsesRetry.getAsLong();
-    }
-
-    private void resetRequestTimeoutIfNecessary()
-    {
-        if (preferWaitExpired != null)
-        {
-            preferWaitExpired.cancel(true);
-            preferWaitExpired = null;
-        }
-    }
-
-    private void cleanupRequestIfNecessary()
-    {
-        requestGroup.dequeue(ifNoneMatch, acceptReplyId);
-        purge();
-        factory.router.clearThrottle(connectReplyId);
-    }
-
-    private void purge()
-    {
-        if (requestSlot.value != NO_SLOT)
-        {
-            factory.requestBufferPool.release(requestSlot.value);
-            requestSlot.value = NO_SLOT;
-        }
     }
 
     private void sendHttpResponseHeaders(
@@ -644,5 +612,31 @@ final class HttpCacheProxyCacheableRequest
             length -= chunkLength;
         }
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
+    }
+
+    private void resetRequestTimeoutIfNecessary()
+    {
+        if (preferWaitExpired != null)
+        {
+            preferWaitExpired.cancel(true);
+            preferWaitExpired = null;
+        }
+    }
+
+    private void cleanupRequestIfNecessary()
+    {
+        requestGroup.dequeue(ifNoneMatch, acceptReplyId);
+        purge();
+        factory.router.clearThrottle(connectReplyId);
+        factory.router.clearThrottle(acceptReplyId);
+    }
+
+    private void purge()
+    {
+        if (requestSlot.value != NO_SLOT)
+        {
+            factory.requestBufferPool.release(requestSlot.value);
+            requestSlot.value = NO_SLOT;
+        }
     }
 }

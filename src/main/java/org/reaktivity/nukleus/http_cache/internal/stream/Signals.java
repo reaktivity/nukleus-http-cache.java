@@ -22,7 +22,6 @@ final class Signals
     public static final int CACHE_ENTRY_ABORTED_SIGNAL = 3;
     public static final int REQUEST_EXPIRED_SIGNAL = 4;
     public static final int INITIATE_REQUEST_SIGNAL = 5;
-    public static final int REQUEST_IN_FLIGHT_ABORT_SIGNAL = 6;
     public static final int REQUEST_RETRY_SIGNAL = 7;
     public static final int CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8;
 
