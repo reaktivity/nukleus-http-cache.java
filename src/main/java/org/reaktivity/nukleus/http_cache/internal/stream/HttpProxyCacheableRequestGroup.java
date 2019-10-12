@@ -144,7 +144,8 @@ final class HttpProxyCacheableRequestGroup
             {
                 routeIdsByReplyId.forEach((replyId, routeId) ->
                 {
-                    if (!requestsWithAnswer.containsLong(replyId))
+                    if (!requestsWithAnswer.containsLong(replyId) &&
+                        this.acceptReplyId == acceptReplyId)
                     {
                         activeRouteId.value = routeId;
                         activeReplyId.value = replyId;
@@ -157,7 +158,8 @@ final class HttpProxyCacheableRequestGroup
                 {
                     value.forEach((replyId, routeId) ->
                     {
-                        if (!requestsWithAnswer.containsLong(replyId))
+                        if (!requestsWithAnswer.containsLong(replyId) &&
+                            this.acceptReplyId == acceptReplyId)
                         {
                             activeRouteId.value = routeId;
                             activeReplyId.value = replyId;

@@ -318,7 +318,7 @@ final class HttpCacheProxyCacheableRequest
             onResponseSignalCacheEntryAborted(signal);
             break;
         case GROUP_REQUEST_RESET_SIGNAL:
-            onResponseSignalGroupRequestAborted(signal);
+            onResponseSignalGroupRequestReset(signal);
             break;
         default:
             break;
@@ -371,7 +371,7 @@ final class HttpCacheProxyCacheableRequest
         cleanupRequestIfNecessary();
     }
 
-    private void onResponseSignalGroupRequestAborted(
+    private void onResponseSignalGroupRequestReset(
         SignalFW signal)
     {
         cleanupRequestIfNecessary();

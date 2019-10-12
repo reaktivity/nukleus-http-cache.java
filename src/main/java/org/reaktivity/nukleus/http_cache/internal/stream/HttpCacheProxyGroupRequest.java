@@ -276,13 +276,9 @@ final class HttpCacheProxyGroupRequest
     {
         final int signalId = (int) signal.signalId();
 
-        switch (signalId)
+        if (signalId == REQUEST_RETRY_SIGNAL)
         {
-        case REQUEST_RETRY_SIGNAL:
             retryCacheableRequest();
-            break;
-        default:
-            break;
         }
     }
 
