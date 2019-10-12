@@ -266,6 +266,7 @@ final class HttpCacheProxyGroupRequest
     {
         final long traceId = abort.trace();
         factory.writer.doAbort(connectInitial, routeId, connectInitialId, traceId);
+        factory.writer.doReset(connectInitial, routeId, connectReplyId, traceId);
         cleanupRequestIfNecessary();
     }
 

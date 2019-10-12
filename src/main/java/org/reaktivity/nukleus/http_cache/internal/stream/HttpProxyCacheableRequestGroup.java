@@ -236,20 +236,26 @@ final class HttpProxyCacheableRequestGroup
         long acceptReplyId,
         long acceptRouteId)
     {
+        gotResponse(acceptReplyId);
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
                         factory.supplyTrace.getAsLong(),
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
-    private void doSignalCacheEntryUpdated(
-        long acceptReplyId,
-        long acceptRouteId)
+    private void gotResponse(long acceptReplyId)
     {
         if (!requestsWithAnswer.containsLong(acceptReplyId))
         {
             requestsWithAnswer.pushLong(acceptReplyId);
         }
+    }
+
+    private void doSignalCacheEntryUpdated(
+        long acceptReplyId,
+        long acceptRouteId)
+    {
+        gotResponse(acceptReplyId);
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
                         factory.supplyTrace.getAsLong(),

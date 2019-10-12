@@ -375,13 +375,13 @@ final class HttpCacheProxyCacheableRequest
                                    acceptReplyId,
                                    signal.trace());
             requestGroup.dequeue(ifNoneMatch, acceptReplyId);
+            cacheEntry.setSubscribers(-1);
         }
         else
         {
             send503RetryAfter();
         }
         cleanupRequestIfNecessary();
-        cacheEntry.setSubscribers(-1);
     }
 
     private void onResponseSignalInitiateRequest(
