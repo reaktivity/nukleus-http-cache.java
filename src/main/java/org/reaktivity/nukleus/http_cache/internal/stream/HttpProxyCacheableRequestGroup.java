@@ -211,10 +211,7 @@ final class HttpProxyCacheableRequestGroup
         BeginFW begin = factory.beginRO.wrap(buffer, index, length);
         routeId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(begin.streamId());
-        connect = new HttpCacheProxyGroupRequest(factory,
-                                                 this,
-                                                 acceptReplyId,
-                                                 acceptRouteId)::onRequestMessage;
+        connect = new HttpCacheProxyGroupRequest(factory, this)::onRequestMessage;
         return connect;
     }
 

@@ -55,24 +55,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
-    void onResponseMessage(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case ResetFW.TYPE_ID:
-            factory.writer.doReset(acceptReply,
-                                   acceptRouteId,
-                                   acceptInitialId,
-                                   factory.supplyTrace.getAsLong());
-            break;
-        }
-    }
-
-    void onRequestMessage(
+    void onAccept(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -96,6 +79,11 @@ final class HttpCacheProxyCachedNotModifiedRequest
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
             onAbort(abort);
             break;
+        case ResetFW.TYPE_ID:
+            onReset();
+            break;
+        default:
+            break;
         }
     }
 
@@ -118,23 +106,12 @@ final class HttpCacheProxyCachedNotModifiedRequest
                                 0,
                                 0L);
 
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(requestHeaders));
-        }
 
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
                              factory.supplyTrace.getAsLong(),
                              requestHeaders);
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                              currentTimeMillis(), acceptReplyId, "304");
-        }
-
     }
 
     private void onData(
@@ -164,6 +141,14 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
+                               factory.supplyTrace.getAsLong());
+    }
+
+    private void onReset()
+    {
+        factory.writer.doReset(acceptReply,
+                               acceptRouteId,
+                               acceptInitialId,
                                factory.supplyTrace.getAsLong());
     }
 }

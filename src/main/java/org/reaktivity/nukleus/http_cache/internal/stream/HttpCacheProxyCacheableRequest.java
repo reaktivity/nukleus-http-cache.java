@@ -16,16 +16,13 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.Math.min;
-import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
@@ -34,7 +31,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -203,12 +199,6 @@ final class HttpCacheProxyCacheableRequest
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                              currentTimeMillis(), acceptReplyId, getRequestURL(requestHeaders));
-        }
-
         // count all requests
         factory.counters.requests.getAsLong();
         factory.counters.requestsCacheable.getAsLong();
@@ -261,6 +251,7 @@ final class HttpCacheProxyCacheableRequest
     {
         final long traceId = abort.trace();
         factory.writer.doAbort(connect, connectRouteId, connectInitialId, traceId);
+        factory.writer.doReset(accept, acceptRouteId, acceptInitialId, traceId);
         cleanupRequestIfNecessary();
         resetRequestTimeoutIfNecessary();
     }
@@ -303,8 +294,6 @@ final class HttpCacheProxyCacheableRequest
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
-
-
     private void onResponseSignal(
         SignalFW signal)
     {
@@ -336,16 +325,10 @@ final class HttpCacheProxyCacheableRequest
         SignalFW signal)
     {
         cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
-        if (cacheEntry == null)
-        {
-            cleanupRequestIfNecessary();
-            send503RetryAfter();
-            return;
-        }
         if (payloadWritten == -1)
         {
             resetRequestTimeoutIfNecessary();
-            sendHttpResponseHeaders(cacheEntry, signal.signalId());
+            sendHttpResponseHeaders(cacheEntry);
         }
         else
         {
@@ -456,12 +439,6 @@ final class HttpCacheProxyCacheableRequest
 
     private void send503RetryAfter()
     {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(),
-                              acceptReplyId, "503");
-        }
-
         factory.writer.doHttpResponse(
             accept,
             acceptRouteId,
@@ -484,16 +461,9 @@ final class HttpCacheProxyCacheableRequest
     }
 
     private void sendHttpResponseHeaders(
-        DefaultCacheEntry cacheEntry,
-        long signalId)
+        DefaultCacheEntry cacheEntry)
     {
-        ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
-
-        boolean isStale = false;
-        if (signalId == CACHE_ENTRY_SIGNAL)
-        {
-            isStale = cacheEntry.isStale();
-        }
+        final ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
         if (cacheEntry.etag() != null)
         {
@@ -506,7 +476,7 @@ final class HttpCacheProxyCacheableRequest
                                                         responseHeaders,
                                                         cacheEntry.getRequestHeaders(),
                                                         cacheEntry.etag(),
-                                                        isStale,
+                                                        false,
                                                         factory.supplyTrace.getAsLong());
 
         payloadWritten = 0;
@@ -523,7 +493,8 @@ final class HttpCacheProxyCacheableRequest
             ackedBudget &&
             cacheEntry.isResponseCompleted())
         {
-            if (!etagSent && cacheEntry.etag() != null)
+            if (!etagSent &&
+                cacheEntry.etag() != null)
             {
                 factory.writer.doHttpEnd(accept,
                                          acceptRouteId,

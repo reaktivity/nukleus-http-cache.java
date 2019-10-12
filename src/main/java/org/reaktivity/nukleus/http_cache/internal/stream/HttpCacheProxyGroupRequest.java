@@ -38,8 +38,6 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
-import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -52,16 +50,10 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyGroupRequest
 {
-    private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
-    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW("503");
     private final MutableDirectBuffer writeBuffer;
 
     private final HttpCacheProxyFactory factory;
     private final HttpProxyCacheableRequestGroup requestGroup;
-    private final long acceptInitialId;
-    private final long acceptReplyId;
-    private final long acceptRouteId;
-    private final MessageConsumer acceptReply;
 
     private long initialId;
     private long replyId;
@@ -77,16 +69,10 @@ final class HttpCacheProxyGroupRequest
 
     HttpCacheProxyGroupRequest(
         HttpCacheProxyFactory factory,
-        HttpProxyCacheableRequestGroup requestGroup,
-        long acceptReplyId,
-        long acceptRouteId)
+        HttpProxyCacheableRequestGroup requestGroup)
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
-        this.acceptReplyId = acceptReplyId;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptInitialId = acceptReplyId | 0x1;
-        this.acceptReply = factory.router.supplyReceiver(acceptReplyId);
         this.requestSlot =  new MutableInteger(NO_SLOT);
         this.writeBuffer = new UnsafeBuffer(allocateDirect(factory.writer.writerCapacity()).order(nativeOrder()));
     }
@@ -242,8 +228,7 @@ final class HttpCacheProxyGroupRequest
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
         {
-            //TODO find different way to handle it.
-            send503RetryAfter();
+            cleanupRequestIfNecessary();
             return;
         }
         doHttpBegin(requestHeaders);
@@ -282,7 +267,7 @@ final class HttpCacheProxyGroupRequest
     private void onRequestReset(
         final ResetFW reset)
     {
-        //TODO: Signal accept side to reset request and clean up
+
         cleanupRequestIfNecessary();
     }
 
@@ -353,7 +338,7 @@ final class HttpCacheProxyGroupRequest
         final ArrayFW<HttpHeaderFW> headers)
     {
         assert requestSlot.value == NO_SLOT;
-        int newRequestSlot = factory.requestBufferPool.acquire(acceptInitialId);
+        int newRequestSlot = factory.requestBufferPool.acquire(replyId);
         if (newRequestSlot == NO_SLOT)
         {
             return false;
@@ -404,24 +389,6 @@ final class HttpCacheProxyGroupRequest
         };
     }
 
-    private void onResponseSignalInFlightRequestAborted(
-        SignalFW signal)
-    {
-        if (retryRequest != null)
-        {
-            retryRequest.cancel(true);
-        }
-        factory.writer.doAbort(connectInitial,
-                               routeId,
-                               connectInitialId,
-                               factory.supplyTrace.getAsLong());
-        factory.writer.doReset(connectInitial,
-                               routeId,
-                               connectReplyId,
-                               factory.supplyTrace.getAsLong());
-        factory.router.clearThrottle(replyId);
-    }
-
     private void doHttpBegin(
         ArrayFW<HttpHeaderFW> requestHeaders)
     {
@@ -438,29 +405,6 @@ final class HttpCacheProxyGroupRequest
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
     }
 
-    private void send503RetryAfter()
-    {
-
-        factory.writer.doHttpResponse(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyId,
-            factory.supplyTrace.getAsLong(),
-            e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
-                  .item(h -> h.name("retry-after").value("0")));
-
-        factory.writer.doHttpEnd(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyId,
-            factory.supplyTrace.getAsLong());
-
-        // count all responses
-        factory.counters.responses.getAsLong();
-
-        // count retry responses
-        factory.counters.responsesRetry.getAsLong();
-    }
 
     private void cleanupRequestIfNecessary()
     {
@@ -469,6 +413,11 @@ final class HttpCacheProxyGroupRequest
         {
             factory.requestBufferPool.release(requestSlot.value);
             requestSlot.value = NO_SLOT;
+        }
+
+        if (retryRequest != null)
+        {
+            retryRequest.cancel(true);
         }
     }
 }

@@ -15,9 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
@@ -278,8 +276,8 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                                acceptRouteId,
                                                                acceptReplyId,
                                                                acceptInitialId);
-                newStream = cachedNotModifiedRequest::onRequestMessage;
-                router.setThrottle(acceptReplyId, cachedNotModifiedRequest::onResponseMessage);
+                newStream = cachedNotModifiedRequest::onAccept;
+                router.setThrottle(acceptReplyId, newStream);
             }
             else
             {
@@ -290,8 +288,8 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                     acceptRouteId,
                                                     acceptReplyId,
                                                     acceptInitialId);
-                newStream = cachedRequest::onRequestMessage;
-                router.setThrottle(acceptReplyId, cachedRequest::onResponseMessage);
+                newStream = cachedRequest::onAccept;
+                router.setThrottle(acceptReplyId, newStream);
             }
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
@@ -367,10 +365,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         long acceptReplyId,
         long trace)
     {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "504");
-        }
 
         writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e ->
             e.item(h -> h.name(STATUS)

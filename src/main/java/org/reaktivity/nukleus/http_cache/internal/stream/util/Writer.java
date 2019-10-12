@@ -649,6 +649,7 @@ public class Writer
             }
 
             builder.item(h -> h.name(STATUS).value(HttpStatus.NOT_MODIFIED_304));
+            builder.item(h -> h.name(ETAG).value(getHeader(requestHeaders, IF_NONE_MATCH)));
         });
     }
 
