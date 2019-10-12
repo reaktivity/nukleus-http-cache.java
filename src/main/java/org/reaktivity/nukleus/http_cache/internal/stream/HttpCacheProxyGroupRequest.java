@@ -267,7 +267,7 @@ final class HttpCacheProxyGroupRequest
     private void onRequestReset(
         final ResetFW reset)
     {
-
+        requestGroup.onGroupRequestReset();
         cleanupRequestIfNecessary();
     }
 

@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RESET_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
@@ -316,6 +317,9 @@ final class HttpCacheProxyCacheableRequest
         case CACHE_ENTRY_ABORTED_SIGNAL:
             onResponseSignalCacheEntryAborted(signal);
             break;
+        case GROUP_REQUEST_RESET_SIGNAL:
+            onResponseSignalGroupRequestAborted(signal);
+            break;
         default:
             break;
         }
@@ -365,6 +369,13 @@ final class HttpCacheProxyCacheableRequest
             send503RetryAfter();
         }
         cleanupRequestIfNecessary();
+    }
+
+    private void onResponseSignalGroupRequestAborted(
+        SignalFW signal)
+    {
+        cleanupRequestIfNecessary();
+        send503RetryAfter();
     }
 
     private void onResponseSignalInitiateRequest(

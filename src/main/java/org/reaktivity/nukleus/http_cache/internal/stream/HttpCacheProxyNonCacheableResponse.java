@@ -133,11 +133,6 @@ final class HttpCacheProxyNonCacheableResponse
         // count all responses
         factory.counters.responses.getAsLong();
 
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), acceptReplyId,
-                              getHeader(responseHeaders, ":status"));
-        }
     }
 
     private void onData(
