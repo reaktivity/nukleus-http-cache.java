@@ -67,7 +67,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
             factory.writer.doReset(acceptReply,
                                    acceptRouteId,
                                    acceptInitialId,
-                                   factory.supplyTrace.getAsLong());
+                                   factory.supplyTraceId.getAsLong());
             break;
         }
     }
@@ -113,10 +113,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                begin.trace(),
+                                begin.traceId(),
+                                0L,
                                 initialWindow,
-                                0,
-                                0L);
+                                0);
 
         if (DEBUG)
         {
@@ -127,7 +127,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
-                             factory.supplyTrace.getAsLong(),
+                             factory.supplyTraceId.getAsLong(),
                              requestHeaders);
         if (DEBUG)
         {
@@ -143,10 +143,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                data.trace(),
+                                data.traceId(),
+                                data.budgetId(),
                                 data.reserved(),
-                                0,
-                                data.groupId());
+                                0);
     }
 
     private void onEnd(
@@ -155,7 +155,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
-                                 factory.supplyTrace.getAsLong());
+                                 factory.supplyTraceId.getAsLong());
     }
 
     private void onAbort(
@@ -164,6 +164,6 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
-                               factory.supplyTrace.getAsLong());
+                               factory.supplyTraceId.getAsLong());
     }
 }

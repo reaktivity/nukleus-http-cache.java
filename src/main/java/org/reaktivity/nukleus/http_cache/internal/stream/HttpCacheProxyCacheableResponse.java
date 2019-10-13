@@ -130,7 +130,7 @@ final class HttpCacheProxyCacheableResponse
         BeginFW begin)
     {
         final long connectReplyId = begin.streamId();
-        long traceId = begin.trace();
+        long traceId = begin.traceId();
 
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
@@ -167,7 +167,7 @@ final class HttpCacheProxyCacheableResponse
     private void onData(
         DataFW data)
     {
-        sendWindow(data.reserved(), data.trace());
+        sendWindow(data.reserved(), data.traceId());
         assert requestSlot.value != NO_SLOT;
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
@@ -205,7 +205,7 @@ final class HttpCacheProxyCacheableResponse
             factory.writer.do503AndAbort(acceptReply,
                                          acceptRouteId,
                                          acceptReplyId,
-                                         abort.trace());
+                                         abort.traceId());
             requestGroup.onNonCacheableResponse(acceptReplyId);
         }
         else
@@ -246,9 +246,9 @@ final class HttpCacheProxyCacheableResponse
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,
+                                    0L,
                                     credit,
-                                    0,
-                                    0L);
+                                    0);
         }
     }
 

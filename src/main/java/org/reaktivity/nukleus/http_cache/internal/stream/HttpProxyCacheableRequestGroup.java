@@ -104,7 +104,7 @@ final class HttpProxyCacheableRequestGroup
     {
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
-                        factory.supplyTrace.getAsLong(),
+                        factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
@@ -114,7 +114,7 @@ final class HttpProxyCacheableRequestGroup
     {
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
-                        factory.supplyTrace.getAsLong(),
+                        factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_UPDATED_SIGNAL);
 
     }
@@ -122,11 +122,11 @@ final class HttpProxyCacheableRequestGroup
     private void sendSignalToSubscriber(
         long acceptReplyId,
         long acceptRouteId,
-        long signalId)
+        int signalId)
     {
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
-                        factory.supplyTrace.getAsLong(),
+                        factory.supplyTraceId.getAsLong(),
                         signalId);
     }
 

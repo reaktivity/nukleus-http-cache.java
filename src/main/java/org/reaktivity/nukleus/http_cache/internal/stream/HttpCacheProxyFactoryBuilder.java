@@ -51,7 +51,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
     private LongUnaryOperator supplyInitialId;
-    private LongSupplier supplyTrace;
+    private LongSupplier supplyTraceId;
     private ToIntFunction<String> supplyTypeId;
     private LongUnaryOperator supplyReplyId;
     private Slab cacheBufferPool;
@@ -109,10 +109,10 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public StreamFactoryBuilder setTraceSupplier(
-        LongSupplier supplyTrace)
+    public StreamFactoryBuilder setTraceIdSupplier(
+        LongSupplier supplyTraceId)
     {
-        this.supplyTrace = supplyTrace;
+        this.supplyTraceId = supplyTraceId;
         return this;
     }
 
@@ -183,7 +183,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                            requestCorrelations,
                                            counters,
                                            cacheEntries,
-                                           supplyTrace,
+                                           supplyTraceId,
                                            supplyTypeId);
         }
 
@@ -194,7 +194,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                                  cacheBufferPool,
                                                  counters,
                                                  cacheEntries,
-                                                 supplyTrace,
+                                                 supplyTraceId,
                                                  supplyTypeId,
                                                  config.allowedCachePercentage(),
                                                  config.cacheCapacity());
@@ -212,7 +212,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          emulatedCache,
                                          defaultCache,
                                          counters,
-                                         supplyTrace,
+                                         supplyTraceId,
                                          supplyTypeId,
                                          executor,
                                          scheduler);
