@@ -124,14 +124,14 @@ final class HttpCacheProxyNotModifiedResponse
                                      acceptReply,
                                      acceptRouteId,
                                      acceptReplyId);
-        sendWindow(initialWindow, begin.trace());
+        sendWindow(initialWindow, begin.traceId());
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
     }
 
     private void onData(
         DataFW data)
     {
-        sendWindow(data.reserved(), data.trace());
+        sendWindow(data.reserved(), data.traceId());
     }
 
     private void onEnd(EndFW end)
@@ -139,7 +139,7 @@ final class HttpCacheProxyNotModifiedResponse
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
-                                 end.trace());
+                                 end.traceId());
 
     }
 
@@ -148,7 +148,7 @@ final class HttpCacheProxyNotModifiedResponse
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
-                               abort.trace());
+                               abort.traceId());
     }
 
     private void onReset(ResetFW reset)
@@ -172,9 +172,9 @@ final class HttpCacheProxyNotModifiedResponse
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,
+                                    0L,
                                     credit,
-                                    0,
-                                    0L);
+                                    0);
         }
     }
 }

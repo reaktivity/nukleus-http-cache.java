@@ -249,7 +249,7 @@ final class HttpCacheProxyGroupRequest
     private void onAbort(
         final AbortFW abort)
     {
-        final long traceId = abort.trace();
+        final long traceId = abort.traceId();
         factory.writer.doAbort(connectInitial, routeId, connectInitialId, traceId);
         factory.writer.doReset(connectInitial, routeId, connectReplyId, traceId);
         cleanupRequestIfNecessary();
@@ -261,7 +261,7 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doHttpEnd(connectInitial,
                                  routeId,
                                  connectInitialId,
-                                 window.trace());
+                                 window.traceId());
     }
 
     private void onRequestReset(
@@ -288,10 +288,10 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doWindow(connectInitial,
                                 routeId,
                                 connectReplyId,
-                                window.trace(),
+                                window.traceId(),
+                                window.budgetId(),
                                 window.credit(),
-                                window.padding(),
-                                window.groupId());
+                                window.padding());
     }
 
     private void onReset(
@@ -300,7 +300,7 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doReset(connectInitial,
                                routeId,
                                connectReplyId,
-                               reset.trace());
+                               reset.traceId());
         cleanupRequestIfNecessary();
     }
 
@@ -396,7 +396,7 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doHttpRequest(connectInitial,
                                      routeId,
                                      connectInitialId,
-                                     factory.supplyTrace.getAsLong(),
+                                     factory.supplyTraceId.getAsLong(),
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
     }

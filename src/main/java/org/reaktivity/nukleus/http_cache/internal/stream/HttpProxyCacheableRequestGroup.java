@@ -173,7 +173,7 @@ final class HttpProxyCacheableRequestGroup
                 resetInFightRequest();
                 writer.doSignal(activeRouteId.value,
                                 activeReplyId.value,
-                                factory.supplyTrace.getAsLong(),
+                                factory.supplyTraceId.getAsLong(),
                                 INITIATE_REQUEST_SIGNAL);
             }
         }
@@ -208,7 +208,7 @@ final class HttpProxyCacheableRequestGroup
     {
         factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
-                                factory.supplyTrace.getAsLong(),
+                                factory.supplyTraceId.getAsLong(),
                                 GROUP_REQUEST_RESET_SIGNAL);
         acceptRouteId = 0L;
         acceptReplyId = 0L;
@@ -238,7 +238,7 @@ final class HttpProxyCacheableRequestGroup
         this.acceptReplyId = acceptReplyId;
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
-                        factory.supplyTrace.getAsLong(),
+                        factory.supplyTraceId.getAsLong(),
                         INITIATE_REQUEST_SIGNAL);
     }
 
@@ -249,7 +249,7 @@ final class HttpProxyCacheableRequestGroup
         gotResponse(acceptReplyId);
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
-                        factory.supplyTrace.getAsLong(),
+                        factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
@@ -268,7 +268,7 @@ final class HttpProxyCacheableRequestGroup
         gotResponse(acceptReplyId);
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
-                        factory.supplyTrace.getAsLong(),
+                        factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_UPDATED_SIGNAL);
 
     }
@@ -282,7 +282,7 @@ final class HttpProxyCacheableRequestGroup
             requestsWithAnswer.pushLong(acceptReplyId);
             writer.doSignal(acceptRouteId,
                             acceptReplyId,
-                            factory.supplyTrace.getAsLong(),
+                            factory.supplyTraceId.getAsLong(),
                             CACHE_ENTRY_NOT_MODIFIED_SIGNAL);
         }
     }
@@ -299,6 +299,6 @@ final class HttpProxyCacheableRequestGroup
         factory.writer.doReset(connect,
                                routeId,
                                replyId,
-                               factory.supplyTrace.getAsLong());
+                               factory.supplyTraceId.getAsLong());
     }
 }

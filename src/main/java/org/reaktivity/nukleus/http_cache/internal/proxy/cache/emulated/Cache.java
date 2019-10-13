@@ -85,7 +85,7 @@ public class Cache
 
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
-    final LongSupplier supplyTrace;
+    final LongSupplier supplyTraceId;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests;
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
@@ -100,7 +100,7 @@ public class Cache
         Long2ObjectHashMap<Request> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
-        LongSupplier supplyTrace,
+        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId)
     {
         this.scheduler = scheduler;
@@ -125,7 +125,7 @@ public class Cache
         this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.counters = counters;
-        this.supplyTrace = requireNonNull(supplyTrace);
+        this.supplyTraceId = requireNonNull(supplyTraceId);
         this.uncommittedRequests = new Int2ObjectHashMap<>();
         this.pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     }
@@ -141,7 +141,7 @@ public class Cache
                     this,
                     request,
                     true,
-                    supplyTrace);
+                    supplyTraceId);
             updateCache(requestHash, cacheEntry);
             cacheEntry.sendHttpPushPromise(request);
         }
@@ -152,7 +152,7 @@ public class Cache
                     this,
                     request,
                     expectSubscribers,
-                    supplyTrace);
+                    supplyTraceId);
 
             if (cacheEntry.isIntendedForSingleUser())
             {
@@ -177,7 +177,7 @@ public class Cache
                         this.writer.do503AndAbort(acceptReply,
                                                 acceptRouteId,
                                                 acceptReplyId,
-                                                supplyTrace.getAsLong());
+                                                supplyTraceId.getAsLong());
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -287,9 +287,9 @@ public class Cache
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong(),
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
-        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
+        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong());
     }
 
     public boolean hasPendingInitialRequests(
@@ -332,7 +332,7 @@ public class Cache
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -355,7 +355,7 @@ public class Cache
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -411,9 +411,9 @@ public class Cache
         }
 
         writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
-                request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
+                request.acceptReplyId(), supplyTraceId.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTrace.getAsLong());
+        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTraceId.getAsLong());
 
         request.purge();
 
@@ -437,7 +437,7 @@ public class Cache
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyId = subscriber.acceptReplyId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
 
                 // count all responses
                 counters.responses.getAsLong();

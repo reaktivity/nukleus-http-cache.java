@@ -100,7 +100,7 @@ final class HttpCacheProxyNonCacheableRequest
         factory.writer.doReset(acceptReply,
                                acceptRouteId,
                                acceptStreamId,
-                               factory.supplyTrace.getAsLong());
+                               factory.supplyTraceId.getAsLong());
         factory.correlations.remove(connectReplyId);
     }
 
@@ -156,7 +156,7 @@ final class HttpCacheProxyNonCacheableRequest
             connectInitial,
             connectRouteId,
             connectInitialId,
-            factory.supplyTrace.getAsLong(),
+            factory.supplyTraceId.getAsLong(),
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
 
         factory.router.setThrottle(connectInitialId, this::onRequestMessage);
@@ -165,14 +165,14 @@ final class HttpCacheProxyNonCacheableRequest
     private void onData(
         final DataFW data)
     {
-        final long groupId = data.groupId();
+        final long budgetId = data.budgetId();
         final OctetsFW payload = data.payload();
 
         factory.writer.doHttpData(connectInitial,
                                   connectRouteId,
                                   connectInitialId,
-                                  data.trace(),
-                                  groupId,
+                                  data.traceId(),
+                                  budgetId,
                                   payload.buffer(),
                                   payload.offset(),
                                   payload.sizeof(),
@@ -182,31 +182,31 @@ final class HttpCacheProxyNonCacheableRequest
     private void onEnd(
         final EndFW end)
     {
-        final long traceId = end.trace();
+        final long traceId = end.traceId();
         factory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onAbort(
         final AbortFW abort)
     {
-        final long traceId = abort.trace();
+        final long traceId = abort.traceId();
         factory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
     private void onWindow(
         final WindowFW window)
     {
+        final long traceId = window.traceId();
+        final long budgetId = window.budgetId();
         final int credit = window.credit();
         final int padding = window.padding();
-        final long groupId = window.groupId();
-        final long traceId = window.trace();
-        factory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+        factory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, budgetId, credit, padding);
     }
 
     private void onReset(
         final ResetFW reset)
     {
-        final long traceId = reset.trace();
+        final long traceId = reset.traceId();
         factory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
     }
 
