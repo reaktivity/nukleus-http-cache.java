@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
+import static org.reaktivity.nukleus.concurrent.Signaler.NO_CANCEL_ID;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.RESPONSE_IS_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
@@ -42,10 +43,10 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
 import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
@@ -72,7 +73,7 @@ public class Writer
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
     private final SignalFW.Builder signalRW = new SignalFW.Builder();
 
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     private final RouteManager router;
     private final MutableDirectBuffer writeBuffer;
@@ -98,7 +99,8 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
+                .affinity(0L)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
@@ -115,7 +117,8 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
+                .affinity(0L)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
 
@@ -127,7 +130,7 @@ public class Writer
         long routeId,
         long streamId,
         CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
         boolean cacheControlPrivate,
@@ -139,7 +142,8 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
+                .affinity(0L)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -149,8 +153,8 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        ListFW<HttpHeaderFW> responseHeaders,
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale,
         long traceId)
@@ -164,7 +168,8 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                      .routeId(routeId)
                                      .streamId(streamId)
-                                     .trace(traceId)
+                                     .traceId(traceId)
+                                     .affinity(0L)
                                      .extension(e -> e.set(visitHttpBeginEx(mutator)))
                                      .build();
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
@@ -172,8 +177,8 @@ public class Writer
 
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-        ListFW<HttpHeaderFW> responseHeaders,
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale)
     {
@@ -215,7 +220,7 @@ public class Writer
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         CacheControl cacheControlFW,
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int staleWhileRevalidate,
         String etag,
         boolean cacheControlPrivate)
@@ -270,19 +275,19 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        long groupId,
+        long budgetId,
         DirectBuffer payload,
         int offset,
         int length,
-        int padding)
+        int reserved)
     {
 
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
-                .groupId(groupId)
-                .padding(padding)
+                .traceId(traceId)
+                .budgetId(budgetId)
+                .reserved(reserved)
                 .payload(p -> p.set(payload, offset, length))
                 .build();
 
@@ -294,16 +299,16 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        long groupId,
-        int padding,
+        long budgetId,
+        int reserved,
         Consumer<OctetsFW.Builder> payload)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
-                .groupId(groupId)
-                .padding(padding)
+                .traceId(traceId)
+                .budgetId(budgetId)
+                .reserved(reserved)
                 .payload(payload)
                 .build();
 
@@ -323,7 +328,7 @@ public class Writer
         final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                .routeId(routeId)
                                .streamId(streamId)
-                               .trace(traceId)
+                               .traceId(traceId)
                                .extension(e -> e.set(visitHttpEndEx(mutator)))
                                .build();
 
@@ -340,7 +345,7 @@ public class Writer
         final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
                 .extension(extension)
                 .build();
 
@@ -363,7 +368,7 @@ public class Writer
         final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
                 .build();
 
         receiver.accept(end.typeId(), end.buffer(), end.offset(), end.sizeof());
@@ -378,7 +383,7 @@ public class Writer
         final AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
                 .build();
 
         receiver.accept(abort.typeId(), abort.buffer(), abort.offset(), abort.sizeof());
@@ -389,17 +394,17 @@ public class Writer
         final long routeId,
         final long streamId,
         final long traceId,
+        final long budgetId,
         final int credit,
-        final int padding,
-        final long groupId)
+        final int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
+                .budgetId(budgetId)
                 .credit(credit)
                 .padding(padding)
-                .groupId(groupId)
                 .build();
 
         sender.accept(window.typeId(), window.buffer(), window.offset(), window.sizeof());
@@ -414,7 +419,7 @@ public class Writer
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
-                .trace(traceId)
+                .traceId(traceId)
                 .build();
 
         sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
@@ -424,14 +429,15 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        long signalId)
+        int signalId)
     {
         long acceptInitialId = streamId | 0x01;
         MessageConsumer receiver = router.supplyReceiver(acceptInitialId);
         final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
             .routeId(routeId)
             .streamId(streamId)
-            .trace(traceId)
+            .traceId(traceId)
+            .cancelId(NO_CANCEL_ID)
             .signalId(signalId)
             .build();
 
@@ -439,7 +445,7 @@ public class Writer
     }
 
     private Flyweight.Builder.Visitor visitHttpBeginEx(
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
         return (buffer, offset, limit) ->
                 httpBeginExRW.wrap(buffer, offset, limit)
@@ -450,7 +456,7 @@ public class Writer
     }
 
     private Flyweight.Builder.Visitor visitHttpEndEx(
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
     {
         return (buffer, offset, limit) ->
             httpEndExRW.wrap(buffer, offset, limit)
@@ -463,11 +469,11 @@ public class Writer
     public void doHttpPushPromise(
         AnswerableByCacheRequest request,
         CacheableRequest cachedRequest,
-        ListFW<HttpHeaderFW> responseHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
-        final ListFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
+        final ArrayFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
         final MessageConsumer acceptReply = request.acceptReply;
         final long routeId = request.acceptRouteId;
         final long streamId = request.acceptReplyId;
@@ -480,8 +486,8 @@ public class Writer
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-        ListFW<HttpHeaderFW> requestHeadersRO,
-        ListFW<HttpHeaderFW> responseHeadersRO,
+        ArrayFW<HttpHeaderFW> requestHeadersRO,
+        ArrayFW<HttpHeaderFW> responseHeadersRO,
         int freshnessExtension,
         String etag)
     {
@@ -492,8 +498,8 @@ public class Writer
     }
 
     private void updateRequestHeaders(
-        ListFW<HttpHeaderFW> requestHeadersFW,
-        ListFW<HttpHeaderFW> responseHeadersFW,
+        ArrayFW<HttpHeaderFW> requestHeadersFW,
+        ArrayFW<HttpHeaderFW> responseHeadersFW,
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         int freshnessExtension,
         String etag)
@@ -580,16 +586,16 @@ public class Writer
         long routeId,
         long streamId,
         long authorization,
-        long groupId,
-        int padding,
-        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        long budgetId,
+        int reserved,
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
                 .authorization(authorization)
-                .groupId(groupId)
-                .padding(padding)
+                .budgetId(budgetId)
+                .reserved(reserved)
                 .payload((OctetsFW) null)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
@@ -612,7 +618,7 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
-        ListFW<HttpHeaderFW> requestHeaders)
+        ArrayFW<HttpHeaderFW> requestHeaders)
     {
         this.doHttpResponse(receiver, routeId, streamId, traceId, builder ->
         {

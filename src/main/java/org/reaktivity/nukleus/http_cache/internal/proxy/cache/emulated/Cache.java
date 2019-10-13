@@ -47,8 +47,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -57,13 +57,13 @@ public class Cache
 {
     static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
-    final ListFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> cachedResponse1HeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedRequestHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedRequest1HeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> cachedResponse1HeadersRO = new HttpBeginExFW().headers();
 
-    final ListFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
-    final ListFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final ArrayFW<HttpHeaderFW> responseHeadersRO = new HttpBeginExFW().headers();
 
     final WindowFW windowRO = new WindowFW();
 
@@ -85,7 +85,7 @@ public class Cache
 
     final LongObjectBiConsumer<Runnable> scheduler;
     final Long2ObjectHashMap<Request> correlations;
-    final LongSupplier supplyTrace;
+    final LongSupplier supplyTraceId;
     final Int2ObjectHashMap<PendingCacheEntries> uncommittedRequests;
     final Int2ObjectHashMap<PendingInitialRequests> pendingInitialRequestsMap;
     final HttpCacheCounters counters;
@@ -100,7 +100,7 @@ public class Cache
         Long2ObjectHashMap<Request> correlations,
         HttpCacheCounters counters,
         LongConsumer entryCount,
-        LongSupplier supplyTrace,
+        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId)
     {
         this.scheduler = scheduler;
@@ -125,7 +125,7 @@ public class Cache
         this.responseBufferPool = requestBufferPool.duplicate();
         this.cachedEntries = new Int2CacheHashMapWithLRUEviction(entryCount);
         this.counters = counters;
-        this.supplyTrace = requireNonNull(supplyTrace);
+        this.supplyTraceId = requireNonNull(supplyTraceId);
         this.uncommittedRequests = new Int2ObjectHashMap<>();
         this.pendingInitialRequestsMap = new Int2ObjectHashMap<>();
     }
@@ -141,7 +141,7 @@ public class Cache
                     this,
                     request,
                     true,
-                    supplyTrace);
+                    supplyTraceId);
             updateCache(requestHash, cacheEntry);
             cacheEntry.sendHttpPushPromise(request);
         }
@@ -152,7 +152,7 @@ public class Cache
                     this,
                     request,
                     expectSubscribers,
-                    supplyTrace);
+                    supplyTraceId);
 
             if (cacheEntry.isIntendedForSingleUser())
             {
@@ -177,7 +177,7 @@ public class Cache
                         this.writer.do503AndAbort(acceptReply,
                                                 acceptRouteId,
                                                 acceptReplyId,
-                                                supplyTrace.getAsLong());
+                                                supplyTraceId.getAsLong());
 
                         // count all responses
                         counters.responses.getAsLong();
@@ -215,7 +215,7 @@ public class Cache
 
     public boolean handleInitialRequest(
         int requestHash,
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short authScope,
         CacheableRequest cacheableRequest)
     {
@@ -277,7 +277,7 @@ public class Cache
         long connectInitialId = request.supplyInitialId().applyAsLong(connectRouteId);
         MessageConsumer connectInitial = request.supplyReceiver().apply(connectInitialId);
         long connectReplyId = request.supplyReplyId().applyAsLong(connectInitialId);
-        ListFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
+        ArrayFW<HttpHeaderFW> requestHeaders = request.getRequestHeaders(requestHeadersRO);
 
         correlations.put(connectReplyId, request);
 
@@ -287,9 +287,9 @@ public class Cache
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(),
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong(),
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
-        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong());
+        writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong());
     }
 
     public boolean hasPendingInitialRequests(
@@ -314,7 +314,7 @@ public class Cache
     public void handlePreferWaitIfNoneMatchRequest(
         int requestHash,
         PreferWaitIfNoneMatchRequest preferWaitRequest,
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
         final CacheEntry cacheEntry = cachedEntries.get(requestHash);
@@ -332,7 +332,7 @@ public class Cache
             final MessageConsumer acceptReply = preferWaitRequest.acceptReply();
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -355,7 +355,7 @@ public class Cache
             final long acceptRouteId = preferWaitRequest.acceptRouteId();
             final long acceptReplyId = preferWaitRequest.acceptReplyId();
 
-            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+            writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
 
             // count all responses
             counters.responses.getAsLong();
@@ -366,17 +366,17 @@ public class Cache
     }
 
     private boolean doesNotVary(
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         InitialRequest request)
     {
-        ListFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
-        ListFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
+        ArrayFW<HttpHeaderFW> cachedRequestHeaders = request.getRequestHeaders(cachedRequestHeadersRO);
+        ArrayFW<HttpHeaderFW> cachedResponseHeaders = request.getResponseHeaders(cachedResponseHeadersRO);
         return CacheUtils.doesNotVary(requestHeaders, cachedResponseHeaders, cachedRequestHeaders);
     }
 
     private boolean serveRequest(
         CacheEntry entry,
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short authScope,
         AnswerableByCacheRequest cacheableRequest)
     {
@@ -411,9 +411,9 @@ public class Cache
         }
 
         writer.doHttpResponse(request.acceptReply(), request.acceptRouteId(),
-                request.acceptReplyId(), supplyTrace.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
+                request.acceptReplyId(), supplyTraceId.getAsLong(), e -> e.item(h -> h.name(STATUS).value("304"))
                       .item(h -> h.name(ETAG).value(entry.cachedRequest.etag())));
-        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTrace.getAsLong());
+        writer.doHttpEnd(request.acceptReply(), request.acceptRouteId(), request.acceptReplyId(), supplyTraceId.getAsLong());
 
         request.purge();
 
@@ -437,7 +437,7 @@ public class Cache
                 final MessageConsumer acceptReply = subscriber.acceptReply();
                 final long acceptRouteId = subscriber.acceptRouteId();
                 final long acceptReplyId = subscriber.acceptReplyId();
-                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+                this.writer.do503AndAbort(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
 
                 // count all responses
                 counters.responses.getAsLong();

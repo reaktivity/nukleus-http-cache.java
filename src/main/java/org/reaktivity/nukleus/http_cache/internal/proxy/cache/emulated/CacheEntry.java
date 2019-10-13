@@ -63,8 +63,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request
 import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
@@ -180,7 +180,7 @@ public final class CacheEntry
             long connectInitialId = cachedRequest.supplyInitialId().applyAsLong(connectRouteId);
             long connectReplyId = cachedRequest.supplyReplyId().applyAsLong(connectInitialId);
             MessageConsumer connectInitial = cachedRequest.supplyReceiver().apply(connectInitialId);
-            ListFW<HttpHeaderFW> requestHeaders = getCachedRequest();
+            ArrayFW<HttpHeaderFW> requestHeaders = getCachedRequest();
             final String etag = this.cachedRequest.etag();
 
             if (DEBUG)
@@ -256,7 +256,7 @@ public final class CacheEntry
         boolean injectWarnings)
     {
         addClient();
-        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
 
         ServeFromCacheStream serveFromCacheStream = new ServeFromCacheStream(
             request,
@@ -303,7 +303,7 @@ public final class CacheEntry
         }
         else
         {
-            Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
+            Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = x -> responseHeaders
                 .forEach(h -> x.item(y -> y.name(h.name()).value(h.value())));
 
             // TODO inject stale on above if (freshnessExtension > 0)?
@@ -337,7 +337,7 @@ public final class CacheEntry
     public void sendHttpPushPromise(
         AnswerableByCacheRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         if (freshnessExtension > 0)
         {
@@ -398,7 +398,7 @@ public final class CacheEntry
         private int payloadWritten;
         private final Runnable onEnd;
         private CacheableRequest cachedRequest;
-        private long groupId;
+        private long budgetId;
         private int padding;
         private int acceptReplyBudget;
 
@@ -423,28 +423,28 @@ public final class CacheEntry
             {
             case WindowFW.TYPE_ID:
                 final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
-                groupId = window.groupId();
+                budgetId = window.budgetId();
                 padding = window.padding();
                 long streamId = window.streamId();
                 int credit = window.credit();
                 acceptReplyBudget += credit;
-                cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
-                    this::writePayload, window.trace());
+                cache.budgetManager.window(BudgetManager.StreamKind.CACHE, budgetId, streamId, credit,
+                    this::writePayload, window.traceId());
 
-                boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
+                boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(budgetId, streamId);
                 if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
                 {
                     final MessageConsumer acceptReply = request.acceptReply();
                     final long acceptRouteId = request.acceptRouteId();
                     final long acceptReplyStreamId = request.acceptReplyId();
-                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
+                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.traceId());
                     this.onEnd.run();
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, budgetId, acceptReplyStreamId, window.traceId());
                 }
                 break;
             case ResetFW.TYPE_ID:
             default:
-                cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
+                cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, budgetId, request.acceptReplyId(),
                     supplyTrace.getAsLong());
                 this.onEnd.run();
                 break;
@@ -467,7 +467,7 @@ public final class CacheEntry
                     acceptReplyStreamId,
                     trace,
                     0L,
-                    padding,
+                    toWrite + padding,
                     p -> cachedRequest.buildResponsePayload(payloadWritten, toWrite, p, cache.cachedResponseBufferPool)
                 );
                 payloadWritten += toWrite;
@@ -480,17 +480,17 @@ public final class CacheEntry
         }
     }
 
-    private ListFW<HttpHeaderFW> getCachedRequest()
+    private ArrayFW<HttpHeaderFW> getCachedRequest()
     {
         return cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
     }
 
-    private ListFW<HttpHeaderFW> getCachedResponseHeaders()
+    private ArrayFW<HttpHeaderFW> getCachedResponseHeaders()
     {
         return cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
     }
 
-    private ListFW<HttpHeaderFW> getCachedResponseHeaders(ListFW<HttpHeaderFW> responseHeadersRO, BufferPool bp)
+    private ArrayFW<HttpHeaderFW> getCachedResponseHeaders(ArrayFW<HttpHeaderFW> responseHeadersRO, BufferPool bp)
     {
         return cachedRequest.getResponseHeaders(responseHeadersRO, bp);
     }
@@ -510,7 +510,7 @@ public final class CacheEntry
     }
 
     private boolean canBeServedToAuthorized(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short requestAuthScope)
     {
 
@@ -520,22 +520,22 @@ public final class CacheEntry
         }
 
         final CacheControl responseCacheControl = responseCacheControl();
-        final ListFW<HttpHeaderFW> cachedRequestHeaders = this.getCachedRequest();
+        final ArrayFW<HttpHeaderFW> cachedRequestHeaders = this.getCachedRequest();
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
     }
 
-    private boolean doesNotVaryBy(ListFW<HttpHeaderFW> request)
+    private boolean doesNotVaryBy(ArrayFW<HttpHeaderFW> request)
     {
-        final ListFW<HttpHeaderFW> responseHeaders = this.getCachedResponseHeaders();
-        final ListFW<HttpHeaderFW> cachedRequest = getCachedRequest();
+        final ArrayFW<HttpHeaderFW> responseHeaders = this.getCachedResponseHeaders();
+        final ArrayFW<HttpHeaderFW> cachedRequest = getCachedRequest();
         return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
     // Checks this entry's vary header with the given entry's vary header
     public boolean doesNotVaryBy(CacheEntry entry)
     {
-        final ListFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
-        final ListFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(
+        final ArrayFW<HttpHeaderFW> thisHeaders = this.getCachedResponseHeaders();
+        final ArrayFW<HttpHeaderFW> entryHeaders = entry.getCachedResponseHeaders(
             cache.cachedResponse1HeadersRO, cache.cachedResponse1BufferPool);
         assert thisHeaders.buffer() != entryHeaders.buffer();
 
@@ -544,7 +544,7 @@ public final class CacheEntry
         boolean varyMatches = (thisVary == entryVary) || (thisVary != null && thisVary.equalsIgnoreCase(entryVary));
         if (varyMatches)
         {
-            final ListFW<HttpHeaderFW> requestHeaders = entry.cachedRequest.getRequestHeaders(
+            final ArrayFW<HttpHeaderFW> requestHeaders = entry.cachedRequest.getRequestHeaders(
                 cache.cachedRequest1HeadersRO, cache.cachedRequest1BufferPool);
             return doesNotVaryBy(requestHeaders);
         }
@@ -553,7 +553,7 @@ public final class CacheEntry
 
 
     private boolean satisfiesFreshnessRequirementsOf(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
@@ -572,7 +572,7 @@ public final class CacheEntry
     }
 
     private boolean satisfiesStalenessRequirementsOf(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
         final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
@@ -598,7 +598,7 @@ public final class CacheEntry
     }
 
     private boolean satisfiesAgeRequirementsOf(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
@@ -636,7 +636,7 @@ public final class CacheEntry
     {
         if (lazyInitiatedResponseReceivedAt == null)
         {
-            final ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+            final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
             final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
                 getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
             try
@@ -655,14 +655,14 @@ public final class CacheEntry
 
     private CacheControl responseCacheControl()
     {
-        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
         return cache.responseCacheControlFW.parse(cacheControl);
     }
 
 
     public boolean canServeRequest(
-        ListFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> request,
         short authScope)
     {
         if (this.state == CacheEntryState.PURGED)
@@ -685,14 +685,14 @@ public final class CacheEntry
     }
 
     boolean canServeUpdateRequest(
-        ListFW<HttpHeaderFW> request)
+        ArrayFW<HttpHeaderFW> request)
     {
         if (this.state == CacheEntryState.PURGED)
         {
             return false;
         }
-        ListFW<HttpHeaderFW> cachedRequestHeaders = cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
-        ListFW<HttpHeaderFW> cachedResponseHeaders = cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
+        ArrayFW<HttpHeaderFW> cachedRequestHeaders = cachedRequest.getRequestHeaders(cache.cachedRequestHeadersRO);
+        ArrayFW<HttpHeaderFW> cachedResponseHeaders = cachedRequest.getResponseHeaders(cache.cachedResponseHeadersRO);
         return CacheUtils.doesNotVary(request, cachedResponseHeaders, cachedRequestHeaders);
     }
 
@@ -703,7 +703,7 @@ public final class CacheEntry
 
     protected boolean isIntendedForSingleUser()
     {
-        ListFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         if (SurrogateControl.isProtectedEx(responseHeaders))
         {
             return false;
@@ -716,7 +716,7 @@ public final class CacheEntry
         }
     }
 
-    public boolean isUpdateRequestForThisEntry(ListFW<HttpHeaderFW> requestHeaders)
+    public boolean isUpdateRequestForThisEntry(ArrayFW<HttpHeaderFW> requestHeaders)
     {
         return CacheUtils.isMatchByEtag(requestHeaders, this.cachedRequest.etag()) && doesNotVaryBy(requestHeaders);
     }
@@ -741,7 +741,7 @@ public final class CacheEntry
 
     public boolean isUpdatedBy(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
+        ArrayFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
         String etag = request.etag();
         boolean etagMatches = false;
@@ -758,7 +758,7 @@ public final class CacheEntry
 
     public boolean isSelectedForUpdate(CacheableRequest request)
     {
-        ListFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
+        ArrayFW<HttpHeaderFW> responseHeaders = request.getResponseHeaders(cache.responseHeadersRO);
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
         String etag = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.ETAG);
 

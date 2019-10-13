@@ -51,8 +51,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool
 import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
@@ -82,7 +82,7 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
-    final ListFW<HttpHeaderFW> requestHeadersRO = new ListFW<>(new HttpHeaderFW());
+    final ArrayFW<HttpHeaderFW> requestHeadersRO = new ArrayFW<>(new HttpHeaderFW());
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
@@ -90,7 +90,7 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
-    final LongSupplier supplyTrace;
+    final LongSupplier supplyTraceId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> requestCorrelations;
@@ -118,7 +118,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         Cache emulatedCache,
         DefaultCache defaultCache,
         HttpCacheCounters counters,
-        LongSupplier supplyTrace,
+        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
         SignalingExecutor executor,
         LongObjectBiConsumer<Runnable> scheduler)
@@ -126,7 +126,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
-        this.supplyTrace = requireNonNull(supplyTrace);
+        this.supplyTraceId = requireNonNull(supplyTraceId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.preferWaitMaximum = config.preferWaitMaximum();
         this.requestBufferPool = new CountingBufferPool(
@@ -192,7 +192,7 @@ public class HttpCacheProxyFactory implements StreamFactory
             final long connectRouteId = route.correlationId();
             final OctetsFW extension = beginRO.extension();
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
-            final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+            final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
             if (requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
             {
@@ -207,7 +207,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                    connectRouteId,
                                                    acceptInitialId,
                                                    acceptRouteId,
-                                                   begin.trace());
+                                                   begin.traceId());
             }
         }
 
@@ -249,7 +249,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     }
 
     private MessageConsumer newNativeInitialStream(
-        ListFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         MessageConsumer acceptReply,
         long authorization,
         long connectRouteId,
@@ -303,10 +303,10 @@ public class HttpCacheProxyFactory implements StreamFactory
                             acceptRouteId,
                             acceptInitialId,
                             traceId,
+                            0L,
                             0,
-                            0,
-                            0L);
-            send504(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+                            0);
+            send504(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
         }
         else if (defaultCache.isRequestCacheable(requestHeaders))
         {

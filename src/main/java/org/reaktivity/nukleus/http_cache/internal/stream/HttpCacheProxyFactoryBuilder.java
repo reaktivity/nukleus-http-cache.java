@@ -16,9 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import java.util.function.Function;
-import java.util.function.IntUnaryOperator;
 import java.util.function.LongConsumer;
-import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.Supplier;
@@ -53,7 +51,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private RouteManager router;
     private MutableDirectBuffer writeBuffer;
     private LongUnaryOperator supplyInitialId;
-    private LongSupplier supplyTrace;
+    private LongSupplier supplyTraceId;
     private ToIntFunction<String> supplyTypeId;
     private LongUnaryOperator supplyReplyId;
     private Slab cacheBufferPool;
@@ -111,10 +109,10 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public StreamFactoryBuilder setTraceSupplier(
-        LongSupplier supplyTrace)
+    public StreamFactoryBuilder setTraceIdSupplier(
+        LongSupplier supplyTraceId)
     {
-        this.supplyTrace = supplyTrace;
+        this.supplyTraceId = supplyTraceId;
         return this;
     }
 
@@ -123,20 +121,6 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
         ToIntFunction<String> supplyTypeId)
     {
         this.supplyTypeId = supplyTypeId;
-        return this;
-    }
-
-    @Override
-    public HttpCacheProxyFactoryBuilder setGroupBudgetClaimer(
-        LongFunction<IntUnaryOperator> groupBudgetClaimer)
-    {
-        return this;
-    }
-
-    @Override
-    public HttpCacheProxyFactoryBuilder setGroupBudgetReleaser(
-        LongFunction<IntUnaryOperator> groupBudgetReleaser)
-    {
         return this;
     }
 
@@ -199,7 +183,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                            requestCorrelations,
                                            counters,
                                            cacheEntries,
-                                           supplyTrace,
+                                           supplyTraceId,
                                            supplyTypeId);
         }
 
@@ -210,7 +194,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                                  cacheBufferPool,
                                                  counters,
                                                  cacheEntries,
-                                                 supplyTrace,
+                                                 supplyTraceId,
                                                  supplyTypeId,
                                                  config.allowedCachePercentage(),
                                                  config.cacheCapacity());
@@ -228,7 +212,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          emulatedCache,
                                          defaultCache,
                                          counters,
-                                         supplyTrace,
+                                         supplyTraceId,
                                          supplyTypeId,
                                          executor,
                                          scheduler);

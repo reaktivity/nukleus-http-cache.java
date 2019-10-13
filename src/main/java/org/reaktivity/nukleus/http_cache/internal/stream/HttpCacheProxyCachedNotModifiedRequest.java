@@ -21,8 +21,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -67,7 +67,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
             factory.writer.doReset(acceptReply,
                                    acceptRouteId,
                                    acceptInitialId,
-                                   factory.supplyTrace.getAsLong());
+                                   factory.supplyTraceId.getAsLong());
             break;
         }
     }
@@ -104,7 +104,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
     {
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -113,10 +113,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                begin.trace(),
+                                begin.traceId(),
+                                0L,
                                 initialWindow,
-                                0,
-                                0L);
+                                0);
 
         if (DEBUG)
         {
@@ -127,7 +127,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
-                             factory.supplyTrace.getAsLong(),
+                             factory.supplyTraceId.getAsLong(),
                              requestHeaders);
         if (DEBUG)
         {
@@ -143,10 +143,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                data.trace(),
-                                data.sizeof(),
-                                data.padding(),
-                                data.groupId());
+                                data.traceId(),
+                                data.budgetId(),
+                                data.reserved(),
+                                0);
     }
 
     private void onEnd(
@@ -155,7 +155,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
-                                 factory.supplyTrace.getAsLong());
+                                 factory.supplyTraceId.getAsLong());
     }
 
     private void onAbort(
@@ -164,6 +164,6 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
-                               factory.supplyTrace.getAsLong());
+                               factory.supplyTraceId.getAsLong());
     }
 }

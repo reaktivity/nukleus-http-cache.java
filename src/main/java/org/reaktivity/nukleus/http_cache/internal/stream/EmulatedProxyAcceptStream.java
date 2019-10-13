@@ -34,8 +34,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Initial
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.ProxyRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -102,7 +102,7 @@ final class EmulatedProxyAcceptStream
         else
         {
             streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId,
-                    streamFactory.supplyTrace.getAsLong());
+                    streamFactory.supplyTraceId.getAsLong());
         }
     }
 
@@ -120,7 +120,7 @@ final class EmulatedProxyAcceptStream
 
         final OctetsFW extension = streamFactory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(streamFactory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
         final boolean authorizationHeader = requestHeaders.anyMatch(HAS_AUTHORIZATION);
 
         // Should already be canonicalized in http / http2 nuklei
@@ -140,10 +140,10 @@ final class EmulatedProxyAcceptStream
         streamFactory.writer.doWindow(acceptReply,
                                       acceptRouteId,
                                       acceptStreamId,
-                                      begin.trace(),
+                                      begin.traceId(),
+                                      0L,
                                       0,
-                                      0,
-                                      0L);
+                                      0);
 
         if (isPreferIfNoneMatch(requestHeaders))
         {
@@ -175,7 +175,7 @@ final class EmulatedProxyAcceptStream
         boolean authorizationHeader,
         long authorization,
         short authScope,
-        ListFW<HttpHeaderFW> requestHeaders)
+        ArrayFW<HttpHeaderFW> requestHeaders)
     {
         String etag = null;
         HttpHeaderFW etagHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
@@ -206,7 +206,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private void handleCacheableRequest(
-        final ListFW<HttpHeaderFW> requestHeaders,
+        final ArrayFW<HttpHeaderFW> requestHeaders,
         final String requestURL,
         boolean authorizationHeader,
         long authorization,
@@ -269,7 +269,7 @@ final class EmulatedProxyAcceptStream
 
             sendBeginToConnect(requestHeaders, connectReplyId);
             streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId,
-                    streamFactory.supplyTrace.getAsLong());
+                    streamFactory.supplyTraceId.getAsLong());
             streamFactory.emulatedCache.createPendingInitialRequests(cacheableRequest);
         }
 
@@ -277,7 +277,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private void proxyRequest(
-        final ListFW<HttpHeaderFW> requestHeaders)
+        final ArrayFW<HttpHeaderFW> requestHeaders)
     {
         this.request = new ProxyRequest(
                 acceptReply,
@@ -300,7 +300,7 @@ final class EmulatedProxyAcceptStream
     }
 
     private void sendBeginToConnect(
-        final ListFW<HttpHeaderFW> requestHeaders,
+        final ArrayFW<HttpHeaderFW> requestHeaders,
         long connectCorrelationId)
     {
         streamFactory.requestCorrelations.put(connectCorrelationId, request);
@@ -309,14 +309,14 @@ final class EmulatedProxyAcceptStream
             connect,
             connectRouteId,
             connectInitialId,
-            streamFactory.supplyTrace.getAsLong(),
+            streamFactory.supplyTraceId.getAsLong(),
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
 
         streamFactory.router.setThrottle(connectInitialId, this::onThrottleMessage);
     }
 
     private boolean storeRequest(
-        final ListFW<HttpHeaderFW> headers,
+        final ArrayFW<HttpHeaderFW> headers,
         final BufferPool bufferPool)
     {
         this.requestSlot = bufferPool.acquire(acceptStreamId);
@@ -336,11 +336,11 @@ final class EmulatedProxyAcceptStream
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "504");
         }
 
-        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
+        final long acceptTraceId = streamFactory.supplyTraceId.getAsLong();
+        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, acceptTraceId, e ->
                 e.item(h -> h.name(STATUS)
                              .value("504")));
-        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId,
-                streamFactory.supplyTrace.getAsLong());
+        streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, acceptTraceId);
         request.purge();
 
         // count all responses
@@ -354,11 +354,11 @@ final class EmulatedProxyAcceptStream
             System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId, "503");
         }
 
-        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, streamFactory.supplyTrace.getAsLong(), e ->
+        final long acceptTraceId = streamFactory.supplyTraceId.getAsLong();
+        streamFactory.writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, acceptTraceId, e ->
                 e.item(h -> h.name(STATUS).value("503"))
                  .item(h -> h.name("retry-after").value("0")));
-        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId,
-                streamFactory.supplyTrace.getAsLong());
+        streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId, acceptTraceId);
 
         // count all responses
         streamFactory.counters.responses.getAsLong();
@@ -398,7 +398,7 @@ final class EmulatedProxyAcceptStream
             break;
         default:
             streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId,
-                    streamFactory.supplyTrace.getAsLong());
+                    streamFactory.supplyTraceId.getAsLong());
             break;
         }
     }
@@ -406,32 +406,31 @@ final class EmulatedProxyAcceptStream
     private void onDataWhenProxying(
         final DataFW data)
     {
-        final long groupId = data.groupId();
-        final int padding = data.padding();
+        final long budgetId = data.budgetId();
         final OctetsFW payload = data.payload();
 
         streamFactory.writer.doHttpData(connect,
                                         connectRouteId,
                                         connectInitialId,
-                                        data.trace(),
-                                        groupId,
+                                        data.traceId(),
+                                        budgetId,
                                         payload.buffer(),
                                         payload.offset(),
                                         payload.sizeof(),
-                                        padding);
+                                        data.reserved());
     }
 
     private void onEndWhenProxying(
         final EndFW end)
     {
-        final long traceId = end.trace();
+        final long traceId = end.traceId();
         streamFactory.writer.doHttpEnd(connect, connectRouteId, connectInitialId, traceId);
     }
 
     private void onAbortWhenProxying(
         final AbortFW abort)
     {
-        final long traceId = abort.trace();
+        final long traceId = abort.traceId();
         streamFactory.writer.doAbort(connect, connectRouteId, connectInitialId, traceId);
         request.purge();
     }
@@ -450,7 +449,7 @@ final class EmulatedProxyAcceptStream
             break;
         case ResetFW.TYPE_ID:
             final ResetFW reset = streamFactory.resetRO.wrap(buffer, index, index + length);
-            final long traceId = reset.trace();
+            final long traceId = reset.traceId();
             streamFactory.writer.doReset(acceptReply, acceptRouteId, acceptStreamId, traceId);
             break;
         default:
@@ -461,10 +460,10 @@ final class EmulatedProxyAcceptStream
     private void onWindow(
         final WindowFW window)
     {
+        final long traceId = window.traceId();
+        final long budgetId = window.budgetId();
         final int credit = window.credit();
         final int padding = window.padding();
-        final long groupId = window.groupId();
-        final long traceId = window.trace();
-        streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, credit, padding, groupId);
+        streamFactory.writer.doWindow(acceptReply, acceptRouteId, acceptStreamId, traceId, budgetId, credit, padding);
     }
 }

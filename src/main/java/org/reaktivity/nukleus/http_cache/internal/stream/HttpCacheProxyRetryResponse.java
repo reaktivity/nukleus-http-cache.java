@@ -25,8 +25,8 @@ import java.util.function.Function;
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -113,20 +113,20 @@ final class HttpCacheProxyRetryResponse
                               getHeader(httpBeginFW.headers(), ":status"));
         }
 
-        final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
         String status = getHeader(responseHeaders, STATUS);
         retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
         assert status != null;
 
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
 
-        sendWindow(initialWindow, begin.trace());
+        sendWindow(initialWindow, begin.traceId());
     }
 
     private void onData(
         DataFW data)
     {
-        sendWindow(data.length() + data.padding(), data.trace());
+        sendWindow(data.reserved(), data.traceId());
     }
 
     private void onEnd(EndFW end)
@@ -150,9 +150,9 @@ final class HttpCacheProxyRetryResponse
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,
+                                    0L,
                                     credit,
-                                    0,
-                                    0L);
+                                    0);
         }
     }
 }

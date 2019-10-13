@@ -22,8 +22,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ListFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
@@ -121,7 +121,7 @@ final class HttpCacheProxyNotModifiedResponse
         final long connectReplyId = begin.streamId();
         final OctetsFW extension = factory.beginRO.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ListFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
         if (DEBUG)
         {
@@ -134,14 +134,14 @@ final class HttpCacheProxyNotModifiedResponse
                                      acceptReply,
                                      acceptRouteId,
                                      acceptReplyId);
-        sendWindow(initialWindow, begin.trace());
+        sendWindow(initialWindow, begin.traceId());
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
     }
 
     private void onData(
         DataFW data)
     {
-        sendWindow(data.length() + data.padding(), data.trace());
+        sendWindow(data.reserved(), data.traceId());
     }
 
     private void onEnd(EndFW end)
@@ -149,7 +149,7 @@ final class HttpCacheProxyNotModifiedResponse
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
-                                 end.trace());
+                                 end.traceId());
 
     }
 
@@ -158,7 +158,7 @@ final class HttpCacheProxyNotModifiedResponse
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
-                               abort.trace());
+                               abort.traceId());
     }
 
     private void onReset(ResetFW reset)
@@ -182,9 +182,9 @@ final class HttpCacheProxyNotModifiedResponse
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,
+                                    0L,
                                     credit,
-                                    0,
-                                    0L);
+                                    0);
         }
     }
 }

@@ -103,7 +103,7 @@ public class HttpPushServerBM
 //        this.sourceInputId = random.nextLong();
 //        this.sourceOutputEstHandler = this::processBegin;
 //
-//        final Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
+//        final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
 //        {
 //            hs.item(h -> h.name(":scheme").value("http"));
 //            hs.item(h -> h.name(":method").value("GET"));
@@ -250,7 +250,7 @@ public class HttpPushServerBM
 //    }
 //
 //    private Flyweight.Builder.Visitor visitHttpBeginEx(
-//        Consumer<ListFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
+//        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
 //    {
 //        return (buffer, offset, limit) ->
 //            httpBeginExRW.wrap(buffer, offset, limit)
