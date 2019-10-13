@@ -68,7 +68,7 @@ public class DefaultCache
     private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntries;
 
     private final LongConsumer entryCount;
-    private final LongSupplier supplyTrace;
+    private final LongSupplier supplyTraceId;
     public final HttpCacheCounters counters;
     private final int allowedSlots;
 
@@ -78,7 +78,7 @@ public class DefaultCache
         BufferPool cacheBufferPool,
         HttpCacheCounters counters,
         LongConsumer entryCount,
-        LongSupplier supplyTrace,
+        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
         int allowedCachePercentage,
         int cacheCapacity)
@@ -97,7 +97,7 @@ public class DefaultCache
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
         this.cachedEntries = new Int2ObjectHashMap<>();
         this.counters = counters;
-        this.supplyTrace = requireNonNull(supplyTrace);
+        this.supplyTraceId = requireNonNull(supplyTraceId);
         int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
         this.allowedSlots = (totalSlots * allowedCachePercentage) / 100;
     }
@@ -239,7 +239,7 @@ public class DefaultCache
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                supplyTrace.getAsLong(),
+                supplyTraceId.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(entry.etag()))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
@@ -252,7 +252,7 @@ public class DefaultCache
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                supplyTrace.getAsLong(),
+                supplyTraceId.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(entry.etag())));
         }

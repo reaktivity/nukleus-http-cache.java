@@ -120,13 +120,13 @@ final class HttpCacheProxyRetryResponse
 
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
 
-        sendWindow(initialWindow, begin.trace());
+        sendWindow(initialWindow, begin.traceId());
     }
 
     private void onData(
         DataFW data)
     {
-        sendWindow(data.reserved(), data.trace());
+        sendWindow(data.reserved(), data.traceId());
     }
 
     private void onEnd(EndFW end)
@@ -150,9 +150,9 @@ final class HttpCacheProxyRetryResponse
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,
+                                    0L,
                                     credit,
-                                    0,
-                                    0L);
+                                    0);
         }
     }
 }

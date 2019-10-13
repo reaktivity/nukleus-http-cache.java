@@ -90,7 +90,7 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
-    final LongSupplier supplyTrace;
+    final LongSupplier supplyTraceId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> requestCorrelations;
@@ -118,7 +118,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         Cache emulatedCache,
         DefaultCache defaultCache,
         HttpCacheCounters counters,
-        LongSupplier supplyTrace,
+        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
         SignalingExecutor executor,
         LongObjectBiConsumer<Runnable> scheduler)
@@ -126,7 +126,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.router = requireNonNull(router);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
-        this.supplyTrace = requireNonNull(supplyTrace);
+        this.supplyTraceId = requireNonNull(supplyTraceId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.preferWaitMaximum = config.preferWaitMaximum();
         this.requestBufferPool = new CountingBufferPool(
@@ -207,7 +207,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                    connectRouteId,
                                                    acceptInitialId,
                                                    acceptRouteId,
-                                                   begin.trace());
+                                                   begin.traceId());
             }
         }
 
@@ -303,10 +303,10 @@ public class HttpCacheProxyFactory implements StreamFactory
                             acceptRouteId,
                             acceptInitialId,
                             traceId,
+                            0L,
                             0,
-                            0,
-                            0L);
-            send504(acceptReply, acceptRouteId, acceptReplyId, supplyTrace.getAsLong());
+                            0);
+            send504(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
         }
         else if (defaultCache.isRequestCacheable(requestHeaders))
         {

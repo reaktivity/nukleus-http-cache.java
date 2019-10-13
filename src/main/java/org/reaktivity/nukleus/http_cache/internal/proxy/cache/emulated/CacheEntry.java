@@ -398,7 +398,7 @@ public final class CacheEntry
         private int payloadWritten;
         private final Runnable onEnd;
         private CacheableRequest cachedRequest;
-        private long groupId;
+        private long budgetId;
         private int padding;
         private int acceptReplyBudget;
 
@@ -423,28 +423,28 @@ public final class CacheEntry
             {
             case WindowFW.TYPE_ID:
                 final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
-                groupId = window.groupId();
+                budgetId = window.budgetId();
                 padding = window.padding();
                 long streamId = window.streamId();
                 int credit = window.credit();
                 acceptReplyBudget += credit;
-                cache.budgetManager.window(BudgetManager.StreamKind.CACHE, groupId, streamId, credit,
-                    this::writePayload, window.trace());
+                cache.budgetManager.window(BudgetManager.StreamKind.CACHE, budgetId, streamId, credit,
+                    this::writePayload, window.traceId());
 
-                boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(groupId, streamId);
+                boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(budgetId, streamId);
                 if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
                 {
                     final MessageConsumer acceptReply = request.acceptReply();
                     final long acceptRouteId = request.acceptRouteId();
                     final long acceptReplyStreamId = request.acceptReplyId();
-                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.trace());
+                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.traceId());
                     this.onEnd.run();
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, acceptReplyStreamId, window.trace());
+                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, budgetId, acceptReplyStreamId, window.traceId());
                 }
                 break;
             case ResetFW.TYPE_ID:
             default:
-                cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, groupId, request.acceptReplyId(),
+                cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, budgetId, request.acceptReplyId(),
                     supplyTrace.getAsLong());
                 this.onEnd.run();
                 break;

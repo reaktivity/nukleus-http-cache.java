@@ -110,7 +110,7 @@ final class HttpCacheProxyNonCacheableResponse
         BeginFW begin)
     {
         final long connectReplyId = begin.streamId();
-        final long traceId = begin.trace();
+        final long traceId = begin.traceId();
 
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(httpCacheProxyFactory.httpBeginExRO::tryWrap);
@@ -149,8 +149,8 @@ final class HttpCacheProxyNonCacheableResponse
         httpCacheProxyFactory.writer.doHttpData(acceptReply,
                                                 acceptRouteId,
                                                 acceptReplyId,
-                                                data.trace(),
-                                                data.groupId(),
+                                                data.traceId(),
+                                                data.budgetId(),
                                                 payload.buffer(),
                                                 payload.offset(),
                                                 payload.sizeof(),
@@ -160,35 +160,37 @@ final class HttpCacheProxyNonCacheableResponse
     private void onEnd(
         final EndFW end)
     {
-        final long traceId = end.trace();
+        final long traceId = end.traceId();
         httpCacheProxyFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyId, traceId, end.extension());
     }
 
     private void onAbort(
         final AbortFW abort)
     {
-        final long traceId = abort.trace();
+        final long traceId = abort.traceId();
         httpCacheProxyFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, traceId);
     }
 
     private void onWindow(
         final WindowFW window)
     {
+        final long traceId = window.traceId();
+        final long budgetId = window.budgetId();
         final int credit = window.credit();
         final int padding = window.padding();
-        final long groupId = window.groupId();
         acceptReplyBudget += credit;
         httpCacheProxyFactory.writer.doWindow(connectReplyThrottle,
                                               connectRouteId,
                                               connectReplyId,
-                                              window.trace(),
-                                              credit, padding,
-                                              groupId);
+                                              traceId,
+                                              budgetId,
+                                              credit,
+                                              padding);
     }
 
     private void onReset(
         final ResetFW reset)
     {
-        httpCacheProxyFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyId, reset.trace());
+        httpCacheProxyFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyId, reset.traceId());
     }
 }

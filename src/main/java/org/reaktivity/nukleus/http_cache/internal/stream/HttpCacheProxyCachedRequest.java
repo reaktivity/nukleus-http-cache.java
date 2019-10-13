@@ -52,7 +52,7 @@ final class HttpCacheProxyCachedRequest
     private final int initialWindow;
 
     private int acceptReplyBudget;
-    private long groupId;
+    private long budgetId;
     private int padding;
 
     private int payloadWritten = -1;
@@ -146,14 +146,14 @@ final class HttpCacheProxyCachedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                begin.trace(),
+                                begin.traceId(),
+                                0L,
                                 initialWindow,
-                                0,
-                                0L);
+                                0);
 
         factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
-                                factory.supplyTrace.getAsLong(),
+                                factory.supplyTraceId.getAsLong(),
                                 CACHE_ENTRY_SIGNAL);
     }
 
@@ -163,10 +163,10 @@ final class HttpCacheProxyCachedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                data.trace(),
+                                data.traceId(),
+                                data.budgetId(),
                                 data.reserved(),
-                                0,
-                                data.groupId());
+                                0);
     }
 
     private void onEnd(
@@ -180,7 +180,7 @@ final class HttpCacheProxyCachedRequest
     {
         factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
-                                factory.supplyTrace.getAsLong(),
+                                factory.supplyTraceId.getAsLong(),
                                 CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
@@ -198,7 +198,7 @@ final class HttpCacheProxyCachedRequest
             factory.writer.doAbort(acceptReply,
                                    acceptRouteId,
                                    acceptReplyId,
-                                   signal.trace());
+                                   signal.traceId());
             cacheEntry.setSubscribers(-1);
         }
     }
@@ -206,27 +206,27 @@ final class HttpCacheProxyCachedRequest
     private void onWindow(
         WindowFW window)
     {
-        groupId = window.groupId();
+        budgetId = window.budgetId();
         padding = window.padding();
         long streamId = window.streamId();
         int credit = window.credit();
         acceptReplyBudget += credit;
         factory.budgetManager.window(BudgetManager.StreamKind.CACHE,
-                                     groupId,
+                                     budgetId,
                                      streamId,
                                      credit,
                                      this::writePayload,
-                                     window.trace());
-        sendEndIfNecessary(window.trace());
+                                     window.traceId());
+        sendEndIfNecessary(window.traceId());
     }
 
     private void onReset(
         ResetFW reset)
     {
         factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                     groupId,
+                                     budgetId,
                                      acceptReplyId,
-                                     this.factory.supplyTrace.getAsLong());
+                                     this.factory.supplyTraceId.getAsLong());
         cacheEntry.setSubscribers(-1);
     }
 
@@ -268,7 +268,7 @@ final class HttpCacheProxyCachedRequest
             cacheEntry.etag(),
             isStale,
 
-            factory.supplyTrace.getAsLong());
+            factory.supplyTraceId.getAsLong());
 
         payloadWritten = 0;
 
@@ -280,7 +280,7 @@ final class HttpCacheProxyCachedRequest
         long traceId)
     {
 
-        boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(groupId, acceptReplyId);
+        boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(budgetId, acceptReplyId);
 
         if (payloadWritten == cacheEntry.responseSize() &&
             ackedBudget)
@@ -291,7 +291,7 @@ final class HttpCacheProxyCachedRequest
                                      traceId);
 
             factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                                   groupId,
+                                                   budgetId,
                                                    acceptReplyId,
                                                    traceId);
             cacheEntry.setSubscribers(-1);
@@ -311,7 +311,7 @@ final class HttpCacheProxyCachedRequest
                 acceptRouteId,
                 acceptReplyId,
                 trace,
-                groupId,
+                budgetId,
                 toWrite + padding,
                 p -> buildResponsePayload(payloadWritten,
                                           toWrite,

@@ -51,17 +51,17 @@ public class ServerStreamFactory implements StreamFactory
     private final RouteManager router;
 
     private final LongUnaryOperator supplyReplyId;
-    private final LongSupplier supplyTrace;
+    private final LongSupplier supplyTraceId;
     private final Writer writer;
 
     public ServerStreamFactory(
         RouteManager router,
         MutableDirectBuffer writeBuffer,
         LongUnaryOperator supplyReplyId,
-        LongSupplier supplyTrace,
+        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId)
     {
-        this.supplyTrace = requireNonNull(supplyTrace);
+        this.supplyTraceId = requireNonNull(supplyTraceId);
         this.router = requireNonNull(router);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
@@ -104,7 +104,7 @@ public class ServerStreamFactory implements StreamFactory
         {
             final long acceptInitialId = begin.streamId();
 
-            newStream = new ServerAcceptStream(acceptReply, acceptRouteId, acceptInitialId, supplyTrace)::onStreamMessage;
+            newStream = new ServerAcceptStream(acceptReply, acceptRouteId, acceptInitialId, supplyTraceId)::onStreamMessage;
         }
 
         return newStream;
@@ -217,10 +217,10 @@ public class ServerStreamFactory implements StreamFactory
                             acceptRouteId,
                             begin.streamId(),
                             this.supplyTrace.getAsLong(),
+                            0L,
                             0,
-                            0,
-                            0L);
-            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, begin.trace(), hs ->
+                            0);
+            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, begin.traceId(), hs ->
             {
                 hs.item(h -> h.name(":status").value("200"));
                 hs.item(h -> h.name("content-type").value("text/event-stream"));
@@ -244,7 +244,7 @@ public class ServerStreamFactory implements StreamFactory
         private void onAbort(
             final AbortFW abort)
         {
-            final long traceId = abort.trace();
+            final long traceId = abort.traceId();
             writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, traceId);
         }
 
@@ -258,7 +258,7 @@ public class ServerStreamFactory implements StreamFactory
         private void onReset(
             ResetFW reset)
         {
-            final long traceId = reset.trace();
+            final long traceId = reset.traceId();
             writer.doReset(acceptReply, acceptRouteId, acceptInitialId, traceId);
         }
     }
