@@ -267,7 +267,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         final MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
         MessageConsumer newStream = null;
 
-        if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
+        if (defaultCache.isRequestCacheable(requestHeaders) &&
+            defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
         {
             DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
             boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
@@ -338,6 +339,8 @@ public class HttpCacheProxyFactory implements StreamFactory
                 final HttpCacheProxyCacheableRequest cacheableRequest =
                     new HttpCacheProxyCacheableRequest(this,
                                                        group,
+                                                       requestHash,
+                                                       requestURL,
                                                        acceptReply,
                                                        acceptRouteId,
                                                        acceptInitialId,
@@ -356,6 +359,9 @@ public class HttpCacheProxyFactory implements StreamFactory
         {
             final HttpCacheProxyNonCacheableRequest nonCacheableRequest =
                 new HttpCacheProxyNonCacheableRequest(this,
+                                                      requestHash,
+                                                      requestURL,
+                                                      authorizationScope,
                                                       acceptReply,
                                                       acceptRouteId,
                                                       acceptReplyId,

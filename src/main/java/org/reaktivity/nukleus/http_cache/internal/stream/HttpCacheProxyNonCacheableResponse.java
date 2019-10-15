@@ -36,6 +36,9 @@ final class HttpCacheProxyNonCacheableResponse
 {
     private final HttpCacheProxyFactory httpCacheProxyFactory;
 
+    private final int requestHash;
+    private final String requestUrl;
+
     private final MessageConsumer connectReplyThrottle;
     private final long connectRouteId;
     private final long connectReplyId;
@@ -48,6 +51,8 @@ final class HttpCacheProxyNonCacheableResponse
 
     HttpCacheProxyNonCacheableResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
+        int requestHash,
+        String requestUrl,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
         long connectReplyId,
@@ -56,6 +61,8 @@ final class HttpCacheProxyNonCacheableResponse
         long acceptReplyId)
     {
         this.httpCacheProxyFactory = httpCacheProxyFactory;
+        this.requestHash = requestHash;
+        this.requestUrl = requestUrl;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -138,6 +145,10 @@ final class HttpCacheProxyNonCacheableResponse
             System.out.printf("[%016x] ACCEPT %016x %s [sent proxy response]\n", currentTimeMillis(), acceptReplyId,
                               getHeader(responseHeaders, ":status"));
         }
+
+        httpCacheProxyFactory.defaultCache.invalidateCacheEntryIfNecessary(requestHash,
+                                                                           requestUrl,
+                                                                           responseHeaders);
     }
 
     private void onData(

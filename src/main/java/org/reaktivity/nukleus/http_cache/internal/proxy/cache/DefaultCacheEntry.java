@@ -65,7 +65,7 @@ public final class DefaultCacheEntry
     private int responseSize = 0;
     private int subscribers;
     private boolean responseCompleted = false;
-
+    private boolean validationRequired = false;
 
     DefaultCacheEntry(
         DefaultCache cache,
@@ -78,6 +78,42 @@ public final class DefaultCacheEntry
         this.requestPool = requestPool;
         this.responsePool = responsePool;
         responseSlots = new IntArrayList();
+    }
+
+    public int responseSize()
+    {
+        return responseSize;
+    }
+
+    public String etag()
+    {
+        return etag;
+    }
+
+    public void setEtag(String etag)
+    {
+        this.etag = etag;
+    }
+
+    public boolean isResponseCompleted()
+    {
+        return responseCompleted;
+    }
+
+    public void setResponseCompleted(boolean responseCompleted)
+    {
+        validationRequired = false;
+        this.responseCompleted = responseCompleted;
+    }
+
+    public boolean isValidationRequired()
+    {
+        return validationRequired;
+    }
+
+    public void setValidationRequired(boolean validationRequired)
+    {
+        this.validationRequired = validationRequired;
     }
 
     public void setSubscribers(int numberOfSubscribers)
@@ -232,35 +268,10 @@ public final class DefaultCacheEntry
         return storeResponseData(data.payload());
     }
 
-    public int responseSize()
-    {
-        return responseSize;
-    }
-
     public void purge()
     {
-        this.evictRequestIfNecessary();
-        this.evictResponseIfNecessary();
-    }
-
-    public String etag()
-    {
-        return etag;
-    }
-
-    public void setEtag(String etag)
-    {
-        this.etag = etag;
-    }
-
-    public boolean isResponseCompleted()
-    {
-        return responseCompleted;
-    }
-
-    public void setResponseCompleted(boolean responseCompleted)
-    {
-        this.responseCompleted = responseCompleted;
+        evictRequestIfNecessary();
+        evictResponseIfNecessary();
     }
 
     public boolean canServeRequest(

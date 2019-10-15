@@ -51,7 +51,6 @@ import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -86,7 +85,9 @@ final class HttpCacheProxyCacheableRequest
     private long connectInitialId;
 
     private final MutableInteger requestSlot;
-    private int requestHash;
+    private final String requestUrl;
+    private final int requestHash;
+
     private boolean isRequestPurged;
     private String ifNoneMatch;
     private Future<?> preferWaitExpired;
@@ -104,6 +105,8 @@ final class HttpCacheProxyCacheableRequest
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
+        int requestHash,
+        String requestUrl,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptInitialId,
@@ -116,6 +119,8 @@ final class HttpCacheProxyCacheableRequest
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
+        this.requestHash = requestHash;
+        this.requestUrl = requestUrl;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptInitialId = acceptInitialId;
@@ -161,13 +166,15 @@ final class HttpCacheProxyCacheableRequest
             final HttpCacheProxyNotModifiedResponse notModifiedResponse =
                 new HttpCacheProxyNotModifiedResponse(factory,
                                                       requestHash,
-                                                      getHeader(getRequestHeaders(), PREFER),
+                                                      requestUrl,
                                                       acceptReply,
                                                       acceptRouteId,
                                                       acceptReplyId,
                                                       connectReply,
                                                       connectReplyId,
-                                                      connectRouteId);
+                                                      connectRouteId,
+                                                      getHeader(getRequestHeaders(), PREFER)
+                );
             factory.router.setThrottle(acceptReplyId, notModifiedResponse::onResponseMessage);
             newStream = notModifiedResponse::onResponseMessage;
             cleanupRequestIfNecessary();
@@ -180,6 +187,7 @@ final class HttpCacheProxyCacheableRequest
                 new HttpCacheProxyCacheableResponse(factory,
                                                     requestGroup,
                                                     requestHash,
+                                                    requestUrl,
                                                     requestSlot,
                                                     acceptReply,
                                                     acceptRouteId,
@@ -195,6 +203,8 @@ final class HttpCacheProxyCacheableRequest
         {
             final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
                     new HttpCacheProxyNonCacheableResponse(factory,
+                                                           requestHash,
+                                                           requestUrl,
                                                            connectReply,
                                                            connectRouteId,
                                                            connectReplyId,
@@ -297,10 +307,6 @@ final class HttpCacheProxyCacheableRequest
             send503RetryAfter();
             return;
         }
-
-        // Should already be canonicalized in http / http2 nuklei
-        final String requestURL = getRequestURL(requestHeaders);
-        requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
 
         HttpHeaderFW ifNoneMatchHeader = requestHeaders.matchFirst(h -> IF_NONE_MATCH.equals(h.name().asString()));
         if (ifNoneMatchHeader != null)
