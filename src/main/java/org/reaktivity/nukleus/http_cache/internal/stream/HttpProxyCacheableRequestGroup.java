@@ -27,7 +27,7 @@ import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2LongHashMap;
-import org.agrona.collections.LongArrayList;
+import org.agrona.collections.LongHashSet;
 import org.agrona.collections.MutableInteger;
 import org.agrona.collections.MutableLong;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -37,18 +37,21 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 final class HttpProxyCacheableRequestGroup
 {
     private final HashMap<String, Long2LongHashMap> requestsQueue;
-    private final LongArrayList requestsWithAnswer;
-    private final int requestHash;
+    private final LongHashSet responsesInFlight;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
     private final Consumer<Integer> cleaner;
+    private final MutableLong activeRouteId;
+    private final MutableLong activeReplyId;
+    private final int requestHash;
+
+    private MessageConsumer connect;
     private String etag;
+    private String recentAuthorizationToken;
     private long acceptRouteId;
     private long acceptReplyId;
-    private String recentAuthorizationToken;
     private long routeId;
     private long replyId;
-    private MessageConsumer connect;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
@@ -61,7 +64,9 @@ final class HttpProxyCacheableRequestGroup
         this.factory = factory;
         this.cleaner = cleaner;
         this.requestsQueue = new HashMap<>();
-        this.requestsWithAnswer = new LongArrayList();
+        this.responsesInFlight = new LongHashSet();
+        this.activeRouteId = new MutableLong();
+        this.activeReplyId = new MutableLong();
     }
 
     String getRecentAuthorizationToken()
@@ -69,14 +74,14 @@ final class HttpProxyCacheableRequestGroup
         return recentAuthorizationToken;
     }
 
-    int getRequestHash()
-    {
-        return requestHash;
-    }
-
     String getEtag()
     {
         return etag;
+    }
+
+    int getRequestHash()
+    {
+        return requestHash;
     }
 
     void setRecentAuthorizationToken(
@@ -123,7 +128,7 @@ final class HttpProxyCacheableRequestGroup
 
         final long acceptRouteId = routeIdsByReplyId.remove(acceptReplyId);
         assert acceptRouteId != routeIdsByReplyId.missingValue();
-        requestsWithAnswer.removeLong(acceptReplyId);
+        responsesInFlight.remove(acceptReplyId);
 
         if (routeIdsByReplyId.isEmpty())
         {
@@ -137,14 +142,14 @@ final class HttpProxyCacheableRequestGroup
 
         if (!requestsQueue.isEmpty())
         {
-            MutableLong activeRouteId = new MutableLong();
-            MutableLong activeReplyId = new MutableLong();
+            activeRouteId.value = 0L;
+            activeReplyId.value = 0L;
 
             if (!routeIdsByReplyId.isEmpty())
             {
                 routeIdsByReplyId.forEach((replyId, routeId) ->
                 {
-                    if (!requestsWithAnswer.containsLong(replyId) &&
+                    if (!responsesInFlight.contains(replyId) &&
                         this.acceptReplyId == acceptReplyId)
                     {
                         activeRouteId.value = routeId;
@@ -158,7 +163,7 @@ final class HttpProxyCacheableRequestGroup
                 {
                     value.forEach((replyId, routeId) ->
                     {
-                        if (!requestsWithAnswer.containsLong(replyId) &&
+                        if (!responsesInFlight.contains(replyId) &&
                             this.acceptReplyId == acceptReplyId)
                         {
                             activeRouteId.value = routeId;
@@ -255,9 +260,9 @@ final class HttpProxyCacheableRequestGroup
 
     private void gotResponse(long acceptReplyId)
     {
-        if (!requestsWithAnswer.containsLong(acceptReplyId))
+        if (!responsesInFlight.contains(acceptReplyId))
         {
-            requestsWithAnswer.pushLong(acceptReplyId);
+            responsesInFlight.add(acceptReplyId);
         }
     }
 
@@ -277,9 +282,9 @@ final class HttpProxyCacheableRequestGroup
         long acceptReplyId,
         long acceptRouteId)
     {
-        if (!requestsWithAnswer.containsLong(acceptReplyId))
+        if (!responsesInFlight.contains(acceptReplyId))
         {
-            requestsWithAnswer.pushLong(acceptReplyId);
+            responsesInFlight.add(acceptReplyId);
             writer.doSignal(acceptRouteId,
                             acceptReplyId,
                             factory.supplyTraceId.getAsLong(),

@@ -131,7 +131,6 @@ final class HttpCacheProxyGroupRequest
                     case AbortFW.TYPE_ID:
                         writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
                         newResponse.accept(t, writeBuffer, 0, l);
-                        //TODO: check if there is better way to clear the throttle
                         factory.router.clearThrottle(replyId);
                         break;
                     case ResetFW.TYPE_ID:

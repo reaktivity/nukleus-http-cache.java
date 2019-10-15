@@ -87,20 +87,20 @@ final class HttpCacheProxyNonCacheableRequest
         int index,
         int length)
     {
-        switch (msgTypeId)
+        if (msgTypeId == ResetFW.TYPE_ID)
         {
-        case ResetFW.TYPE_ID:
-            onResponseReset();
-            break;
+            ResetFW reset = factory.resetRO.wrap(buffer, index, length);
+            onResponseReset(reset);
         }
     }
 
-    private void onResponseReset()
+    private void onResponseReset(
+        ResetFW reset)
     {
         factory.writer.doReset(acceptReply,
                                acceptRouteId,
                                acceptStreamId,
-                               factory.supplyTraceId.getAsLong());
+                               reset.traceId());
         factory.correlations.remove(connectReplyId);
     }
 

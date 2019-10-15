@@ -23,7 +23,7 @@ final class Signals
     public static final int INITIATE_REQUEST_SIGNAL = 5;
     public static final int REQUEST_RETRY_SIGNAL = 7;
     public static final int CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8;
-    public static final int SERVE_CACHE_ENTRY_SIGNAL = 9;
+    public static final int CACHE_ENTRY_READY_SIGNAL = 9;
     public static final int REQUEST_ABORTED_SIGNAL = 10;
     public static final int GROUP_REQUEST_RESET_SIGNAL = 11;
 

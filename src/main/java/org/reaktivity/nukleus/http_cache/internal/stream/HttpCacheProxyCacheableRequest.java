@@ -145,7 +145,7 @@ final class HttpCacheProxyCacheableRequest
         }
 
         factory.router.setThrottle(acceptReplyId, newStream);
-        purge();
+        cleanupRequestSlotIfNecessary();
         resetRequestTimeoutIfNecessary();
         requestGroup.dequeue(ifNoneMatch, acceptReplyId);
 
@@ -612,12 +612,12 @@ final class HttpCacheProxyCacheableRequest
     private void cleanupRequestIfNecessary()
     {
         requestGroup.dequeue(ifNoneMatch, acceptReplyId);
-        purge();
+        cleanupRequestSlotIfNecessary();
         factory.router.clearThrottle(connectReplyId);
         factory.router.clearThrottle(acceptReplyId);
     }
 
-    private void purge()
+    private void cleanupRequestSlotIfNecessary()
     {
         if (requestSlot.value != NO_SLOT)
         {

@@ -76,7 +76,8 @@ final class HttpCacheProxyCachedNotModifiedRequest
             onAbort(abort);
             break;
         case ResetFW.TYPE_ID:
-            onReset();
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onReset(reset);
             break;
         default:
             break;
@@ -89,6 +90,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final long traceId = begin.traceId();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -97,11 +99,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                begin.traceId(),
+                                traceId,
                                 0L,
                                 initialWindow,
                                 0);
-
 
         factory.writer.do304(acceptReply,
                              acceptRouteId,
@@ -128,7 +129,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
-                                 factory.supplyTraceId.getAsLong());
+                                 end.traceId());
     }
 
     private void onAbort(
@@ -137,14 +138,15 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
-                               factory.supplyTraceId.getAsLong());
+                               abort.traceId());
     }
 
-    private void onReset()
+    private void onReset(
+        ResetFW reset)
     {
         factory.writer.doReset(acceptReply,
                                acceptRouteId,
                                acceptInitialId,
-                               factory.supplyTraceId.getAsLong());
+                               reset.traceId());
     }
 }
