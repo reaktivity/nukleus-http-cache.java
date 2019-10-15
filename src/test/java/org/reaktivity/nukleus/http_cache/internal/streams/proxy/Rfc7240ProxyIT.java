@@ -179,25 +179,4 @@ public class Rfc7240ProxyIT
         k3po.finish();
     }
 
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/poll.immediately.if.unsafe.request.invalidates.cache/accept/client",
-        "${streams}/poll.immediately.if.unsafe.request.invalidates.cache/connect/server",
-    })
-    public void shouldPollImmediatelyIfUnsafeRequestInvalidatesCache() throws Exception
-    {
-        k3po.finish();
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/poll.immediately.with.full.url.if.unsafe.request.invalidates.cache/accept/client",
-        "${streams}/poll.immediately.with.full.url.if.unsafe.request.invalidates.cache/connect/server",
-    })
-    public void shouldPollImmediatelyWithFullUrlIfUnsafeRequestInvalidatesCache() throws Exception
-    {
-        k3po.finish();
-    }
 }
