@@ -19,7 +19,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_EN
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RESET_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_GROUP_LEADER_UPDATED_SIGNAL;
 
 import java.util.HashMap;
 import java.util.Objects;
@@ -179,7 +179,7 @@ final class HttpProxyCacheableRequestGroup
                 writer.doSignal(activeRouteId.value,
                                 activeReplyId.value,
                                 factory.supplyTraceId.getAsLong(),
-                                INITIATE_REQUEST_SIGNAL);
+                                REQUEST_GROUP_LEADER_UPDATED_SIGNAL);
             }
         }
     }
@@ -244,7 +244,7 @@ final class HttpProxyCacheableRequestGroup
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
                         factory.supplyTraceId.getAsLong(),
-                        INITIATE_REQUEST_SIGNAL);
+                        REQUEST_GROUP_LEADER_UPDATED_SIGNAL);
     }
 
     private void doSignalCacheEntryAborted(

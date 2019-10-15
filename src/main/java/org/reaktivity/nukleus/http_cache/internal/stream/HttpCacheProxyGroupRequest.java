@@ -20,7 +20,7 @@ import static java.nio.ByteOrder.nativeOrder;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_RETRY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
@@ -275,7 +275,7 @@ final class HttpCacheProxyGroupRequest
     {
         final int signalId = (int) signal.signalId();
 
-        if (signalId == REQUEST_RETRY_SIGNAL)
+        if (signalId == GROUP_REQUEST_RETRY_SIGNAL)
         {
             retryCacheableRequest();
         }
@@ -316,7 +316,7 @@ final class HttpCacheProxyGroupRequest
                                                      MILLISECONDS,
                                                      routeId,
                                                      replyId,
-                                                     REQUEST_RETRY_SIGNAL);
+                                                     GROUP_REQUEST_RETRY_SIGNAL);
         }
         return true;
     }

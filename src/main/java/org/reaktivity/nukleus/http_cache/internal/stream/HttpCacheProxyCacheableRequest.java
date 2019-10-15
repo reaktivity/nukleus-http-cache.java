@@ -25,7 +25,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_EN
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RESET_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_GROUP_LEADER_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_EXPIRED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
@@ -303,7 +303,7 @@ final class HttpCacheProxyCacheableRequest
 
         switch (signalId)
         {
-        case INITIATE_REQUEST_SIGNAL:
+        case REQUEST_GROUP_LEADER_UPDATED_SIGNAL:
             onResponseSignalInitiateRequest(signal);
             break;
         case REQUEST_EXPIRED_SIGNAL:
