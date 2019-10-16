@@ -203,7 +203,7 @@ public class DefaultCache
         DefaultCacheEntry cacheEntry = cachedEntries.remove(requestHash);
         if (cacheEntry != null)
         {
-            cacheEntry.invalidate(true);
+            cacheEntry.invalidate();
         }
 
         headers.forEach(header ->
@@ -234,7 +234,7 @@ public class DefaultCache
                 Int2ObjectHashMap<DefaultCacheEntry> collection = links.get(collectionHash);
                 collection.forEach((hash, entry) ->
                 {
-                    entry.invalidate(true);
+                    entry.invalidate();
                 });
             }
         }

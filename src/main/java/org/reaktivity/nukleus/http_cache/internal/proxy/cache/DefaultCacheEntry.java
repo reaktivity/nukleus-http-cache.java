@@ -124,10 +124,9 @@ public final class DefaultCacheEntry
         return validationRequired;
     }
 
-    public void invalidate(
-        boolean validationRequired)
+    public void invalidate()
     {
-        this.validationRequired = validationRequired;
+        validationRequired = true;
     }
 
     public void setSubscribers(int numberOfSubscribers)
