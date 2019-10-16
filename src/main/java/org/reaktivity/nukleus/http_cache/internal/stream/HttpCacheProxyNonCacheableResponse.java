@@ -37,7 +37,7 @@ final class HttpCacheProxyNonCacheableResponse
     private final HttpCacheProxyFactory httpCacheProxyFactory;
 
     private final int requestHash;
-    private final String requestUrl;
+    private final String requestURL;
 
     private final MessageConsumer connectReplyThrottle;
     private final long connectRouteId;
@@ -52,7 +52,7 @@ final class HttpCacheProxyNonCacheableResponse
     HttpCacheProxyNonCacheableResponse(
         HttpCacheProxyFactory httpCacheProxyFactory,
         int requestHash,
-        String requestUrl,
+        String requestURL,
         MessageConsumer connectReplyThrottle,
         long connectRouteId,
         long connectReplyId,
@@ -62,7 +62,7 @@ final class HttpCacheProxyNonCacheableResponse
     {
         this.httpCacheProxyFactory = httpCacheProxyFactory;
         this.requestHash = requestHash;
-        this.requestUrl = requestUrl;
+        this.requestURL = requestURL;
         this.connectReplyThrottle = connectReplyThrottle;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -147,7 +147,7 @@ final class HttpCacheProxyNonCacheableResponse
         }
 
         httpCacheProxyFactory.defaultCache.invalidateCacheEntryIfNecessary(requestHash,
-                                                                           requestUrl,
+                                                                           requestURL,
                                                                            responseHeaders);
     }
 

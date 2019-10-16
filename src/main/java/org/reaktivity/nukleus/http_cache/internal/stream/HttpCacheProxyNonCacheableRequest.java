@@ -46,14 +46,12 @@ final class HttpCacheProxyNonCacheableRequest
     private final long connectRouteId;
     private final long connectReplyId;
     private final long connectInitialId;
-    private final String requestUrl;
-    private final short authorizationScope;
+    private final String requestURL;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory factory,
         int requestHash,
-        String requestUrl,
-        short authorizationScope,
+        String requestURL,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId,
@@ -66,8 +64,7 @@ final class HttpCacheProxyNonCacheableRequest
     {
         this.factory = factory;
         this.requestHash = requestHash;
-        this.requestUrl = requestUrl;
-        this.authorizationScope = authorizationScope;
+        this.requestURL = requestURL;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptStreamId = acceptStreamId;
@@ -85,7 +82,7 @@ final class HttpCacheProxyNonCacheableRequest
         final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
             new HttpCacheProxyNonCacheableResponse(factory,
                                                    requestHash,
-                                                   requestUrl,
+                                                   requestURL,
                                                    connectReply,
                                                    connectRouteId,
                                                    connectReplyId,

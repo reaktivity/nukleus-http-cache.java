@@ -49,12 +49,12 @@ final class HttpCacheProxyNotModifiedResponse
 
     private int connectReplyBudget;
     private final String preferWait;
-    private final String requestUrl;
+    private final String requestURL;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,
         int requestHash,
-        String requestUrl,
+        String requestURL,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId,
@@ -65,7 +65,7 @@ final class HttpCacheProxyNotModifiedResponse
     {
         this.factory = factory;
         this.requestHash = requestHash;
-        this.requestUrl = requestUrl;
+        this.requestURL = requestURL;
         this.preferWait = preferWait;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
@@ -131,7 +131,7 @@ final class HttpCacheProxyNotModifiedResponse
             System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
                               getHeader(responseHeaders, ":status"));
         }
-        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, requestUrl);
+        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, requestURL);
         factory.defaultCache.send304(cacheEntry,
                                      preferWait,
                                      acceptReply,

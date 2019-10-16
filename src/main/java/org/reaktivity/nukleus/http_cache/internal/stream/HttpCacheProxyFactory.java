@@ -300,7 +300,6 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                         acceptInitialId,
                                                         acceptRouteId,
                                                         requestURL,
-                                                        authorizationScope,
                                                         requestHash,
                                                         connectInitialId,
                                                         connectInitial,
@@ -414,15 +413,14 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     private MessageConsumer createNonCacheableRequestStream(
         MessageConsumer acceptReply, long connectRouteId, long acceptInitialId, long acceptRouteId, String requestURL,
-        short authorizationScope, int requestHash, long connectInitialId, MessageConsumer connectInitial, long connectReplyId,
-        long acceptReplyId, MessageConsumer connectReply)
+        int requestHash, long connectInitialId, MessageConsumer connectInitial, long connectReplyId,
+        long acceptReplyId, MessageConsumer connectReply )
     {
         MessageConsumer newStream;
         final HttpCacheProxyNonCacheableRequest nonCacheableRequest =
             new HttpCacheProxyNonCacheableRequest(this,
                                                   requestHash,
                                                   requestURL,
-                                                  authorizationScope,
                                                   acceptReply,
                                                   acceptRouteId,
                                                   acceptReplyId,

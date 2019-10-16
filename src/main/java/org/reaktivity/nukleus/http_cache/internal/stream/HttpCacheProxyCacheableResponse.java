@@ -48,7 +48,7 @@ final class HttpCacheProxyCacheableResponse
     private int requestHash;
 
     private final MutableInteger requestSlot;
-    private final String requestUrl;
+    private final String requestURL;
     private final int initialWindow;
     private String ifNoneMatch;
     private final Function<Long, Boolean> retryRequest;
@@ -67,7 +67,7 @@ final class HttpCacheProxyCacheableResponse
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
         int requestHash,
-        String requestUrl,
+        String requestURL,
         MutableInteger requestSlot,
         MessageConsumer acceptReply,
         long acceptRouteId,
@@ -80,7 +80,7 @@ final class HttpCacheProxyCacheableResponse
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
-        this.requestUrl = requestUrl;
+        this.requestURL = requestURL;
         this.requestSlot = requestSlot;
         this.requestHash = requestHash;
         this.acceptReply = acceptReply;
@@ -146,7 +146,7 @@ final class HttpCacheProxyCacheableResponse
 
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-        cacheEntry = factory.defaultCache.supply(requestHash, requestUrl);
+        cacheEntry = factory.defaultCache.supply(requestHash, requestURL);
         cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
         String etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;

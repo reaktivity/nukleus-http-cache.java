@@ -55,6 +55,7 @@ public final class DefaultCacheEntry
 
     private final DefaultCache cache;
     private final int requestHash;
+    private final int collectionHash;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -70,14 +71,26 @@ public final class DefaultCacheEntry
     DefaultCacheEntry(
         DefaultCache cache,
         int requestHash,
+        int collectionHash,
         BufferPool requestPool,
         BufferPool responsePool)
     {
         this.cache = cache;
         this.requestHash = requestHash;
+        this.collectionHash = collectionHash;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
         responseSlots = new IntArrayList();
+    }
+
+    public int requestHash()
+    {
+        return requestHash;
+    }
+
+    public int getCollectionHash()
+    {
+        return collectionHash;
     }
 
     public int responseSize()
@@ -106,12 +119,13 @@ public final class DefaultCacheEntry
         this.responseCompleted = responseCompleted;
     }
 
-    public boolean isValidationRequired()
+    public boolean isValid()
     {
         return validationRequired;
     }
 
-    public void setValidationRequired(boolean validationRequired)
+    public void invalidate(
+        boolean validationRequired)
     {
         this.validationRequired = validationRequired;
     }
@@ -310,11 +324,6 @@ public final class DefaultCacheEntry
             this.responseSize = 0;
             this.setResponseCompleted(false);
         }
-    }
-
-    public int requestHash()
-    {
-        return this.requestHash;
     }
 
     private boolean storeResponseData(

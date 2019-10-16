@@ -85,7 +85,7 @@ final class HttpCacheProxyCacheableRequest
     private long connectInitialId;
 
     private final MutableInteger requestSlot;
-    private final String requestUrl;
+    private final String requestURL;
     private final int requestHash;
 
     private boolean isRequestPurged;
@@ -106,7 +106,7 @@ final class HttpCacheProxyCacheableRequest
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
         int requestHash,
-        String requestUrl,
+        String requestURL,
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptInitialId,
@@ -120,7 +120,7 @@ final class HttpCacheProxyCacheableRequest
         this.factory = factory;
         this.requestGroup = requestGroup;
         this.requestHash = requestHash;
-        this.requestUrl = requestUrl;
+        this.requestURL = requestURL;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptInitialId = acceptInitialId;
@@ -166,7 +166,7 @@ final class HttpCacheProxyCacheableRequest
             final HttpCacheProxyNotModifiedResponse notModifiedResponse =
                 new HttpCacheProxyNotModifiedResponse(factory,
                                                       requestHash,
-                                                      requestUrl,
+                                                      requestURL,
                                                       acceptReply,
                                                       acceptRouteId,
                                                       acceptReplyId,
@@ -187,7 +187,7 @@ final class HttpCacheProxyCacheableRequest
                 new HttpCacheProxyCacheableResponse(factory,
                                                     requestGroup,
                                                     requestHash,
-                                                    requestUrl,
+                                                    requestURL,
                                                     requestSlot,
                                                     acceptReply,
                                                     acceptRouteId,
@@ -204,7 +204,7 @@ final class HttpCacheProxyCacheableRequest
             final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
                     new HttpCacheProxyNonCacheableResponse(factory,
                                                            requestHash,
-                                                           requestUrl,
+                                                           requestURL,
                                                            connectReply,
                                                            connectRouteId,
                                                            connectReplyId,

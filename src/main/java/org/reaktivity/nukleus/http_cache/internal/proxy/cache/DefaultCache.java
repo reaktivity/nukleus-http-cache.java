@@ -36,7 +36,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -59,8 +58,9 @@ import org.reaktivity.nukleus.route.RouteManager;
 
 public class DefaultCache
 {
-    private static final Pattern LINK_URL_PATTERN =  Pattern.compile("<(.*?)>;");
-    private static final Pattern URL_PATTERN = Pattern.compile("^(https?:)?//");
+    private static final Pattern LINK_URL_PATTERN =
+        Pattern.compile(
+            "(<(?<scheme>https?):/)?/?(?<hostname>[^:/\\s]+)(?<port>:([^/]*))?(?<path>(/\\w+)*)>;.*(rel=\"(collection|items)\")");
 
     final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
@@ -74,7 +74,7 @@ public class DefaultCache
 
     private final Writer writer;
     private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntries;
-    private final Int2ObjectHashMap<String> links;
+    private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> links;
 
     private final LongConsumer entryCount;
     private final LongSupplier supplyTraceId;
@@ -131,10 +131,24 @@ public class DefaultCache
 
     public DefaultCacheEntry supply(
         int requestHash,
-        String requestUrl)
+        String requestURL)
     {
-        links.put(requestHash, requestUrl);
-        return cachedEntries.computeIfAbsent(requestHash, this::newCacheEntry);
+        final int collectionHash = getCollectionHash(requestURL);
+        Int2ObjectHashMap<DefaultCacheEntry> collection = links
+            .computeIfAbsent(collectionHash, l -> new Int2ObjectHashMap<>());
+        DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, collectionHash);
+        collection.put(requestHash, cacheEntry);
+        return cacheEntry;
+    }
+
+    private int getCollectionHash(
+        String requestURL)
+    {
+        final URI requestURI = URI.create(requestURL);
+        return String.format("%s://%s/%s",
+                             requestURI.getScheme(),
+                             requestURI.getAuthority(),
+                             requestURI.getPath()).hashCode();
     }
 
     public boolean matchCacheableResponse(
@@ -158,8 +172,7 @@ public class DefaultCache
         return satisfiedByCache(requestHeaders) &&
                 cacheEntry != null &&
                 cacheEntry.canServeRequest(requestHeaders, authScope) &&
-                !cacheEntry.isValidationRequired();
-
+                !cacheEntry.isValid();
     }
 
 
@@ -169,78 +182,60 @@ public class DefaultCache
         DefaultCacheEntry cacheEntry = cachedEntries.remove(requestHash);
         if (cacheEntry != null)
         {
+            final int collectionHash = cacheEntry.getCollectionHash();
+            Int2ObjectHashMap collection = links.get(collectionHash);
+            collection.remove(requestHash);
+            if (collection.isEmpty())
+            {
+                links.remove(collectionHash);
+            }
+
             entryCount.accept(-1);
             cacheEntry.purge();
         }
-        links.remove(requestHash);
     }
 
     public void invalidateCacheEntryIfNecessary(
         int requestHash,
-        String requestUrl,
+        String requestURL,
         ArrayFW<HttpHeaderFW> headers)
     {
         DefaultCacheEntry cacheEntry = cachedEntries.remove(requestHash);
         if (cacheEntry != null)
         {
-            cacheEntry.setValidationRequired(true);
+            cacheEntry.invalidate(true);
         }
 
         headers.forEach(header ->
         {
-            invalidateLinkCacheEntry(requestUrl, header);
+            invalidateLinkCacheEntry(requestURL, header);
         });
     }
 
     private void invalidateLinkCacheEntry(
-        String requestUrl,
+        String requestURL,
         HttpHeaderFW header)
     {
         if (LINK.equals(header.name().asString()))
         {
             Matcher matcher = LINK_URL_PATTERN.matcher(header.value().asString());
-            if (matcher.find())
+            if (matcher.matches())
             {
-                String linkFullURL = matcher.group(1);
-                if (linkFullURL != null)
-                {
-                    try
-                    {
-                        final URI requestURI = new URI(requestUrl);
-                        if (URL_PATTERN.asPredicate().test(linkFullURL))
-                        {
-                            final URI linkRequestURI = new URI(linkFullURL);
-                            if (!requestURI.getAuthority().equals(linkRequestURI.getAuthority()))
-                            {
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            linkFullURL = String.format("%s://%s%s",
-                                                        requestURI.getScheme(),
-                                                        requestURI.getAuthority(),
-                                                        linkFullURL);
-                        }
+                final URI requestURI = URI.create(requestURL);
+                final String linkTargetScheme = matcher.group("scheme");
+                final String linkTargetHostname = matcher.group("hostname");
 
-                        final String finalLinkFullURL = linkFullURL;
-                        links.entrySet()
-                             .stream()
-                             .filter(map -> map.getValue().startsWith(finalLinkFullURL))
-                             .forEach(entry ->
-                             {
-                                 DefaultCacheEntry cacheEntry = get(entry.getKey());
-                                 if (cacheEntry != null)
-                                 {
-                                     cacheEntry.setValidationRequired(true);
-                                 }
-                             });
-                    }
-                    catch (URISyntaxException e)
-                    {
-                        //NOOP
-                    }
+                if (!requestURI.getScheme().equals(linkTargetScheme) ||
+                    !requestURI.getHost().equals(linkTargetHostname))
+                {
+                    return;
                 }
+                final int collectionHash = getCollectionHash(requestURL);
+                Int2ObjectHashMap<DefaultCacheEntry> collection = links.get(collectionHash);
+                collection.forEach((hash, entry) ->
+                {
+                    entry.invalidate(true);
+                });
             }
         }
     }
@@ -395,7 +390,6 @@ public class DefaultCache
         return isSelectedForUpdate;
     }
 
-
     private boolean satisfiedByCache(
         ArrayFW<HttpHeaderFW> headers)
     {
@@ -403,27 +397,32 @@ public class DefaultCache
         {
             final String name = h.name().asString();
             final String value = h.value().asString();
-            switch (name)
+            if (CACHE_CONTROL.equals(name))
             {
-            case CACHE_CONTROL:
-                // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
                 return value.contains(CacheDirectives.NO_CACHE) ||
                        value.contains(MAX_AGE_0) ||
                        value.contains(NO_STORE);
-            default:
-                return false;
             }
+            return false;
         });
     }
 
-    private DefaultCacheEntry newCacheEntry(
-        int requestHash)
+    private DefaultCacheEntry computeCacheEntryIfAbsent(
+        int requestHash,
+        int collectionHash)
     {
-        entryCount.accept(1);
-        return new DefaultCacheEntry(
-            this,
-            requestHash,
-            cachedRequestBufferPool,
-            cachedResponseBufferPool);
+        DefaultCacheEntry entry = get(requestHash);
+        if (entry == null)
+        {
+            entryCount.accept(1);
+            return new DefaultCacheEntry(
+                this,
+                requestHash,
+                collectionHash,
+                cachedRequestBufferPool,
+                cachedResponseBufferPool);
+        }
+
+        return entry;
     }
 }
