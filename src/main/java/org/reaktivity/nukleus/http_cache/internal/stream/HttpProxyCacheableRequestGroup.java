@@ -18,10 +18,10 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RESET_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_GROUP_LEADER_UPDATED_SIGNAL;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -36,7 +36,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
 final class HttpProxyCacheableRequestGroup
 {
-    private final HashMap<String, Long2LongHashMap> requestsQueue;
+    private final Map<String, Long2LongHashMap> requestsQueue;
     private final LongHashSet responsesInFlight;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
@@ -90,7 +90,7 @@ final class HttpProxyCacheableRequestGroup
         this.recentAuthorizationToken = recentAuthorizationToken;
     }
 
-    int getNumberOfRequests()
+    int getQueuedRequests()
     {
         MutableInteger totalRequests = new MutableInteger();
         requestsQueue.forEach((key, routeIdsByReplyId) -> totalRequests.value += routeIdsByReplyId.size());
@@ -209,15 +209,6 @@ final class HttpProxyCacheableRequestGroup
         });
     }
 
-    void onGroupRequestReset()
-    {
-        factory.writer.doSignal(acceptRouteId,
-                                acceptReplyId,
-                                factory.supplyTraceId.getAsLong(),
-                                GROUP_REQUEST_RESET_SIGNAL);
-        acceptRouteId = 0L;
-        acceptReplyId = 0L;
-    }
 
     MessageConsumer newRequest(
         int msgTypeId,
@@ -229,7 +220,7 @@ final class HttpProxyCacheableRequestGroup
         BeginFW begin = factory.beginRO.wrap(buffer, index, length);
         routeId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(begin.streamId());
-        connect = new HttpCacheProxyGroupRequest(factory, this)::onRequestMessage;
+        connect = new HttpCacheProxyGroupRequest(factory, this, sender)::onRequestMessage;
         return connect;
     }
 
@@ -260,10 +251,7 @@ final class HttpProxyCacheableRequestGroup
 
     private void gotResponse(long acceptReplyId)
     {
-        if (!responsesInFlight.contains(acceptReplyId))
-        {
-            responsesInFlight.add(acceptReplyId);
-        }
+        responsesInFlight.add(acceptReplyId);
     }
 
     private void doSignalCacheEntryUpdated(

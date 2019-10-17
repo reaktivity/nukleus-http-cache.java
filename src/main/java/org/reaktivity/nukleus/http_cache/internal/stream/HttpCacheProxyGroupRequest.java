@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_RE
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -38,6 +39,8 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
+import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
+import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -50,10 +53,17 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyGroupRequest
 {
+    private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
+    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW("503");
+    private final HttpBeginExFW.Builder beginExRW = new HttpBeginExFW.Builder();
+    private final int httpTypeId;
+
     private final MutableDirectBuffer writeBuffer;
+    private final MutableInteger requestSlot;
 
     private final HttpCacheProxyFactory factory;
     private final HttpProxyCacheableRequestGroup requestGroup;
+    private final MessageConsumer initial;
 
     private long initialId;
     private long replyId;
@@ -63,18 +73,22 @@ final class HttpCacheProxyGroupRequest
     private long connectReplyId;
     private long connectInitialId;
 
-    private final MutableInteger requestSlot;
     private Future<?> retryRequest;
     private int attempts;
 
+    private int state;
+
     HttpCacheProxyGroupRequest(
         HttpCacheProxyFactory factory,
-        HttpProxyCacheableRequestGroup requestGroup)
+        HttpProxyCacheableRequestGroup requestGroup,
+        MessageConsumer initial)
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
+        this.initial = initial;
         this.requestSlot =  new MutableInteger(NO_SLOT);
         this.writeBuffer = new UnsafeBuffer(allocateDirect(factory.writer.writerCapacity()).order(nativeOrder()));
+        this.httpTypeId = factory.supplyTypeId.applyAsInt("http");
     }
 
     MessageConsumer newResponse(
@@ -142,7 +156,6 @@ final class HttpCacheProxyGroupRequest
                     default:
                         break;
                     }
-
                 };
             }
         }
@@ -222,7 +235,6 @@ final class HttpCacheProxyGroupRequest
         initialId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(initialId);
         factory.router.setThrottle(replyId, this::onResponseMessage);
-        // count all requests
 
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
@@ -231,6 +243,7 @@ final class HttpCacheProxyGroupRequest
             return;
         }
         doHttpBegin(requestHeaders);
+        state = RequestState.openingInitial(state);
     }
 
     private void onData(
@@ -242,7 +255,7 @@ final class HttpCacheProxyGroupRequest
     private void onEnd(
         final EndFW end)
     {
-        //NOOP
+        state = RequestState.closeInitial(state);
     }
 
     private void onAbort(
@@ -257,6 +270,7 @@ final class HttpCacheProxyGroupRequest
     private void onRequestWindow(
         final WindowFW window)
     {
+        state = RequestState.closeInitial(state);
         factory.writer.doHttpEnd(connectInitial,
                                  routeId,
                                  connectInitialId,
@@ -266,14 +280,24 @@ final class HttpCacheProxyGroupRequest
     private void onRequestReset(
         final ResetFW reset)
     {
-        requestGroup.onGroupRequestReset();
+        final long traceId = reset.traceId();
+        if (RequestState.initialClosed(state))
+        {
+            send503RetryAfter(traceId);
+        }
+        else
+        {
+            factory.writer.doReset(initial, routeId, initialId, traceId);
+            factory.router.clearThrottle(connectReplyId);
+        }
+
         cleanupRequestIfNecessary();
     }
 
     private void onRequestSignal(
         SignalFW signal)
     {
-        final int signalId = (int) signal.signalId();
+        final int signalId = signal.signalId();
 
         if (signalId == GROUP_REQUEST_RETRY_SIGNAL)
         {
@@ -284,6 +308,7 @@ final class HttpCacheProxyGroupRequest
     private void onWindow(
         final WindowFW window)
     {
+        state = RequestState.openInitial(state);
         factory.writer.doWindow(connectInitial,
                                 routeId,
                                 connectReplyId,
@@ -400,6 +425,35 @@ final class HttpCacheProxyGroupRequest
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
     }
 
+    private void send503RetryAfter(
+        long traceId)
+    {
+        Function<HttpBeginExFW, MessageConsumer> responseFactory = factory.correlations.remove(replyId);
+        if (responseFactory != null)
+        {
+            beginExRW.wrap(writeBuffer, 0, writeBuffer.capacity());
+
+            final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+                e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
+                      .item(h -> h.name(RETRY_AFTER).value("0"));
+
+            beginExRW.typeId(httpTypeId)
+                     .headers(mutator);
+
+            MessageConsumer newResponse = responseFactory.apply(beginExRW.build());
+
+            factory.writer.doHttpResponse(newResponse,
+                routeId,
+                replyId,
+                traceId,
+                mutator);
+
+            factory.writer.doHttpEnd(newResponse,
+                routeId,
+                replyId,
+                traceId);
+        }
+    }
 
     private void cleanupRequestIfNecessary()
     {
@@ -413,6 +467,37 @@ final class HttpCacheProxyGroupRequest
         if (retryRequest != null)
         {
             retryRequest.cancel(true);
+        }
+    }
+
+    private static final class RequestState
+    {
+        private static final int INITIAL_OPENING = 0x10;
+        private static final int INITIAL_OPENED = 0x20;
+        private static final int INITIAL_CLOSED = 0x40;
+
+        static int openingInitial(
+            int state)
+        {
+            return state | INITIAL_OPENING;
+        }
+
+        static int openInitial(
+            int state)
+        {
+            return openingInitial(state) | INITIAL_OPENED;
+        }
+
+        static int closeInitial(
+            int state)
+        {
+            return state | INITIAL_CLOSED;
+        }
+
+        static boolean initialClosed(
+            int state)
+        {
+            return (state & INITIAL_CLOSED) != 0;
         }
     }
 }

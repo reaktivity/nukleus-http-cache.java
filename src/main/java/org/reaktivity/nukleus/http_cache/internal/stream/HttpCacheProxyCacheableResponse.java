@@ -126,7 +126,7 @@ final class HttpCacheProxyCacheableResponse
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
         cacheEntry = factory.defaultCache.supply(requestHash);
-        cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
+        cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
         etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;
 

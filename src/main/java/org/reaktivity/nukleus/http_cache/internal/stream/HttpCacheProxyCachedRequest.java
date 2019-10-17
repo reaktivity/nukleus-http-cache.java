@@ -17,8 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.Math.min;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_READY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_ABORTED_SIGNAL;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;

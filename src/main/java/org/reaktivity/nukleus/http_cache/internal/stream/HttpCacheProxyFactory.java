@@ -88,6 +88,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
     final LongSupplier supplyTraceId;
+    final ToIntFunction<String> supplyTypeId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final Long2ObjectHashMap<Request> requestCorrelations;
@@ -126,6 +127,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.supplyTraceId = requireNonNull(supplyTraceId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.preferWaitMaximum = config.preferWaitMaximum();
+        this.supplyTypeId = supplyTypeId;
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.request.acquires"),
