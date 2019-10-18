@@ -184,9 +184,9 @@ public class DefaultCache
         if (cacheEntry != null)
         {
             final int requestHashWithoutQuery = cacheEntry.requestHashWithoutQuery();
-            Int2ObjectHashMap requestHashWithoutQueryList = cachedEntriesByRequestHashWithoutQuery.get(requestHashWithoutQuery);
-            requestHashWithoutQueryList.remove(requestHash);
-            if (requestHashWithoutQueryList.isEmpty())
+            Int2ObjectHashMap cachedEntriesByRequestHashFromWithoutQueryList = cachedEntriesByRequestHashWithoutQuery
+                .computeIfPresent(requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
+            if (cachedEntriesByRequestHashFromWithoutQueryList == null)
             {
                 cachedEntriesByRequestHashWithoutQuery.remove(requestHashWithoutQuery);
             }
