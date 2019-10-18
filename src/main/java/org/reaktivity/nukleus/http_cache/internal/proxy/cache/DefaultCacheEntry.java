@@ -88,7 +88,7 @@ public final class DefaultCacheEntry
         return requestHash;
     }
 
-    public int getCollectionHash()
+    public int requestHashWithoutQuery()
     {
         return collectionHash;
     }
@@ -121,7 +121,7 @@ public final class DefaultCacheEntry
 
     public boolean isValid()
     {
-        return validationRequired;
+        return !validationRequired;
     }
 
     public void invalidate()

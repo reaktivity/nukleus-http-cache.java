@@ -60,7 +60,8 @@ public class DefaultCache
 {
     private static final Pattern LINK_URL_PATTERN =
         Pattern.compile(
-            "(<(?<scheme>https?):/)?/?(?<hostname>[^:/\\s]+)(?<port>:([^/]*))?(?<path>(/\\w+)*)>;.*(rel=\"(collection|items)\")");
+            "(<(?<scheme>https?):/)?/?(?<hostname>[^:/\\s]+)(?<port>:(\\d+))?(?<path>[\\w\\-.]*[^#?\\s]+).*>;" +
+            ".*(rel=\"(collection|items)\")");
 
     final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
@@ -73,8 +74,8 @@ public class DefaultCache
     private final BufferPool cacheBufferPool;
 
     private final Writer writer;
-    private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntries;
-    private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> links;
+    private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHash;
+    private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> cachedEntriesByRequestHashWithoutQuery;
 
     private final LongConsumer entryCount;
     private final LongSupplier supplyTraceId;
@@ -104,8 +105,8 @@ public class DefaultCache
                 cacheBufferPool.duplicate(),
                 counters.supplyCounter.apply("http-cache.cached.response.acquires"),
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
-        this.cachedEntries = new Int2ObjectHashMap<>();
-        this.links = new Int2ObjectHashMap<>();
+        this.cachedEntriesByRequestHash = new Int2ObjectHashMap<>();
+        this.cachedEntriesByRequestHashWithoutQuery = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.supplyTraceId = requireNonNull(supplyTraceId);
         int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
@@ -120,28 +121,28 @@ public class DefaultCache
     public DefaultCacheEntry get(
         int requestHash)
     {
-        return cachedEntries.get(requestHash);
+        return cachedEntriesByRequestHash.get(requestHash);
     }
 
     public boolean hasCacheEntry(
         int requestHash)
     {
-        return cachedEntries.containsKey(requestHash);
+        return cachedEntriesByRequestHash.containsKey(requestHash);
     }
 
     public DefaultCacheEntry supply(
         int requestHash,
         String requestURL)
     {
-        final int collectionHash = getCollectionHash(requestURL);
-        Int2ObjectHashMap<DefaultCacheEntry> collection = links
+        final int collectionHash = requestHashWithoutQuery(requestURL);
+        Int2ObjectHashMap<DefaultCacheEntry> collection = cachedEntriesByRequestHashWithoutQuery
             .computeIfAbsent(collectionHash, l -> new Int2ObjectHashMap<>());
         DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, collectionHash);
         collection.put(requestHash, cacheEntry);
         return cacheEntry;
     }
 
-    private int getCollectionHash(
+    private int requestHashWithoutQuery(
         String requestURL)
     {
         final URI requestURI = URI.create(requestURL);
@@ -156,7 +157,7 @@ public class DefaultCache
         String newEtag,
         boolean hasIfNoneMatch)
     {
-        DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
+        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
         return hasIfNoneMatch &&
                cacheEntry != null &&
                cacheEntry.etag() != null &&
@@ -168,7 +169,7 @@ public class DefaultCache
         short authScope,
         int requestHash)
     {
-        final DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
+        final DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
         return satisfiedByCache(requestHeaders) &&
                 cacheEntry != null &&
                 cacheEntry.canServeRequest(requestHeaders, authScope) &&
@@ -179,15 +180,15 @@ public class DefaultCache
     public void purge(
         int requestHash)
     {
-        DefaultCacheEntry cacheEntry = cachedEntries.remove(requestHash);
+        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.remove(requestHash);
         if (cacheEntry != null)
         {
-            final int collectionHash = cacheEntry.getCollectionHash();
-            Int2ObjectHashMap collection = links.get(collectionHash);
-            collection.remove(requestHash);
-            if (collection.isEmpty())
+            final int requestHashWithoutQuery = cacheEntry.requestHashWithoutQuery();
+            Int2ObjectHashMap requestHashWithoutQueryList = cachedEntriesByRequestHashWithoutQuery.get(requestHashWithoutQuery);
+            requestHashWithoutQueryList.remove(requestHash);
+            if (requestHashWithoutQueryList.isEmpty())
             {
-                links.remove(collectionHash);
+                cachedEntriesByRequestHashWithoutQuery.remove(requestHashWithoutQuery);
             }
 
             entryCount.accept(-1);
@@ -200,7 +201,7 @@ public class DefaultCache
         String requestURL,
         ArrayFW<HttpHeaderFW> headers)
     {
-        DefaultCacheEntry cacheEntry = cachedEntries.remove(requestHash);
+        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.remove(requestHash);
         if (cacheEntry != null)
         {
             cacheEntry.invalidate();
@@ -230,8 +231,8 @@ public class DefaultCache
                 {
                     return;
                 }
-                final int collectionHash = getCollectionHash(requestURL);
-                Int2ObjectHashMap<DefaultCacheEntry> collection = links.get(collectionHash);
+                final int collectionHash = requestHashWithoutQuery(requestURL);
+                Int2ObjectHashMap<DefaultCacheEntry> collection = cachedEntriesByRequestHashWithoutQuery.get(collectionHash);
                 collection.forEach((hash, entry) ->
                 {
                     entry.invalidate();
@@ -285,7 +286,7 @@ public class DefaultCache
 
                 if (etagMatches)
                 {
-                    DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
+                    DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
                     if (cacheEntry != null)
                     {
                         cacheEntry.updateResponseHeader(status, responseHeaders);
@@ -363,7 +364,7 @@ public class DefaultCache
 
     public void purgeEntriesForNonPendingRequests()
     {
-        cachedEntries.forEach((requestHash, cacheEntry) ->
+        cachedEntriesByRequestHash.forEach((requestHash, cacheEntry) ->
         {
             if (cacheEntry.getSubscribers() == 0)
             {
