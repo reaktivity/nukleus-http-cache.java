@@ -134,15 +134,15 @@ public class DefaultCache
         int requestHash,
         String requestURL)
     {
-        final int collectionHash = requestHashWithoutQuery(requestURL);
+        final int requestHashWithoutQuery = generateRequestHashWithoutQuery(requestURL);
         Int2ObjectHashMap<DefaultCacheEntry> collection = cachedEntriesByRequestHashWithoutQuery
-            .computeIfAbsent(collectionHash, l -> new Int2ObjectHashMap<>());
-        DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, collectionHash);
+            .computeIfAbsent(requestHashWithoutQuery, l -> new Int2ObjectHashMap<>());
+        DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, requestHashWithoutQuery);
         collection.put(requestHash, cacheEntry);
         return cacheEntry;
     }
 
-    private int requestHashWithoutQuery(
+    private int generateRequestHashWithoutQuery(
         String requestURL)
     {
         final URI requestURI = URI.create(requestURL);
@@ -173,7 +173,7 @@ public class DefaultCache
         return satisfiedByCache(requestHeaders) &&
                 cacheEntry != null &&
                 cacheEntry.canServeRequest(requestHeaders, authScope) &&
-                !cacheEntry.isValid();
+                cacheEntry.isValid();
     }
 
 
@@ -231,7 +231,7 @@ public class DefaultCache
                 {
                     return;
                 }
-                final int collectionHash = requestHashWithoutQuery(requestURL);
+                final int collectionHash = generateRequestHashWithoutQuery(requestURL);
                 Int2ObjectHashMap<DefaultCacheEntry> collection = cachedEntriesByRequestHashWithoutQuery.get(collectionHash);
                 collection.forEach((hash, entry) ->
                 {

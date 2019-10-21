@@ -55,7 +55,7 @@ public final class DefaultCacheEntry
 
     private final DefaultCache cache;
     private final int requestHash;
-    private final int collectionHash;
+    private final int requestHashWithoutQuery;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -71,13 +71,13 @@ public final class DefaultCacheEntry
     DefaultCacheEntry(
         DefaultCache cache,
         int requestHash,
-        int collectionHash,
+        int requestHashWithoutQuery,
         BufferPool requestPool,
         BufferPool responsePool)
     {
         this.cache = cache;
         this.requestHash = requestHash;
-        this.collectionHash = collectionHash;
+        this.requestHashWithoutQuery = requestHashWithoutQuery;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
         responseSlots = new IntArrayList();
@@ -90,7 +90,7 @@ public final class DefaultCacheEntry
 
     public int requestHashWithoutQuery()
     {
-        return collectionHash;
+        return requestHashWithoutQuery;
     }
 
     public int responseSize()

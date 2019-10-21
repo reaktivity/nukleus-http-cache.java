@@ -178,5 +178,4 @@ public class Rfc7240ProxyIT
     {
         k3po.finish();
     }
-
 }

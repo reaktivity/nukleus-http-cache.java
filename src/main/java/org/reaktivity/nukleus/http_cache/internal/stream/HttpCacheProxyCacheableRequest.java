@@ -144,7 +144,7 @@ final class HttpCacheProxyCacheableRequest
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
 
         if ((retry && attempts < 3) ||
-            this.factory.defaultCache.checkToRetry(getRequestHeaders(),
+            factory.defaultCache.checkToRetry(getRequestHeaders(),
                                                    responseHeaders,
                                                    ifNoneMatch,
                                                    requestHash))
