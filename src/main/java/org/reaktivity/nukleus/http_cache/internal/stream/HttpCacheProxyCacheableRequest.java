@@ -84,7 +84,7 @@ final class HttpCacheProxyCacheableRequest
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
-    private boolean requestExpired;
+    private boolean responseClosing;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -146,8 +146,10 @@ final class HttpCacheProxyCacheableRequest
         connect = factory.router.supplyReceiver(connectReplyId);
         factory.router.setThrottle(acceptReplyId, newStream);
         cleanupRequestSlotIfNecessary();
-        resetRequestTimeoutIfNecessary();
+        cleanupRequestTimeoutIfNecessary();
         requestGroup.dequeue(ifNoneMatch, acceptReplyId);
+
+        assert newStream != null;
 
         return newStream;
     }
@@ -256,7 +258,7 @@ final class HttpCacheProxyCacheableRequest
         factory.writer.doReset(accept, acceptRouteId, acceptInitialId, traceId);
 
         cleanupRequestIfNecessary();
-        resetRequestTimeoutIfNecessary();
+        cleanupRequestTimeoutIfNecessary();
     }
 
     private void schedulePreferWaitIfNoneMatchIfNecessary(
@@ -330,7 +332,7 @@ final class HttpCacheProxyCacheableRequest
         cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
         if (payloadWritten == -1)
         {
-            resetRequestTimeoutIfNecessary();
+            cleanupRequestTimeoutIfNecessary();
             sendHttpResponseHeaders(cacheEntry);
         }
         else
@@ -349,7 +351,7 @@ final class HttpCacheProxyCacheableRequest
                                      accept,
                                      acceptRouteId,
                                      acceptReplyId);
-        requestExpired = true;
+        responseClosing = true;
     }
 
     private void onResponseSignalCacheEntryAborted(
@@ -379,16 +381,7 @@ final class HttpCacheProxyCacheableRequest
             builder -> requestHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value())));
 
         connect = factory.writer.newHttpStream(requestGroup::newRequest, connectRouteId, connectInitialId,
-            factory.supplyTraceId.getAsLong(), mutator,
-            (t, b, i, l) ->
-            {
-                if (t == ResetFW.TYPE_ID)
-                {
-                    ResetFW reset = factory.resetRO.wrap(b, i, l);
-                    factory.writer.doReset(accept, acceptRouteId, acceptInitialId, reset.traceId());
-                    cleanupRequestIfNecessary();
-                }
-            });
+            factory.supplyTraceId.getAsLong(), mutator, this::onConnectMessage);
 
         factory.writer.doHttpRequest(connect,
                                      connectRouteId,
@@ -396,6 +389,26 @@ final class HttpCacheProxyCacheableRequest
                                      signal.traceId(),
                                      mutator);
         cleanupRequestSlotIfNecessary();
+    }
+
+    private void onConnectMessage(
+        int type,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        if (type == ResetFW.TYPE_ID)
+        {
+            ResetFW reset = factory.resetRO.wrap(buffer, index, length);
+            onConnectResponseReset(reset);
+        }
+    }
+
+    private void onConnectResponseReset(
+        ResetFW reset)
+    {
+        factory.writer.doReset(accept, acceptRouteId, acceptInitialId, reset.traceId());
+        cleanupRequestIfNecessary();
     }
 
     private void onResponseSignalCacheEntryNotModified(
@@ -406,14 +419,14 @@ final class HttpCacheProxyCacheableRequest
                                      accept,
                                      acceptRouteId,
                                      acceptReplyId);
-        resetRequestTimeoutIfNecessary();
-        requestExpired = true;
+        cleanupRequestTimeoutIfNecessary();
+        responseClosing = true;
     }
 
     private void onResponseWindow(
         WindowFW window)
     {
-        if (requestExpired)
+        if (responseClosing)
         {
             factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, factory.supplyTraceId.getAsLong());
             cleanupRequestIfNecessary();
@@ -599,7 +612,7 @@ final class HttpCacheProxyCacheableRequest
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
     }
 
-    private void resetRequestTimeoutIfNecessary()
+    private void cleanupRequestTimeoutIfNecessary()
     {
         if (preferWaitExpired != null)
         {

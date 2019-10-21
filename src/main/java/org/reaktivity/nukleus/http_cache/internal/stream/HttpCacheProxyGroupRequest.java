@@ -75,7 +75,6 @@ final class HttpCacheProxyGroupRequest
 
     private Future<?> retryRequest;
     private int attempts;
-
     private int state;
 
     HttpCacheProxyGroupRequest(
@@ -131,36 +130,42 @@ final class HttpCacheProxyGroupRequest
             if (responseFactory != null)
             {
                 MessageConsumer newResponse = responseFactory.apply(beginEx);
-                newStream = (t, b, i, l) ->
-                {
-                    writeBuffer.putBytes(0, b, i, l);
-                    switch (t)
-                    {
-                    case BeginFW.TYPE_ID:
-                    case DataFW.TYPE_ID:
-                        writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
-                        newResponse.accept(t, writeBuffer, 0, l);
-                        break;
-                    case EndFW.TYPE_ID:
-                    case AbortFW.TYPE_ID:
-                        writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
-                        newResponse.accept(t, writeBuffer, 0, l);
-                        factory.router.clearThrottle(replyId);
-                        break;
-                    case ResetFW.TYPE_ID:
-                    case WindowFW.TYPE_ID:
-                    case SignalFW.TYPE_ID:
-                        writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, initialId);
-                        newResponse.accept(t, writeBuffer, 0, l);
-                        break;
-                    default:
-                        break;
-                    }
-                };
+                newStream = onResponseMessage(newResponse);
             }
         }
 
         return newStream;
+    }
+
+    private MessageConsumer onResponseMessage(
+        MessageConsumer newResponse)
+    {
+        return (t, b, i, l) ->
+        {
+            writeBuffer.putBytes(0, b, i, l);
+            switch (t)
+            {
+            case BeginFW.TYPE_ID:
+            case DataFW.TYPE_ID:
+                writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
+                newResponse.accept(t, writeBuffer, 0, l);
+                break;
+            case EndFW.TYPE_ID:
+            case AbortFW.TYPE_ID:
+                writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
+                newResponse.accept(t, writeBuffer, 0, l);
+                factory.router.clearThrottle(replyId);
+                break;
+            case ResetFW.TYPE_ID:
+            case WindowFW.TYPE_ID:
+            case SignalFW.TYPE_ID:
+                writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, initialId);
+                newResponse.accept(t, writeBuffer, 0, l);
+                break;
+            default:
+                break;
+            }
+        };
     }
 
     void onRequestMessage(
