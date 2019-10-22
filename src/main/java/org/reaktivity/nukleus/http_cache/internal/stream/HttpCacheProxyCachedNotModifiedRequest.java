@@ -15,10 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
-
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -55,24 +51,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
-    void onResponseMessage(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case ResetFW.TYPE_ID:
-            factory.writer.doReset(acceptReply,
-                                   acceptRouteId,
-                                   acceptInitialId,
-                                   factory.supplyTraceId.getAsLong());
-            break;
-        }
-    }
-
-    void onRequestMessage(
+    void onAccept(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -96,6 +75,12 @@ final class HttpCacheProxyCachedNotModifiedRequest
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
             onAbort(abort);
             break;
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onReset(reset);
+            break;
+        default:
+            break;
         }
     }
 
@@ -105,6 +90,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final long traceId = begin.traceId();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -113,28 +99,16 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
-                                begin.traceId(),
+                                traceId,
                                 0L,
                                 initialWindow,
                                 0);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(requestHeaders));
-        }
 
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
                              factory.supplyTraceId.getAsLong(),
                              requestHeaders);
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                              currentTimeMillis(), acceptReplyId, "304");
-        }
-
     }
 
     private void onData(
@@ -155,7 +129,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
-                                 factory.supplyTraceId.getAsLong());
+                                 end.traceId());
     }
 
     private void onAbort(
@@ -164,6 +138,15 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
-                               factory.supplyTraceId.getAsLong());
+                               abort.traceId());
+    }
+
+    private void onReset(
+        ResetFW reset)
+    {
+        factory.writer.doReset(acceptReply,
+                               acceptRouteId,
+                               acceptInitialId,
+                               reset.traceId());
     }
 }

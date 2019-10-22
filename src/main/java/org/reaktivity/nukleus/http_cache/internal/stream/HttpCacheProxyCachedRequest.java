@@ -16,13 +16,9 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.lang.Math.min;
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_READY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_ABORTED_SIGNAL;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -36,7 +32,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
@@ -75,7 +70,7 @@ final class HttpCacheProxyCachedRequest
         this.initialWindow = factory.responseBufferPool.slotCapacity();
     }
 
-    void onRequestMessage(
+    void onAccept(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -99,17 +94,6 @@ final class HttpCacheProxyCachedRequest
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
             onAbort(abort);
             break;
-        }
-    }
-
-    void onResponseMessage(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
         case WindowFW.TYPE_ID:
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
             onWindow(window);
@@ -122,26 +106,20 @@ final class HttpCacheProxyCachedRequest
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onReset(reset);
             break;
+        default:
+            break;
         }
     }
+
 
     private void onBegin(
         BeginFW begin)
     {
-        final OctetsFW extension = begin.extension();
-        final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-
         cacheEntry = factory.defaultCache.get(requestHash);
         cacheEntry.setSubscribers(1);
         // count all requests
         factory.counters.requests.getAsLong();
         factory.counters.requestsCacheable.getAsLong();
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginFW.headers()));
-        }
 
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
@@ -154,7 +132,7 @@ final class HttpCacheProxyCachedRequest
         factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
                                 factory.supplyTraceId.getAsLong(),
-                                CACHE_ENTRY_SIGNAL);
+                                CACHE_ENTRY_READY_SIGNAL);
     }
 
     private void onData(
@@ -181,26 +159,35 @@ final class HttpCacheProxyCachedRequest
         factory.writer.doSignal(acceptRouteId,
                                 acceptReplyId,
                                 factory.supplyTraceId.getAsLong(),
-                                CACHE_ENTRY_ABORTED_SIGNAL);
+                                REQUEST_ABORTED_SIGNAL);
+
     }
 
     private void onSignal(
         SignalFW signal)
     {
-        final long signalId = signal.signalId();
+        final int signalId = (int) signal.signalId();
 
-        if (signalId == CACHE_ENTRY_SIGNAL)
+        switch (signalId)
         {
-            handleCacheUpdateSignal(signal);
+        case CACHE_ENTRY_READY_SIGNAL:
+            onServeCacheEntrySignal(signal);
+            break;
+        case REQUEST_ABORTED_SIGNAL:
+            onRequestAbortedSignal(signal);
+            break;
+        default:
+            break;
         }
-        else if (signalId == CACHE_ENTRY_ABORTED_SIGNAL)
-        {
-            factory.writer.doAbort(acceptReply,
-                                   acceptRouteId,
-                                   acceptReplyId,
-                                   signal.traceId());
-            cacheEntry.setSubscribers(-1);
-        }
+    }
+
+    private void onRequestAbortedSignal(SignalFW signal)
+    {
+        factory.writer.doAbort(acceptReply,
+                               acceptRouteId,
+                               acceptReplyId,
+                               signal.traceId());
+        cacheEntry.setSubscribers(-1);
     }
 
     private void onWindow(
@@ -230,14 +217,10 @@ final class HttpCacheProxyCachedRequest
         cacheEntry.setSubscribers(-1);
     }
 
-    private void handleCacheUpdateSignal(
+    private void onServeCacheEntrySignal(
         SignalFW signal)
     {
         cacheEntry = factory.defaultCache.get(requestHash);
-        if (cacheEntry == null)
-        {
-            return;
-        }
         sendHttpResponseHeaders(cacheEntry, signal.signalId());
     }
 
@@ -247,18 +230,6 @@ final class HttpCacheProxyCachedRequest
     {
         ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n", currentTimeMillis(), acceptReplyId,
-                              getHeader(responseHeaders, ":status"));
-        }
-
-        boolean isStale = false;
-        if (signalId == CACHE_ENTRY_SIGNAL)
-        {
-            isStale = cacheEntry.isStale();
-        }
-
         factory.writer.doHttpResponseWithUpdatedHeaders(
             acceptReply,
             acceptRouteId,
@@ -266,9 +237,9 @@ final class HttpCacheProxyCachedRequest
             responseHeaders,
             cacheEntry.getRequestHeaders(),
             cacheEntry.etag(),
-            isStale,
-
+            cacheEntry.isStale(),
             factory.supplyTraceId.getAsLong());
+
 
         payloadWritten = 0;
 
@@ -326,7 +297,7 @@ final class HttpCacheProxyCachedRequest
         return budget;
     }
 
-    public void buildResponsePayload(
+    private void buildResponsePayload(
         int index,
         int length,
         OctetsFW.Builder p,
@@ -337,7 +308,7 @@ final class HttpCacheProxyCachedRequest
         buildResponsePayload(index, length, p, bp, startSlot);
     }
 
-    public void buildResponsePayload(
+    private void buildResponsePayload(
         int index,
         int length,
         OctetsFW.Builder builder,
