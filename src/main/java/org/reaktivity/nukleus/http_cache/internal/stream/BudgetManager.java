@@ -210,7 +210,7 @@ public class BudgetManager
                 int index = groupBudget.size();
                 streamBudget = new StreamBudget(streamId, streamKind, budgetAvailable, index);
                 groupBudget.add(streamId, streamBudget);
-                assert credit == groupBudget.initialBudget;
+                assert credit <= groupBudget.initialBudget;
             }
             else
             {
