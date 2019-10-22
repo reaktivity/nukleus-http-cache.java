@@ -120,7 +120,7 @@ final class HttpCacheProxyCacheableRequest
 
         if (factory.defaultCache.matchCacheableResponse(requestGroup.getRequestHash(),
                                                         getHeader(responseHeaders, ETAG),
-                                                       ifNoneMatch != null))
+                                                        ifNoneMatch != null))
         {
             newStream = new HttpCacheProxyNotModifiedResponse(factory,
                                                              requestGroup.getRequestHash(),
