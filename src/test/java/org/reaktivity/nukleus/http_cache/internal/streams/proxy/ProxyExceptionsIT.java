@@ -95,6 +95,18 @@ public class ProxyExceptionsIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/connect.sent.reset.on.cacheable.request/accept/client",
+        "${streams}/connect.sent.reset.on.cacheable.request/connect/server",
+    })
+    public void shouldConnectSentResetOnCacheableRequest() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/connect.sent.reset/accept/client",
         "${streams}/connect.sent.reset/connect/server",
     })

@@ -60,6 +60,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
+import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class Writer
 {
@@ -87,6 +88,30 @@ public class Writer
         this.router = router;
         this.writeBuffer = writeBuffer;
         this.httpTypeId = supplyTypeId.applyAsInt("http");
+    }
+
+    public int writerCapacity()
+    {
+        return writeBuffer.capacity();
+    }
+
+    public MessageConsumer newHttpStream(
+        StreamFactory factory,
+        long routeId,
+        long streamId,
+        long traceId,
+        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
+        MessageConsumer source)
+    {
+        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                                     .routeId(routeId)
+                                     .streamId(streamId)
+                                     .traceId(traceId)
+                                     .affinity(0L)
+                                     .extension(e -> e.set(visitHttpBeginEx(mutator)))
+                                     .build();
+
+        return factory.newStream(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof(), source);
     }
 
     public void doHttpRequest(
@@ -631,6 +656,7 @@ public class Writer
             }
 
             builder.item(h -> h.name(STATUS).value(HttpStatus.NOT_MODIFIED_304));
+            builder.item(h -> h.name(ETAG).value(getHeader(requestHeaders, IF_NONE_MATCH)));
         });
     }
 

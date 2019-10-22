@@ -15,10 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
-
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -91,16 +87,21 @@ final class HttpCacheProxyNonCacheableRequest
         int index,
         int length)
     {
-        switch (msgTypeId)
+        if (msgTypeId == ResetFW.TYPE_ID)
         {
-        case ResetFW.TYPE_ID:
-            factory.writer.doReset(acceptReply,
-                                   acceptRouteId,
-                                   acceptStreamId,
-                                   factory.supplyTraceId.getAsLong());
-            factory.correlations.remove(connectReplyId);
-            break;
+            ResetFW reset = factory.resetRO.wrap(buffer, index, length);
+            onResponseReset(reset);
         }
+    }
+
+    private void onResponseReset(
+        ResetFW reset)
+    {
+        factory.writer.doReset(acceptReply,
+                               acceptRouteId,
+                               acceptStreamId,
+                               reset.traceId());
+        factory.correlations.remove(connectReplyId);
     }
 
     void onRequestMessage(
@@ -150,20 +151,6 @@ final class HttpCacheProxyNonCacheableRequest
 
         // count all requests
         factory.counters.requests.getAsLong();
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [received request]\n",
-                    currentTimeMillis(), acceptReplyId, getRequestURL(httpBeginEx.headers()));
-        }
-
-        long connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [sent proxy request]\n",
-                              currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
-        }
 
         factory.writer.doHttpRequest(
             connectInitial,

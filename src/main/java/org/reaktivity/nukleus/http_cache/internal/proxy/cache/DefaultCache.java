@@ -149,7 +149,6 @@ public class DefaultCache
 
     }
 
-
     public void purge(
         int requestHash)
     {
@@ -161,8 +160,7 @@ public class DefaultCache
         }
     }
 
-
-    public boolean isUpdatedByEtagToRetry(
+    public boolean checkTrailerToRetry(
         String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
@@ -178,14 +176,14 @@ public class DefaultCache
 
             if (ifNoneMatch != null && newEtag != null)
             {
-                return !(status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag));
+                return status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag);
             }
         }
 
-        return true;
+        return false;
     }
 
-    public boolean isUpdatedByResponseHeadersToRetry(
+    public boolean checkToRetry(
         ArrayFW<HttpHeaderFW> requestHeaders,
         ArrayFW<HttpHeaderFW> responseHeaders,
         String ifNoneMatch,
@@ -208,20 +206,21 @@ public class DefaultCache
                 if (etagMatches)
                 {
                     DefaultCacheEntry cacheEntry = cachedEntries.get(requestHash);
-                    cacheEntry.updateResponseHeader(status, responseHeaders);
+                    if (cacheEntry != null)
+                    {
+                        cacheEntry.updateResponseHeader(status, responseHeaders);
+                    }
                 }
             }
 
-            boolean notModified = status.equals(NOT_MODIFIED_304) || etagMatches;
-
-            return !notModified;
+            return status.equals(NOT_MODIFIED_304) || etagMatches;
         }
 
-        return true;
+        return false;
     }
 
     public void send304(
-        DefaultCacheEntry entry,
+        String etag,
         String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
@@ -235,13 +234,12 @@ public class DefaultCache
 
         if (preferWait != null)
         {
-            writer.doHttpResponse(
-                acceptReply,
+            writer.doHttpResponse(acceptReply,
                 acceptRouteId,
                 acceptReplyId,
                 supplyTraceId.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                      .item(h -> h.name(ETAG).value(entry.etag()))
+                      .item(h -> h.name(ETAG).value(etag))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG)));
@@ -254,7 +252,7 @@ public class DefaultCache
                 acceptReplyId,
                 supplyTraceId.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                      .item(h -> h.name(ETAG).value(entry.etag())));
+                      .item(h -> h.name(ETAG).value(etag)));
         }
         // count all responses
         counters.responses.getAsLong();

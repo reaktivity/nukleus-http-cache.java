@@ -77,7 +77,6 @@ public class Rfc7240ProxyIT
         k3po.finish();
     }
 
-
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -134,7 +133,6 @@ public class Rfc7240ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
     }
 
@@ -178,4 +176,16 @@ public class Rfc7240ProxyIT
     {
         k3po.finish();
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/receive.503.on.group.request.reset/accept/client",
+        "${streams}/receive.503.on.group.request.reset/connect/server",
+    })
+    public void shouldReceive503OnGroupRequestReset() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

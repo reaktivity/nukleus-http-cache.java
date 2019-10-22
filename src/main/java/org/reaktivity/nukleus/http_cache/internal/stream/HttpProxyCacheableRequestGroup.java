@@ -16,23 +16,41 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.INITIATE_REQUEST_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_GROUP_LEADER_UPDATED_SIGNAL;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
+import org.agrona.DirectBuffer;
 import org.agrona.collections.Long2LongHashMap;
+import org.agrona.collections.LongHashSet;
+import org.agrona.collections.MutableInteger;
+import org.agrona.collections.MutableLong;
+import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
 final class HttpProxyCacheableRequestGroup
 {
-    private final Long2LongHashMap routeIdsByReplyId;
-    private final int requestHash;
+    private final Map<String, Long2LongHashMap> queuedRequestsByEtag;
+    private final LongHashSet responsesInFlight;
     private final Writer writer;
     private final HttpCacheProxyFactory factory;
     private final Consumer<Integer> cleaner;
+    private final MutableLong activeRouteId;
+    private final MutableLong activeReplyId;
+    private final int requestHash;
+
+    private MessageConsumer connect;
+    private String etag;
     private String recentAuthorizationToken;
+    private long acceptReplyId;
+    private long connectRouteId;
+    private long connectReplyId;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
@@ -44,12 +62,25 @@ final class HttpProxyCacheableRequestGroup
         this.writer = writer;
         this.factory = factory;
         this.cleaner = cleaner;
-        this.routeIdsByReplyId = new Long2LongHashMap(-1L);
+        this.queuedRequestsByEtag = new HashMap<>();
+        this.responsesInFlight = new LongHashSet();
+        this.activeRouteId = new MutableLong();
+        this.activeReplyId = new MutableLong();
     }
 
     String getRecentAuthorizationToken()
     {
         return recentAuthorizationToken;
+    }
+
+    String getEtag()
+    {
+        return etag;
+    }
+
+    int getRequestHash()
+    {
+        return requestHash;
     }
 
     void setRecentAuthorizationToken(
@@ -58,60 +89,174 @@ final class HttpProxyCacheableRequestGroup
         this.recentAuthorizationToken = recentAuthorizationToken;
     }
 
-    int getNumberOfRequests()
+    int getQueuedRequests()
     {
-        return routeIdsByReplyId.size();
+        MutableInteger totalRequests = new MutableInteger();
+        queuedRequestsByEtag.forEach((key, routeIdsByReplyId) -> totalRequests.value += routeIdsByReplyId.size());
+        return totalRequests.value;
     }
 
-    boolean queue(
+    void enqueue(
+        String etag,
         long acceptRouteId,
         long acceptReplyId)
     {
-        routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
-        return routeIdsByReplyId.size() > 1;
-    }
+        final boolean requestQueueIsEmpty = queuedRequestsByEtag.isEmpty();
+        final Long2LongHashMap routeIdsByReplyId = queuedRequestsByEtag.computeIfAbsent(etag, this::createQueue);
 
-    void unqueue(
-        long acceptReplyId)
-    {
-        routeIdsByReplyId.remove(acceptReplyId);
-        if (routeIdsByReplyId.isEmpty())
+        routeIdsByReplyId.put(acceptReplyId, acceptRouteId);
+
+        if (requestQueueIsEmpty)
         {
-            cleaner.accept(requestHash);
+            initiateRequest(etag, acceptRouteId, acceptReplyId);
+        }
+        else if (this.etag != null &&
+                !this.etag.equals(etag))
+        {
+            resetInFlightRequest();
+            initiateRequest(null, acceptRouteId, acceptReplyId);
         }
     }
 
-    void onNonCacheableResponse(
+    void dequeue(
+        String etag,
         long acceptReplyId)
     {
-        routeIdsByReplyId.remove(acceptReplyId);
-        serveNextRequestIfPossible();
+        final Long2LongHashMap routeIdsByReplyId = queuedRequestsByEtag.get(etag);
+        assert routeIdsByReplyId != null;
+
+        final long acceptRouteId = routeIdsByReplyId.remove(acceptReplyId);
+        assert acceptRouteId != routeIdsByReplyId.missingValue();
+        responsesInFlight.remove(acceptReplyId);
+
+        if (routeIdsByReplyId.isEmpty())
+        {
+            queuedRequestsByEtag.remove(etag);
+
+            if (queuedRequestsByEtag.isEmpty())
+            {
+                cleaner.accept(requestHash);
+            }
+        }
+
+        if (!queuedRequestsByEtag.isEmpty())
+        {
+            activeRouteId.value = 0L;
+            activeReplyId.value = 0L;
+
+            if (!routeIdsByReplyId.isEmpty())
+            {
+                routeIdsByReplyId.forEach((replyId, routeId) ->
+                {
+                    if (!responsesInFlight.contains(replyId) &&
+                        this.acceptReplyId == acceptReplyId)
+                    {
+                        activeRouteId.value = routeId;
+                        activeReplyId.value = replyId;
+                    }
+                });
+            }
+            else
+            {
+                queuedRequestsByEtag.forEach((key, value) ->
+                {
+                    value.forEach((replyId, routeId) ->
+                    {
+                        if (!responsesInFlight.contains(replyId) &&
+                            this.acceptReplyId == acceptReplyId)
+                        {
+                            activeRouteId.value = routeId;
+                            activeReplyId.value = replyId;
+                        }
+                    });
+                });
+            }
+
+            if (activeRouteId.value != 0L)
+            {
+                resetInFlightRequest();
+                writer.doSignal(activeRouteId.value,
+                                activeReplyId.value,
+                                factory.supplyTraceId.getAsLong(),
+                                REQUEST_GROUP_LEADER_UPDATED_SIGNAL);
+            }
+        }
     }
 
-    void onCacheableResponseUpdated()
+    void onCacheableResponseUpdated(
+        String etag)
     {
-        routeIdsByReplyId.forEach(this::doSignalCacheEntryUpdated);
+        queuedRequestsByEtag.forEach((key, routeIdsByReplyId) ->
+        {
+            if (key != null && key.equals(etag) ||
+                (key == null && etag == null) && queuedRequestsByEtag.size() > 1)
+            {
+                routeIdsByReplyId.forEach(this::doSignalCacheEntryNotModified);
+            }
+            else
+            {
+                routeIdsByReplyId.forEach(this::doSignalCacheEntryUpdated);
+            }
+        });
     }
 
     void onCacheableResponseAborted()
     {
-        this.routeIdsByReplyId.forEach(this::doSignalCacheEntryAborted);
+        queuedRequestsByEtag.forEach((key, routeIdsByReplyId) ->
+        {
+            routeIdsByReplyId.forEach(this::doSignalCacheEntryAborted);
+        });
+    }
+
+
+    MessageConsumer newRequest(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length,
+        MessageConsumer sender)
+    {
+        BeginFW begin = factory.beginRO.wrap(buffer, index, length);
+        connectRouteId = begin.routeId();
+        connectReplyId = begin.streamId();
+        connect = new HttpCacheProxyGroupRequest(factory, this, sender)::onRequestMessage;
+        return connect;
+    }
+
+    private void initiateRequest(
+        String etag,
+        long acceptRouteId,
+        long acceptReplyId)
+    {
+        this.etag = etag;
+        this.acceptReplyId = acceptReplyId;
+        writer.doSignal(acceptRouteId,
+                        acceptReplyId,
+                        factory.supplyTraceId.getAsLong(),
+                        REQUEST_GROUP_LEADER_UPDATED_SIGNAL);
     }
 
     private void doSignalCacheEntryAborted(
         long acceptReplyId,
         long acceptRouteId)
     {
+        gotResponse(acceptReplyId);
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
                         factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_ABORTED_SIGNAL);
     }
 
+    private void gotResponse(long acceptReplyId)
+    {
+        responsesInFlight.add(acceptReplyId);
+    }
+
     private void doSignalCacheEntryUpdated(
         long acceptReplyId,
         long acceptRouteId)
     {
+        gotResponse(acceptReplyId);
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
                         factory.supplyTraceId.getAsLong(),
@@ -119,29 +264,32 @@ final class HttpProxyCacheableRequestGroup
 
     }
 
-    private void sendSignalToSubscriber(
+    private void doSignalCacheEntryNotModified(
         long acceptReplyId,
-        long acceptRouteId,
-        int signalId)
+        long acceptRouteId)
     {
-        writer.doSignal(acceptRouteId,
-                        acceptReplyId,
-                        factory.supplyTraceId.getAsLong(),
-                        signalId);
+        if (!responsesInFlight.contains(acceptReplyId))
+        {
+            responsesInFlight.add(acceptReplyId);
+            writer.doSignal(acceptRouteId,
+                            acceptReplyId,
+                            factory.supplyTraceId.getAsLong(),
+                            CACHE_ENTRY_NOT_MODIFIED_SIGNAL);
+        }
     }
 
-    private void serveNextRequestIfPossible()
+    private Long2LongHashMap createQueue(
+        String etag)
     {
-        if (routeIdsByReplyId.isEmpty())
-        {
-            cleaner.accept(requestHash);
-        }
-        else
-        {
-            Map.Entry<Long, Long> stream = routeIdsByReplyId.entrySet().iterator().next();
-            sendSignalToSubscriber(stream.getKey(),
-                                   stream.getValue(),
-                                   INITIATE_REQUEST_SIGNAL);
-        }
+        Long2LongHashMap queue =  queuedRequestsByEtag.get(etag);
+        return Objects.requireNonNullElseGet(queue, () -> new Long2LongHashMap(-1));
+    }
+
+    private void resetInFlightRequest()
+    {
+        factory.writer.doReset(connect,
+            connectRouteId,
+            connectReplyId,
+                               factory.supplyTraceId.getAsLong());
     }
 }
