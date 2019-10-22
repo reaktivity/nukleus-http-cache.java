@@ -25,6 +25,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -74,6 +75,7 @@ final class HttpCacheProxyGroupRequest
     private long connectInitialId;
 
     private Future<?> retryRequest;
+    private String requestURL;
     private int attempts;
     private int state;
 
@@ -117,6 +119,7 @@ final class HttpCacheProxyGroupRequest
             final HttpCacheProxyCacheableResponse cacheableResponse =
                 new HttpCacheProxyCacheableResponse(factory,
                                                     requestGroup,
+                                                    requestURL,
                                                     requestSlot,
                                                     connectInitial,
                                                     connectReplyId,
@@ -236,6 +239,7 @@ final class HttpCacheProxyGroupRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        requestURL = getRequestURL(requestHeaders);
         routeId = begin.routeId();
         initialId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(initialId);

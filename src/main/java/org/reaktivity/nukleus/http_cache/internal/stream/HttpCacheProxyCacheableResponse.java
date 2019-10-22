@@ -61,13 +61,9 @@ final class HttpCacheProxyCacheableResponse
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
-<<<<<<< HEAD
-        int requestHash,
         String requestURL,
-=======
->>>>>>> cb82714e1d2831ed9f4dd830a5145b2822faabf1
         MutableInteger requestSlot,
-        MessageConsumer connectReply,
+        MessageConsumer connect,
         long connectReplyId,
         long connectRouteId,
         Function<Long, Boolean> retryRequest)
@@ -77,7 +73,7 @@ final class HttpCacheProxyCacheableResponse
         this.requestURL = requestURL;
         this.requestSlot = requestSlot;
         this.requestHash = requestGroup.getRequestHash();
-        this.connectReply = connectReply;
+        this.connectReply = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.initialWindow = factory.responseBufferPool.slotCapacity();
@@ -123,24 +119,15 @@ final class HttpCacheProxyCacheableResponse
     private void onBegin(
         BeginFW begin)
     {
-        final long connectReplyId = begin.streamId();
         long traceId = begin.traceId();
 
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-
-
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-<<<<<<< HEAD
         cacheEntry = factory.defaultCache.supply(requestHash, requestURL);
-        cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
-        String etag = getHeader(responseHeaders, ETAG);
-=======
-        cacheEntry = factory.defaultCache.supply(requestHash);
         cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
         etag = getHeader(responseHeaders, ETAG);
->>>>>>> cb82714e1d2831ed9f4dd830a5145b2822faabf1
         isResponseBuffering = etag == null;
 
         if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
