@@ -195,18 +195,21 @@ public class HttpCacheProxyFactory implements StreamFactory
 
             if (requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
             {
-                newStream = new EmulatedProxyAcceptStream(this, acceptReply, acceptRouteId, acceptInitialId,
-                    connectRouteId)::handleStream;
+                newStream = new EmulatedProxyAcceptStream(this,
+                                                          acceptReply,
+                                                          acceptRouteId,
+                                                          acceptInitialId,
+                                                          connectRouteId)::handleStream;
             }
             else
             {
                 newStream = newNativeInitialStream(requestHeaders,
-                    acceptReply,
-                    authorization,
-                    connectRouteId,
-                    acceptInitialId,
-                    acceptRouteId,
-                    begin.traceId());
+                                                   acceptReply,
+                                                   authorization,
+                                                   connectRouteId,
+                                                   acceptInitialId,
+                                                   acceptRouteId,
+                                                   begin.traceId());
             }
         }
 

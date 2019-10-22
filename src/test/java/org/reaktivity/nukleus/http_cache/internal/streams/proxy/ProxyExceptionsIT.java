@@ -83,7 +83,7 @@ public class ProxyExceptionsIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/connect.reply.sent.abort/accept/client",
+         "${streams}/connect.reply.sent.abort/accept/client",
         "${streams}/connect.reply.sent.abort/connect/server",
     })
     public void shouldConnectReplySentAbort() throws Exception

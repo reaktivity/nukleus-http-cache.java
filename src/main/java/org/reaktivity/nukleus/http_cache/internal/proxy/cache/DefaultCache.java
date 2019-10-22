@@ -124,21 +124,17 @@ public class DefaultCache
         return cachedEntriesByRequestHash.get(requestHash);
     }
 
-    public boolean hasCacheEntry(
-        int requestHash)
-    {
-        return cachedEntriesByRequestHash.containsKey(requestHash);
-    }
-
     public DefaultCacheEntry supply(
         int requestHash,
         String requestURL)
     {
         final int requestHashWithoutQuery = generateRequestHashWithoutQuery(requestURL);
-        Int2ObjectHashMap<DefaultCacheEntry> collection = cachedEntriesByRequestHashWithoutQuery
-            .computeIfAbsent(requestHashWithoutQuery, l -> new Int2ObjectHashMap<>());
+        Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHashFromWithoutQueryList =
+            cachedEntriesByRequestHashWithoutQuery.computeIfAbsent(requestHashWithoutQuery, l -> new Int2ObjectHashMap<>());
+
         DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, requestHashWithoutQuery);
-        collection.put(requestHash, cacheEntry);
+        cachedEntriesByRequestHashFromWithoutQueryList.put(requestHash, cacheEntry);
+        cachedEntriesByRequestHash.put(requestHash, cacheEntry);
         return cacheEntry;
     }
 
