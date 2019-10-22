@@ -15,9 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -54,43 +52,36 @@ final class HttpCacheProxyCacheableResponse
     private final Function<Long, Boolean> retryRequest;
     private final HttpProxyCacheableRequestGroup requestGroup;
 
-    private final MessageConsumer acceptReply;
-    private final long acceptRouteId;
-    private final long acceptReplyId;
-
     private MessageConsumer connectReply;
     private long connectRouteId;
     private long connectReplyId;
     private DefaultCacheEntry cacheEntry;
+    private String etag;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
+<<<<<<< HEAD
         int requestHash,
         String requestURL,
+=======
+>>>>>>> cb82714e1d2831ed9f4dd830a5145b2822faabf1
         MutableInteger requestSlot,
-        MessageConsumer acceptReply,
-        long acceptRouteId,
-        long acceptReplyId,
         MessageConsumer connectReply,
         long connectReplyId,
         long connectRouteId,
-        String ifNoneMatch,
         Function<Long, Boolean> retryRequest)
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
         this.requestURL = requestURL;
         this.requestSlot = requestSlot;
-        this.requestHash = requestHash;
-        this.acceptReply = acceptReply;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptReplyId = acceptReplyId;
+        this.requestHash = requestGroup.getRequestHash();
         this.connectReply = connectReply;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.initialWindow = factory.responseBufferPool.slotCapacity();
-        this.ifNoneMatch = ifNoneMatch;
+        this.ifNoneMatch = requestGroup.getEtag();
         this.retryRequest = retryRequest;
         assert requestSlot.value != NO_SLOT;
     }
@@ -138,17 +129,18 @@ final class HttpCacheProxyCacheableResponse
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
 
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
-                    getHeader(httpBeginFW.headers(), ":status"));
-        }
 
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
+<<<<<<< HEAD
         cacheEntry = factory.defaultCache.supply(requestHash, requestURL);
         cacheEntry.setSubscribers(requestGroup.getNumberOfRequests());
         String etag = getHeader(responseHeaders, ETAG);
+=======
+        cacheEntry = factory.defaultCache.supply(requestHash);
+        cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
+        etag = getHeader(responseHeaders, ETAG);
+>>>>>>> cb82714e1d2831ed9f4dd830a5145b2822faabf1
         isResponseBuffering = etag == null;
 
         if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
@@ -161,7 +153,7 @@ final class HttpCacheProxyCacheableResponse
         cacheEntry.setEtag(etag);
         if (!isResponseBuffering)
         {
-            requestGroup.onCacheableResponseUpdated();
+            requestGroup.onCacheableResponseUpdated(etag);
         }
 
         sendWindow(initialWindow, traceId);
@@ -171,50 +163,37 @@ final class HttpCacheProxyCacheableResponse
         DataFW data)
     {
         sendWindow(data.reserved(), data.traceId());
-        assert requestSlot.value != NO_SLOT;
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
         if (!isResponseBuffering)
         {
-            requestGroup.onCacheableResponseUpdated();
+            requestGroup.onCacheableResponseUpdated(etag);
         }
     }
 
     private void onEnd(
         EndFW end)
     {
-        assert requestSlot.value != NO_SLOT;
         checkEtag(end, cacheEntry);
         cacheEntry.setResponseCompleted(true);
 
-        if (!factory.defaultCache.isUpdatedByEtagToRetry(ifNoneMatch,
-                                                         cacheEntry))
+        if (isResponseBuffering &&
+            factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
+                                                     cacheEntry))
         {
             long retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
             retryRequest.apply(retryAfter);
         }
         else
         {
-            requestGroup.onCacheableResponseUpdated();
+            requestGroup.onCacheableResponseUpdated(etag);
         }
     }
 
     private void onAbort(AbortFW abort)
     {
         assert requestSlot.value != NO_SLOT;
-        if (isResponseBuffering)
-        {
-            factory.counters.responses.getAsLong();
-            factory.writer.do503AndAbort(acceptReply,
-                                         acceptRouteId,
-                                         acceptReplyId,
-                                         abort.traceId());
-            requestGroup.onNonCacheableResponse(acceptReplyId);
-        }
-        else
-        {
-            requestGroup.onCacheableResponseAborted();
-        }
+        requestGroup.onCacheableResponseAborted();
 
         purgeRequest();
         factory.defaultCache.purge(requestHash);
@@ -232,8 +211,8 @@ final class HttpCacheProxyCacheableResponse
             HttpHeaderFW etag = trailers.matchFirst(h -> ETAG.equals(h.name().asString()));
             if (etag != null)
             {
-                cacheEntry.setEtag(etag.value().asString());
-                isResponseBuffering = false;
+                this.etag = etag.value().asString();
+                cacheEntry.setEtag(this.etag);
             }
         }
     }

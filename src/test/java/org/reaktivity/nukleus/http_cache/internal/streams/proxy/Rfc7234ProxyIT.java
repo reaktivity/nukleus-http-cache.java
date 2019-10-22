@@ -139,6 +139,19 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/cache.request.and.304/accept/client",
+        "${streams}/cache.request.and.304/connect/server",
+    })
+    public void shouldCacheRequestWith304() throws Exception
+    {
+        k3po.finish();
+        counters.assertRequests(2);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/cache.max-age/accept/client",
         "${streams}/cache.max-age/connect/server",
     })

@@ -322,8 +322,9 @@ public class Cache
 
         String ifNoneMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
         assert ifNoneMatch != null;
-        if (uncommittedRequest != null && ifNoneMatch.contains(uncommittedRequest.etag()) &&
-                doesNotVary(requestHeaders, uncommittedRequest.request))
+        if ((uncommittedRequest != null && uncommittedRequest.etag() != null) &&
+            ifNoneMatch.contains(uncommittedRequest.etag()) &&
+            doesNotVary(requestHeaders, uncommittedRequest.request))
         {
             uncommittedRequest.subscribe(preferWaitRequest);
         }

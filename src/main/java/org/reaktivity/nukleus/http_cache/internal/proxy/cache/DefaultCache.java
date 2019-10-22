@@ -176,7 +176,6 @@ public class DefaultCache
                 cacheEntry.isValid();
     }
 
-
     public void purge(
         int requestHash)
     {
@@ -241,7 +240,8 @@ public class DefaultCache
         }
     }
 
-    public boolean isUpdatedByEtagToRetry(
+
+    public boolean checkTrailerToRetry(
         String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
@@ -257,11 +257,11 @@ public class DefaultCache
 
             if (ifNoneMatch != null && newEtag != null)
             {
-                return !(status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag));
+                return status.equals(HttpStatus.OK_200) && isMatchByEtag(requestHeaders, newEtag);
             }
         }
 
-        return true;
+        return false;
     }
 
     public boolean checkToRetry(
@@ -301,7 +301,7 @@ public class DefaultCache
     }
 
     public void send304(
-        DefaultCacheEntry entry,
+        String etag,
         String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
@@ -315,13 +315,12 @@ public class DefaultCache
 
         if (preferWait != null)
         {
-            writer.doHttpResponse(
-                acceptReply,
+            writer.doHttpResponse(acceptReply,
                 acceptRouteId,
                 acceptReplyId,
                 supplyTraceId.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                      .item(h -> h.name(ETAG).value(entry.etag()))
+                      .item(h -> h.name(ETAG).value(etag))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG)));
@@ -334,7 +333,7 @@ public class DefaultCache
                 acceptReplyId,
                 supplyTraceId.getAsLong(),
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
-                      .item(h -> h.name(ETAG).value(entry.etag())));
+                      .item(h -> h.name(ETAG).value(etag)));
         }
         // count all responses
         counters.responses.getAsLong();
