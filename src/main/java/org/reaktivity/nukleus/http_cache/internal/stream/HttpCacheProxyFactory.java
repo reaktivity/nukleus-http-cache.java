@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.nio.ByteBuffer.allocateDirect;
-import static java.nio.ByteOrder.nativeOrder;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -140,7 +138,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.response.acquires"),
                 counters.supplyCounter.apply("http-cache.response.releases"));
-        this.writeBuffer = new UnsafeBuffer(allocateDirect(writeBuffer.capacity()).order(nativeOrder()));
+        this.writeBuffer = new UnsafeBuffer(new byte[writeBuffer.capacity()]);
 
         this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
