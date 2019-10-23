@@ -31,6 +31,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -91,6 +92,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final ToIntFunction<String> supplyTypeId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
+    final MutableDirectBuffer writeBuffer;
     final Long2ObjectHashMap<Request> requestCorrelations;
 
     final int preferWaitMaximum;
@@ -136,6 +138,8 @@ public class HttpCacheProxyFactory implements StreamFactory
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.response.acquires"),
                 counters.supplyCounter.apply("http-cache.response.releases"));
+        this.writeBuffer = new UnsafeBuffer(new byte[writeBuffer.capacity()]);
+
         this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
         this.emulatedCache = emulatedCache;
