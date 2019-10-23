@@ -60,8 +60,8 @@ public class DefaultCache
 {
     private static final Pattern LINK_URL_PATTERN =
         Pattern.compile(
-            "(<(?<scheme>https?):/)?/?(?<hostname>[^:/\\s]+)(?<port>:(\\d+))?(?<path>[\\w\\-.]*[^#?\\s]+).*>;" +
-            ".*(rel=\"(collection|items)\")");
+            "((<(?<scheme>https?):/)?/?(?<hostname>[^:/\\s]+)(?<port>:(\\d+))?(?<path>[\\w\\-.]*[^#?\\s]+).*>;" +
+            ".*(rel=\"(collection|items)\"))");
 
     final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
@@ -212,26 +212,32 @@ public class DefaultCache
         String requestURL,
         HttpHeaderFW header)
     {
-        if (LINK.equals(header.name().asString()))
+        final String linkName = header.name().asString();
+        final String linkValue = header.value().asString();
+        if (LINK.equals(linkName))
         {
-            Matcher matcher = LINK_URL_PATTERN.matcher(header.value().asString());
-            if (matcher.matches())
+            for (String linkTarget: linkValue.split("\\s*,\\s*"))
             {
-                final URI requestURI = URI.create(requestURL);
-                final String linkTargetScheme = matcher.group("scheme");
-                final String linkTargetHostname = matcher.group("hostname");
+                Matcher matcher = LINK_URL_PATTERN.matcher(linkTarget);
+                if (matcher.matches())
+                {
+                    final URI requestURI = URI.create(requestURL);
+                    final String linkTargetScheme = matcher.group("scheme");
+                    final String linkTargetHostname = matcher.group("hostname");
 
-                if (!requestURI.getScheme().equals(linkTargetScheme) ||
-                    !requestURI.getHost().equals(linkTargetHostname))
-                {
-                    return;
+                    if ((linkTargetScheme != null && linkTargetHostname != null) &&
+                        (!requestURI.getScheme().equals(linkTargetScheme) || !requestURI.getHost().equals(linkTargetHostname)))
+                    {
+                        return;
+                    }
+                    final int requestHashWithoutQuery = generateRequestHashWithoutQuery(requestURL);
+                    Int2ObjectHashMap<DefaultCacheEntry> requestHashWithoutQueryList =
+                        cachedEntriesByRequestHashWithoutQuery.get(requestHashWithoutQuery);
+                    requestHashWithoutQueryList.forEach((hash, entry) ->
+                    {
+                        entry.invalidate();
+                    });
                 }
-                final int collectionHash = generateRequestHashWithoutQuery(requestURL);
-                Int2ObjectHashMap<DefaultCacheEntry> collection = cachedEntriesByRequestHashWithoutQuery.get(collectionHash);
-                collection.forEach((hash, entry) ->
-                {
-                    entry.invalidate();
-                });
             }
         }
     }

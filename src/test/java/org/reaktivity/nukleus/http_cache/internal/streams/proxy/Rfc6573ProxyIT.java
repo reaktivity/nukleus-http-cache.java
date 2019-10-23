@@ -57,7 +57,7 @@ public class Rfc6573ProxyIT
     @Specification({
         "${route}/proxy/controller",
         "${streams}/invalidate.cache.when.collection.relative.path/accept/client",
-        "${streams}/invalidate.cache.when.collection.relative.path/accept/server",
+        "${streams}/invalidate.cache.when.collection.relative.path/connect/server",
     })
     public void shouldInvalidateCacheWhenCollectionRelativePath() throws Exception
     {
@@ -68,7 +68,7 @@ public class Rfc6573ProxyIT
     @Specification({
         "${route}/proxy/controller",
         "${streams}/invalidate.cache.when.collection.same.origin/accept/client",
-        "${streams}/invalidate.cache.when.collection.same.origin/accept/server",
+        "${streams}/invalidate.cache.when.collection.same.origin/connect/server",
     })
     public void shouldInvalidateCacheWhenCollectionSameOrigin() throws Exception
     {
@@ -78,8 +78,19 @@ public class Rfc6573ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
+        "${streams}/invalidate.cache.with.multiple.link.target/accept/client",
+        "${streams}/invalidate.cache.with.multiple.link.target/connect/server",
+    })
+    public void shouldInvalidateCachWithMultipleLinkTargets() throws Exception
+    {
+        k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
         "${streams}/ignore.link.when.collection.cross.origin/accept/client",
-        "${streams}/ignore.link.when.collection.cross.origin/accept/server",
+        "${streams}/ignore.link.when.collection.cross.origin/connect/server",
     })
     public void shouldIgnoreLinkWhenCollectionCrossOrigin() throws Exception
     {
