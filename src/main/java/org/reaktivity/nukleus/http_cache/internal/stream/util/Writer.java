@@ -90,11 +90,6 @@ public class Writer
         this.httpTypeId = supplyTypeId.applyAsInt("http");
     }
 
-    public int writerCapacity()
-    {
-        return writeBuffer.capacity();
-    }
-
     public MessageConsumer newHttpStream(
         StreamFactory factory,
         long routeId,
