@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.nio.ByteBuffer.allocateDirect;
-import static java.nio.ByteOrder.nativeOrder;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
@@ -33,7 +31,6 @@ import java.util.function.Function;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.MutableInteger;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -58,7 +55,6 @@ final class HttpCacheProxyGroupRequest
     private final HttpBeginExFW.Builder beginExRW = new HttpBeginExFW.Builder();
     private final int httpTypeId;
 
-    private final MutableDirectBuffer writeBuffer;
     private final MutableInteger requestSlot;
 
     private final HttpCacheProxyFactory factory;
@@ -86,7 +82,6 @@ final class HttpCacheProxyGroupRequest
         this.requestGroup = requestGroup;
         this.initial = initial;
         this.requestSlot =  new MutableInteger(NO_SLOT);
-        this.writeBuffer = new UnsafeBuffer(allocateDirect(factory.writer.writerCapacity()).order(nativeOrder()));
         this.httpTypeId = factory.supplyTypeId.applyAsInt("http");
     }
 
@@ -142,25 +137,25 @@ final class HttpCacheProxyGroupRequest
     {
         return (t, b, i, l) ->
         {
-            writeBuffer.putBytes(0, b, i, l);
+            factory.writeBuffer.putBytes(0, b, i, l);
             switch (t)
             {
             case BeginFW.TYPE_ID:
             case DataFW.TYPE_ID:
-                writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
-                newResponse.accept(t, writeBuffer, 0, l);
+                factory. writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
+                newResponse.accept(t, factory.writeBuffer, 0, l);
                 break;
             case EndFW.TYPE_ID:
             case AbortFW.TYPE_ID:
-                writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
-                newResponse.accept(t, writeBuffer, 0, l);
+                factory.writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
+                newResponse.accept(t, factory.writeBuffer, 0, l);
                 factory.router.clearThrottle(replyId);
                 break;
             case ResetFW.TYPE_ID:
             case WindowFW.TYPE_ID:
             case SignalFW.TYPE_ID:
-                writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, initialId);
-                newResponse.accept(t, writeBuffer, 0, l);
+                factory.writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, initialId);
+                newResponse.accept(t, factory.writeBuffer, 0, l);
                 break;
             default:
                 break;
@@ -436,7 +431,7 @@ final class HttpCacheProxyGroupRequest
         Function<HttpBeginExFW, MessageConsumer> responseFactory = factory.correlations.remove(replyId);
         if (responseFactory != null)
         {
-            beginExRW.wrap(writeBuffer, 0, writeBuffer.capacity());
+            beginExRW.wrap(factory.writeBuffer, 0, factory.writeBuffer.capacity());
 
             final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
                 e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
