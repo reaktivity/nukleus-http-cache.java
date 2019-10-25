@@ -26,7 +26,6 @@ final class Signals
     public static final int CACHE_ENTRY_READY_SIGNAL = 9;
     public static final int REQUEST_ABORTED_SIGNAL = 10;
 
-
     private Signals()
     {
         // utility
