@@ -16,7 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
 @FunctionalInterface
-public interface CheckingBudgetAvailability
+public interface HttpCacheProxyEncoder
 {
-    int checkBudget(int credit, long trace);
+    int encode(int credit, long traceId);
 }

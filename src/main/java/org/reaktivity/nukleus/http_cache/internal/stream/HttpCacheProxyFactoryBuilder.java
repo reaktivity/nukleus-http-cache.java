@@ -58,7 +58,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private HeapBufferPool requestBufferPool;
     private Cache emulatedCache;
     private DefaultCache defaultCache;
-    private BudgetManager emulatedBudgetManager;
+    private EmulatedBudgetManager emulatedBudgetManager;
     private BudgetManager defaultBudgetManager;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
@@ -162,7 +162,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         if (emulatedBudgetManager == null && defaultBudgetManager == null)
         {
-            emulatedBudgetManager = new BudgetManager();
+            emulatedBudgetManager = new EmulatedBudgetManager();
             defaultBudgetManager =  new BudgetManager();
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
@@ -202,6 +202,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         return new HttpCacheProxyFactory(config,
                                          router,
+                                         emulatedBudgetManager,
                                          defaultBudgetManager,
                                          writeBuffer,
                                          requestBufferPool,
