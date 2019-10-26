@@ -255,14 +255,15 @@ final class HttpCacheProxyCachedRequest
     private void sendEndIfNecessary(
         long traceId)
     {
-        if (payloadWritten == cacheEntry.responseSize())
+        final StreamBudget streamBudget = supplyStreamBudget();
+        if (payloadWritten == cacheEntry.responseSize() &&
+            streamBudget.closeable())
         {
             factory.writer.doHttpEnd(acceptReply,
                                      acceptRouteId,
                                      acceptReplyId,
                                      traceId);
 
-            final StreamBudget streamBudget = supplyStreamBudget();
             streamBudget.close();
             cacheEntry.setSubscribers(-1);
 

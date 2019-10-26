@@ -515,7 +515,9 @@ final class HttpCacheProxyCacheableRequest
     private void sendEndIfNecessary(
         long traceId)
     {
+        final StreamBudget streamBudget = supplyStreamBudget();
         if (payloadWritten == cacheEntry.responseSize() &&
+            streamBudget.closeable() &&
             cacheEntry.isResponseCompleted())
         {
             if (!etagSent &&
@@ -535,7 +537,6 @@ final class HttpCacheProxyCacheableRequest
                                          traceId);
             }
 
-            final StreamBudget streamBudget = supplyStreamBudget();
             streamBudget.close();
             cleanupRequestIfNecessary();
             cacheEntry.setSubscribers(-1);

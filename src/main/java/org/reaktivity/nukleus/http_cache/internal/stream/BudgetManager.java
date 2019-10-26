@@ -132,6 +132,11 @@ public final class BudgetManager
                 }
             }
 
+            public boolean closeable()
+            {
+                return available == total;
+            }
+
             public void close()
             {
                 final int inflight = total - available;
