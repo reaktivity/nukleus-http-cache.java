@@ -85,6 +85,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     final BudgetManager budgetManager;
+    final EmulatedBudgetManager emulatedBudgetManager;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
@@ -108,6 +109,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     public HttpCacheProxyFactory(
         HttpCacheConfiguration config,
         RouteManager router,
+        EmulatedBudgetManager emulatedBudgetManager,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
@@ -124,6 +126,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         LongObjectBiConsumer<Runnable> scheduler)
     {
         this.router = requireNonNull(router);
+        this.emulatedBudgetManager = requireNonNull(emulatedBudgetManager);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyTraceId = requireNonNull(supplyTraceId);

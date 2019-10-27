@@ -27,7 +27,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheRefreshRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
-import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.StreamKind;
+import org.reaktivity.nukleus.http_cache.internal.stream.EmulatedBudgetManager.StreamKind;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -491,14 +491,14 @@ final class EmulatedProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
         final long traceId = end.traceId();
-        streamFactory.budgetManager.closing(budgetId, acceptReplyStreamId, connectReplyBudget, traceId);
-        if (streamFactory.budgetManager.hasUnackedBudget(budgetId, acceptReplyStreamId))
+        streamFactory.emulatedBudgetManager.closing(budgetId, acceptReplyStreamId, connectReplyBudget, traceId);
+        if (streamFactory.emulatedBudgetManager.hasUnackedBudget(budgetId, acceptReplyStreamId))
         {
             endDeferred = true;
         }
         else
         {
-            streamFactory.budgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, traceId);
+            streamFactory.emulatedBudgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, traceId);
             streamFactory.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId, end.extension());
         }
     }
@@ -511,7 +511,7 @@ final class EmulatedProxyConnectReplyStream
         final long acceptRouteId = streamCorrelation.acceptRouteId();
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
 
-        streamFactory.budgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, traceId);
+        streamFactory.emulatedBudgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, traceId);
         streamFactory.writer.doAbort(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
     }
 
@@ -523,14 +523,14 @@ final class EmulatedProxyConnectReplyStream
         acceptReplyBudget += credit;
         padding = window.padding();
         budgetId = window.budgetId();
-        streamFactory.budgetManager.window(StreamKind.PROXY, budgetId, streamId, credit,
+        streamFactory.emulatedBudgetManager.window(StreamKind.PROXY, budgetId, streamId, credit,
             this::budgetAvailableWhenProxying, window.traceId());
-        if (endDeferred && !streamFactory.budgetManager.hasUnackedBudget(budgetId, streamId))
+        if (endDeferred && !streamFactory.emulatedBudgetManager.hasUnackedBudget(budgetId, streamId))
         {
             final long acceptRouteId = streamCorrelation.acceptRouteId();
             final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
             final MessageConsumer acceptReply = streamCorrelation.acceptReply();
-            streamFactory.budgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, window.traceId());
+            streamFactory.emulatedBudgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, window.traceId());
             if (this.endExtension != null && this.endExtension.sizeof() > 0)
             {
                 streamFactory.writer.doHttpEnd(acceptReply,
@@ -551,7 +551,7 @@ final class EmulatedProxyConnectReplyStream
         final ResetFW reset)
     {
         final long acceptReplyStreamId = streamCorrelation.acceptReplyId();
-        streamFactory.budgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, reset.traceId());
+        streamFactory.emulatedBudgetManager.closed(StreamKind.PROXY, budgetId, acceptReplyStreamId, reset.traceId());
         streamFactory.writer.doReset(connectReplyThrottle, connectRouteId, connectReplyStreamId, reset.traceId());
         // if cached, do not purge the buffer slots as it may be used by other clients
         if (!cached)
