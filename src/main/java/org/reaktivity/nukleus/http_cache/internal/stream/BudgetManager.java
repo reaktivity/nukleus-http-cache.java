@@ -38,8 +38,8 @@ public final class BudgetManager
         private final long groupId;
         private final Long2ObjectHashMap<StreamBudget> streamBudgetsById;
 
-        private int total;
-        private int available;
+        private int groupTotal;
+        private int groupAvailable;
 
         private GroupBudget(
             long groupId)
@@ -58,7 +58,8 @@ public final class BudgetManager
         @Override
         public String toString()
         {
-            return String.format("groupId = %d, available = %d, streamBudgetsById = %s", groupId, available, streamBudgetsById);
+            return String.format("groupId = %d, groupAvailable = %d, streamBudgetsById = %s",
+                    groupId, groupAvailable, streamBudgetsById);
         }
 
         private void flush(
@@ -72,7 +73,7 @@ public final class BudgetManager
             long traceId)
         {
             // TODO fairness
-            final int limit = groupId != 0 ? Math.min(stream.available, available) : stream.available;
+            final int limit = groupId != 0 ? Math.min(stream.streamAvailable, groupAvailable) : stream.streamAvailable;
             if (limit > 0)
             {
                 final int remaining = stream.encoder.encode(limit, traceId);
@@ -86,8 +87,8 @@ public final class BudgetManager
             private final long streamId;
             private final HttpCacheProxyEncoder encoder;
 
-            private int total;
-            private int available;
+            private int streamTotal;
+            private int streamAvailable;
 
 
             private StreamBudget(
@@ -101,18 +102,28 @@ public final class BudgetManager
             public void adjust(
                 int delta)
             {
-                available += delta;
-                assert available >= 0;
+                final boolean groupInit = groupTotal == 0;
+                final boolean groupUpdate = streamTotal != 0;
 
-                final int oldTotal = total;
-                total = Math.max(available, oldTotal);
+                final int newStreamAvailable = streamAvailable + delta;
+                assert newStreamAvailable >= 0;
 
-                if (groupId != 0L && (GroupBudget.this.total == 0 || oldTotal != 0))
+                final int newStreamTotal = newStreamAvailable > streamTotal ? newStreamAvailable : streamTotal;
+                final int newStreamTotalDiff = newStreamTotal - streamTotal;
+                assert newStreamTotalDiff >= 0;
+
+                streamAvailable = newStreamAvailable;
+                streamTotal = newStreamTotal;
+
+                if (groupId != 0L && (groupInit || groupUpdate))
                 {
-                    GroupBudget.this.available += delta;
-                    assert GroupBudget.this.available >= 0;
+                    final int groupDelta = groupInit ? delta : delta - newStreamTotalDiff;
 
-                    GroupBudget.this.total = Math.max(total, GroupBudget.this.total);
+                    groupAvailable += groupDelta;
+                    groupTotal = Math.max(streamTotal, groupTotal);
+
+                    assert groupAvailable >= 0;
+                    assert groupAvailable <= groupTotal;
                 }
             }
 
@@ -134,17 +145,17 @@ public final class BudgetManager
 
             public boolean closeable()
             {
-                return available == total;
+                return streamAvailable == streamTotal;
             }
 
             public void close()
             {
-                final int inflight = total - available;
+                final int inflight = streamTotal - streamAvailable;
 
                 if (groupId != 0L)
                 {
-                    GroupBudget.this.available += inflight;
-                    assert GroupBudget.this.available >= 0;
+                    GroupBudget.this.groupAvailable += inflight;
+                    assert GroupBudget.this.groupAvailable >= 0;
                 }
 
                 streamBudgetsById.remove(streamId);
@@ -158,7 +169,7 @@ public final class BudgetManager
             @Override
             public String toString()
             {
-                return String.format("streamId = %d, available = %s", streamId, available);
+                return String.format("streamId = %d, groupAvailable = %s", streamId, streamAvailable);
             }
         }
     }
