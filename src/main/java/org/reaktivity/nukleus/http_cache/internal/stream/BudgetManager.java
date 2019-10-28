@@ -153,8 +153,8 @@ public final class BudgetManager
 
                 if (groupId != 0L)
                 {
-                    GroupBudget.this.groupAvailable += inflight;
-                    assert GroupBudget.this.groupAvailable >= 0;
+                    groupAvailable += inflight;
+                    assert groupAvailable >= 0;
                 }
 
                 streamBudgetsById.remove(streamId);
