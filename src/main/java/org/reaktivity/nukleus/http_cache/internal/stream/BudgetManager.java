@@ -16,7 +16,6 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheProxyEncoder;
 
 public final class BudgetManager
 {
@@ -50,7 +49,7 @@ public final class BudgetManager
 
         public StreamBudget supplyStreamBudget(
             long streamId,
-            HttpCacheProxyEncoder encoder)
+            BudgetEncoder encoder)
         {
             return streamBudgetsById.computeIfAbsent(streamId, id -> new StreamBudget(id, encoder));
         }
@@ -85,7 +84,7 @@ public final class BudgetManager
         public final class StreamBudget
         {
             private final long streamId;
-            private final HttpCacheProxyEncoder encoder;
+            private final BudgetEncoder encoder;
 
             private int streamTotal;
             private int streamAvailable;
@@ -93,7 +92,7 @@ public final class BudgetManager
 
             private StreamBudget(
                 long streamId,
-                HttpCacheProxyEncoder encoder)
+                BudgetEncoder encoder)
             {
                 this.streamId = streamId;
                 this.encoder = encoder;
@@ -172,5 +171,11 @@ public final class BudgetManager
                 return String.format("streamId = %d, groupAvailable = %s", streamId, streamAvailable);
             }
         }
+    }
+
+    @FunctionalInterface
+    public interface BudgetEncoder
+    {
+        int encode(int credit, long traceId);
     }
 }

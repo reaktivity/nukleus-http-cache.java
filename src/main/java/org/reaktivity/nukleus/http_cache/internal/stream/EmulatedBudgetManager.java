@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.Objects.requireNonNull;
 
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpCacheProxyEncoder;
 
 public class EmulatedBudgetManager
 {
@@ -36,10 +35,10 @@ public class EmulatedBudgetManager
         final StreamKind streamKind;
         int unackedBudget;
         int index;
-        HttpCacheProxyEncoder budgetAvailable;
+        BudgetManager.BudgetEncoder budgetAvailable;
         boolean closing;
 
-        StreamBudget(long streamId, StreamKind kind, HttpCacheProxyEncoder budgetAvailable, int index)
+        StreamBudget(long streamId, StreamKind kind, BudgetManager.BudgetEncoder budgetAvailable, int index)
         {
             this.streamId = streamId;
             this.streamKind = requireNonNull(kind);
@@ -187,7 +186,7 @@ public class EmulatedBudgetManager
     }
 
     public void window(StreamKind streamKind, long groupId, long streamId, int credit,
-                       HttpCacheProxyEncoder budgetAvailable, long trace)
+                       BudgetManager.BudgetEncoder budgetAvailable, long trace)
     {
         if (groupId == 0)
         {
