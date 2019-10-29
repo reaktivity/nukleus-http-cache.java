@@ -114,6 +114,8 @@ public final class BudgetManager
                 streamAvailable = newStreamAvailable;
                 streamTotal = newStreamTotal;
 
+                assert streamAvailable <= streamTotal;
+
                 if (groupId != 0L && (groupInit || groupUpdate))
                 {
                     final int groupDelta = groupInit ? delta : delta - newStreamTotalDiff;
@@ -151,24 +153,34 @@ public final class BudgetManager
             {
                 final int inflight = streamTotal - streamAvailable;
 
+                streamAvailable += inflight;
+
+                assert streamAvailable <= streamTotal;
+
                 if (groupId != 0L)
                 {
                     groupAvailable += inflight;
+
                     assert groupAvailable >= 0;
+                    assert groupAvailable <= groupTotal;
                 }
 
-                streamBudgetsById.remove(streamId);
+                final StreamBudget streamBudget = streamBudgetsById.remove(streamId);
+
+                assert streamBudget == this;
 
                 if (streamBudgetsById.isEmpty())
                 {
-                    groupBudgetsById.remove(groupId);
+                    final GroupBudget groupBudget = groupBudgetsById.remove(groupId);
+
+                    assert groupBudget == GroupBudget.this;
                 }
             }
 
             @Override
             public String toString()
             {
-                return String.format("streamId = %d, groupAvailable = %s", streamId, streamAvailable);
+                return String.format("streamId = %d, streamAvailable = %s", streamId, streamAvailable);
             }
         }
     }
