@@ -77,7 +77,13 @@ public final class BudgetManager
             {
                 final int remaining = stream.encoder.encode(limit, traceId);
                 final int used = limit - remaining;
-                stream.adjust(-used);
+
+                assert used >= 0;
+
+                if (used != 0)
+                {
+                    stream.adjust(-used);
+                }
             }
         }
 
