@@ -114,7 +114,7 @@ public final class BudgetManager
                 streamAvailable = newStreamAvailable;
                 streamTotal = newStreamTotal;
 
-                assert streamAvailable <= streamTotal;
+                assert streamAvailable <= streamTotal : String.format("%d <= %d", streamAvailable, streamTotal);
 
                 if (groupId != 0L && (groupInit || groupUpdate))
                 {
@@ -123,8 +123,8 @@ public final class BudgetManager
                     groupAvailable += groupDelta;
                     groupTotal = Math.max(streamTotal, groupTotal);
 
-                    assert groupAvailable >= 0;
-                    assert groupAvailable <= groupTotal;
+                    assert groupAvailable >= 0 : String.format("%d >= 0", groupAvailable);
+                    assert groupAvailable <= groupTotal : String.format("%d <= %d", groupAvailable, groupTotal);
                 }
             }
 
@@ -155,14 +155,14 @@ public final class BudgetManager
 
                 streamAvailable += inflight;
 
-                assert streamAvailable <= streamTotal;
+                assert streamAvailable <= streamTotal : String.format("%d <= %d", streamAvailable, streamTotal);
 
                 if (groupId != 0L)
                 {
                     groupAvailable += inflight;
 
-                    assert groupAvailable >= 0;
-                    assert groupAvailable <= groupTotal;
+                    assert groupAvailable >= 0 : String.format("%d >= 0", groupAvailable);
+                    assert groupAvailable <= groupTotal : String.format("%d <= %d", groupAvailable, groupTotal);
                 }
 
                 final StreamBudget streamBudget = streamBudgetsById.remove(streamId);
