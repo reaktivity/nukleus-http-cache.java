@@ -60,7 +60,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Cacheab
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
-import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
+import org.reaktivity.nukleus.http_cache.internal.stream.EmulatedBudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -423,13 +423,14 @@ public final class CacheEntry
             {
             case WindowFW.TYPE_ID:
                 final WindowFW window = cache.windowRO.wrap(buffer, index, index + length);
+                final long traceId = window.traceId();
                 budgetId = window.budgetId();
                 padding = window.padding();
                 long streamId = window.streamId();
                 int credit = window.credit();
                 acceptReplyBudget += credit;
-                cache.budgetManager.window(BudgetManager.StreamKind.CACHE, budgetId, streamId, credit,
-                    this::writePayload, window.traceId());
+                cache.budgetManager.window(EmulatedBudgetManager.StreamKind.CACHE, budgetId, streamId, credit,
+                    this::writePayload, traceId);
 
                 boolean ackedBudget = !cache.budgetManager.hasUnackedBudget(budgetId, streamId);
                 if (payloadWritten == cachedRequest.responseSize() && ackedBudget)
@@ -437,14 +438,14 @@ public final class CacheEntry
                     final MessageConsumer acceptReply = request.acceptReply();
                     final long acceptRouteId = request.acceptRouteId();
                     final long acceptReplyStreamId = request.acceptReplyId();
-                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, window.traceId());
+                    CacheEntry.this.cache.writer.doHttpEnd(acceptReply, acceptRouteId, acceptReplyStreamId, traceId);
                     this.onEnd.run();
-                    cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, budgetId, acceptReplyStreamId, window.traceId());
+                    cache.budgetManager.closed(EmulatedBudgetManager.StreamKind.CACHE, budgetId, acceptReplyStreamId, traceId);
                 }
                 break;
             case ResetFW.TYPE_ID:
             default:
-                cache.budgetManager.closed(BudgetManager.StreamKind.CACHE, budgetId, request.acceptReplyId(),
+                cache.budgetManager.closed(EmulatedBudgetManager.StreamKind.CACHE, budgetId, request.acceptReplyId(),
                     supplyTrace.getAsLong());
                 this.onEnd.run();
                 break;

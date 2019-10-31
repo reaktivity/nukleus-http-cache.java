@@ -142,7 +142,7 @@ public class DefaultCache
         String requestURL)
     {
         final URI requestURI = URI.create(requestURL);
-        return String.format("%s://%s/%s",
+        return String.format("%s://%s%s",
                              requestURI.getScheme(),
                              requestURI.getAuthority(),
                              requestURI.getPath()).hashCode();
@@ -230,18 +230,23 @@ public class DefaultCache
                     {
                         return;
                     }
-                    final int requestHashWithoutQuery = generateRequestHashWithoutQuery(requestURL);
+
+                    final String linkTargetFullUrl = String.format("%s://%s%s", requestURI.getScheme(),
+                        requestURI.getAuthority(),  matcher.group("path"));
+                    final int requestHashWithoutQuery = generateRequestHashWithoutQuery(linkTargetFullUrl);
                     Int2ObjectHashMap<DefaultCacheEntry> requestHashWithoutQueryList =
                         cachedEntriesByRequestHashWithoutQuery.get(requestHashWithoutQuery);
-                    requestHashWithoutQueryList.forEach((hash, entry) ->
+                    if (requestHashWithoutQueryList != null)
                     {
-                        entry.invalidate();
-                    });
+                        requestHashWithoutQueryList.forEach((hash, entry) ->
+                        {
+                            entry.invalidate();
+                        });
+                    }
                 }
             }
         }
     }
-
 
     public boolean checkTrailerToRetry(
         String ifNoneMatch,

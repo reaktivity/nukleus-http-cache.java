@@ -41,7 +41,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Cacheab
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.InitialRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.PreferWaitIfNoneMatchRequest;
 import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
-import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager;
+import org.reaktivity.nukleus.http_cache.internal.stream.EmulatedBudgetManager;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -74,7 +74,7 @@ public class Cache
     public final BufferPool cachedResponseBufferPool;
 
     final Writer writer;
-    final BudgetManager budgetManager;
+    final EmulatedBudgetManager budgetManager;
     final Int2CacheHashMapWithLRUEviction cachedEntries;
     final BufferPool cachedRequest1BufferPool;
     final BufferPool cachedResponse1BufferPool;
@@ -93,7 +93,7 @@ public class Cache
     public Cache(
         RouteManager router,
         LongObjectBiConsumer<Runnable> scheduler,
-        BudgetManager budgetManager,
+        EmulatedBudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
         BufferPool cacheBufferPool,

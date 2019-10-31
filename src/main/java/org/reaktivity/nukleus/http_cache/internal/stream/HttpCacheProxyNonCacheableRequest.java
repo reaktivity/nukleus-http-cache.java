@@ -97,7 +97,7 @@ final class HttpCacheProxyNonCacheableRequest
     {
         if (msgTypeId == ResetFW.TYPE_ID)
         {
-            ResetFW reset = factory.resetRO.wrap(buffer, index, length);
+            ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
         }
     }

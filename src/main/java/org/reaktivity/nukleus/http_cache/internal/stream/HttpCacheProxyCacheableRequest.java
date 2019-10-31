@@ -40,6 +40,8 @@ import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.GroupBudget;
+import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.GroupBudget.StreamBudget;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -88,6 +90,7 @@ final class HttpCacheProxyCacheableRequest
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
     private boolean responseClosing;
+    private StreamBudget streamBudget;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -348,7 +351,7 @@ final class HttpCacheProxyCacheableRequest
         else
         {
             final long traceId = signal.traceId();
-            factory.budgetManager.resumeAssigningBudget(budgetId, 0, traceId);
+            supplyStreamBudget().flushGroup(traceId);
             sendEndIfNecessary(traceId);
         }
     }
@@ -445,26 +448,24 @@ final class HttpCacheProxyCacheableRequest
         {
             budgetId = window.budgetId();
             padding = window.padding();
-            long streamId = window.streamId();
-            int credit = window.credit();
+            final long traceId = window.traceId();
+            final int credit = window.credit();
             acceptReplyBudget += credit;
-            factory.budgetManager.window(BudgetManager.StreamKind.CACHE,
-                                         budgetId,
-                                         streamId,
-                                         credit,
-                                         this::writePayload,
-                                         window.traceId());
-            sendEndIfNecessary(window.traceId());
+
+            final StreamBudget streamBudget = supplyStreamBudget();
+            streamBudget.adjust(credit);
+            streamBudget.flushGroup(traceId);
+            sendEndIfNecessary(traceId);
         }
     }
 
     private void onResponseReset(
         ResetFW reset)
     {
-        factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                     budgetId,
-                                     acceptReplyId,
-                                     factory.supplyTraceId.getAsLong());
+        final long traceId = reset.traceId();
+        final StreamBudget streamBudget = supplyStreamBudget();
+        streamBudget.close();
+        streamBudget.flushGroup(traceId);
 
         cleanupRequestIfNecessary();
         if (cacheEntry != null)
@@ -524,10 +525,9 @@ final class HttpCacheProxyCacheableRequest
     private void sendEndIfNecessary(
         long traceId)
     {
-        boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(budgetId, acceptReplyId);
-
+        final StreamBudget streamBudget = supplyStreamBudget();
         if (payloadWritten == cacheEntry.responseSize() &&
-            ackedBudget &&
+            streamBudget.closeable() &&
             cacheEntry.isResponseCompleted())
         {
             if (!etagSent &&
@@ -547,13 +547,22 @@ final class HttpCacheProxyCacheableRequest
                                          traceId);
             }
 
-            factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                         budgetId,
-                                         acceptReplyId,
-                                         traceId);
+            streamBudget.close();
             cleanupRequestIfNecessary();
             cacheEntry.setSubscribers(-1);
+
+            streamBudget.flushGroup(traceId);
         }
+    }
+
+    private StreamBudget supplyStreamBudget()
+    {
+        if (streamBudget == null)
+        {
+            final GroupBudget groupBudget = factory.budgetManager.supplyGroupBudget(budgetId);
+            streamBudget = groupBudget.supplyStreamBudget(acceptReplyId, this::writePayload);
+        }
+        return streamBudget;
     }
 
     private int writePayload(

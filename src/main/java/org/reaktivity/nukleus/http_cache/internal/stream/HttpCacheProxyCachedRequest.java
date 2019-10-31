@@ -25,6 +25,8 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.GroupBudget;
+import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.GroupBudget.StreamBudget;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -52,6 +54,7 @@ final class HttpCacheProxyCachedRequest
 
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
+    private StreamBudget streamBudget;
 
     HttpCacheProxyCachedRequest(
         HttpCacheProxyFactory factory,
@@ -193,28 +196,30 @@ final class HttpCacheProxyCachedRequest
     private void onWindow(
         WindowFW window)
     {
+        final long traceId = window.traceId();
+
         budgetId = window.budgetId();
         padding = window.padding();
-        long streamId = window.streamId();
         int credit = window.credit();
         acceptReplyBudget += credit;
-        factory.budgetManager.window(BudgetManager.StreamKind.CACHE,
-                                     budgetId,
-                                     streamId,
-                                     credit,
-                                     this::writePayload,
-                                     window.traceId());
-        sendEndIfNecessary(window.traceId());
+
+        final StreamBudget streamBudget = supplyStreamBudget();
+        streamBudget.adjust(credit);
+        streamBudget.flushGroup(traceId);
+
+        sendEndIfNecessary(traceId);
     }
 
     private void onReset(
         ResetFW reset)
     {
-        factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                     budgetId,
-                                     acceptReplyId,
-                                     this.factory.supplyTraceId.getAsLong());
+        final long traceId = reset.traceId();
+
+        final StreamBudget streamBudget = supplyStreamBudget();
+        streamBudget.close();
         cacheEntry.setSubscribers(-1);
+
+        streamBudget.flushGroup(traceId);
     }
 
     private void onServeCacheEntrySignal(
@@ -250,28 +255,35 @@ final class HttpCacheProxyCachedRequest
     private void sendEndIfNecessary(
         long traceId)
     {
-
-        boolean ackedBudget = !factory.budgetManager.hasUnackedBudget(budgetId, acceptReplyId);
-
+        final StreamBudget streamBudget = supplyStreamBudget();
         if (payloadWritten == cacheEntry.responseSize() &&
-            ackedBudget)
+            streamBudget.closeable())
         {
             factory.writer.doHttpEnd(acceptReply,
                                      acceptRouteId,
                                      acceptReplyId,
                                      traceId);
 
-            factory.budgetManager.closed(BudgetManager.StreamKind.CACHE,
-                                                   budgetId,
-                                                   acceptReplyId,
-                                                   traceId);
+            streamBudget.close();
             cacheEntry.setSubscribers(-1);
+
+            streamBudget.flushGroup(traceId);
         }
+    }
+
+    private StreamBudget supplyStreamBudget()
+    {
+        if (streamBudget == null)
+        {
+            final GroupBudget groupBudget = factory.budgetManager.supplyGroupBudget(budgetId);
+            streamBudget = groupBudget.supplyStreamBudget(acceptReplyId, this::writePayload);
+        }
+        return streamBudget;
     }
 
     private int writePayload(
         int budget,
-        long trace)
+        long traceId)
     {
         final int minBudget = min(budget, acceptReplyBudget);
         final int toWrite = min(minBudget - padding, cacheEntry.responseSize() - payloadWritten);
@@ -281,7 +293,7 @@ final class HttpCacheProxyCachedRequest
                 acceptReply,
                 acceptRouteId,
                 acceptReplyId,
-                trace,
+                traceId,
                 budgetId,
                 toWrite + padding,
                 p -> buildResponsePayload(payloadWritten,

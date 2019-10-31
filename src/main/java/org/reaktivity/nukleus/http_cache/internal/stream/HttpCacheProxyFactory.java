@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.nio.ByteBuffer.allocateDirect;
-import static java.nio.ByteOrder.nativeOrder;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
@@ -87,6 +85,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
     final BudgetManager budgetManager;
+    final EmulatedBudgetManager emulatedBudgetManager;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
@@ -94,6 +93,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final ToIntFunction<String> supplyTypeId;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
+    final MutableDirectBuffer writeBuffer;
     final Long2ObjectHashMap<Request> requestCorrelations;
 
     final int preferWaitMaximum;
@@ -105,11 +105,11 @@ public class HttpCacheProxyFactory implements StreamFactory
     final SignalingExecutor executor;
     final LongObjectBiConsumer<Runnable> scheduler;
     final Int2ObjectHashMap<HttpProxyCacheableRequestGroup> requestGroups;
-    final MutableDirectBuffer writeBuffer;
 
     public HttpCacheProxyFactory(
         HttpCacheConfiguration config,
         RouteManager router,
+        EmulatedBudgetManager emulatedBudgetManager,
         BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
@@ -126,6 +126,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         LongObjectBiConsumer<Runnable> scheduler)
     {
         this.router = requireNonNull(router);
+        this.emulatedBudgetManager = requireNonNull(emulatedBudgetManager);
         this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
@@ -137,10 +138,11 @@ public class HttpCacheProxyFactory implements StreamFactory
             counters.supplyCounter.apply("http-cache.request.acquires"),
             counters.supplyCounter.apply("http-cache.request.releases"));
         this.responseBufferPool = new CountingBufferPool(
-            requestBufferPool,
-            counters.supplyCounter.apply("http-cache.response.acquires"),
-            counters.supplyCounter.apply("http-cache.response.releases"));
-        this.writeBuffer = new UnsafeBuffer(allocateDirect(writeBuffer.capacity()).order(nativeOrder()));
+                requestBufferPool,
+                counters.supplyCounter.apply("http-cache.response.acquires"),
+                counters.supplyCounter.apply("http-cache.response.releases"));
+        this.writeBuffer = new UnsafeBuffer(new byte[writeBuffer.capacity()]);
+
         this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
         this.emulatedCache = emulatedCache;
@@ -274,8 +276,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         final MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
         MessageConsumer newStream = null;
 
-        if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
         {
+            System.out.printf("[HttpCacheProxyFactory] [Cached] [ulr=%s] \n", requestURL);
             newStream = createCachedStream(requestHeaders,
                                            acceptReply,
                                            acceptInitialId,

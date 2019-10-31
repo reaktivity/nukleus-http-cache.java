@@ -15,232 +15,185 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.util.Objects.requireNonNull;
-
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.CheckingBudgetAvailability;
 
-public class BudgetManager
+public final class BudgetManager
 {
-    private final Long2ObjectHashMap<GroupBudget> groups;  // group id -> GroupBudget
+    private final Long2ObjectHashMap<GroupBudget> groupBudgetsById;
 
-    public enum StreamKind
+    public BudgetManager()
     {
-        CACHE,
-        PROXY
+        this.groupBudgetsById = new Long2ObjectHashMap<>();
     }
 
-    private static class StreamBudget
+    public GroupBudget supplyGroupBudget(
+        long groupId)
     {
-        final long streamId;
-        final StreamKind streamKind;
-        int unackedBudget;
-        int index;
-        CheckingBudgetAvailability budgetAvailable;
-        boolean closing;
-
-        StreamBudget(long streamId, StreamKind kind, CheckingBudgetAvailability budgetAvailable, int index)
-        {
-            this.streamId = streamId;
-            this.streamKind = requireNonNull(kind);
-            this.budgetAvailable = budgetAvailable;
-            this.index = index;
-        }
-
-        @Override
-        public String toString()
-        {
-            return String.format("(id=%d kind=%s closing=%s unackedBudget=%d)", streamId, streamKind, closing, unackedBudget);
-        }
+        return groupBudgetsById.computeIfAbsent(groupId, GroupBudget::new);
     }
 
-    public void resumeAssigningBudget(long groupId, int credit, long traceId)
+    public final class GroupBudget
     {
-        GroupBudget groupBudget = groups.get(groupId);
-        if (groupBudget != null)
-        {
-            groupBudget.moreBudget(credit, traceId);
-        }
-    }
+        private final long groupId;
+        private final Long2ObjectHashMap<StreamBudget> streamBudgetsById;
 
-    private class GroupBudget
-    {
-        final long groupId;
-        final Long2ObjectHashMap<StreamBudget> streamMap;  // stream id -> BudgetEnty
-        int initialBudget;
-        int budget;
+        private int groupTotal;
+        private int groupAvailable;
 
-        GroupBudget(long groupId, int initialBudget)
+        private GroupBudget(
+            long groupId)
         {
             this.groupId = groupId;
-            this.initialBudget = initialBudget;
-            this.streamMap = new Long2ObjectHashMap<>();
+            this.streamBudgetsById = new Long2ObjectHashMap<>();
         }
 
-        void add(long streamId, StreamBudget streamBudget)
+        public StreamBudget supplyStreamBudget(
+            long streamId,
+            BudgetEncoder encoder)
         {
-            streamMap.put(streamId, streamBudget);
-        }
-
-        StreamBudget get(long streamId)
-        {
-            return streamMap.get(streamId);
-        }
-
-        boolean isEmpty()
-        {
-            return streamMap.isEmpty();
-        }
-
-        int size()
-        {
-            return streamMap.size();
-        }
-
-        StreamBudget remove(long streamId)
-        {
-            return streamMap.remove(streamId);
-        }
-
-        private void moreBudget(int credit, long trace)
-        {
-            budget += credit;
-            if (budget > initialBudget)
-            {
-                initialBudget = budget;
-            }
-            assert budget <= initialBudget;
-
-            streamMap.forEach((k, stream) ->
-            {
-                // Give budget to first stream. TODO fairness
-                if (!stream.closing && budget > 0)
-                {
-                    int slice = budget;
-                    budget -= slice;
-                    stream.unackedBudget += slice;
-                    int remaining = stream.budgetAvailable.checkBudget(slice, trace);
-                    budget += remaining;
-                    stream.unackedBudget -= remaining;
-                    if (stream.unackedBudget < 0)
-                    {
-                        stream.unackedBudget = 0;
-                    }
-                }
-            });
+            return streamBudgetsById.computeIfAbsent(streamId, id -> new StreamBudget(id, encoder));
         }
 
         @Override
         public String toString()
         {
-            long proxyStreams = streamMap.values().stream().filter(s -> s.streamKind == StreamKind.PROXY).count();
-            long cacheStreams = streamMap.values().stream().filter(s -> s.streamKind == StreamKind.CACHE).count();
-            long unackedStreams = streamMap.values().stream().filter(s -> s.unackedBudget > 0).count();
-
-            return String.format("(groupId=%d budget=%d proxyStreams=%d cacheStreams=%d unackedStreams=%d)",
-                    groupId, budget, proxyStreams, cacheStreams, unackedStreams);
+            return String.format("groupId = %d, groupAvailable = %d, streamBudgetsById = %s",
+                    groupId, groupAvailable, streamBudgetsById);
         }
-    }
 
-    BudgetManager()
-    {
-        groups = new Long2ObjectHashMap<>();
-    }
-
-    void closing(long groupId, long streamId, int credit, long trace)
-    {
-        if (groupId != 0)
+        private void flush(
+            long traceId)
         {
-            GroupBudget groupBudget = groups.get(groupId);
-            StreamBudget streamBudget = groupBudget.get(streamId);
-            streamBudget.unackedBudget -= credit;
-            if (streamBudget.unackedBudget < 0)
-            {
-                streamBudget.unackedBudget = 0;
-            }
-            streamBudget.closing = true;
-            if (credit > 0)
-            {
-                groupBudget.moreBudget(credit, trace);
-            }
+            streamBudgetsById.values().forEach(s -> flushStream(s, traceId));
         }
-    }
 
-    public void closed(StreamKind streamKind, long groupId, long streamId, long trace)
-    {
-        if (groupId != 0)
+        private void flushStream(
+            StreamBudget stream,
+            long traceId)
         {
-            GroupBudget groupBudget = groups.get(groupId);
-            if (groupBudget != null)
+            // TODO fairness
+            final int limit = groupId != 0 ? Math.min(stream.streamAvailable, groupAvailable) : stream.streamAvailable;
+            if (limit > 0)
             {
-                StreamBudget streamBudget = groupBudget.remove(streamId);
-                if (groupBudget.isEmpty())
+                final int remaining = stream.encoder.encode(limit, traceId);
+                final int used = limit - remaining;
+
+                assert used >= 0;
+
+                if (used != 0)
                 {
-                    groups.remove(groupId);
-                }
-                else if (streamBudget != null && streamBudget.unackedBudget > 0)
-                {
-                    groupBudget.moreBudget(streamBudget.unackedBudget, trace);
+                    stream.adjust(-used);
                 }
             }
         }
-    }
 
-    public void window(StreamKind streamKind, long groupId, long streamId, int credit,
-                       CheckingBudgetAvailability budgetAvailable, long trace)
-    {
-        if (groupId == 0)
+        public final class StreamBudget
         {
-            budgetAvailable.checkBudget(credit, trace);
-        }
-        else
-        {
-            boolean gotBudget = false;
-            GroupBudget groupBudget = groups.get(groupId);
-            if (groupBudget == null)
+            private final long streamId;
+            private final BudgetEncoder encoder;
+
+            private int streamTotal;
+            private int streamAvailable;
+
+
+            private StreamBudget(
+                long streamId,
+                BudgetEncoder encoder)
             {
-                groupBudget = new GroupBudget(groupId, credit);
-                groups.put(groupId, groupBudget);
-                gotBudget = true;
+                this.streamId = streamId;
+                this.encoder = encoder;
             }
-            StreamBudget streamBudget = groupBudget.get(streamId);
-            if (streamBudget == null)
+
+            public void adjust(
+                int delta)
             {
-                // Ignore initial window of a stream (except the very first stream)
-                int index = groupBudget.size();
-                streamBudget = new StreamBudget(streamId, streamKind, budgetAvailable, index);
-                groupBudget.add(streamId, streamBudget);
-                assert credit <= groupBudget.initialBudget;
-            }
-            else
-            {
-                streamBudget.unackedBudget -= credit;
-                if (streamBudget.unackedBudget < 0)
+                final boolean groupInit = groupTotal == 0;
+                final boolean groupUpdate = streamTotal != 0;
+
+                final int newStreamAvailable = streamAvailable + delta;
+                assert newStreamAvailable >= 0;
+
+                final int newStreamTotal = newStreamAvailable > streamTotal ? newStreamAvailable : streamTotal;
+                final int newStreamTotalDiff = newStreamTotal - streamTotal;
+                assert newStreamTotalDiff >= 0;
+
+                streamAvailable = newStreamAvailable;
+                streamTotal = newStreamTotal;
+
+                assert streamAvailable <= streamTotal : String.format("%d <= %d", streamAvailable, streamTotal);
+
+                if (groupId != 0L && (groupInit || groupUpdate))
                 {
-                    streamBudget.unackedBudget = 0;
+                    final int groupDelta = groupInit ? delta : delta - newStreamTotalDiff;
+
+                    groupAvailable += groupDelta;
+                    groupTotal = Math.max(streamTotal, groupTotal);
+
+                    assert groupAvailable >= 0 : String.format("%d >= 0", groupAvailable);
+                    assert groupAvailable <= groupTotal : String.format("%d <= %d", groupAvailable, groupTotal);
                 }
-                gotBudget = true;
             }
 
-            if (gotBudget && credit > 0)
+            public void flushGroup(
+                long traceId)
             {
-                groupBudget.moreBudget(credit, trace);
+                if (groupId == 0L)
+                {
+                    if (streamBudgetsById.containsValue(this))
+                    {
+                        flushStream(this, traceId);
+                    }
+                }
+                else
+                {
+                    flush(traceId);
+                }
             }
 
+            public boolean closeable()
+            {
+                return streamAvailable == streamTotal;
+            }
+
+            public void close()
+            {
+                final int inflight = streamTotal - streamAvailable;
+
+                streamAvailable += inflight;
+
+                assert streamAvailable <= streamTotal : String.format("%d <= %d", streamAvailable, streamTotal);
+
+                if (groupId != 0L)
+                {
+                    groupAvailable += inflight;
+
+                    assert groupAvailable >= 0 : String.format("%d >= 0", groupAvailable);
+                    assert groupAvailable <= groupTotal : String.format("%d <= %d", groupAvailable, groupTotal);
+                }
+
+                final StreamBudget streamBudget = streamBudgetsById.remove(streamId);
+
+                assert streamBudget == this;
+
+                if (streamBudgetsById.isEmpty())
+                {
+                    final GroupBudget groupBudget = groupBudgetsById.remove(groupId);
+
+                    assert groupBudget == GroupBudget.this;
+                }
+            }
+
+            @Override
+            public String toString()
+            {
+                return String.format("streamId = %d, streamAvailable = %s", streamId, streamAvailable);
+            }
         }
     }
 
-    public boolean hasUnackedBudget(long groupId, long streamId)
+    @FunctionalInterface
+    public interface BudgetEncoder
     {
-        if (groupId == 0)
-        {
-            return false;
-        }
-        else
-        {
-            GroupBudget groupBudget = groups.get(groupId);
-            StreamBudget streamBudget = groupBudget.get(streamId);
-            return streamBudget.unackedBudget != 0;
-        }
+        int encode(int credit, long traceId);
     }
 }
