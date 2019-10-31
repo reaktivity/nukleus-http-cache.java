@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_INVALIDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
@@ -198,6 +199,10 @@ final class HttpCacheProxyGroupRequest
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
             onWindow(window);
             break;
+        case SignalFW.TYPE_ID:
+            final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
+            onSignal(signal);
+            break;
         default:
             break;
         }
@@ -332,6 +337,21 @@ final class HttpCacheProxyGroupRequest
         cleanupRequestIfNecessary();
     }
 
+    private void onSignal(
+        SignalFW signal)
+    {
+        final int signalId = signal.signalId();
+
+        if (signalId == CACHE_ENTRY_INVALIDATED_SIGNAL)
+        {
+            if (retryRequest != null)
+            {
+                retryRequest.cancel(true);
+                retryCacheableRequest();
+            }
+        }
+    }
+
     private boolean scheduleRequest(
         long retryAfter)
     {
@@ -427,6 +447,7 @@ final class HttpCacheProxyGroupRequest
                                      factory.supplyTraceId.getAsLong(),
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
+        retryRequest = null;
     }
 
     private void send503RetryAfter(
@@ -471,6 +492,7 @@ final class HttpCacheProxyGroupRequest
         if (retryRequest != null)
         {
             retryRequest.cancel(true);
+            retryRequest = null;
         }
     }
 

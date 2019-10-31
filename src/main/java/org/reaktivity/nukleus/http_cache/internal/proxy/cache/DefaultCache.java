@@ -47,6 +47,8 @@ import org.agrona.collections.Int2ObjectHashMap;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactory;
+import org.reaktivity.nukleus.http_cache.internal.stream.HttpProxyCacheableRequestGroup;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -192,6 +194,7 @@ public class DefaultCache
     }
 
     public void invalidateCacheEntryIfNecessary(
+        HttpCacheProxyFactory factory,
         int requestHash,
         String requestURL,
         ArrayFW<HttpHeaderFW> headers)
@@ -204,11 +207,12 @@ public class DefaultCache
 
         headers.forEach(header ->
         {
-            invalidateLinkCacheEntry(requestURL, header);
+            invalidateLinkCacheEntry(factory, requestURL, header);
         });
     }
 
     private void invalidateLinkCacheEntry(
+        HttpCacheProxyFactory factory,
         String requestURL,
         HttpHeaderFW header)
     {
@@ -240,6 +244,11 @@ public class DefaultCache
                     {
                         requestHashWithoutQueryList.forEach((hash, entry) ->
                         {
+                            final HttpProxyCacheableRequestGroup requestGroup = factory.requestGroups.get(hash);
+                            if (requestGroup != null)
+                            {
+                                requestGroup.onCacheEntryInvalidated();
+                            }
                             entry.invalidate();
                         });
                     }

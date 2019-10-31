@@ -129,7 +129,8 @@ final class HttpCacheProxyNonCacheableResponse
         // count all responses
         factory.counters.responses.getAsLong();
 
-        factory.defaultCache.invalidateCacheEntryIfNecessary(requestHash,
+        factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
+                                                             requestHash,
                                                              requestURL,
                                                              responseHeaders);
     }

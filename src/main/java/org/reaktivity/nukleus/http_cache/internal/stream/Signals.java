@@ -21,6 +21,7 @@ final class Signals
     public static final int CACHE_ENTRY_ABORTED_SIGNAL = 3;
     public static final int REQUEST_EXPIRED_SIGNAL = 4;
     public static final int REQUEST_GROUP_LEADER_UPDATED_SIGNAL = 5;
+    public static final int CACHE_ENTRY_INVALIDATED_SIGNAL = 6;
     public static final int GROUP_REQUEST_RETRY_SIGNAL = 7;
     public static final int CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8;
     public static final int CACHE_ENTRY_READY_SIGNAL = 9;
