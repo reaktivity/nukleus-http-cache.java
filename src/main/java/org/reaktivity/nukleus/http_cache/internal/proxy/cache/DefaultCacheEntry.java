@@ -62,11 +62,11 @@ public final class DefaultCacheEntry
 
     private String etag;
     private int requestSlot = NO_SLOT;
-    private int responseHeadersSize = 0;
-    private int responseSize = 0;
+    private int responseHeadersSize;
+    private int responseSize;
     private int subscribers;
-    private boolean responseCompleted = false;
-    private boolean validationRequired = false;
+    private boolean responseCompleted;
+    private boolean validationRequired;
 
     DefaultCacheEntry(
         DefaultCache cache,
