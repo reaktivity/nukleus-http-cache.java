@@ -338,7 +338,7 @@ final class HttpCacheProxyGroupRequest
     }
 
     private void onSignal(
-        SignalFW signal)
+        final SignalFW signal)
     {
         final int signalId = signal.signalId();
 
@@ -462,26 +462,27 @@ final class HttpCacheProxyGroupRequest
                 e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
                       .item(h -> h.name(RETRY_AFTER).value("0"));
 
-            beginExRW.typeId(httpTypeId)
-                     .headers(mutator);
+            beginExRW.typeId(httpTypeId).headers(mutator);
 
             MessageConsumer newResponse = responseFactory.apply(beginExRW.build());
 
             factory.writer.doHttpResponse(newResponse,
-                routeId,
-                replyId,
-                traceId,
-                mutator);
+                                          routeId,
+                                          replyId,
+                                          traceId,
+                                          mutator);
 
             factory.writer.doHttpEnd(newResponse,
-                routeId,
-                replyId,
-                traceId);
+                                     routeId,
+                                     replyId,
+                                     traceId);
         }
     }
 
     private void cleanupRequestIfNecessary()
     {
+        factory.correlations.remove(connectReplyId);
+        factory.correlations.remove(replyId);
         factory.router.clearThrottle(replyId);
         if (requestSlot.value != NO_SLOT)
         {
