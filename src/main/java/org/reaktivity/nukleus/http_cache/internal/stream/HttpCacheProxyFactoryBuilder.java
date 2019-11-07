@@ -17,14 +17,14 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import java.util.function.Function;
 import java.util.function.LongConsumer;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
-import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Long2ObjectHashMap;
-import org.reaktivity.nukleus.buffer.BufferPool;
+import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
@@ -54,12 +54,12 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private LongSupplier supplyTraceId;
     private ToIntFunction<String> supplyTypeId;
     private LongUnaryOperator supplyReplyId;
+    private LongFunction<BudgetDebitor> supplyDebitor;
     private Slab cacheBufferPool;
     private HeapBufferPool requestBufferPool;
     private Cache emulatedCache;
     private DefaultCache defaultCache;
     private EmulatedBudgetManager emulatedBudgetManager;
-    private BudgetManager defaultBudgetManager;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
     private SignalingExecutor executor;
@@ -125,9 +125,10 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     }
 
     @Override
-    public StreamFactoryBuilder setBufferPoolSupplier(
-        Supplier<BufferPool> supplyBufferPool)
+    public StreamFactoryBuilder setBudgetDebitorSupplier(
+        LongFunction<BudgetDebitor> supplyDebitor)
     {
+        this.supplyDebitor = supplyDebitor;
         return this;
     }
 
@@ -160,10 +161,9 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     {
         final HttpCacheCounters counters = new HttpCacheCounters(supplyCounter, supplyAccumulator);
 
-        if (emulatedBudgetManager == null && defaultBudgetManager == null)
+        if (emulatedBudgetManager == null)
         {
             emulatedBudgetManager = new EmulatedBudgetManager();
-            defaultBudgetManager =  new BudgetManager();
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
@@ -203,11 +203,11 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
         return new HttpCacheProxyFactory(config,
                                          router,
                                          emulatedBudgetManager,
-                                         defaultBudgetManager,
                                          writeBuffer,
                                          requestBufferPool,
                                          supplyInitialId,
                                          supplyReplyId,
+                                         supplyDebitor,
                                          requestCorrelations,
                                          correlations,
                                          emulatedCache,

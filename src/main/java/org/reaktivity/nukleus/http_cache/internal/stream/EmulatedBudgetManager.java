@@ -29,16 +29,22 @@ public class EmulatedBudgetManager
         PROXY
     }
 
+    @FunctionalInterface
+    public interface BudgetEncoder
+    {
+        int encode(int credit, long traceId);
+    }
+
     private static class StreamBudget
     {
         final long streamId;
         final StreamKind streamKind;
         int unackedBudget;
         int index;
-        BudgetManager.BudgetEncoder budgetAvailable;
+        BudgetEncoder budgetAvailable;
         boolean closing;
 
-        StreamBudget(long streamId, StreamKind kind, BudgetManager.BudgetEncoder budgetAvailable, int index)
+        StreamBudget(long streamId, StreamKind kind, BudgetEncoder budgetAvailable, int index)
         {
             this.streamId = streamId;
             this.streamKind = requireNonNull(kind);
@@ -186,7 +192,7 @@ public class EmulatedBudgetManager
     }
 
     public void window(StreamKind streamKind, long groupId, long streamId, int credit,
-                       BudgetManager.BudgetEncoder budgetAvailable, long trace)
+                       BudgetEncoder budgetAvailable, long trace)
     {
         if (groupId == 0)
         {

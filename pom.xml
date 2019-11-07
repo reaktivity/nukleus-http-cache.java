@@ -53,8 +53,8 @@
     <k3po.version>3.0.0-alpha-103</k3po.version>
 
     <nukleus.plugin.version>0.42</nukleus.plugin.version>
-    <nukleus.http.cache.spec.version>develop-SNAPSHOT</nukleus.http.cache.spec.version>
-    <reaktor.version>0.104</reaktor.version>
+    <nukleus.http.cache.spec.version>0.83</nukleus.http.cache.spec.version>
+    <reaktor.version>0.109</reaktor.version>
   </properties>
 
   <dependencies>
@@ -249,6 +249,11 @@
             <artifactId>reaktor</artifactId>
             <version>${reaktor.version}</version>
             <type>test-jar</type>
+          </dependency>
+          <dependency>
+            <groupId>org.reaktivity</groupId>
+            <artifactId>reaktor</artifactId>
+            <version>${reaktor.version}</version>
           </dependency>
         </dependencies>
       </plugin>
