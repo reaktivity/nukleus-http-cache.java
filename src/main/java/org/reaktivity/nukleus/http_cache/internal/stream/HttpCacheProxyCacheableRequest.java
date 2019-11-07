@@ -15,8 +15,8 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.Math.min;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
@@ -37,11 +37,10 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.MutableInteger;
+import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.GroupBudget;
-import org.reaktivity.nukleus.http_cache.internal.stream.BudgetManager.GroupBudget.StreamBudget;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -81,13 +80,15 @@ final class HttpCacheProxyCacheableRequest
     private Future<?> preferWaitExpired;
 
     private int acceptReplyBudget;
-    private long budgetId;
-    private int padding;
+    private long acceptReplyDebitorId;
+    private BudgetDebitor acceptReplyDebitor;
+    private long acceptReplyDebitorIndex = NO_DEBITOR_INDEX;
+
+    private int acceptReplyPadding;
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
     private boolean responseClosing;
-    private StreamBudget streamBudget;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -262,6 +263,7 @@ final class HttpCacheProxyCacheableRequest
 
         cleanupRequestIfNecessary();
         cleanupRequestTimeoutIfNecessary();
+        cleanupResponseIfNecessary();
     }
 
     private void schedulePreferWaitIfNoneMatchIfNecessary(
@@ -341,8 +343,7 @@ final class HttpCacheProxyCacheableRequest
         else
         {
             final long traceId = signal.traceId();
-            supplyStreamBudget().flushGroup(traceId);
-            sendEndIfNecessary(traceId);
+            doResponseFlush(traceId);
         }
     }
 
@@ -368,11 +369,13 @@ final class HttpCacheProxyCacheableRequest
                                    signal.traceId());
             requestGroup.dequeue(ifNoneMatch, acceptReplyId);
             cacheEntry.setSubscribers(-1);
+            cleanupResponseIfNecessary();
         }
         else
         {
             send503RetryAfter();
         }
+
         cleanupRequestIfNecessary();
     }
 
@@ -433,35 +436,77 @@ final class HttpCacheProxyCacheableRequest
         {
             factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, factory.supplyTraceId.getAsLong());
             cleanupRequestIfNecessary();
+            cleanupResponseIfNecessary();
         }
         else
         {
-            budgetId = window.budgetId();
-            padding = window.padding();
+            acceptReplyDebitorId = window.budgetId();
+            acceptReplyPadding = window.padding();
             final long traceId = window.traceId();
             final int credit = window.credit();
             acceptReplyBudget += credit;
 
-            final StreamBudget streamBudget = supplyStreamBudget();
-            streamBudget.adjust(credit);
-            streamBudget.flushGroup(traceId);
-            sendEndIfNecessary(traceId);
+            if (acceptReplyDebitorId != 0L && acceptReplyDebitor == null)
+            {
+                acceptReplyDebitor = factory.supplyDebitor.apply(acceptReplyDebitorId);
+                acceptReplyDebitorIndex = acceptReplyDebitor.acquire(acceptReplyDebitorId, acceptReplyId, this::doResponseFlush);
+            }
+
+            doResponseFlush(traceId);
         }
     }
 
     private void onResponseReset(
         ResetFW reset)
     {
-        final long traceId = reset.traceId();
-        final StreamBudget streamBudget = supplyStreamBudget();
-        streamBudget.close();
-        streamBudget.flushGroup(traceId);
-
         cleanupRequestIfNecessary();
+        cleanupResponseIfNecessary();
         if (cacheEntry != null)
         {
             cacheEntry.setSubscribers(-1);
         }
+    }
+
+    private void doResponseFlush(
+        long traceId)
+    {
+        final int remaining = cacheEntry.responseSize() - payloadWritten;
+        int writable = Math.min(acceptReplyBudget - acceptReplyPadding, remaining);
+
+        if (writable > 0)
+        {
+            final int maximum = writable + acceptReplyPadding;
+            final int minimum = Math.min(maximum, 1024);
+
+            int claimed = maximum;
+            if (acceptReplyDebitorIndex != NO_DEBITOR_INDEX)
+            {
+                claimed = acceptReplyDebitor.claim(acceptReplyDebitorIndex, acceptReplyId, minimum, maximum);
+            }
+
+            final int required = claimed;
+            final int writableMax = required - acceptReplyPadding;
+            if (writableMax > 0)
+            {
+                final BufferPool cacheResponsePool = factory.defaultCache.getResponsePool();
+
+                factory.writer.doHttpData(
+                    accept,
+                    acceptRouteId,
+                    acceptReplyId,
+                    traceId,
+                    acceptReplyDebitorId,
+                    required,
+                    p -> buildResponsePayload(payloadWritten, writableMax, p, cacheResponsePool));
+
+                payloadWritten += writableMax;
+
+                acceptReplyBudget -= required;
+                assert acceptReplyBudget >= 0;
+            }
+        }
+
+        sendEndIfNecessary(traceId);
     }
 
     private void send503RetryAfter()
@@ -479,6 +524,8 @@ final class HttpCacheProxyCacheableRequest
             acceptRouteId,
             acceptReplyId,
             factory.supplyTraceId.getAsLong());
+
+        cleanupResponseIfNecessary();
 
         // count all responses
         factory.counters.responses.getAsLong();
@@ -515,9 +562,7 @@ final class HttpCacheProxyCacheableRequest
     private void sendEndIfNecessary(
         long traceId)
     {
-        final StreamBudget streamBudget = supplyStreamBudget();
         if (payloadWritten == cacheEntry.responseSize() &&
-            streamBudget.closeable() &&
             cacheEntry.isResponseCompleted())
         {
             if (!etagSent &&
@@ -537,50 +582,10 @@ final class HttpCacheProxyCacheableRequest
                                          traceId);
             }
 
-            streamBudget.close();
             cleanupRequestIfNecessary();
+            cleanupResponseIfNecessary();
             cacheEntry.setSubscribers(-1);
-
-            streamBudget.flushGroup(traceId);
         }
-    }
-
-    private StreamBudget supplyStreamBudget()
-    {
-        if (streamBudget == null)
-        {
-            final GroupBudget groupBudget = factory.budgetManager.supplyGroupBudget(budgetId);
-            streamBudget = groupBudget.supplyStreamBudget(acceptReplyId, this::writePayload);
-        }
-        return streamBudget;
-    }
-
-    private int writePayload(
-        int budget,
-        long trace)
-    {
-        final int minBudget = min(budget, acceptReplyBudget);
-        final int toWrite = min(minBudget - padding, cacheEntry.responseSize() - payloadWritten);
-        if (toWrite > 0)
-        {
-            factory.writer.doHttpData(
-                accept,
-                acceptRouteId,
-                acceptReplyId,
-                trace,
-                budgetId,
-                toWrite + padding,
-                p -> buildResponsePayload(payloadWritten,
-                                          toWrite,
-                                          p,
-                                          factory.defaultCache.getResponsePool()));
-            payloadWritten += toWrite;
-            budget -= toWrite + padding;
-            acceptReplyBudget -= toWrite + padding;
-            assert acceptReplyBudget >= 0;
-        }
-
-        return budget;
     }
 
     private void buildResponsePayload(
@@ -619,6 +624,16 @@ final class HttpCacheProxyCacheableRequest
             length -= chunkLength;
         }
         buildResponsePayload(index, length, builder, bp, ++slotCnt);
+    }
+
+    private void cleanupResponseIfNecessary()
+    {
+        if (acceptReplyDebitorIndex != NO_DEBITOR_INDEX)
+        {
+            acceptReplyDebitor.release(acceptReplyDebitorIndex, acceptReplyId);
+            acceptReplyDebitorIndex = NO_DEBITOR_INDEX;
+            acceptReplyDebitor = null;
+        }
     }
 
     private void cleanupRequestTimeoutIfNecessary()
