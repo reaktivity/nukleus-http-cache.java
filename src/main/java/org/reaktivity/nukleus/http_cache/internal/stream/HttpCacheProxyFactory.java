@@ -23,6 +23,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.LongSupplier;
 import java.util.function.LongUnaryOperator;
 import java.util.function.ToIntFunction;
@@ -32,6 +33,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
+import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.concurrent.SignalingExecutor;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -84,13 +86,13 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
-    final BudgetManager budgetManager;
     final EmulatedBudgetManager emulatedBudgetManager;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
     final LongSupplier supplyTraceId;
     final ToIntFunction<String> supplyTypeId;
+    final LongFunction<BudgetDebitor> supplyDebitor;
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final MutableDirectBuffer writeBuffer;
@@ -110,11 +112,11 @@ public class HttpCacheProxyFactory implements StreamFactory
         HttpCacheConfiguration config,
         RouteManager router,
         EmulatedBudgetManager emulatedBudgetManager,
-        BudgetManager budgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
+        LongFunction<BudgetDebitor> supplyDebitor,
         Long2ObjectHashMap<Request> requestCorrelations,
         Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations,
         Cache emulatedCache,
@@ -127,12 +129,12 @@ public class HttpCacheProxyFactory implements StreamFactory
     {
         this.router = requireNonNull(router);
         this.emulatedBudgetManager = requireNonNull(emulatedBudgetManager);
-        this.budgetManager = requireNonNull(budgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.preferWaitMaximum = config.preferWaitMaximum();
         this.supplyTypeId = supplyTypeId;
+        this.supplyDebitor = supplyDebitor;
         this.requestBufferPool = new CountingBufferPool(
                 requestBufferPool,
                 counters.supplyCounter.apply("http-cache.request.acquires"),
