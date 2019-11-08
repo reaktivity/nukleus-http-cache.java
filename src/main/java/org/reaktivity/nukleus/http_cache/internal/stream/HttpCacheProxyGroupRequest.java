@@ -23,6 +23,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -72,6 +73,8 @@ final class HttpCacheProxyGroupRequest
     private Future<?> retryRequest;
     private int attempts;
     private int state;
+    private short authScope;
+    private long authorization;
 
     HttpCacheProxyGroupRequest(
         HttpCacheProxyFactory factory,
@@ -116,7 +119,8 @@ final class HttpCacheProxyGroupRequest
                                                     connectInitial,
                                                     connectReplyId,
                                                     routeId,
-                                                    this::scheduleRequest);
+                                                    this::scheduleRequest,
+                                                    authScope);
             newStream = cacheableResponse::onResponseMessage;
         }
         else
@@ -231,6 +235,8 @@ final class HttpCacheProxyGroupRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        authorization = begin.authorization();
+        authScope = authorizationScope(authorization);
         routeId = begin.routeId();
         initialId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(initialId);
@@ -421,6 +427,7 @@ final class HttpCacheProxyGroupRequest
                                      routeId,
                                      connectInitialId,
                                      factory.supplyTraceId.getAsLong(),
+                                     authorization,
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
     }

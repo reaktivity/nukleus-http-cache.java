@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.function.Function;
 
@@ -41,21 +42,21 @@ final class HttpCacheProxyCacheableResponse
 {
     private final HttpCacheProxyFactory factory;
 
-    private int connectReplyBudget;
-    private boolean isResponseBuffering;
-    private int requestHash;
-
     private final MutableInteger requestSlot;
     private final int initialWindow;
-    private String ifNoneMatch;
     private final Function<Long, Boolean> retryRequest;
     private final HttpProxyCacheableRequestGroup requestGroup;
+    private final int requestHash;
+    private final short authScope;
 
     private MessageConsumer connectReply;
     private long connectRouteId;
     private long connectReplyId;
     private DefaultCacheEntry cacheEntry;
     private String etag;
+    private String ifNoneMatch;
+    private boolean isResponseBuffering;
+    private int connectReplyBudget;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
@@ -64,7 +65,8 @@ final class HttpCacheProxyCacheableResponse
         MessageConsumer connectReply,
         long connectReplyId,
         long connectRouteId,
-        Function<Long, Boolean> retryRequest)
+        Function<Long, Boolean> retryRequest,
+        short authScope)
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
@@ -76,6 +78,7 @@ final class HttpCacheProxyCacheableResponse
         this.initialWindow = factory.responseBufferPool.slotCapacity();
         this.ifNoneMatch = requestGroup.getEtag();
         this.retryRequest = retryRequest;
+        this.authScope = authScope;
         assert requestSlot.value != NO_SLOT;
     }
 
@@ -116,16 +119,12 @@ final class HttpCacheProxyCacheableResponse
     private void onBegin(
         BeginFW begin)
     {
-        final long connectReplyId = begin.streamId();
-        long traceId = begin.traceId();
-
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-
-
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        long traceId = begin.traceId();
 
-        cacheEntry = factory.defaultCache.supply(requestHash);
+        cacheEntry = factory.defaultCache.supply(requestHash, authScope);
         cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
         etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;

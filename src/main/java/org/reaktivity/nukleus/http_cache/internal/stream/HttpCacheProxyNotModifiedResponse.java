@@ -15,6 +15,8 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
@@ -43,12 +45,15 @@ final class HttpCacheProxyNotModifiedResponse
     private final long connectRouteId;
     private final long connectReplyId;
 
-    private int connectReplyBudget;
+    private final short authScope;
     private final String preferWait;
+
+    private int connectReplyBudget;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,
         int requestHash,
+        short authScope,
         String preferWait,
         MessageConsumer acceptReply,
         long acceptRouteId,
@@ -59,6 +64,7 @@ final class HttpCacheProxyNotModifiedResponse
     {
         this.factory = factory;
         this.requestHash = requestHash;
+        this.authScope = authScope;
         this.preferWait = preferWait;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
@@ -118,7 +124,7 @@ final class HttpCacheProxyNotModifiedResponse
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash);
+        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope);
         factory.defaultCache.send304(cacheEntry.etag(),
                                      preferWait,
                                      acceptReply,

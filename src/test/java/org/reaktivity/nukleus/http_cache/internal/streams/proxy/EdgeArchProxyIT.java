@@ -127,7 +127,7 @@ public class EdgeArchProxyIT
     public void shouldInjectIndividualizedPushPromisesOnSharedFreshnessExtension() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -157,78 +157,13 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/accept/client",
-        "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/connect/server",
-    })
-    public void shouldCacheAndPollOnSurrogateMaxAgeWhenFreshExt() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.cache/accept/client",
-        "${streams}/polling.updates.cache/connect/server",
-    })
-    public void shouldUpdateCacheOnPoll() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.cache.after.503.retry-after/accept/client",
-        "${streams}/polling.updates.cache.after.503.retry-after/connect/server",
-    })
-    public void shouldUpdateCacheOnPollAfter503RetryAfter() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.waits.on.surrogate-age/accept/client",
-        "${streams}/polling.waits.on.surrogate-age/connect/server",
-    })
-    public void pollingWaitsOnSurrogateAge() throws Exception
-    {
-        k3po.start();
-        Instant start = Instant.now();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Instant finish = Instant.now();
-        Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertExpectedCacheEntries(1, 2);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
         "${streams}/polling.updates.pending.on-update.requests/accept/client",
         "${streams}/polling.updates.pending.on-update.requests/connect/server",
     })
     public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -240,7 +175,7 @@ public class EdgeArchProxyIT
     public void shouldAttachToNextCacheEntryIfPushPromiseArrivesBeforeResponseCompletes() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test

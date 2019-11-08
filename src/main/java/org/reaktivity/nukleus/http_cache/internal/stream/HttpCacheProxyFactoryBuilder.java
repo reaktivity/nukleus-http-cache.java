@@ -30,10 +30,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HeapBufferPool;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Slab;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -44,8 +41,6 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 {
 
     private final HttpCacheConfiguration config;
-    private final LongObjectBiConsumer<Runnable> scheduler;
-    private final Long2ObjectHashMap<Request> requestCorrelations;
     private final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
 
     private RouteManager router;
@@ -57,9 +52,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private LongFunction<BudgetDebitor> supplyDebitor;
     private Slab cacheBufferPool;
     private HeapBufferPool requestBufferPool;
-    private Cache emulatedCache;
     private DefaultCache defaultCache;
-    private EmulatedBudgetManager emulatedBudgetManager;
     private Function<String, LongSupplier> supplyCounter;
     private Function<String, LongConsumer> supplyAccumulator;
     private SignalingExecutor executor;
@@ -67,13 +60,10 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private LongConsumer cacheEntries;
 
     public HttpCacheProxyFactoryBuilder(
-            HttpCacheConfiguration config,
-            LongObjectBiConsumer<Runnable> scheduler)
+            HttpCacheConfiguration config)
     {
         this.config = config;
-        this.requestCorrelations = new Long2ObjectHashMap<>();
         this.correlations = new Long2ObjectHashMap<>();
-        this.scheduler = scheduler;
     }
 
     @Override
@@ -161,34 +151,13 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     {
         final HttpCacheCounters counters = new HttpCacheCounters(supplyCounter, supplyAccumulator);
 
-        if (emulatedBudgetManager == null)
+        if (defaultCache == null)
         {
-            emulatedBudgetManager = new EmulatedBudgetManager();
+            cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
             this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
-        }
-
-        cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
-
-        if (emulatedCache == null)
-        {
-            this.emulatedCache = new Cache(router,
-                                           scheduler,
-                                           emulatedBudgetManager,
-                                           writeBuffer,
-                                           requestBufferPool,
-                                           cacheBufferPool,
-                                           requestCorrelations,
-                                           counters,
-                                           cacheEntries,
-                                           supplyTraceId,
-                                           supplyTypeId);
-        }
-
-        if (defaultCache == null)
-        {
             this.defaultCache = new DefaultCache(router,
                                                  writeBuffer,
                                                  cacheBufferPool,
@@ -202,21 +171,17 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         return new HttpCacheProxyFactory(config,
                                          router,
-                                         emulatedBudgetManager,
                                          writeBuffer,
                                          requestBufferPool,
                                          supplyInitialId,
                                          supplyReplyId,
                                          supplyDebitor,
-                                         requestCorrelations,
                                          correlations,
-                                         emulatedCache,
                                          defaultCache,
                                          counters,
                                          supplyTraceId,
                                          supplyTypeId,
-                                         executor,
-                                         scheduler);
+                                         executor);
     }
 
 }

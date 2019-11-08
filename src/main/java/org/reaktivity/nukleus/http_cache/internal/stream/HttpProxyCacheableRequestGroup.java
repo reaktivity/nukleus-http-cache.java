@@ -290,6 +290,6 @@ final class HttpProxyCacheableRequestGroup
         factory.writer.doReset(connect,
             connectRouteId,
             connectReplyId,
-                               factory.supplyTraceId.getAsLong());
+            factory.supplyTraceId.getAsLong());
     }
 }

@@ -29,7 +29,9 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -89,6 +91,9 @@ final class HttpCacheProxyCacheableRequest
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
     private boolean responseClosing;
+    private boolean isEmulatedProtocolStack;
+    private short authScope;
+    private long authorization;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -128,6 +133,7 @@ final class HttpCacheProxyCacheableRequest
         {
             newStream = new HttpCacheProxyNotModifiedResponse(factory,
                                                              requestGroup.getRequestHash(),
+                                                             authScope,
                                                              prefer,
                                                              accept,
                                                              acceptRouteId,
@@ -206,6 +212,9 @@ final class HttpCacheProxyCacheableRequest
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
         final long traceId = begin.traceId();
+        authorization = begin.authorization();
+        authScope = authorizationScope(authorization);
+        isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -275,10 +284,10 @@ final class HttpCacheProxyCacheableRequest
             if (preferWait > 0)
             {
                 preferWaitExpired = factory.executor.schedule(Math.min(preferWait, factory.preferWaitMaximum),
-                                                                   SECONDS,
-                                                                   acceptRouteId,
-                                                                   acceptReplyId,
-                                                                   REQUEST_EXPIRED_SIGNAL);
+                                                              SECONDS,
+                                                              acceptRouteId,
+                                                              acceptReplyId,
+                                                              REQUEST_EXPIRED_SIGNAL);
             }
         }
     }
@@ -393,6 +402,7 @@ final class HttpCacheProxyCacheableRequest
                                      connectRouteId,
                                      connectInitialId,
                                      signal.traceId(),
+                                     authorization,
                                      mutator);
         cleanupRequestSlotIfNecessary();
     }
@@ -565,6 +575,18 @@ final class HttpCacheProxyCacheableRequest
         if (payloadWritten == cacheEntry.responseSize() &&
             cacheEntry.isResponseCompleted())
         {
+
+            if (isEmulatedProtocolStack)
+            {
+                factory.writer.doHttpPushPromise(accept,
+                                                 acceptRouteId,
+                                                 acceptReplyId,
+                                                 authScope,
+                                                 cacheEntry.getRequestHeaders(),
+                                                 cacheEntry.getCachedResponseHeaders(),
+                                                 cacheEntry.etag());
+            }
+
             if (!etagSent &&
                 cacheEntry.etag() != null)
             {

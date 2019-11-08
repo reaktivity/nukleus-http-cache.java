@@ -24,24 +24,20 @@ import java.util.Map;
 import org.reaktivity.nukleus.Elektron;
 import org.reaktivity.nukleus.http_cache.internal.stream.HttpCacheProxyFactoryBuilder;
 import org.reaktivity.nukleus.http_cache.internal.stream.ServerStreamFactoryBuilder;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.DelayedTaskScheduler;
 import org.reaktivity.nukleus.route.RouteKind;
 import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 
 final class HttpCacheElektron implements Elektron
 {
     private final Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders;
-    private final HttpCacheAgent agent;
 
     HttpCacheElektron(
         HttpCacheConfiguration config)
     {
-        DelayedTaskScheduler scheduler = new DelayedTaskScheduler();
         Map<RouteKind, StreamFactoryBuilder> streamFactoryBuilders = new EnumMap<>(RouteKind.class);
         streamFactoryBuilders.put(SERVER, new ServerStreamFactoryBuilder());
-        streamFactoryBuilders.put(PROXY, new HttpCacheProxyFactoryBuilder(config, scheduler::schedule));
+        streamFactoryBuilders.put(PROXY, new HttpCacheProxyFactoryBuilder(config));
 
-        this.agent = new HttpCacheAgent(scheduler);
         this.streamFactoryBuilders = streamFactoryBuilders;
     }
 
@@ -50,12 +46,6 @@ final class HttpCacheElektron implements Elektron
         RouteKind kind)
     {
         return streamFactoryBuilders.get(kind);
-    }
-
-    @Override
-    public HttpCacheAgent agent()
-    {
-        return agent;
     }
 
     @Override

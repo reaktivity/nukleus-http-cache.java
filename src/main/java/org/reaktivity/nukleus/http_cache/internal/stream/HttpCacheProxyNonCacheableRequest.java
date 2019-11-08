@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -148,6 +149,7 @@ final class HttpCacheProxyNonCacheableRequest
         final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
         assert httpBeginEx != null;
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
+        final long authorization = begin.authorization();
 
         // count all requests
         factory.counters.requests.getAsLong();
@@ -157,6 +159,7 @@ final class HttpCacheProxyNonCacheableRequest
             connectRouteId,
             connectInitialId,
             factory.supplyTraceId.getAsLong(),
+            authorization,
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
 
         factory.router.setThrottle(connectInitialId, this::onRequestMessage);

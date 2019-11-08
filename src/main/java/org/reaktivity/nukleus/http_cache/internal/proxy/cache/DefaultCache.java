@@ -113,16 +113,18 @@ public class DefaultCache
         return cachedEntries.get(requestHash);
     }
 
-    public boolean hasCacheEntry(
-        int requestHash)
-    {
-        return cachedEntries.containsKey(requestHash);
-    }
-
     public DefaultCacheEntry supply(
-        int requestHash)
+        int requestHash,
+        short authScope)
     {
-        return cachedEntries.computeIfAbsent(requestHash, this::newCacheEntry);
+        DefaultCacheEntry entry = get(requestHash);
+        if (entry == null)
+        {
+            entry = newCacheEntry(requestHash, authScope);
+            cachedEntries.put(requestHash, entry);
+        }
+
+        return entry;
     }
 
     public boolean matchCacheableResponse(
@@ -331,12 +333,14 @@ public class DefaultCache
     }
 
     private DefaultCacheEntry newCacheEntry(
-        int requestHash)
+        int requestHash,
+        short authScope)
     {
         entryCount.accept(1);
         return new DefaultCacheEntry(
             this,
             requestHash,
+            authScope,
             cachedRequestBufferPool,
             cachedResponseBufferPool);
     }
