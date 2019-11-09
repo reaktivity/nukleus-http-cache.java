@@ -154,10 +154,10 @@ public class DefaultCache
     public void purge(
         int requestHash)
     {
-        DefaultCacheEntry cacheEntry = this.cachedEntries.remove(requestHash);
-        entryCount.accept(-1);
+        DefaultCacheEntry cacheEntry = cachedEntries.remove(requestHash);
         if (cacheEntry != null)
         {
+            entryCount.accept(-1);
             cacheEntry.purge();
         }
     }

@@ -169,30 +169,6 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/polling.update.attachs.to.next.cache.if.push.promise.arrives.before.response.completes/accept/client",
-        "${streams}/polling.update.attachs.to.next.cache.if.push.promise.arrives.before.response.completes/connect/server",
-    })
-    public void shouldAttachToNextCacheEntryIfPushPromiseArrivesBeforeResponseCompletes() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.pending.on-update.requests.only.when.modified/accept/client",
-        "${streams}/polling.updates.pending.on-update.requests.only.when.modified/connect/server",
-    })
-    public void shouldUpdateOnUpdateRequestsOnlyWhenModified() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
         "${streams}/failed.polling.aborts.pending.on-update.requests/accept/client",
         "${streams}/failed.polling.aborts.pending.on-update.requests/connect/server",
     })
@@ -241,23 +217,6 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/update.cache.when.304.response.has.matching.etag/accept/client",
-        "${streams}/update.cache.when.304.response.has.matching.etag/connect/server",
-    })
-    public void shouldCacheWhen304ResponseHasMatchingEtag() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
         "${streams}/update.cache.when.200.response.has.different.etag/accept/client",
         "${streams}/update.cache.when.200.response.has.different.etag/connect/server",
     })
@@ -265,44 +224,6 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.stops.if.no.subscribers/accept/client",
-        "${streams}/polling.stops.if.no.subscribers/connect/server",
-    })
-    public void shouldStopPollingIfNoSubscribers() throws Exception
-    {
-        k3po.finish();
-        Thread.sleep(100); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.stops.if.no.subscribers.and.not.updated/accept/client",
-        "${streams}/polling.stops.if.no.subscribers.and.not.updated/connect/server",
-    })
-    public void shouldStopPollingIfNoSubscribersAndNotUpdated() throws Exception
-    {
-        k3po.finish();
-        Thread.sleep(10); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/maintain.polling.per.multiple.auth.scopes/accept/client",
-        "${streams}/maintain.polling.per.multiple.auth.scopes/connect/server",
-    })
-    public void shouldMaintainPollingForMultipleAuthScopes() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(2, 2, 2);
     }
 
 
@@ -315,7 +236,7 @@ public class EdgeArchProxyIT
     public void noAuthorizationSendsCacheControlPrivate() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -327,7 +248,7 @@ public class EdgeArchProxyIT
     public void noAuthorizationSendsCacheControlPrivateExceptWhenPublic() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test

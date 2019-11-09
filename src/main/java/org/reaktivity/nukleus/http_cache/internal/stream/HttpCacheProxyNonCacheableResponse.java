@@ -15,10 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
-
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -109,19 +105,12 @@ final class HttpCacheProxyNonCacheableResponse
     private void onBegin(
         BeginFW begin)
     {
-        final long connectReplyId = begin.streamId();
         final long traceId = begin.traceId();
 
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::tryWrap);
         assert httpBeginFW != null;
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
-                              getHeader(responseHeaders, ":status"));
-        }
 
         factory.writer.doHttpResponse(
             accept,

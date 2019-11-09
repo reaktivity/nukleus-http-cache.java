@@ -182,6 +182,7 @@ public class Writer
         boolean isStale)
     {
         final int staleWhileRevalidate = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        final boolean hasPreferWait = isPreferWait(requestHeaders);
         responseHeaders.forEach(h ->
         {
             final StringFW name = h.name();
@@ -191,7 +192,7 @@ public class Writer
             {
                 builder.item(header -> header.name(name).value(value));
             }
-            updateEmulatedResponseHeaders(builder, h, staleWhileRevalidate);
+            updateEmulatedResponseHeaders(builder, h, staleWhileRevalidate, hasPreferWait);
         });
 
         if (!responseHeaders.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
@@ -220,7 +221,9 @@ public class Writer
 
         if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL))
         {
-            final String value = "stale-while-revalidate=" + staleWhileRevalidate;
+            final String value = hasPreferWait
+                ? "private, stale-while-revalidate=" + staleWhileRevalidate
+                : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
         }
     }
@@ -228,7 +231,8 @@ public class Writer
     private void updateEmulatedResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         HttpHeaderFW responseHeader,
-        int staleWhileRevalidate)
+        int staleWhileRevalidate,
+        boolean hasPreferWait)
     {
         final StringFW nameFW = responseHeader.name();
         final String name = nameFW.asString();
@@ -239,6 +243,10 @@ public class Writer
         {
             cacheControlParser.parse(value);
             cacheControlParser.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
+            if (hasPreferWait && !(cacheControlParser.contains("private") || cacheControlParser.contains("public")))
+            {
+                cacheControlParser.getValues().put("private", null);
+            }
             StringBuilder cacheControlDirectives = new StringBuilder();
             cacheControlParser.getValues().forEach((k, v) ->
             {

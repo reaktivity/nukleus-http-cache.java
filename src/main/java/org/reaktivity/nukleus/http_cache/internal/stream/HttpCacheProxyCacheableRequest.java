@@ -151,6 +151,7 @@ final class HttpCacheProxyCacheableRequest
                                                                accept,
                                                                acceptRouteId,
                                                                acceptReplyId)::onResponseMessage;
+            factory.defaultCache.purge(requestGroup.getRequestHash());
         }
 
         connect = factory.router.supplyReceiver(connectReplyId);
@@ -444,6 +445,20 @@ final class HttpCacheProxyCacheableRequest
     {
         if (responseClosing)
         {
+            if (isEmulatedProtocolStack)
+            {
+                final DefaultCacheEntry entry = factory.defaultCache.get(requestGroup.getRequestHash());
+                if (entry != null)
+                {
+                    factory.writer.doHttpPushPromise(accept,
+                        acceptRouteId,
+                        acceptReplyId,
+                        authScope,
+                        entry.getRequestHeaders(),
+                        entry.getCachedResponseHeaders(),
+                        entry.etag());
+                }
+            }
             factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, factory.supplyTraceId.getAsLong());
             cleanupRequestIfNecessary();
             cleanupResponseIfNecessary();
@@ -575,7 +590,6 @@ final class HttpCacheProxyCacheableRequest
         if (payloadWritten == cacheEntry.responseSize() &&
             cacheEntry.isResponseCompleted())
         {
-
             if (isEmulatedProtocolStack)
             {
                 factory.writer.doHttpPushPromise(accept,

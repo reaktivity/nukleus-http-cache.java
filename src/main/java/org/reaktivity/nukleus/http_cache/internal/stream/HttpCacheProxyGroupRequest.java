@@ -74,7 +74,6 @@ final class HttpCacheProxyGroupRequest
     private int attempts;
     private int state;
     private short authScope;
-    private long authorization;
 
     HttpCacheProxyGroupRequest(
         HttpCacheProxyFactory factory,
@@ -235,7 +234,7 @@ final class HttpCacheProxyGroupRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
-        authorization = begin.authorization();
+        long authorization = begin.authorization();
         authScope = authorizationScope(authorization);
         routeId = begin.routeId();
         initialId = begin.streamId();
@@ -427,7 +426,7 @@ final class HttpCacheProxyGroupRequest
                                      routeId,
                                      connectInitialId,
                                      factory.supplyTraceId.getAsLong(),
-                                     authorization,
+                                     0,
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
     }
