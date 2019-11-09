@@ -33,6 +33,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -93,6 +94,19 @@ final class HttpCacheProxyGroupRequest
         MessageConsumer newStream = null;
         ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
+
+        DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
+        if (cacheEntry != null)
+        {
+            boolean notVaries = cacheEntry.doesNotVaryBy(getRequestHeaders(), responseHeaders);
+            if (!notVaries)
+            {
+                factory.defaultCache.purge(requestGroup.getRequestHash());
+                cleanupRequestIfNecessary();
+                requestGroup.onCacheableResponseAborted();
+                return null;
+            }
+        }
 
         if ((retry && attempts < 3) ||
             (factory.defaultCache.checkToRetry(getRequestHeaders(),

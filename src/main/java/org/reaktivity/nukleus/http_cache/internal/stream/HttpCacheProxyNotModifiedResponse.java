@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;

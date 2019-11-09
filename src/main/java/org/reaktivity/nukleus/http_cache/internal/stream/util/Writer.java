@@ -29,6 +29,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Consumer;
@@ -183,6 +184,7 @@ public class Writer
     {
         final int staleWhileRevalidate = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
         final boolean hasPreferWait = isPreferWait(requestHeaders);
+        final boolean isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
         responseHeaders.forEach(h ->
         {
             final StringFW name = h.name();
@@ -192,7 +194,8 @@ public class Writer
             {
                 builder.item(header -> header.name(name).value(value));
             }
-            updateEmulatedResponseHeaders(builder, h, staleWhileRevalidate, hasPreferWait);
+
+            updateEmulatedResponseHeaders(builder, h, staleWhileRevalidate, hasPreferWait, isEmulatedProtocolStack);
         });
 
         if (!responseHeaders.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
@@ -219,7 +222,7 @@ public class Writer
             builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
         }
 
-        if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL))
+        if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL) && isEmulatedProtocolStack)
         {
             final String value = hasPreferWait
                 ? "private, stale-while-revalidate=" + staleWhileRevalidate
@@ -232,7 +235,8 @@ public class Writer
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         HttpHeaderFW responseHeader,
         int staleWhileRevalidate,
-        boolean hasPreferWait)
+        boolean hasPreferWait,
+        boolean isEmulatedProtocolStack)
     {
         final StringFW nameFW = responseHeader.name();
         final String name = nameFW.asString();
@@ -241,23 +245,30 @@ public class Writer
 
         if (HttpHeaders.CACHE_CONTROL.equals(name))
         {
-            cacheControlParser.parse(value);
-            cacheControlParser.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
-            if (hasPreferWait && !(cacheControlParser.contains("private") || cacheControlParser.contains("public")))
+            if (isEmulatedProtocolStack)
             {
-                cacheControlParser.getValues().put("private", null);
-            }
-            StringBuilder cacheControlDirectives = new StringBuilder();
-            cacheControlParser.getValues().forEach((k, v) ->
-            {
-                cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
-                cacheControlDirectives.append(k);
-                if (v != null)
+                cacheControlParser.parse(value);
+                cacheControlParser.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
+                if (hasPreferWait && !(cacheControlParser.contains("private") || cacheControlParser.contains("public")))
                 {
-                    cacheControlDirectives.append('=').append(v);
+                    cacheControlParser.getValues().put("private", null);
                 }
-            });
-            builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
+                StringBuilder cacheControlDirectives = new StringBuilder();
+                cacheControlParser.getValues().forEach((k, v) ->
+                {
+                    cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
+                    cacheControlDirectives.append(k);
+                    if (v != null)
+                    {
+                        cacheControlDirectives.append('=').append(v);
+                    }
+                });
+                builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
+            }
+            else
+            {
+                builder.item(header -> header.name(nameFW).value(valueFW));
+            }
         }
     }
 

@@ -38,6 +38,7 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
+import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -373,6 +374,26 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
         return cache.responseCacheControlFW.parse(cacheControl);
+    }
+
+    // Checks this entry's vary header with the given entry's vary header
+    public boolean doesNotVaryBy(
+        ArrayFW<HttpHeaderFW> newRequestHeader,
+        ArrayFW<HttpHeaderFW> newResponseHeader)
+    {
+        final ArrayFW<HttpHeaderFW> thisHeaders = getCachedResponseHeaders();
+        assert thisHeaders.buffer() != newResponseHeader.buffer();
+
+        String thisVary = HttpHeadersUtil.getHeader(thisHeaders, HttpHeaders.VARY);
+        String entryVary = HttpHeadersUtil.getHeader(newResponseHeader, HttpHeaders.VARY);
+
+        boolean varyMatches = (thisVary == entryVary) || (thisVary != null && thisVary.equalsIgnoreCase(entryVary));
+        if (varyMatches)
+        {
+            return doesNotVaryBy(newRequestHeader);
+        }
+
+        return false;
     }
 
     private boolean doesNotVaryBy(ArrayFW<HttpHeaderFW> request)
