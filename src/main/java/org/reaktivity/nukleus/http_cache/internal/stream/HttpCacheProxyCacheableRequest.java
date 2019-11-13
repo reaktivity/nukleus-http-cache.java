@@ -223,10 +223,6 @@ final class HttpCacheProxyCacheableRequest
         authScope = authorizationScope(authorization);
         final long traceId = begin.traceId();
 
-        // count all requests
-        factory.counters.requests.getAsLong();
-        factory.counters.requestsCacheable.getAsLong();
-
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
         {

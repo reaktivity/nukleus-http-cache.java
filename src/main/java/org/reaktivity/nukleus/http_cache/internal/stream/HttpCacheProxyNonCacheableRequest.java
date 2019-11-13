@@ -157,9 +157,6 @@ final class HttpCacheProxyNonCacheableRequest
         assert httpBeginEx != null;
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
 
-        // count all requests
-        factory.counters.requests.getAsLong();
-
         factory.writer.doHttpRequest(
             connectInitial,
             connectRouteId,

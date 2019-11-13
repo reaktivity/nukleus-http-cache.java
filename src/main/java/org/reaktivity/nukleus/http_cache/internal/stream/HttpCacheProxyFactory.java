@@ -278,6 +278,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
         final MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
         MessageConsumer newStream = null;
+        counters.requests.getAsLong();
 
         if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
         {
@@ -376,6 +377,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     {
         MessageConsumer newStream;
         HttpProxyCacheableRequestGroup group = requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);
+        counters.requestsCacheable.getAsLong();
 
         HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
         if (authorizationHeader != null)
@@ -409,7 +411,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         long acceptReplyId)
     {
         counters.requestsCacheable.getAsLong();
-        counters.requests.getAsLong();
         writer.doWindow(acceptReply,
                         acceptRouteId,
                         acceptInitialId,
@@ -428,6 +429,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         int requestHash,
         long acceptReplyId)
     {
+        counters.requestsCacheable.getAsLong();
+        counters.responsesCached.getAsLong();
         MessageConsumer newStream;
         DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
         boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
