@@ -55,26 +55,29 @@ public final class DefaultCacheEntry
 
     private final DefaultCache cache;
     private final int requestHash;
+    private final short authScope;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
     private String etag;
     private int requestSlot = NO_SLOT;
-    private int responseHeadersSize = 0;
-    private int responseSize = 0;
+    private int responseHeadersSize;
+    private int responseSize;
     private int subscribers;
-    private boolean responseCompleted = false;
+    private boolean responseCompleted;
 
 
     DefaultCacheEntry(
         DefaultCache cache,
         int requestHash,
+        short authScope,
         BufferPool requestPool,
         BufferPool responsePool)
     {
         this.cache = cache;
         this.requestHash = requestHash;
+        this.authScope = authScope;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
         responseSlots = new IntArrayList();
@@ -389,6 +392,11 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> request,
         short requestAuthScope)
     {
+        if (SurrogateControl.isProtectedEx(getCachedResponseHeaders()))
+        {
+            return requestAuthScope == authScope;
+        }
+
         final CacheControl responseCacheControl = responseCacheControl();
         final ArrayFW<HttpHeaderFW> cachedRequestHeaders = this.getRequestHeaders(this.cache.requestHeadersRO);
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
