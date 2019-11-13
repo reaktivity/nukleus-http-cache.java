@@ -188,4 +188,15 @@ public class Rfc7240ProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.with.503.if.latest.request.vary.does.not.match/accept/client",
+        "${streams}/respond.with.503.if.latest.request.vary.does.not.match/connect/server",
+    })
+    public void shouldRespondWith503IfLatestRequestVaryDoesNotMatch() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

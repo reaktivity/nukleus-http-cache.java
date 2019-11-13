@@ -42,6 +42,7 @@ import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -94,6 +95,7 @@ final class HttpCacheProxyCacheableRequest
     private boolean isEmulatedProtocolStack;
     private short authScope;
     private long authorization;
+    private String vary;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -235,7 +237,13 @@ final class HttpCacheProxyCacheableRequest
         }
         prefer = getHeader(requestHeaders, PREFER);
 
-        requestGroup.enqueue(ifNoneMatch, acceptRouteId, acceptReplyId);
+        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
+        if (cacheEntry != null && cacheEntry.getVaryBy() != null)
+        {
+            vary = getHeader(requestHeaders, cacheEntry.getVaryBy());
+        }
+
+        requestGroup.enqueue(ifNoneMatch, vary, acceptRouteId, acceptReplyId);
         factory.writer.doWindow(accept,
                                 acceptRouteId,
                                 acceptInitialId,
@@ -317,7 +325,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignal(
         SignalFW signal)
     {
-        final int signalId = (int) signal.signalId();
+        final int signalId = signal.signalId();
 
         switch (signalId)
         {
@@ -345,8 +353,16 @@ final class HttpCacheProxyCacheableRequest
         SignalFW signal)
     {
         cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
+
         if (payloadWritten == -1)
         {
+            boolean notVaries = CacheUtils.doesNotVary(vary, cacheEntry.getRequestVary());
+            if (vary != null && !notVaries)
+            {
+                cleanupRequestIfNecessary();
+                send503RetryAfter();
+                return;
+            }
             cleanupRequestTimeoutIfNecessary();
             sendHttpResponseHeaders(cacheEntry);
         }
@@ -371,7 +387,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalCacheEntryAborted(
         SignalFW signal)
     {
-        if (this.payloadWritten >= 0)
+        if (payloadWritten >= 0)
         {
             factory.writer.doAbort(accept,
                                    acceptRouteId,

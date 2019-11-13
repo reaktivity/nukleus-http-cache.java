@@ -243,7 +243,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -255,7 +255,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderAsterisk() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -268,9 +268,8 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         Thread.sleep(100); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
     }
-
 
     @Test
     @Specification({

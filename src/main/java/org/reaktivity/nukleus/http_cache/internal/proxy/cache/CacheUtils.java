@@ -158,7 +158,9 @@ public final class CacheUtils
 
     // takes care of multi header values during match
     // for e.g requestHeader = "gzip", cachedRequest = "gzip, deflate, br"
-    private static boolean doesNotVary(String requestHeader, String cachedRequest)
+    public static boolean doesNotVary(
+        String requestHeader,
+        String cachedRequest)
     {
         if (requestHeader == cachedRequest)
         {

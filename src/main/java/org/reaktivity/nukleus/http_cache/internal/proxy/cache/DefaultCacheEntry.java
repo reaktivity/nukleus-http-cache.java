@@ -26,6 +26,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -38,7 +39,6 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayList;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -67,6 +67,8 @@ public final class DefaultCacheEntry
     private int responseSize = 0;
     private int subscribers;
     private boolean responseCompleted = false;
+    private String varyBy;
+    private String requestVary;
 
     DefaultCacheEntry(
         DefaultCache cache,
@@ -80,7 +82,17 @@ public final class DefaultCacheEntry
         this.authScope = authScope;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
-        responseSlots = new IntArrayList();
+        this.responseSlots = new IntArrayList();
+    }
+
+    public String getRequestVary()
+    {
+        return requestVary;
+    }
+
+    public String getVaryBy()
+    {
+        return varyBy;
     }
 
     public void setSubscribers(int numberOfSubscribers)
@@ -121,14 +133,14 @@ public final class DefaultCacheEntry
         int requestHeaderSlot = requestPool.acquire(requestHash);
         if (requestHeaderSlot == NO_SLOT)
         {
-            this.cache.purgeEntriesForNonPendingRequests();
+            cache.purgeEntriesForNonPendingRequests();
             requestHeaderSlot = requestPool.acquire(requestHash);
             if (requestHeaderSlot == NO_SLOT)
             {
                 return false;
             }
         }
-        this.requestSlot = requestHeaderSlot;
+        requestSlot = requestHeaderSlot;
 
         MutableDirectBuffer buffer = requestPool.buffer(requestSlot);
         buffer.putBytes(0, requestHeaders.buffer(), requestHeaders.offset(), requestHeaders.sizeof());
@@ -158,6 +170,12 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> responseHeaders)
     {
         evictResponseIfNecessary();
+        varyBy = getHeader(responseHeaders, HttpHeaders.VARY);
+        if (varyBy != null)
+        {
+            requestVary = getHeader(getRequestHeaders(), varyBy);
+        }
+
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
         {
@@ -167,7 +185,7 @@ public final class DefaultCacheEntry
         int headerSlot = responsePool.acquire(requestHash);
         if (headerSlot == NO_SLOT)
         {
-            this.cache.purgeEntriesForNonPendingRequests();
+            cache.purgeEntriesForNonPendingRequests();
             headerSlot = responsePool.acquire(requestHash);
             if (headerSlot == NO_SLOT)
             {
@@ -178,7 +196,7 @@ public final class DefaultCacheEntry
 
         MutableDirectBuffer buffer = responsePool.buffer(headerSlot);
         buffer.putBytes(0, responseHeaders.buffer(), responseHeaders.offset(), responseHeaders.sizeof());
-        this.responseHeadersSize = responseHeaders.sizeof();
+        responseHeadersSize = responseHeaders.sizeof();
 
         return true;
     }
@@ -218,7 +236,7 @@ public final class DefaultCacheEntry
         final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> headersRW =
             new ArrayFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
 
-        this.responseHeadersSize = responseBuffer.capacity();
+        responseHeadersSize = responseBuffer.capacity();
         headersRW.wrap(responseBuffer, 0, responseHeadersSize);
 
         for (Map.Entry<String, String> entry : newHeadersMap.entrySet())
@@ -242,8 +260,8 @@ public final class DefaultCacheEntry
 
     public void purge()
     {
-        this.evictRequestIfNecessary();
-        this.evictResponseIfNecessary();
+        evictRequestIfNecessary();
+        evictResponseIfNecessary();
     }
 
     public String etag()
@@ -288,8 +306,8 @@ public final class DefaultCacheEntry
     {
         if (requestSlot != NO_SLOT)
         {
-            this.requestPool.release(requestSlot);
-            this.requestSlot = NO_SLOT;
+            requestPool.release(requestSlot);
+            requestSlot = NO_SLOT;
         }
     }
 
@@ -297,17 +315,17 @@ public final class DefaultCacheEntry
     {
         if (!responseSlots.isEmpty())
         {
-            this.responseSlots.forEach(i -> responsePool.release(i));
-            this.responseSlots.clear();
-            this.responseSize = 0;
-            this.setResponseCompleted(false);
+            responseSlots.forEach(responsePool::release);
+            responseSlots.clear();
+            responseSize = 0;
+            setResponseCompleted(false);
         }
     }
 
     private boolean storeResponseData(
         Flyweight data)
     {
-        return this.storeResponseData(data, 0);
+        return storeResponseData(data, 0);
     }
 
     private boolean storeResponseData(
@@ -327,7 +345,7 @@ public final class DefaultCacheEntry
             int newSlot = responsePool.acquire(requestHash);
             if (newSlot == NO_SLOT)
             {
-                this.cache.purgeEntriesForNonPendingRequests();
+                cache.purgeEntriesForNonPendingRequests();
                 newSlot = responsePool.acquire(requestHash);
                 if (newSlot == NO_SLOT)
                 {
@@ -348,26 +366,10 @@ public final class DefaultCacheEntry
         return storeResponseData(data, written);
     }
 
-    private static String getHeader(ArrayFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
-    {
-        // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
-        final StringBuilder header = new StringBuilder();
-        cachedRequestHeadersRO.forEach(h ->
-        {
-            if (headerName.equalsIgnoreCase(h.name().asString()))
-            {
-                header.append(h.value().asString());
-            }
-        });
-
-        return header.length() == 0 ? null : header.toString();
-    }
-
     public boolean isStale()
     {
         return Instant.now().isAfter(staleAt());
     }
-
 
     private CacheControl responseCacheControl()
     {
@@ -376,30 +378,12 @@ public final class DefaultCacheEntry
         return cache.responseCacheControlFW.parse(cacheControl);
     }
 
-    // Checks this entry's vary header with the given entry's vary header
     public boolean doesNotVaryBy(
-        ArrayFW<HttpHeaderFW> newRequestHeader,
-        ArrayFW<HttpHeaderFW> newResponseHeader)
+        ArrayFW<HttpHeaderFW> request)
     {
-        final ArrayFW<HttpHeaderFW> thisHeaders = getCachedResponseHeaders();
-        assert thisHeaders.buffer() != newResponseHeader.buffer();
+        final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        final ArrayFW<HttpHeaderFW> cachedRequest = getRequestHeaders(cache.requestHeadersRO);
 
-        String thisVary = HttpHeadersUtil.getHeader(thisHeaders, HttpHeaders.VARY);
-        String entryVary = HttpHeadersUtil.getHeader(newResponseHeader, HttpHeaders.VARY);
-
-        boolean varyMatches = (thisVary == entryVary) || (thisVary != null && thisVary.equalsIgnoreCase(entryVary));
-        if (varyMatches)
-        {
-            return doesNotVaryBy(newRequestHeader);
-        }
-
-        return false;
-    }
-
-    private boolean doesNotVaryBy(ArrayFW<HttpHeaderFW> request)
-    {
-        final ArrayFW<HttpHeaderFW> responseHeaders = this.getCachedResponseHeaders();
-        final ArrayFW<HttpHeaderFW> cachedRequest = getRequestHeaders(this.cache.requestHeadersRO);
         return CacheUtils.doesNotVary(request, responseHeaders, cachedRequest);
     }
 
@@ -414,16 +398,16 @@ public final class DefaultCacheEntry
         }
 
         final CacheControl responseCacheControl = responseCacheControl();
-        final ArrayFW<HttpHeaderFW> cachedRequestHeaders = this.getRequestHeaders(this.cache.requestHeadersRO);
+        final ArrayFW<HttpHeaderFW> cachedRequestHeaders = getRequestHeaders(cache.requestHeadersRO);
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
     }
 
     private ArrayFW<HttpHeaderFW> getRequestHeaders(
-        ArrayFW<HttpHeaderFW> requestHeadersRO,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         BufferPool bp)
     {
         final MutableDirectBuffer buffer = bp.buffer(requestSlot);
-        return requestHeadersRO.wrap(buffer, 0, buffer.capacity());
+        return requestHeaders.wrap(buffer, 0, buffer.capacity());
     }
 
     private boolean satisfiesFreshnessRequirementsOf(
@@ -437,10 +421,7 @@ public final class DefaultCacheEntry
         if (requestCacheControl.contains(MIN_FRESH))
         {
             final String minFresh = requestCacheControl.getValue(MIN_FRESH);
-            if (! now.plusSeconds(parseInt(minFresh)).isBefore(staleAt))
-            {
-                return false;
-            }
+            return now.plusSeconds(parseInt(minFresh)).isBefore(staleAt);
         }
         return true;
     }
@@ -525,4 +506,5 @@ public final class DefaultCacheEntry
         }
         return lazyInitiatedResponseReceivedAt;
     }
+
 }

@@ -95,19 +95,6 @@ final class HttpCacheProxyGroupRequest
         ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
 
-        DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
-        if (cacheEntry != null)
-        {
-            boolean notVaries = cacheEntry.doesNotVaryBy(getRequestHeaders(), responseHeaders);
-            if (!notVaries)
-            {
-                factory.defaultCache.purge(requestGroup.getRequestHash());
-                cleanupRequestIfNecessary();
-                requestGroup.onCacheableResponseAborted();
-                return null;
-            }
-        }
-
         if ((retry && attempts < 3) ||
             (factory.defaultCache.checkToRetry(getRequestHeaders(),
                                                responseHeaders,

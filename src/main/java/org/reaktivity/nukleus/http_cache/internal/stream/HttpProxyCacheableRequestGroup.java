@@ -31,6 +31,7 @@ import org.agrona.collections.LongHashSet;
 import org.agrona.collections.MutableInteger;
 import org.agrona.collections.MutableLong;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
@@ -48,6 +49,7 @@ final class HttpProxyCacheableRequestGroup
     private MessageConsumer connect;
     private String etag;
     private String recentAuthorizationToken;
+    private String vary;
     private long acceptReplyId;
     private long connectRouteId;
     private long connectReplyId;
@@ -98,6 +100,7 @@ final class HttpProxyCacheableRequestGroup
 
     void enqueue(
         String etag,
+        String newVary,
         long acceptRouteId,
         long acceptReplyId)
     {
@@ -108,13 +111,21 @@ final class HttpProxyCacheableRequestGroup
 
         if (requestQueueIsEmpty)
         {
-            initiateRequest(etag, acceptRouteId, acceptReplyId);
+            initiateRequest(etag, newVary, acceptRouteId, acceptReplyId);
         }
-        else if (this.etag != null &&
-                !this.etag.equals(etag))
+        else
         {
-            resetInFlightRequest();
-            initiateRequest(null, acceptRouteId, acceptReplyId);
+            if (this.etag != null &&
+                !this.etag.equals(etag))
+            {
+                resetInFlightRequest();
+                initiateRequest(null, newVary, acceptRouteId, acceptReplyId);
+            }
+            else if (vary != null && !vary.equalsIgnoreCase(newVary))
+            {
+                resetInFlightRequest();
+                initiateRequest(etag, newVary, acceptRouteId, acceptReplyId);
+            }
         }
     }
 
@@ -225,10 +236,12 @@ final class HttpProxyCacheableRequestGroup
 
     private void initiateRequest(
         String etag,
+        String newVary,
         long acceptRouteId,
         long acceptReplyId)
     {
         this.etag = etag;
+        this.vary = newVary;
         this.acceptReplyId = acceptReplyId;
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
