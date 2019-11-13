@@ -319,14 +319,10 @@ public class DefaultCache
         {
             final String name = h.name().asString();
             final String value = h.value().asString();
-            if (CACHE_CONTROL.equals(name))
-            {
-                // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                return value.contains(CacheDirectives.NO_CACHE) ||
-                       value.contains(MAX_AGE_0) ||
-                       value.contains(NO_STORE);
-            }
-            return false;
+            return CACHE_CONTROL.equals(name) &&
+                   (value.contains(CacheDirectives.NO_CACHE) ||
+                    value.contains(MAX_AGE_0) ||
+                    value.contains(NO_STORE));
         });
     }
 
