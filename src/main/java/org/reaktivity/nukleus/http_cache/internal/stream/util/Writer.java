@@ -113,7 +113,8 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        long traceId, long authorization,
+        long traceId,
+        long authorization,
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
