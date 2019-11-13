@@ -291,7 +291,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
-            handleOnleIfCachedRequest(acceptReply,
+            handleOnlyIfCachedRequest(acceptReply,
                              acceptInitialId,
                              acceptRouteId,
                              traceId,
@@ -403,7 +403,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         return newStream;
     }
 
-    private void handleOnleIfCachedRequest(
+    private void handleOnlyIfCachedRequest(
         MessageConsumer acceptReply,
         long acceptInitialId,
         long acceptRouteId,
