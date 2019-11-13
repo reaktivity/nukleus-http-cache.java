@@ -114,12 +114,14 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
+        long authorization,
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
                 .traceId(traceId)
+                .authorization(authorization)
                 .affinity(0L)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();

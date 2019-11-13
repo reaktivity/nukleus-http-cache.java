@@ -310,6 +310,7 @@ final class EmulatedProxyAcceptStream
             connectRouteId,
             connectInitialId,
             streamFactory.supplyTraceId.getAsLong(),
+            0L,
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
 
         streamFactory.router.setThrottle(connectInitialId, this::onThrottleMessage);

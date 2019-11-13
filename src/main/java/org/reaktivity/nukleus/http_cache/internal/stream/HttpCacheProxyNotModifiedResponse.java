@@ -35,6 +35,8 @@ final class HttpCacheProxyNotModifiedResponse
 
     private final int initialWindow;
     private final int requestHash;
+    private final short authScope;
+
     private final MessageConsumer accept;
     private final long acceptRouteId;
     private final long acceptReplyId;
@@ -50,6 +52,7 @@ final class HttpCacheProxyNotModifiedResponse
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,
         int requestHash,
+        short authScope,
         String requestURL,
         MessageConsumer accept,
         long acceptRouteId,
@@ -62,6 +65,7 @@ final class HttpCacheProxyNotModifiedResponse
         this.factory = factory;
         this.requestHash = requestHash;
         this.requestURL = requestURL;
+        this.authScope = authScope;
         this.preferWait = preferWait;
         this.accept = accept;
         this.acceptRouteId = acceptRouteId;
@@ -121,10 +125,10 @@ final class HttpCacheProxyNotModifiedResponse
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, requestURL);
+        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
         factory.defaultCache.send304(cacheEntry.etag(),
                                      preferWait,
-            accept,
+                                     accept,
                                      acceptRouteId,
                                      acceptReplyId);
         sendWindow(initialWindow, begin.traceId());

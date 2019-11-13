@@ -128,13 +128,14 @@ public class DefaultCache
 
     public DefaultCacheEntry supply(
         int requestHash,
+        short authScope,
         String requestURL)
     {
         final int requestHashWithoutQuery = generateRequestHashWithoutQuery(requestURL);
         Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHashFromWithoutQueryList =
             cachedEntriesByRequestHashWithoutQuery.computeIfAbsent(requestHashWithoutQuery, l -> new Int2ObjectHashMap<>());
 
-        DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, requestHashWithoutQuery);
+        DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, authScope, requestHashWithoutQuery);
         cachedEntriesByRequestHashFromWithoutQueryList.put(requestHash, cacheEntry);
         cachedEntriesByRequestHash.put(requestHash, cacheEntry);
         return cacheEntry;
@@ -148,6 +149,7 @@ public class DefaultCache
                              requestURI.getScheme(),
                              requestURI.getAuthority(),
                              requestURI.getPath()).hashCode();
+
     }
 
     public boolean matchCacheableResponse(
@@ -425,18 +427,19 @@ public class DefaultCache
 
     private DefaultCacheEntry computeCacheEntryIfAbsent(
         int requestHash,
+        short authScope,
         int collectionHash)
     {
         DefaultCacheEntry entry = get(requestHash);
         if (entry == null)
         {
             entryCount.accept(1);
-            return new DefaultCacheEntry(
-                this,
-                requestHash,
-                collectionHash,
-                cachedRequestBufferPool,
-                cachedResponseBufferPool);
+            return new DefaultCacheEntry(this,
+                                         requestHash,
+                                         authScope,
+                                         collectionHash,
+                                         cachedRequestBufferPool,
+                                         cachedResponseBufferPool);
         }
 
         return entry;

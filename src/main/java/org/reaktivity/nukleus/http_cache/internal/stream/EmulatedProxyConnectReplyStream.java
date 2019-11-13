@@ -319,7 +319,7 @@ final class EmulatedProxyConnectReplyStream
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, builder ->
+        streamFactory.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, traceId, 0L, builder ->
         {
             requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value())));
             if (request instanceof CacheRefreshRequest)

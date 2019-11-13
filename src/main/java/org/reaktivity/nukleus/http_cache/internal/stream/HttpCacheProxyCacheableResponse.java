@@ -41,14 +41,12 @@ final class HttpCacheProxyCacheableResponse
 {
     private final HttpCacheProxyFactory factory;
 
-    private int connectReplyBudget;
-    private boolean isResponseBuffering;
-    private int requestHash;
-
     private final MutableInteger requestSlot;
     private final String requestURL;
     private final int initialWindow;
     private String ifNoneMatch;
+    private final int requestHash;
+    private final short authScope;
     private final Function<Long, Boolean> retryRequest;
     private final HttpProxyCacheableRequestGroup requestGroup;
 
@@ -57,12 +55,15 @@ final class HttpCacheProxyCacheableResponse
     private long connectReplyId;
     private DefaultCacheEntry cacheEntry;
     private String etag;
+    private int connectReplyBudget;
+    private boolean isResponseBuffering;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
         String requestURL,
         MutableInteger requestSlot,
+        short authScope,
         MessageConsumer connect,
         long connectReplyId,
         long connectRouteId,
@@ -73,6 +74,7 @@ final class HttpCacheProxyCacheableResponse
         this.requestURL = requestURL;
         this.requestSlot = requestSlot;
         this.requestHash = requestGroup.getRequestHash();
+        this.authScope = authScope;
         this.connectReply = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -124,8 +126,8 @@ final class HttpCacheProxyCacheableResponse
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
 
-        cacheEntry = factory.defaultCache.supply(requestHash, requestURL);
         cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
         etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;

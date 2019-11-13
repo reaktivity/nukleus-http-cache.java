@@ -30,6 +30,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -92,6 +93,8 @@ final class HttpCacheProxyCacheableRequest
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
     private boolean responseClosing;
+    private short authScope;
+    private long authorization;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -135,6 +138,7 @@ final class HttpCacheProxyCacheableRequest
         {
             newStream = new HttpCacheProxyNotModifiedResponse(factory,
                                                              requestHash,
+                                                             authScope,
                                                              requestURL,
                                                              accept,
                                                              acceptRouteId,
@@ -215,6 +219,8 @@ final class HttpCacheProxyCacheableRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        authorization = begin.authorization();
+        authScope = authorizationScope(authorization);
         final long traceId = begin.traceId();
 
         // count all requests
@@ -403,6 +409,7 @@ final class HttpCacheProxyCacheableRequest
                                      connectRouteId,
                                      connectInitialId,
                                      signal.traceId(),
+                                     authorization,
                                      mutator);
         cleanupRequestSlotIfNecessary();
     }

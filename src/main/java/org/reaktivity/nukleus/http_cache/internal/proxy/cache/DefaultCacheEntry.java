@@ -56,6 +56,7 @@ public final class DefaultCacheEntry
     private final DefaultCache cache;
     private final int requestHash;
     private final int requestHashWithoutQuery;
+    private final short authScope;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
@@ -68,15 +69,18 @@ public final class DefaultCacheEntry
     private boolean responseCompleted;
     private boolean validationRequired;
 
+
     DefaultCacheEntry(
         DefaultCache cache,
         int requestHash,
+        short authScope,
         int requestHashWithoutQuery,
         BufferPool requestPool,
         BufferPool responsePool)
     {
         this.cache = cache;
         this.requestHash = requestHash;
+        this.authScope = authScope;
         this.requestHashWithoutQuery = requestHashWithoutQuery;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
@@ -408,6 +412,11 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> request,
         short requestAuthScope)
     {
+        if (SurrogateControl.isProtectedEx(getCachedResponseHeaders()))
+        {
+            return requestAuthScope == authScope;
+        }
+
         final CacheControl responseCacheControl = responseCacheControl();
         final ArrayFW<HttpHeaderFW> cachedRequestHeaders = this.getRequestHeaders(this.cache.requestHeadersRO);
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);
