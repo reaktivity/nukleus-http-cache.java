@@ -186,6 +186,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         final BeginFW begin,
         final MessageConsumer acceptReply)
     {
+        counters.requests.getAsLong();
         final long acceptRouteId = begin.routeId();
         final long authorization = begin.authorization();
 
@@ -277,6 +278,8 @@ public class HttpCacheProxyFactory implements StreamFactory
 
         if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
         {
+            counters.requestsCacheable.getAsLong();
+            counters.responsesCached.getAsLong();
             DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
             boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
             if (etagMatched)
@@ -306,7 +309,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
             counters.requestsCacheable.getAsLong();
-            counters.requests.getAsLong();
             writer.doWindow(acceptReply,
                             acceptRouteId,
                             acceptInitialId,
@@ -318,6 +320,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else if (defaultCache.isRequestCacheable(requestHeaders))
         {
+            counters.requestsCacheable.getAsLong();
             HttpProxyCacheableRequestGroup group = requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);
 
             HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
