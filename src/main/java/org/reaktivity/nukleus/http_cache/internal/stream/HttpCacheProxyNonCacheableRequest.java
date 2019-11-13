@@ -149,14 +149,12 @@ final class HttpCacheProxyNonCacheableRequest
         assert httpBeginEx != null;
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
 
-        // count all requests
-        factory.counters.requests.getAsLong();
-
         factory.writer.doHttpRequest(
             connectInitial,
             connectRouteId,
             connectInitialId,
             factory.supplyTraceId.getAsLong(),
+            0L,
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
 
         factory.router.setThrottle(connectInitialId, this::onRequestMessage);

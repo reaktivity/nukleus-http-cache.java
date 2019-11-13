@@ -23,6 +23,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -61,17 +62,17 @@ final class HttpCacheProxyGroupRequest
     private final HttpProxyCacheableRequestGroup requestGroup;
     private final MessageConsumer initial;
 
-    private long initialId;
-    private long replyId;
-    private long routeId;
-
     private MessageConsumer connectInitial;
     private long connectReplyId;
     private long connectInitialId;
 
     private Future<?> retryRequest;
+    private long initialId;
+    private long replyId;
+    private long routeId;
     private int attempts;
     private int state;
+    private short authScope;
 
     HttpCacheProxyGroupRequest(
         HttpCacheProxyFactory factory,
@@ -113,6 +114,7 @@ final class HttpCacheProxyGroupRequest
                 new HttpCacheProxyCacheableResponse(factory,
                                                     requestGroup,
                                                     requestSlot,
+                                                    authScope,
                                                     connectInitial,
                                                     connectReplyId,
                                                     routeId,
@@ -231,6 +233,8 @@ final class HttpCacheProxyGroupRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        long authorization = begin.authorization();
+        authScope = authorizationScope(authorization);
         routeId = begin.routeId();
         initialId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(initialId);
@@ -421,6 +425,7 @@ final class HttpCacheProxyGroupRequest
                                      routeId,
                                      connectInitialId,
                                      factory.supplyTraceId.getAsLong(),
+                                     0L,
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
     }

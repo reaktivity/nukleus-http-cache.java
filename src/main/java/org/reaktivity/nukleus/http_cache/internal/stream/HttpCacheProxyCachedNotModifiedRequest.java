@@ -92,10 +92,6 @@ final class HttpCacheProxyCachedNotModifiedRequest
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
         final long traceId = begin.traceId();
 
-        // count all requests
-        factory.counters.requests.getAsLong();
-        factory.counters.requestsCacheable.getAsLong();
-
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
