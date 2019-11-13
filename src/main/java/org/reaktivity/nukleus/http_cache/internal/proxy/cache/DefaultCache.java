@@ -183,12 +183,8 @@ public class DefaultCache
         if (cacheEntry != null)
         {
             final int requestHashWithoutQuery = cacheEntry.requestHashWithoutQuery();
-            Int2ObjectHashMap cachedEntriesByRequestHashFromWithoutQueryList = cachedEntriesByRequestHashWithoutQuery
-                .computeIfPresent(requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
-            if (cachedEntriesByRequestHashFromWithoutQueryList == null)
-            {
-                cachedEntriesByRequestHashWithoutQuery.remove(requestHashWithoutQuery);
-            }
+            cachedEntriesByRequestHashWithoutQuery.computeIfPresent(
+                requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
 
             entryCount.accept(-1);
             cacheEntry.purge();
@@ -207,10 +203,7 @@ public class DefaultCache
             cacheEntry.invalidate();
         }
 
-        headers.forEach(header ->
-        {
-            invalidateLinkCacheEntry(factory, requestURL, header);
-        });
+        headers.forEach(header -> invalidateLinkCacheEntry(factory, requestURL, header));
     }
 
     private void invalidateLinkCacheEntry(
@@ -232,7 +225,7 @@ public class DefaultCache
                     final String linkTargetHostname = matcher.group("hostname");
 
                     if ((linkTargetScheme != null && linkTargetHostname != null) &&
-                        (!requestURI.getScheme().equals(linkTargetScheme) || !requestURI.getHost().equals(linkTargetHostname)))
+                        (!linkTargetScheme.equals(requestURI.getScheme()) || !linkTargetHostname.equals(requestURI.getHost())))
                     {
                         return;
                     }
