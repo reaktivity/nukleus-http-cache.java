@@ -129,9 +129,6 @@ final class HttpCacheProxyCachedRequest
         isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
         cacheEntry = factory.defaultCache.get(requestHash);
         cacheEntry.setSubscribers(1);
-        // count all requests
-        factory.counters.requests.getAsLong();
-        factory.counters.requestsCacheable.getAsLong();
 
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
@@ -298,7 +295,6 @@ final class HttpCacheProxyCachedRequest
         payloadWritten = 0;
 
         factory.counters.responses.getAsLong();
-        factory.defaultCache.counters.responsesCached.getAsLong();
     }
 
     private void sendEndIfNecessary(

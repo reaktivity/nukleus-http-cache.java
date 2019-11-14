@@ -191,10 +191,10 @@ public class Rfc7240ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/respond.with.503.if.latest.request.vary.does.not.match/accept/client",
-        "${streams}/respond.with.503.if.latest.request.vary.does.not.match/connect/server",
+        "${streams}/poll.immediately.if.cache.entry.invalidated/accept/client",
+        "${streams}/poll.immediately.if.cache.entry.invalidated/connect/server",
     })
-    public void shouldRespondWith503IfLatestRequestVaryDoesNotMatch() throws Exception
+    public void shouldPollImmediatelyIfCacheEntryInvalidated() throws Exception
     {
         k3po.finish();
     }

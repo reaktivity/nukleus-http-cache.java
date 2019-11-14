@@ -32,6 +32,9 @@ final class HttpCacheProxyNonCacheableResponse
 {
     private final HttpCacheProxyFactory factory;
 
+    private final int requestHash;
+    private final String requestURL;
+
     private final MessageConsumer connect;
     private final long connectRouteId;
     private final long connectReplyId;
@@ -44,6 +47,8 @@ final class HttpCacheProxyNonCacheableResponse
 
     HttpCacheProxyNonCacheableResponse(
         HttpCacheProxyFactory factory,
+        int requestHash,
+        String requestURL,
         MessageConsumer connect,
         long connectRouteId,
         long connectReplyId,
@@ -52,6 +57,8 @@ final class HttpCacheProxyNonCacheableResponse
         long acceptReplyId)
     {
         this.factory = factory;
+        this.requestHash = requestHash;
+        this.requestURL = requestURL;
         this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -122,6 +129,10 @@ final class HttpCacheProxyNonCacheableResponse
         // count all responses
         factory.counters.responses.getAsLong();
 
+        factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
+                                                             requestHash,
+                                                             requestURL,
+                                                             responseHeaders);
     }
 
     private void onData(

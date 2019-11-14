@@ -126,7 +126,12 @@ public final class CacheUtils
 
         final String cachedAuthorizationHeader = getHeader(cachedRequest, "authorization");
         final String requestAuthorizationHeader = getHeader(request, "authorization");
-        if (cachedAuthorizationHeader != null || requestAuthorizationHeader != null)
+
+        if (cachedAuthorizationHeader != null && requestAuthorizationHeader != null)
+        {
+            return cachedAuthorizationHeader.equals(requestAuthorizationHeader);
+        }
+        else if (cachedAuthorizationHeader != null || requestAuthorizationHeader != null)
         {
             return false;
         }

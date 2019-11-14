@@ -446,6 +446,24 @@ public class Writer
         receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
     }
 
+    public void doSignal(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long traceId,
+        int signalId)
+    {
+        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                                        .routeId(routeId)
+                                        .streamId(streamId)
+                                        .traceId(traceId)
+                                        .cancelId(NO_CANCEL_ID)
+                                        .signalId(signalId)
+                                        .build();
+
+        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
+    }
+
     private Flyweight.Builder.Visitor visitHttpBeginEx(
         Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
