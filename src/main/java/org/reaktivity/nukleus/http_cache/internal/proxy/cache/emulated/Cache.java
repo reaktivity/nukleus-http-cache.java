@@ -453,7 +453,7 @@ public class Cache
     public void purge(
         CacheEntry entry)
     {
-        this.cachedEntries.remove(entry.requestUrl());
+        this.cachedEntries.remove(entry.requestURL());
         entry.purge();
     }
 

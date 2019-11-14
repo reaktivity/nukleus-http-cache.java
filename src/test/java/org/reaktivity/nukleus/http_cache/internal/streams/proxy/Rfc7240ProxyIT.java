@@ -188,4 +188,15 @@ public class Rfc7240ProxyIT
         k3po.finish();
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/poll.immediately.if.cache.entry.invalidated/accept/client",
+        "${streams}/poll.immediately.if.cache.entry.invalidated/connect/server",
+    })
+    public void shouldPollImmediatelyIfCacheEntryInvalidated() throws Exception
+    {
+        k3po.finish();
+    }
+
 }

@@ -41,6 +41,7 @@ public final class HttpHeaders
     public static final String EMULATED_PROTOCOL_STACK = "x-protocol-stack";
     public static final String PREFERENCE_APPLIED = "preference-applied";
     public static final String ACCESS_CONTROL_EXPOSE_HEADERS = "access-control-expose-headers";
+    public static final String LINK = "link";
 
     private HttpHeaders()
     {

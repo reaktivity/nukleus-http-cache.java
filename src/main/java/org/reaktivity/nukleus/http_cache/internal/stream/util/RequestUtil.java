@@ -25,9 +25,9 @@ public final class RequestUtil
 
     public static int requestHash(
         short authorizationScope,
-        int requestUrlHash)
+        int requestURLHash)
     {
-        return 31 * authorizationScope + requestUrlHash;
+        return 31 * authorizationScope + requestURLHash;
     }
 
     private RequestUtil()

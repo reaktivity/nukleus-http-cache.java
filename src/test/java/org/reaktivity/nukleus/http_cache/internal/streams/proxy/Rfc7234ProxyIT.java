@@ -875,4 +875,15 @@ public class Rfc7234ProxyIT
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/invalidate.cache.for.unsafe.request/connect/client",
+        "${streams}/invalidate.cache.for.unsafe.request/connect/server",
+    })
+    public void shouldInvalidateCacheForUnsafeRequest() throws Exception
+    {
+        k3po.finish();
+    }
 }

@@ -16,6 +16,7 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_INVALIDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_GROUP_LEADER_UPDATED_SIGNAL;
@@ -34,7 +35,7 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
-final class HttpProxyCacheableRequestGroup
+public final class HttpProxyCacheableRequestGroup
 {
     private final Map<String, Long2LongHashMap> queuedRequestsByEtag;
     private final LongHashSet responsesInFlight;
@@ -208,6 +209,14 @@ final class HttpProxyCacheableRequestGroup
         });
     }
 
+    public void onCacheEntryInvalidated()
+    {
+        writer.doSignal(connect,
+                        connectRouteId,
+                        connectReplyId,
+                        factory.supplyTraceId.getAsLong(),
+                        CACHE_ENTRY_INVALIDATED_SIGNAL);
+    }
 
     MessageConsumer newRequest(
         int msgTypeId,
@@ -288,8 +297,8 @@ final class HttpProxyCacheableRequestGroup
     private void resetInFlightRequest()
     {
         factory.writer.doReset(connect,
-            connectRouteId,
-            connectReplyId,
+                               connectRouteId,
+                               connectReplyId,
                                factory.supplyTraceId.getAsLong());
     }
 }

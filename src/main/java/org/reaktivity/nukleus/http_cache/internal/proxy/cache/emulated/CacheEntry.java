@@ -774,7 +774,7 @@ public final class CacheEntry
         return expectSubscribers || !subscribers.isEmpty();
     }
 
-    public int requestUrl()
+    public int requestURL()
     {
         return this.cachedRequest.requestHash();
     }

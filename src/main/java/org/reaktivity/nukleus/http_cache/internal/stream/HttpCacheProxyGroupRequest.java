@@ -18,11 +18,13 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_INVALIDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
@@ -54,8 +56,8 @@ final class HttpCacheProxyGroupRequest
     private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
     private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW("503");
     private final HttpBeginExFW.Builder beginExRW = new HttpBeginExFW.Builder();
-    private final int httpTypeId;
 
+    private final int httpTypeId;
     private final MutableInteger requestSlot;
 
     private final HttpCacheProxyFactory factory;
@@ -67,6 +69,7 @@ final class HttpCacheProxyGroupRequest
     private long connectInitialId;
 
     private Future<?> retryRequest;
+    private String requestURL;
     private long initialId;
     private long replyId;
     private long routeId;
@@ -113,6 +116,7 @@ final class HttpCacheProxyGroupRequest
             final HttpCacheProxyCacheableResponse cacheableResponse =
                 new HttpCacheProxyCacheableResponse(factory,
                                                     requestGroup,
+                                                    requestURL,
                                                     requestSlot,
                                                     authScope,
                                                     connectInitial,
@@ -144,7 +148,7 @@ final class HttpCacheProxyGroupRequest
             {
             case BeginFW.TYPE_ID:
             case DataFW.TYPE_ID:
-                factory. writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
+                factory.writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
                 newResponse.accept(t, factory.writeBuffer, 0, l);
                 break;
             case EndFW.TYPE_ID:
@@ -197,6 +201,10 @@ final class HttpCacheProxyGroupRequest
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
             onWindow(window);
             break;
+        case SignalFW.TYPE_ID:
+            final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
+            onSignal(signal);
+            break;
         default:
             break;
         }
@@ -233,6 +241,7 @@ final class HttpCacheProxyGroupRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        requestURL = getRequestURL(requestHeaders);
         long authorization = begin.authorization();
         authScope = authorizationScope(authorization);
         routeId = begin.routeId();
@@ -332,6 +341,21 @@ final class HttpCacheProxyGroupRequest
         cleanupRequestIfNecessary();
     }
 
+    private void onSignal(
+        final SignalFW signal)
+    {
+        final int signalId = signal.signalId();
+
+        if (signalId == CACHE_ENTRY_INVALIDATED_SIGNAL)
+        {
+            if (retryRequest != null)
+            {
+                retryRequest.cancel(true);
+                retryCacheableRequest();
+            }
+        }
+    }
+
     private boolean scheduleRequest(
         long retryAfter)
     {
@@ -428,6 +452,7 @@ final class HttpCacheProxyGroupRequest
                                      0L,
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);
+        retryRequest = null;
     }
 
     private void send503RetryAfter(
@@ -442,26 +467,27 @@ final class HttpCacheProxyGroupRequest
                 e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
                       .item(h -> h.name(RETRY_AFTER).value("0"));
 
-            beginExRW.typeId(httpTypeId)
-                     .headers(mutator);
+            beginExRW.typeId(httpTypeId).headers(mutator);
 
             MessageConsumer newResponse = responseFactory.apply(beginExRW.build());
 
             factory.writer.doHttpResponse(newResponse,
-                routeId,
-                replyId,
-                traceId,
-                mutator);
+                                          routeId,
+                                          replyId,
+                                          traceId,
+                                          mutator);
 
             factory.writer.doHttpEnd(newResponse,
-                routeId,
-                replyId,
-                traceId);
+                                     routeId,
+                                     replyId,
+                                     traceId);
         }
     }
 
     private void cleanupRequestIfNecessary()
     {
+        factory.correlations.remove(connectReplyId);
+        factory.correlations.remove(replyId);
         factory.router.clearThrottle(replyId);
         if (requestSlot.value != NO_SLOT)
         {
@@ -472,6 +498,7 @@ final class HttpCacheProxyGroupRequest
         if (retryRequest != null)
         {
             retryRequest.cancel(true);
+            retryRequest = null;
         }
     }
 

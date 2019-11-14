@@ -76,6 +76,9 @@ final class HttpCacheProxyCacheableRequest
     private long connectReplyId;
     private long connectInitialId;
 
+    private final String requestURL;
+    private final int requestHash;
+
     private String ifNoneMatch;
     private String prefer;
     private Future<?> preferWaitExpired;
@@ -96,6 +99,8 @@ final class HttpCacheProxyCacheableRequest
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
+        int requestHash,
+        String requestURL,
         MessageConsumer accept,
         long acceptRouteId,
         long acceptInitialId,
@@ -107,6 +112,8 @@ final class HttpCacheProxyCacheableRequest
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
+        this.requestHash = requestHash;
+        this.requestURL = requestURL;
         this.accept = accept;
         this.acceptRouteId = acceptRouteId;
         this.acceptInitialId = acceptInitialId;
@@ -130,19 +137,22 @@ final class HttpCacheProxyCacheableRequest
                                                         ifNoneMatch != null))
         {
             newStream = new HttpCacheProxyNotModifiedResponse(factory,
-                                                             requestGroup.getRequestHash(),
+                                                             requestHash,
                                                              authScope,
-                                                             prefer,
+                                                             requestURL,
                                                              accept,
                                                              acceptRouteId,
                                                              acceptReplyId,
                                                              connect,
                                                              connectReplyId,
-                                                             connectRouteId)::onResponseMessage;
+                                                             connectRouteId,
+                                                             prefer)::onResponseMessage;
         }
         else
         {
             newStream = new HttpCacheProxyNonCacheableResponse(factory,
+                                                               requestHash,
+                                                               requestURL,
                                                                connect,
                                                                connectRouteId,
                                                                connectReplyId,
