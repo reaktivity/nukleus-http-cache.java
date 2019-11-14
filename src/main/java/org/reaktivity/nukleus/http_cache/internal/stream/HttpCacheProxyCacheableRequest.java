@@ -30,6 +30,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -75,6 +76,9 @@ final class HttpCacheProxyCacheableRequest
     private long connectReplyId;
     private long connectInitialId;
 
+    private final String requestURL;
+    private final int requestHash;
+
     private String ifNoneMatch;
     private String prefer;
     private Future<?> preferWaitExpired;
@@ -89,10 +93,14 @@ final class HttpCacheProxyCacheableRequest
     private DefaultCacheEntry cacheEntry;
     private boolean etagSent;
     private boolean responseClosing;
+    private short authScope;
+    private long authorization;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
         HttpProxyCacheableRequestGroup requestGroup,
+        int requestHash,
+        String requestURL,
         MessageConsumer accept,
         long acceptRouteId,
         long acceptInitialId,
@@ -104,6 +112,8 @@ final class HttpCacheProxyCacheableRequest
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
+        this.requestHash = requestHash;
+        this.requestURL = requestURL;
         this.accept = accept;
         this.acceptRouteId = acceptRouteId;
         this.acceptInitialId = acceptInitialId;
@@ -127,18 +137,22 @@ final class HttpCacheProxyCacheableRequest
                                                         ifNoneMatch != null))
         {
             newStream = new HttpCacheProxyNotModifiedResponse(factory,
-                                                             requestGroup.getRequestHash(),
-                                                             prefer,
+                                                             requestHash,
+                                                             authScope,
+                                                             requestURL,
                                                              accept,
                                                              acceptRouteId,
                                                              acceptReplyId,
                                                              connect,
                                                              connectReplyId,
-                                                             connectRouteId)::onResponseMessage;
+                                                             connectRouteId,
+                                                             prefer)::onResponseMessage;
         }
         else
         {
             newStream = new HttpCacheProxyNonCacheableResponse(factory,
+                                                               requestHash,
+                                                               requestURL,
                                                                connect,
                                                                connectRouteId,
                                                                connectReplyId,
@@ -205,11 +219,9 @@ final class HttpCacheProxyCacheableRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        authorization = begin.authorization();
+        authScope = authorizationScope(authorization);
         final long traceId = begin.traceId();
-
-        // count all requests
-        factory.counters.requests.getAsLong();
-        factory.counters.requestsCacheable.getAsLong();
 
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
@@ -393,6 +405,7 @@ final class HttpCacheProxyCacheableRequest
                                      connectRouteId,
                                      connectInitialId,
                                      signal.traceId(),
+                                     authorization,
                                      mutator);
         cleanupRequestSlotIfNecessary();
     }

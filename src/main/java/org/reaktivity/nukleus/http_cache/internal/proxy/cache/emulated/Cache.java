@@ -287,7 +287,7 @@ public class Cache
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
         }
 
-        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong(),
+        writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong(), 0L,
             builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
         writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, supplyTraceId.getAsLong());
     }
@@ -453,7 +453,7 @@ public class Cache
     public void purge(
         CacheEntry entry)
     {
-        this.cachedEntries.remove(entry.requestUrl());
+        this.cachedEntries.remove(entry.requestURL());
         entry.purge();
     }
 

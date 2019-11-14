@@ -55,29 +55,82 @@ public final class DefaultCacheEntry
 
     private final DefaultCache cache;
     private final int requestHash;
+    private final int requestHashWithoutQuery;
+    private final short authScope;
 
     private Instant lazyInitiatedResponseReceivedAt;
     private Instant lazyInitiatedResponseStaleAt;
 
     private String etag;
     private int requestSlot = NO_SLOT;
-    private int responseHeadersSize = 0;
-    private int responseSize = 0;
+    private int responseHeadersSize;
+    private int responseSize;
     private int subscribers;
-    private boolean responseCompleted = false;
+    private boolean responseCompleted;
+    private boolean validationRequired;
 
 
     DefaultCacheEntry(
         DefaultCache cache,
         int requestHash,
+        short authScope,
+        int requestHashWithoutQuery,
         BufferPool requestPool,
         BufferPool responsePool)
     {
         this.cache = cache;
         this.requestHash = requestHash;
+        this.authScope = authScope;
+        this.requestHashWithoutQuery = requestHashWithoutQuery;
         this.requestPool = requestPool;
         this.responsePool = responsePool;
         responseSlots = new IntArrayList();
+    }
+
+    public int requestHash()
+    {
+        return requestHash;
+    }
+
+    public int requestHashWithoutQuery()
+    {
+        return requestHashWithoutQuery;
+    }
+
+    public int responseSize()
+    {
+        return responseSize;
+    }
+
+    public String etag()
+    {
+        return etag;
+    }
+
+    public void setEtag(String etag)
+    {
+        this.etag = etag;
+    }
+
+    public boolean isResponseCompleted()
+    {
+        return responseCompleted;
+    }
+
+    public void setResponseCompleted(boolean responseCompleted)
+    {
+        validationRequired = false;
+        this.responseCompleted = responseCompleted;
+    }
+
+    public boolean isValid()
+    {
+        return !validationRequired;
+    }
+
+    public void invalidate()
+    {
+        validationRequired = true;
     }
 
     public void setSubscribers(int numberOfSubscribers)
@@ -232,35 +285,10 @@ public final class DefaultCacheEntry
         return storeResponseData(data.payload());
     }
 
-    public int responseSize()
-    {
-        return responseSize;
-    }
-
     public void purge()
     {
-        this.evictRequestIfNecessary();
-        this.evictResponseIfNecessary();
-    }
-
-    public String etag()
-    {
-        return etag;
-    }
-
-    public void setEtag(String etag)
-    {
-        this.etag = etag;
-    }
-
-    public boolean isResponseCompleted()
-    {
-        return responseCompleted;
-    }
-
-    public void setResponseCompleted(boolean responseCompleted)
-    {
-        this.responseCompleted = responseCompleted;
+        evictRequestIfNecessary();
+        evictResponseIfNecessary();
     }
 
     public boolean canServeRequest(
@@ -299,11 +327,6 @@ public final class DefaultCacheEntry
             this.responseSize = 0;
             this.setResponseCompleted(false);
         }
-    }
-
-    public int requestHash()
-    {
-        return this.requestHash;
     }
 
     private boolean storeResponseData(
@@ -389,6 +412,11 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> request,
         short requestAuthScope)
     {
+        if (SurrogateControl.isProtectedEx(getCachedResponseHeaders()))
+        {
+            return requestAuthScope == authScope;
+        }
+
         final CacheControl responseCacheControl = responseCacheControl();
         final ArrayFW<HttpHeaderFW> cachedRequestHeaders = this.getRequestHeaders(this.cache.requestHeadersRO);
         return sameAuthorizationScope(request, cachedRequestHeaders, responseCacheControl);

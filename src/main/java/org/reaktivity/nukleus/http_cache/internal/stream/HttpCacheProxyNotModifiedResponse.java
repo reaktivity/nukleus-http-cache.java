@@ -35,35 +35,42 @@ final class HttpCacheProxyNotModifiedResponse
 
     private final int initialWindow;
     private final int requestHash;
-    private final MessageConsumer acceptReply;
+    private final short authScope;
+
+    private final MessageConsumer accept;
     private final long acceptRouteId;
     private final long acceptReplyId;
 
-    private final MessageConsumer connectReply;
+    private final MessageConsumer connect;
     private final long connectRouteId;
     private final long connectReplyId;
 
     private int connectReplyBudget;
     private final String preferWait;
+    private final String requestURL;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,
         int requestHash,
-        String preferWait,
-        MessageConsumer acceptReply,
+        short authScope,
+        String requestURL,
+        MessageConsumer accept,
         long acceptRouteId,
         long acceptReplyId,
-        MessageConsumer connectReply,
+        MessageConsumer connect,
         long connectReplyId,
-        long connectRouteId)
+        long connectRouteId,
+        String preferWait)
     {
         this.factory = factory;
         this.requestHash = requestHash;
+        this.requestURL = requestURL;
+        this.authScope = authScope;
         this.preferWait = preferWait;
-        this.acceptReply = acceptReply;
+        this.accept = accept;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
-        this.connectReply = connectReply;
+        this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.initialWindow = factory.responseBufferPool.slotCapacity();
@@ -118,10 +125,10 @@ final class HttpCacheProxyNotModifiedResponse
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
 
-        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash);
+        DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
         factory.defaultCache.send304(cacheEntry.etag(),
                                      preferWait,
-                                     acceptReply,
+                                     accept,
                                      acceptRouteId,
                                      acceptReplyId);
         sendWindow(initialWindow, begin.traceId());
@@ -136,7 +143,7 @@ final class HttpCacheProxyNotModifiedResponse
 
     private void onEnd(EndFW end)
     {
-        factory.writer.doHttpEnd(acceptReply,
+        factory.writer.doHttpEnd(accept,
                                  acceptRouteId,
                                  acceptReplyId,
                                  end.traceId());
@@ -145,7 +152,7 @@ final class HttpCacheProxyNotModifiedResponse
 
     private void onAbort(AbortFW abort)
     {
-        factory.writer.doAbort(acceptReply,
+        factory.writer.doAbort(accept,
                                acceptRouteId,
                                acceptReplyId,
                                abort.traceId());
@@ -168,7 +175,7 @@ final class HttpCacheProxyNotModifiedResponse
         connectReplyBudget += credit;
         if (connectReplyBudget > 0)
         {
-            factory.writer.doWindow(connectReply,
+            factory.writer.doWindow(connect,
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,

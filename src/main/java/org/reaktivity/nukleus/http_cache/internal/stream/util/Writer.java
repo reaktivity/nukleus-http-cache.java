@@ -114,12 +114,14 @@ public class Writer
         long routeId,
         long streamId,
         long traceId,
+        long authorization,
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
                 .traceId(traceId)
+                .authorization(authorization)
                 .affinity(0L)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
                 .build();
@@ -460,6 +462,24 @@ public class Writer
             .cancelId(NO_CANCEL_ID)
             .signalId(signalId)
             .build();
+
+        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
+    }
+
+    public void doSignal(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long traceId,
+        int signalId)
+    {
+        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                                        .routeId(routeId)
+                                        .streamId(streamId)
+                                        .traceId(traceId)
+                                        .cancelId(NO_CANCEL_ID)
+                                        .signalId(signalId)
+                                        .build();
 
         receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
     }

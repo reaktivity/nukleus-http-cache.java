@@ -189,7 +189,7 @@ public final class CacheEntry
                     currentTimeMillis(), connectReplyId, getRequestURL(requestHeaders));
             }
 
-            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(), builder ->
+            cache.writer.doHttpRequest(connectInitial, connectRouteId, connectInitialId, supplyTrace.getAsLong(), 0L, builder ->
             {
                 requestHeaders.forEach(h ->
                 {
@@ -774,7 +774,7 @@ public final class CacheEntry
         return expectSubscribers || !subscribers.isEmpty();
     }
 
-    public int requestUrl()
+    public int requestURL()
     {
         return this.cachedRequest.requestHash();
     }
