@@ -42,7 +42,6 @@ import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
@@ -85,21 +84,19 @@ final class HttpCacheProxyCacheableRequest
     private String prefer;
     private Future<?> preferWaitExpired;
 
+    private BudgetDebitor acceptReplyDebitor;
     private int acceptReplyBudget;
     private long acceptReplyDebitorId;
-    private BudgetDebitor acceptReplyDebitor;
     private long acceptReplyDebitorIndex = NO_DEBITOR_INDEX;
 
+    private DefaultCacheEntry cacheEntry;
+    private long authorization;
     private int acceptReplyPadding;
     private int payloadWritten = -1;
-    private DefaultCacheEntry cacheEntry;
+    private short authScope;
     private boolean etagSent;
     private boolean responseClosing;
     private boolean isEmulatedProtocolStack;
-    private short authScope;
-    private long authorization;
-    private String vary;
-
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -225,8 +222,7 @@ final class HttpCacheProxyCacheableRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
-        authorization = begin.authorization();
-        authScope = authorizationScope(authorization);
+        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
         final long traceId = begin.traceId();
         authorization = begin.authorization();
         authScope = authorizationScope(authorization);
@@ -246,11 +242,8 @@ final class HttpCacheProxyCacheableRequest
         }
         prefer = getHeader(requestHeaders, PREFER);
 
-        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
-        if (cacheEntry != null && cacheEntry.getVaryBy() != null)
-        {
-            vary = getHeader(requestHeaders, cacheEntry.getVaryBy());
-        }
+        final String vary = cacheEntry != null && cacheEntry.getVaryBy() != null ?
+            getHeader(requestHeaders, cacheEntry.getVaryBy()) : null;
 
         requestGroup.enqueue(ifNoneMatch, vary, acceptRouteId, acceptReplyId);
         factory.writer.doWindow(accept,
@@ -354,7 +347,7 @@ final class HttpCacheProxyCacheableRequest
             onResponseSignalCacheEntryAborted(signal);
             break;
         default:
-            break;
+            assert false : "Unsupported signal id";
         }
     }
 
@@ -365,12 +358,15 @@ final class HttpCacheProxyCacheableRequest
 
         if (payloadWritten == -1)
         {
-            boolean notVaries = CacheUtils.doesNotVary(vary, cacheEntry.getRequestVary());
-            if (vary != null && !notVaries)
+            if (!requestGroup.isRequestGroupLeader(acceptReplyId))
             {
-                cleanupRequestIfNecessary();
-                send503RetryAfter();
-                return;
+                if (cacheEntry.getVaryBy() != null &&
+                    (requestSlot.value == NO_SLOT || !cacheEntry.doesNotVaryBy(getRequestHeaders())))
+                {
+                    cleanupRequestIfNecessary();
+                    send503RetryAfter();
+                    return;
+                }
             }
             cleanupRequestTimeoutIfNecessary();
             sendHttpResponseHeaders(cacheEntry);

@@ -32,7 +32,6 @@ import org.agrona.collections.LongHashSet;
 import org.agrona.collections.MutableInteger;
 import org.agrona.collections.MutableLong;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 
@@ -97,6 +96,12 @@ public final class HttpProxyCacheableRequestGroup
         MutableInteger totalRequests = new MutableInteger();
         queuedRequestsByEtag.forEach((key, routeIdsByReplyId) -> totalRequests.value += routeIdsByReplyId.size());
         return totalRequests.value;
+    }
+
+    boolean isRequestGroupLeader(
+        long acceptReplyId)
+    {
+        return this.acceptReplyId == acceptReplyId;
     }
 
     void enqueue(

@@ -63,12 +63,11 @@ public final class DefaultCacheEntry
     private Instant lazyInitiatedResponseStaleAt;
 
     private String etag;
+    private String varyBy;
     private int requestSlot = NO_SLOT;
     private int responseHeadersSize;
     private int responseSize;
     private int subscribers;
-    private String varyBy;
-    private String requestVary;
     private boolean validationRequired;
     private boolean responseCompleted;
 
@@ -89,10 +88,6 @@ public final class DefaultCacheEntry
         this.responseSlots = new IntArrayList();
     }
 
-    public String getRequestVary()
-    {
-        return requestVary;
-    }
 
     public String getVaryBy()
     {
@@ -202,7 +197,8 @@ public final class DefaultCacheEntry
         return this.getResponseHeaders(cache.cachedResponseHeadersRO);
     }
 
-    public ArrayFW<HttpHeaderFW> getResponseHeaders(ArrayFW<HttpHeaderFW> responseHeadersRO)
+    public ArrayFW<HttpHeaderFW> getResponseHeaders(
+        ArrayFW<HttpHeaderFW> responseHeadersRO)
     {
         return getResponseHeaders(responseHeadersRO, responsePool);
     }
@@ -221,17 +217,14 @@ public final class DefaultCacheEntry
     {
         evictResponseIfNecessary();
         varyBy = getHeader(responseHeaders, HttpHeaders.VARY);
-        if (varyBy != null)
-        {
-            requestVary = getHeader(getRequestHeaders(), varyBy);
-        }
+        etag = getHeader(responseHeaders, ETAG);
 
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
         {
             return false;
         }
-        etag = getHeader(responseHeaders, ETAG);
+
         int headerSlot = responsePool.acquire(requestHash);
         if (headerSlot == NO_SLOT)
         {

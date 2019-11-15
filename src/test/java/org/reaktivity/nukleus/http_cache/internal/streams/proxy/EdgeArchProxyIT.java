@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_REQUESTS_NAME;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 
@@ -29,6 +30,7 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configure;
 
 public class EdgeArchProxyIT
 {
@@ -278,6 +280,21 @@ public class EdgeArchProxyIT
         "${streams}/cache.sends.304.for.matching.etag/connect/server",
     })
     public void sends304ForMatchingEtagRequest() throws Exception
+    {
+        k3po.finish();
+    }
+
+    // First response gets proxied (but doesn't get stored in cache
+    // as there is no buffer slot for headers)
+    // Second request gets 503 + retry-after
+    @Test
+    @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "2")       // 1 buffer slot
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/cache.sends.503.retry-after/accept/client",
+        "${streams}/cache.sends.503.retry-after/connect/server",
+    })
+    public void sends503RetryAfterForSecondRequest() throws Exception
     {
         k3po.finish();
     }

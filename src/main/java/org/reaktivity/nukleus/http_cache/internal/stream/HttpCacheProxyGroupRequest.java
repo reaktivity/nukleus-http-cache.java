@@ -252,6 +252,8 @@ final class HttpCacheProxyGroupRequest
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
         {
+            final long traceId = begin.traceId();
+            send503RetryAfter(traceId);
             cleanupRequestIfNecessary();
             return;
         }

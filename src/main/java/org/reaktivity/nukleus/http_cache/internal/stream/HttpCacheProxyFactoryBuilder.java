@@ -156,17 +156,17 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
             cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
-            this.cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
-            this.requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
-            this.defaultCache = new DefaultCache(router,
-                                                 writeBuffer,
-                                                 cacheBufferPool,
-                                                 counters,
-                                                 cacheEntries,
-                                                 supplyTraceId,
-                                                 supplyTypeId,
-                                                 config.allowedCachePercentage(),
-                                                 config.cacheCapacity());
+            cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
+            requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
+            defaultCache = new DefaultCache(router,
+                                            writeBuffer,
+                                            cacheBufferPool,
+                                            counters,
+                                            cacheEntries,
+                                            supplyTraceId,
+                                            supplyTypeId,
+                                            config.allowedCachePercentage(),
+                                            config.cacheCapacity());
         }
 
         return new HttpCacheProxyFactory(config,
