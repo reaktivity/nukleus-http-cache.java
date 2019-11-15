@@ -284,15 +284,11 @@ public class EdgeArchProxyIT
         k3po.finish();
     }
 
-    // First response gets proxied (but doesn't get stored in cache
-    // as there is no buffer slot for headers)
-    // Second request gets 503 + retry-after
     @Test
-    @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "2")       // 1 buffer slot
+    @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "1")  // 1 buffer slot
     @Specification({
         "${route}/proxy/controller",
         "${streams}/cache.sends.503.retry-after/accept/client",
-        "${streams}/cache.sends.503.retry-after/connect/server",
     })
     public void sends503RetryAfterForSecondRequest() throws Exception
     {
