@@ -41,20 +41,22 @@ final class HttpCacheProxyCacheableResponse
 {
     private final HttpCacheProxyFactory factory;
 
-    private final MutableInteger requestSlot;
-    private final String requestURL;
-    private final int initialWindow;
-    private String ifNoneMatch;
-    private final int requestHash;
-    private final short authScope;
     private final Function<Long, Boolean> retryRequest;
     private final HttpProxyCacheableRequestGroup requestGroup;
 
-    private MessageConsumer connectReply;
+    private final MutableInteger requestSlot;
+    private final String requestURL;
+    private final int initialWindow;
+    private final int requestHash;
+    private final short authScope;
+
+    private DefaultCacheEntry cacheEntry;
+    private MessageConsumer connect;
+    private String ifNoneMatch;
+    private String etag;
     private long connectRouteId;
     private long connectReplyId;
-    private DefaultCacheEntry cacheEntry;
-    private String etag;
+
     private int connectReplyBudget;
     private boolean isResponseBuffering;
 
@@ -75,7 +77,7 @@ final class HttpCacheProxyCacheableResponse
         this.requestSlot = requestSlot;
         this.requestHash = requestGroup.getRequestHash();
         this.authScope = authScope;
-        this.connectReply = connect;
+        this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.initialWindow = factory.responseBufferPool.slotCapacity();
@@ -121,13 +123,12 @@ final class HttpCacheProxyCacheableResponse
     private void onBegin(
         BeginFW begin)
     {
-        long traceId = begin.traceId();
-
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
-        cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
+        final long traceId = begin.traceId();
 
+        cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
         cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
         etag = getHeader(responseHeaders, ETAG);
         isResponseBuffering = etag == null;
@@ -213,7 +214,7 @@ final class HttpCacheProxyCacheableResponse
         connectReplyBudget += credit;
         if (connectReplyBudget > 0)
         {
-            factory.writer.doWindow(connectReply,
+            factory.writer.doWindow(connect,
                                     connectRouteId,
                                     connectReplyId,
                                     traceId,

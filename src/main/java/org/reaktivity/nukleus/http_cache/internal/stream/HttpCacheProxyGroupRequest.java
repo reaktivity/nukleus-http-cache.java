@@ -242,16 +242,18 @@ final class HttpCacheProxyGroupRequest
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
         requestURL = getRequestURL(requestHeaders);
-        long authorization = begin.authorization();
-        authScope = authorizationScope(authorization);
         routeId = begin.routeId();
         initialId = begin.streamId();
         replyId = factory.supplyReplyId.applyAsLong(initialId);
         factory.router.setThrottle(replyId, this::onResponseMessage);
+        long authorization = begin.authorization();
+        authScope = authorizationScope(authorization);
 
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
         {
+            final long traceId = begin.traceId();
+            send503RetryAfter(traceId);
             cleanupRequestIfNecessary();
             return;
         }

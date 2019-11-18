@@ -49,6 +49,7 @@ public final class HttpProxyCacheableRequestGroup
     private MessageConsumer connect;
     private String etag;
     private String recentAuthorizationToken;
+    private String vary;
     private long acceptReplyId;
     private long connectRouteId;
     private long connectReplyId;
@@ -97,8 +98,15 @@ public final class HttpProxyCacheableRequestGroup
         return totalRequests.value;
     }
 
+    boolean isRequestGroupLeader(
+        long acceptReplyId)
+    {
+        return this.acceptReplyId == acceptReplyId;
+    }
+
     void enqueue(
         String etag,
+        String newVary,
         long acceptRouteId,
         long acceptReplyId)
     {
@@ -109,13 +117,21 @@ public final class HttpProxyCacheableRequestGroup
 
         if (requestQueueIsEmpty)
         {
-            initiateRequest(etag, acceptRouteId, acceptReplyId);
+            initiateRequest(etag, newVary, acceptRouteId, acceptReplyId);
         }
-        else if (this.etag != null &&
-                !this.etag.equals(etag))
+        else
         {
-            resetInFlightRequest();
-            initiateRequest(null, acceptRouteId, acceptReplyId);
+            if (this.etag != null &&
+                !this.etag.equals(etag))
+            {
+                resetInFlightRequest();
+                initiateRequest(null, newVary, acceptRouteId, acceptReplyId);
+            }
+            else if (vary != null && !vary.equalsIgnoreCase(newVary))
+            {
+                resetInFlightRequest();
+                initiateRequest(etag, newVary, acceptRouteId, acceptReplyId);
+            }
         }
     }
 
@@ -234,10 +250,12 @@ public final class HttpProxyCacheableRequestGroup
 
     private void initiateRequest(
         String etag,
+        String newVary,
         long acceptRouteId,
         long acceptReplyId)
     {
         this.etag = etag;
+        this.vary = newVary;
         this.acceptReplyId = acceptReplyId;
         writer.doSignal(acceptRouteId,
                         acceptReplyId,

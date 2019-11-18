@@ -91,11 +91,13 @@ public final class HttpHeadersUtil
         return scheme.append("://").append(authority.toString()).append(path.toString()).toString();
     }
 
-    public static String getHeader(ArrayFW<HttpHeaderFW> cachedRequestHeadersRO, String headerName)
+    public static String getHeader(
+        ArrayFW<HttpHeaderFW> cachedRequestHeaders,
+        String headerName)
     {
         // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
         final StringBuilder header = new StringBuilder();
-        cachedRequestHeadersRO.forEach(h ->
+        cachedRequestHeaders.forEach(h ->
         {
             if (headerName.equalsIgnoreCase(h.name().asString()))
             {

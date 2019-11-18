@@ -149,7 +149,6 @@ public class DefaultCache
                              requestURI.getScheme(),
                              requestURI.getAuthority(),
                              requestURI.getPath()).hashCode();
-
     }
 
     public boolean matchCacheableResponse(
@@ -239,7 +238,7 @@ public class DefaultCache
                     {
                         requestHashWithoutQueryList.forEach((hash, entry) ->
                         {
-                            final HttpProxyCacheableRequestGroup requestGroup = factory.requestGroups.get(hash);
+                            final HttpProxyCacheableRequestGroup requestGroup = factory.getRequestGroup(hash);
                             if (requestGroup != null)
                             {
                                 requestGroup.onCacheEntryInvalidated();
@@ -414,6 +413,7 @@ public class DefaultCache
                     value.contains(NO_STORE));
         });
     }
+
 
     private DefaultCacheEntry computeCacheEntryIfAbsent(
         int requestHash,
