@@ -140,9 +140,10 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.executor = executor;
     }
 
-    public Int2ObjectHashMap<HttpProxyCacheableRequestGroup> getRequestGroups()
+    public HttpProxyCacheableRequestGroup getRequestGroups(
+        int requestHash)
     {
-        return requestGroups;
+        return requestGroups.get(requestHash);
     }
 
     @Override
