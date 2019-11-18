@@ -29,6 +29,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
@@ -83,18 +84,19 @@ final class HttpCacheProxyCacheableRequest
     private String prefer;
     private Future<?> preferWaitExpired;
 
+    private BudgetDebitor acceptReplyDebitor;
     private int acceptReplyBudget;
     private long acceptReplyDebitorId;
-    private BudgetDebitor acceptReplyDebitor;
     private long acceptReplyDebitorIndex = NO_DEBITOR_INDEX;
 
+    private DefaultCacheEntry cacheEntry;
+    private long authorization;
     private int acceptReplyPadding;
     private int payloadWritten = -1;
-    private DefaultCacheEntry cacheEntry;
+    private short authScope;
     private boolean etagSent;
     private boolean responseClosing;
-    private short authScope;
-    private long authorization;
+    private boolean isEmulatedProtocolStack;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -159,6 +161,7 @@ final class HttpCacheProxyCacheableRequest
                                                                accept,
                                                                acceptRouteId,
                                                                acceptReplyId)::onResponseMessage;
+            factory.defaultCache.purge(requestGroup.getRequestHash());
         }
 
         connect = factory.router.supplyReceiver(connectReplyId);
@@ -219,9 +222,11 @@ final class HttpCacheProxyCacheableRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
+        final long traceId = begin.traceId();
         authorization = begin.authorization();
         authScope = authorizationScope(authorization);
-        final long traceId = begin.traceId();
+        isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
 
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
@@ -237,7 +242,10 @@ final class HttpCacheProxyCacheableRequest
         }
         prefer = getHeader(requestHeaders, PREFER);
 
-        requestGroup.enqueue(ifNoneMatch, acceptRouteId, acceptReplyId);
+        final String vary = cacheEntry != null && cacheEntry.getVaryBy() != null ?
+            getHeader(requestHeaders, cacheEntry.getVaryBy()) : null;
+
+        requestGroup.enqueue(ifNoneMatch, vary, acceptRouteId, acceptReplyId);
         factory.writer.doWindow(accept,
                                 acceptRouteId,
                                 acceptInitialId,
@@ -287,10 +295,10 @@ final class HttpCacheProxyCacheableRequest
             if (preferWait > 0)
             {
                 preferWaitExpired = factory.executor.schedule(Math.min(preferWait, factory.preferWaitMaximum),
-                                                                   SECONDS,
-                                                                   acceptRouteId,
-                                                                   acceptReplyId,
-                                                                   REQUEST_EXPIRED_SIGNAL);
+                                                              SECONDS,
+                                                              acceptRouteId,
+                                                              acceptReplyId,
+                                                              REQUEST_EXPIRED_SIGNAL);
             }
         }
     }
@@ -319,7 +327,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignal(
         SignalFW signal)
     {
-        final int signalId = (int) signal.signalId();
+        final int signalId = signal.signalId();
 
         switch (signalId)
         {
@@ -339,7 +347,7 @@ final class HttpCacheProxyCacheableRequest
             onResponseSignalCacheEntryAborted(signal);
             break;
         default:
-            break;
+            assert false : "Unsupported signal id";
         }
     }
 
@@ -347,8 +355,19 @@ final class HttpCacheProxyCacheableRequest
         SignalFW signal)
     {
         cacheEntry = factory.defaultCache.get(requestGroup.getRequestHash());
+
         if (payloadWritten == -1)
         {
+            if (!requestGroup.isRequestGroupLeader(acceptReplyId))
+            {
+                if (cacheEntry.getVaryBy() != null &&
+                    (requestSlot.value == NO_SLOT || !cacheEntry.doesNotVaryBy(getRequestHeaders())))
+                {
+                    cleanupRequestIfNecessary();
+                    send503RetryAfter();
+                    return;
+                }
+            }
             cleanupRequestTimeoutIfNecessary();
             sendHttpResponseHeaders(cacheEntry);
         }
@@ -373,7 +392,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalCacheEntryAborted(
         SignalFW signal)
     {
-        if (this.payloadWritten >= 0)
+        if (payloadWritten >= 0)
         {
             factory.writer.doAbort(accept,
                                    acceptRouteId,
@@ -447,6 +466,20 @@ final class HttpCacheProxyCacheableRequest
     {
         if (responseClosing)
         {
+            if (isEmulatedProtocolStack)
+            {
+                final DefaultCacheEntry entry = factory.defaultCache.get(requestGroup.getRequestHash());
+                if (entry != null)
+                {
+                    factory.writer.doHttpPushPromise(accept,
+                        acceptRouteId,
+                        acceptReplyId,
+                        authScope,
+                        entry.getRequestHeaders(),
+                        entry.getCachedResponseHeaders(),
+                        entry.etag());
+                }
+            }
             factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, factory.supplyTraceId.getAsLong());
             cleanupRequestIfNecessary();
             cleanupResponseIfNecessary();
@@ -578,6 +611,17 @@ final class HttpCacheProxyCacheableRequest
         if (payloadWritten == cacheEntry.responseSize() &&
             cacheEntry.isResponseCompleted())
         {
+            if (isEmulatedProtocolStack)
+            {
+                factory.writer.doHttpPushPromise(accept,
+                                                 acceptRouteId,
+                                                 acceptReplyId,
+                                                 authScope,
+                                                 cacheEntry.getRequestHeaders(),
+                                                 cacheEntry.getCachedResponseHeaders(),
+                                                 cacheEntry.etag());
+            }
+
             if (!etagSent &&
                 cacheEntry.etag() != null)
             {

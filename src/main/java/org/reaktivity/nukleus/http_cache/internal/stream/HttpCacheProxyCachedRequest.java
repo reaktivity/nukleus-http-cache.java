@@ -19,6 +19,7 @@ import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_READY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_ABORTED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -33,6 +34,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
@@ -55,6 +57,8 @@ final class HttpCacheProxyCachedRequest
 
     private int payloadWritten = -1;
     private DefaultCacheEntry cacheEntry;
+    private long authorization;
+    private boolean isEmulatedProtocolStack;
 
     HttpCacheProxyCachedRequest(
         HttpCacheProxyFactory factory,
@@ -118,6 +122,11 @@ final class HttpCacheProxyCachedRequest
     private void onBegin(
         BeginFW begin)
     {
+        final OctetsFW extension = begin.extension();
+        final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
+        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        authorization = begin.authorization();
+        isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
         cacheEntry = factory.defaultCache.get(requestHash);
         cacheEntry.setSubscribers(1);
 
@@ -166,7 +175,7 @@ final class HttpCacheProxyCachedRequest
     private void onSignal(
         SignalFW signal)
     {
-        final int signalId = (int) signal.signalId();
+        final int signalId = signal.signalId();
 
         switch (signalId)
         {
@@ -293,6 +302,16 @@ final class HttpCacheProxyCachedRequest
     {
         if (payloadWritten == cacheEntry.responseSize())
         {
+            if (isEmulatedProtocolStack)
+            {
+                factory.writer.doHttpPushPromise(acceptReply,
+                                                 acceptRouteId,
+                                                 acceptReplyId,
+                                                 authorization,
+                                                 cacheEntry.getRequestHeaders(),
+                                                 cacheEntry.getCachedResponseHeaders(),
+                                                 cacheEntry.etag());
+            }
             factory.writer.doHttpEnd(acceptReply,
                                      acceptRouteId,
                                      acceptReplyId,

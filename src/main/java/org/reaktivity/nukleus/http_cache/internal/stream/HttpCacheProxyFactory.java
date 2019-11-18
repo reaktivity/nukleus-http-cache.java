@@ -18,7 +18,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
@@ -40,15 +39,11 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.emulated.Cache;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.Request;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
-import org.reaktivity.nukleus.http_cache.internal.stream.util.LongObjectBiConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -86,7 +81,7 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
-    final EmulatedBudgetManager emulatedBudgetManager;
+    final Int2ObjectHashMap<HttpProxyCacheableRequestGroup> requestGroups;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
@@ -96,40 +91,30 @@ public class HttpCacheProxyFactory implements StreamFactory
     final BufferPool requestBufferPool;
     final BufferPool responseBufferPool;
     final MutableDirectBuffer writeBuffer;
-    final Long2ObjectHashMap<Request> requestCorrelations;
 
-    final int preferWaitMaximum;
     final Writer writer;
-    final CacheControl cacheControlParser = new CacheControl();
-    final Cache emulatedCache;
     final DefaultCache defaultCache;
     final HttpCacheCounters counters;
     final SignalingExecutor executor;
-    final LongObjectBiConsumer<Runnable> scheduler;
+    final int preferWaitMaximum;
 
-    public final Int2ObjectHashMap<HttpProxyCacheableRequestGroup> requestGroups;
 
     public HttpCacheProxyFactory(
         HttpCacheConfiguration config,
         RouteManager router,
-        EmulatedBudgetManager emulatedBudgetManager,
         MutableDirectBuffer writeBuffer,
         BufferPool requestBufferPool,
         LongUnaryOperator supplyInitialId,
         LongUnaryOperator supplyReplyId,
         LongFunction<BudgetDebitor> supplyDebitor,
-        Long2ObjectHashMap<Request> requestCorrelations,
         Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations,
-        Cache emulatedCache,
         DefaultCache defaultCache,
         HttpCacheCounters counters,
         LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
-        SignalingExecutor executor,
-        LongObjectBiConsumer<Runnable> scheduler)
+        SignalingExecutor executor)
     {
         this.router = requireNonNull(router);
-        this.emulatedBudgetManager = requireNonNull(emulatedBudgetManager);
         this.supplyInitialId = requireNonNull(supplyInitialId);
         this.supplyTraceId = requireNonNull(supplyTraceId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
@@ -146,16 +131,19 @@ public class HttpCacheProxyFactory implements StreamFactory
                 counters.supplyCounter.apply("http-cache.response.releases"));
         this.writeBuffer = new UnsafeBuffer(new byte[writeBuffer.capacity()]);
 
-        this.requestCorrelations = requireNonNull(requestCorrelations);
         this.correlations = requireNonNull(correlations);
-        this.emulatedCache = emulatedCache;
         this.defaultCache = defaultCache;
 
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.executor = executor;
-        this.scheduler = scheduler;
+    }
+
+    public HttpProxyCacheableRequestGroup getRequestGroup(
+        int requestHash)
+    {
+        return requestGroups.get(requestHash);
     }
 
     @Override
@@ -177,7 +165,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else
         {
-            newStream = newReplyStream(begin, source);
+            newStream = newReplyStream(begin);
         }
 
         return newStream;
@@ -203,57 +191,34 @@ public class HttpCacheProxyFactory implements StreamFactory
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
             final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
-            if (requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK))
-            {
-                newStream = new EmulatedProxyAcceptStream(this,
-                                                          acceptReply,
-                                                          acceptRouteId,
-                                                          acceptInitialId,
-                                                          connectRouteId)::handleStream;
-            }
-            else
-            {
-                newStream = newNativeInitialStream(requestHeaders,
-                                                   acceptReply,
-                                                   authorization,
-                                                   connectRouteId,
-                                                   acceptInitialId,
-                                                   acceptRouteId,
-                                                   begin.traceId());
-            }
+            newStream = newNativeInitialStream(requestHeaders,
+                                               acceptReply,
+                                               authorization,
+                                               connectRouteId,
+                                               acceptInitialId,
+                                               acceptRouteId,
+                                               begin.traceId());
+
         }
 
         return newStream;
     }
 
     private MessageConsumer newReplyStream(
-        final BeginFW begin,
-        final MessageConsumer connectInitial)
+        final BeginFW begin)
     {
-        final long sourceRouteId = begin.routeId();
         final long sourceId = begin.streamId();
 
-        Request request = requestCorrelations.get(sourceId);
         MessageConsumer newStream = null;
 
-        if (request != null && request.isEmulated())
+        Function<HttpBeginExFW, MessageConsumer> newResponse = correlations.remove(sourceId);
+        if (newResponse != null)
         {
-            return new EmulatedProxyConnectReplyStream(this,
-                                                        connectInitial,
-                                                        sourceRouteId,
-                                                        sourceId)::handleStream;
-        }
-        else
-        {
-            Function<HttpBeginExFW, MessageConsumer> newResponse = correlations.remove(sourceId);
-            if (newResponse != null)
+            final OctetsFW extension = begin.extension();
+            final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
+            if (httpBeginFW != null)
             {
-                final OctetsFW extension = begin.extension();
-                final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
-                if (httpBeginFW != null)
-                {
-                    newStream = newResponse.apply(httpBeginFW);
-                }
+                newStream = newResponse.apply(httpBeginFW);
             }
         }
 
@@ -484,7 +449,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         counters.responses.getAsLong();
     }
 
-    private HttpProxyCacheableRequestGroup newCacheableRequestGroup(int requestHash)
+    private HttpProxyCacheableRequestGroup newCacheableRequestGroup(
+        int requestHash)
     {
         return new HttpProxyCacheableRequestGroup(requestHash, writer, this, requestGroups::remove);
     }

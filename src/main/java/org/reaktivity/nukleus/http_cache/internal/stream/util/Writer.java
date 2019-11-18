@@ -21,6 +21,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeade
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferenceApplied;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
@@ -28,6 +29,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.function.Consumer;
@@ -41,8 +43,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.AnswerableByCacheRequest;
-import org.reaktivity.nukleus.http_cache.internal.proxy.request.emulated.CacheableRequest;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
@@ -73,8 +74,7 @@ public class Writer
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
     private final SignalFW.Builder signalRW = new SignalFW.Builder();
-
-    final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    private final CacheControl cacheControlParser = new CacheControl();
 
     private final RouteManager router;
     private final MutableDirectBuffer writeBuffer;
@@ -147,29 +147,6 @@ public class Writer
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
-    public void doHttpResponseWithUpdatedCacheControl(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        CacheControl cacheControlFW,
-        ArrayFW<HttpHeaderFW> responseHeaders,
-        int staleWhileRevalidate,
-        String etag,
-        boolean cacheControlPrivate,
-        long traceId)
-    {
-        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-            builder -> updateResponseHeaders(builder, cacheControlFW, responseHeaders, staleWhileRevalidate,
-                        etag, cacheControlPrivate);
-        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .routeId(routeId)
-                .streamId(streamId)
-                .traceId(traceId)
-                .affinity(0L)
-                .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                .build();
-        receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
-    }
 
     public void doHttpResponseWithUpdatedHeaders(
         MessageConsumer receiver,
@@ -187,6 +164,7 @@ public class Writer
                                              requestHeaders,
                                              etag,
                                              isStale);
+
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                      .routeId(routeId)
                                      .streamId(streamId)
@@ -204,14 +182,20 @@ public class Writer
         String etag,
         boolean isStale)
     {
+        final int staleWhileRevalidate = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        final boolean hasPreferWait = isPreferWait(requestHeaders);
+        final boolean isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
         responseHeaders.forEach(h ->
         {
-            final StringFW nameFW = h.name();
-            final String16FW valueFW = h.value();
-            if (!nameFW.asString().equalsIgnoreCase(RETRY_AFTER))
+            final StringFW name = h.name();
+            final String16FW value = h.value();
+            if (!RETRY_AFTER.equals(name.asString()) &&
+                !CACHE_CONTROL.equals(name.asString()))
             {
-                builder.item(header -> header.name(nameFW).value(valueFW));
+                builder.item(header -> header.name(name).value(value));
             }
+
+            updateEmulatedResponseHeaders(builder, h, staleWhileRevalidate, hasPreferWait, isEmulatedProtocolStack);
         });
 
         if (!responseHeaders.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
@@ -237,34 +221,40 @@ public class Writer
         {
             builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
         }
+
+        if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL) && isEmulatedProtocolStack)
+        {
+            final String value = hasPreferWait
+                ? "private, stale-while-revalidate=" + staleWhileRevalidate
+                : "stale-while-revalidate=" + staleWhileRevalidate;
+            builder.item(header -> header.name("cache-control").value(value));
+        }
     }
 
-    private void updateResponseHeaders(
+    private void updateEmulatedResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-        CacheControl cacheControlFW,
-        ArrayFW<HttpHeaderFW> responseHeaders,
+        HttpHeaderFW responseHeader,
         int staleWhileRevalidate,
-        String etag,
-        boolean cacheControlPrivate)
+        boolean hasPreferWait,
+        boolean isEmulatedProtocolStack)
     {
-        responseHeaders.forEach(h ->
-        {
-            final StringFW nameFW = h.name();
-            final String name = nameFW.asString();
-            final String16FW valueFW = h.value();
-            final String value = valueFW.asString();
+        final StringFW nameFW = responseHeader.name();
+        final String name = nameFW.asString();
+        final String16FW valueFW = responseHeader.value();
+        final String value = valueFW.asString();
 
-            switch (name)
+        if (HttpHeaders.CACHE_CONTROL.equals(name))
+        {
+            if (isEmulatedProtocolStack)
             {
-            case HttpHeaders.CACHE_CONTROL:
-                cacheControlFW.parse(value);
-                cacheControlFW.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
-                if (cacheControlPrivate && !(cacheControlFW.contains("private") || cacheControlFW.contains("public")))
+                cacheControlParser.parse(value);
+                cacheControlParser.getValues().put("stale-while-revalidate", "" + staleWhileRevalidate);
+                if (hasPreferWait && !(cacheControlParser.contains("private") || cacheControlParser.contains("public")))
                 {
-                    cacheControlFW.getValues().put("private", null);
+                    cacheControlParser.getValues().put("private", null);
                 }
                 StringBuilder cacheControlDirectives = new StringBuilder();
-                cacheControlFW.getValues().forEach((k, v) ->
+                cacheControlParser.getValues().forEach((k, v) ->
                 {
                     cacheControlDirectives.append(cacheControlDirectives.length() > 0 ? ", " : "");
                     cacheControlDirectives.append(k);
@@ -274,21 +264,11 @@ public class Writer
                     }
                 });
                 builder.item(header -> header.name(nameFW).value(cacheControlDirectives.toString()));
-                break;
-            default:
+            }
+            else
+            {
                 builder.item(header -> header.name(nameFW).value(valueFW));
             }
-        });
-        if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL))
-        {
-            final String value = cacheControlPrivate
-                    ? "private, stale-while-revalidate=" + staleWhileRevalidate
-                    : "stale-while-revalidate=" + staleWhileRevalidate;
-            builder.item(header -> header.name("cache-control").value(value));
-        }
-        if (!responseHeaders.anyMatch(h -> ETAG.equals(h.name().asString())) && etag != null)
-        {
-            builder.item(header -> header.name(ETAG).value(etag));
         }
     }
 
@@ -507,44 +487,44 @@ public class Writer
     }
 
     public void doHttpPushPromise(
-        AnswerableByCacheRequest request,
-        CacheableRequest cachedRequest,
+        MessageConsumer acceptReply,
+        long routeId,
+        long streamId,
+        long authorization,
+        ArrayFW<HttpHeaderFW>  requestHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
+        String etag)
+    {
+        final int staleWhileRevalidate = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
+        doH2PushPromise(acceptReply,
+                        routeId,
+                        streamId,
+                        authorization,
+                        0L,
+                        0,
+                        setPushPromiseHeaders(requestHeaders, responseHeaders, staleWhileRevalidate, etag));
+    }
+
+    private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
+        ArrayFW<HttpHeaderFW> requestHeaders,
         ArrayFW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
-        final ArrayFW<HttpHeaderFW> requestHeaders = cachedRequest.getRequestHeaders(requestHeadersRO);
-        final MessageConsumer acceptReply = request.acceptReply;
-        final long routeId = request.acceptRouteId;
-        final long streamId = request.acceptReplyId;
-        final long authorization = request.authorization();
-
-        doH2PushPromise(
-            acceptReply,
-            routeId, streamId, authorization, 0L, 0,
-            setPushPromiseHeaders(requestHeaders, responseHeaders, freshnessExtension, etag));
-    }
-
-    private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-        ArrayFW<HttpHeaderFW> requestHeadersRO,
-        ArrayFW<HttpHeaderFW> responseHeadersRO,
-        int freshnessExtension,
-        String etag)
-    {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
-            builder -> updateRequestHeaders(requestHeadersRO, responseHeadersRO, builder, freshnessExtension, etag);
+            builder -> updateRequestHeaders(requestHeaders, responseHeaders, builder, freshnessExtension, etag);
 
         return result;
     }
 
     private void updateRequestHeaders(
-        ArrayFW<HttpHeaderFW> requestHeadersFW,
-        ArrayFW<HttpHeaderFW> responseHeadersFW,
+        ArrayFW<HttpHeaderFW> requestHeaders,
+        ArrayFW<HttpHeaderFW> responseHeaders,
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         int freshnessExtension,
         String etag)
     {
-        requestHeadersFW.forEach(h ->
+        requestHeaders.forEach(h ->
         {
             final StringFW nameFW = h.name();
             final String name = nameFW.asString();
@@ -557,10 +537,11 @@ public class Writer
             case HttpHeaders.AUTHORITY:
             case HttpHeaders.SCHEME:
             case HttpHeaders.PATH:
+            case HttpHeaders.PREFER:
                 builder.item(header -> header.name(nameFW).value(valueFW));
                 break;
             case HttpHeaders.CACHE_CONTROL:
-                if (value.contains(CacheDirectives.NO_CACHE))
+                if (value.contains(CacheDirectives.MAX_AGE_0))
                 {
                     builder.item(header -> header.name(nameFW)
                                                  .value(valueFW));
@@ -568,22 +549,22 @@ public class Writer
                 else
                 {
                     builder.item(header -> header.name(nameFW)
-                                                 .value(value + ", no-cache"));
+                                                 .value(value + ", max-age=0"));
                 }
                 break;
             case HttpHeaders.IF_MODIFIED_SINCE:
-                if (responseHeadersFW.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
+                if (responseHeaders.anyMatch(h2 -> "last-modified".equals(h2.name().asString())))
                 {
-                    final String newValue = getHeader(responseHeadersFW, "last-modified");
+                    final String newValue = getHeader(responseHeaders, "last-modified");
                     builder.item(header -> header.name(nameFW)
                                                  .value(newValue));
                 }
                 break;
             case HttpHeaders.IF_NONE_MATCH:
                 String result = etag;
-                if (responseHeadersFW.anyMatch(h2 -> "etag".equals(h2.name().asString())))
+                if (responseHeaders.anyMatch(h2 -> "etag".equals(h2.name().asString())))
                 {
-                    final String existingIfNoneMatch = getHeader(responseHeadersFW, "etag");
+                    final String existingIfNoneMatch = getHeader(responseHeaders, "etag");
                     if (!existingIfNoneMatch.contains(etag))
                     {
                         result += ", " + existingIfNoneMatch;
@@ -601,21 +582,21 @@ public class Writer
             case HttpHeaders.IF_UNMODIFIED_SINCE:
                 break;
             default:
-                if (CacheUtils.isVaryHeader(name, responseHeadersFW))
+                if (CacheUtils.isVaryHeader(name, responseHeaders))
                 {
                     builder.item(header -> header.name(nameFW).value(valueFW));
                 }
             }
         });
-        if (!requestHeadersFW.anyMatch(HAS_CACHE_CONTROL))
+        if (!requestHeaders.anyMatch(HAS_CACHE_CONTROL))
         {
-            builder.item(header -> header.name("cache-control").value("no-cache"));
+            builder.item(header -> header.name("cache-control").value("max-age=0"));
         }
-        if (!requestHeadersFW.anyMatch(PreferHeader.PREFER_HEADER_NAME))
+        if (!requestHeaders.anyMatch(PreferHeader.PREFER_HEADER_NAME))
         {
             builder.item(header -> header.name("prefer").value("wait=" + freshnessExtension));
         }
-        if (!requestHeadersFW.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
+        if (!requestHeaders.anyMatch(h -> HttpHeaders.IF_NONE_MATCH.equals(h.name().asString())))
         {
             builder.item(header -> header.name(IF_NONE_MATCH).value(etag));
         }
@@ -641,16 +622,6 @@ public class Writer
                 .build();
 
         receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
-    }
-
-    public void do503AndAbort(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        long traceId)
-    {
-        this.doHttpResponse(receiver, routeId, streamId, traceId, e -> e.item(h -> h.name(STATUS).value("503")));
-        this.doAbort(receiver, routeId, streamId, traceId);
     }
 
     public void do304(

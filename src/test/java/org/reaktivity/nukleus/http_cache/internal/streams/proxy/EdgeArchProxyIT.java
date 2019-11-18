@@ -20,9 +20,7 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_REQUESTS_NAME;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
-import java.time.Instant;
 
-import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -88,7 +86,7 @@ public class EdgeArchProxyIT
         "${streams}/serve.from.cache.when.freshness.extension.is.valid/accept/client",
         "${streams}/serve.from.cache.when.freshness.extension.is.valid/connect/server",
     })
-    public void serveFromCacheWhenFreshnessExtensionIsValid() throws Exception
+    public void shouldServeFromCacheWhenFreshnessExtensionIsValid() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
@@ -127,7 +125,7 @@ public class EdgeArchProxyIT
     public void shouldInjectIndividualizedPushPromisesOnSharedFreshnessExtension() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -157,99 +155,10 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/accept/client",
-        "${streams}/cache.and.poll.on.surrogate.max-age.when.fresh.ext/connect/server",
-    })
-    public void shouldCacheAndPollOnSurrogateMaxAgeWhenFreshExt() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1, 1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.cache/accept/client",
-        "${streams}/polling.updates.cache/connect/server",
-    })
-    public void shouldUpdateCacheOnPoll() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.cache.after.503.retry-after/accept/client",
-        "${streams}/polling.updates.cache.after.503.retry-after/connect/server",
-    })
-    public void shouldUpdateCacheOnPollAfter503RetryAfter() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.waits.on.surrogate-age/accept/client",
-        "${streams}/polling.waits.on.surrogate-age/connect/server",
-    })
-    public void pollingWaitsOnSurrogateAge() throws Exception
-    {
-        k3po.start();
-        Instant start = Instant.now();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Instant finish = Instant.now();
-        Assert.assertTrue(start.plusMillis(4900).isBefore(finish));
-        counters.assertExpectedCacheEntries(1, 2);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
         "${streams}/polling.updates.pending.on-update.requests/accept/client",
         "${streams}/polling.updates.pending.on-update.requests/connect/server",
     })
     public void shouldUpdateOnUpdateRequestsWhenPollCompletes() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.update.attachs.to.next.cache.if.push.promise.arrives.before.response.completes/accept/client",
-        "${streams}/polling.update.attachs.to.next.cache.if.push.promise.arrives.before.response.completes/connect/server",
-    })
-    public void shouldAttachToNextCacheEntryIfPushPromiseArrivesBeforeResponseCompletes() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.pending.on-update.requests.only.when.modified/accept/client",
-        "${streams}/polling.updates.pending.on-update.requests.only.when.modified/connect/server",
-    })
-    public void shouldUpdateOnUpdateRequestsOnlyWhenModified() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
@@ -306,81 +215,13 @@ public class EdgeArchProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/update.cache.when.304.response.has.matching.etag/accept/client",
-        "${streams}/update.cache.when.304.response.has.matching.etag/connect/server",
-    })
-    public void shouldCacheWhen304ResponseHasMatchingEtag() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/update.cache.when.200.response.has.different.etag/accept/client",
-        "${streams}/update.cache.when.200.response.has.different.etag/connect/server",
-    })
-    public void shouldCacheWhen200ResponseHasDifferentEtag() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.stops.if.no.subscribers/accept/client",
-        "${streams}/polling.stops.if.no.subscribers/connect/server",
-    })
-    public void shouldStopPollingIfNoSubscribers() throws Exception
-    {
-        k3po.finish();
-        Thread.sleep(100); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.stops.if.no.subscribers.and.not.updated/accept/client",
-        "${streams}/polling.stops.if.no.subscribers.and.not.updated/connect/server",
-    })
-    public void shouldStopPollingIfNoSubscribersAndNotUpdated() throws Exception
-    {
-        k3po.finish();
-        Thread.sleep(10); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/maintain.polling.per.multiple.auth.scopes/accept/client",
-        "${streams}/maintain.polling.per.multiple.auth.scopes/connect/server",
-    })
-    public void shouldMaintainPollingForMultipleAuthScopes() throws Exception
-    {
-        k3po.finish();
-        counters.assertExpectedCacheEntries(2, 2, 2);
-    }
-
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
         "${streams}/no.authorization.sends.cache.control.private/accept/client",
         "${streams}/no.authorization.sends.cache.control.private/connect/server",
     })
     public void noAuthorizationSendsCacheControlPrivate() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -392,7 +233,7 @@ public class EdgeArchProxyIT
     public void noAuthorizationSendsCacheControlPrivateExceptWhenPublic() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -404,7 +245,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderMismatch() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -416,7 +257,7 @@ public class EdgeArchProxyIT
     public void pollingVaryHeaderAsterisk() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1, 2, 0);
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -429,22 +270,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         Thread.sleep(100); // Wait for response to be processed
-        counters.assertExpectedCacheEntries(1, 1, 0);
-    }
-
-    // First response gets proxied (but doesn't get stored in cache
-    // as there is no buffer slot for headers)
-    // Second request gets 503 + retry-after
-    @Test
-    @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "1")       // 1 buffer slot
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/cache.sends.503.retry-after/accept/client",
-        "${streams}/cache.sends.503.retry-after/connect/server",
-    })
-    public void sends503RetryAfterForSecondRequest() throws Exception
-    {
-        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
     }
 
     @Test
@@ -459,121 +285,14 @@ public class EdgeArchProxyIT
     }
 
     @Test
-    @Configure(name = "nukleus.http_cache.capacity", value = "8192")       // 2 buffer slots
-    @Configure(name = "nukleus.http_cache.slot.capacity", value = "4096")
+    @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "1")  // 1 buffer slot
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/push.promise.after.cache.full/accept/client",
-        "${streams}/push.promise.after.cache.full/connect/server",
+        "${streams}/cache.sends.503.retry-after/accept/client",
     })
-    public void pushPromiseAfterCacheFull() throws Exception
+    public void sends503RetryAfterForSecondRequest() throws Exception
     {
         k3po.finish();
     }
 
-    @Test
-    @Configure(name = "nukleus.http_cache.capacity", value = "8192")       // 4 buffer slots
-    @Configure(name = "nukleus.http_cache.slot.capacity", value = "2048")
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/polling.updates.after.cache.full/accept/client",
-        "${streams}/polling.updates.after.cache.full/connect/server",
-    })
-    public void pollingAfterCacheFull() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(1000);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/does.not.serve.from.cache.if.no.subscribers/accept/client",
-        "${streams}/does.not.serve.from.cache.if.no.subscribers/connect/server",
-    })
-    public void shouldBypassCacheIfEntryIsStaleAndNotRefreshing() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(5000);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/use.etag.from.trailer.on.200.response/accept/client",
-        "${streams}/use.etag.from.trailer.on.200.response/connect/server",
-    })
-    public void shouldUseEtagFromTrailerOn200Response() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/use.etag.from.trailer.and.update.subscriber/accept/client",
-        "${streams}/use.etag.from.trailer.and.update.subscriber/connect/server",
-    })
-    public void shouldUseEtagFromTrailerAndUpdateSubscriber() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/do.not.send.cache.update.if.trailer.etag.is.matching/accept/client",
-        "${streams}/do.not.send.cache.update.if.trailer.etag.is.matching/connect/server",
-    })
-    public void shouldNotSendCacheUpdateIfTrailerEtagIsMatching() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(10);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
-
-    @Test
-    @Configure(name = "nukleus.http_cache.capacity", value = "8192")       // 4 buffer slots
-    @Configure(name = "nukleus.http_cache.slot.capacity", value = "2048")
-    @Specification({
-        "${route}/proxy/controller",
-        "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/accept/client",
-        "${streams}/use.etag.from.trailer.on.200.response.after.cache.full/connect/server",
-    })
-    public void shouldUseEtagFromTrailerOn200ResponseAfterCacheFull() throws Exception
-    {
-        k3po.start();
-        k3po.awaitBarrier("CACHE_UPDATE_SENT");
-        Thread.sleep(1000);
-        k3po.notifyBarrier("CACHE_UPDATE_RECEIVED");
-        k3po.finish();
-        Thread.sleep(1000);
-        counters.assertExpectedCacheEntries(1);
-    }
 }

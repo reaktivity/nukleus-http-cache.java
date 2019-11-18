@@ -25,11 +25,8 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.PUBLIC;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.SURROGATE_CONTROL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.Arrays;
@@ -50,35 +47,9 @@ public final class CacheUtils
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
     public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
-    public static final String LAST_MODIFIED = "last-modified";
-
     private CacheUtils()
     {
         // utility class
-    }
-
-    public static boolean canBeServedByEmulatedCache(
-        ArrayFW<HttpHeaderFW> headers)
-    {
-        return !headers.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            switch (name)
-            {
-            case CACHE_CONTROL:
-                // TODO remove need for max-age=0 (Currently can't handle multiple outstanding cache updates)
-                return value.contains(CacheDirectives.NO_CACHE) || value.contains(MAX_AGE_0);
-            case METHOD:
-                return !HttpMethods.GET.equalsIgnoreCase(value);
-            case CONTENT_LENGTH:
-                return true;
-            case TRANSFER_ENCODING:
-                return true;
-            default:
-                return false;
-            }
-        });
     }
 
     public static boolean isCacheableResponse(ArrayFW<HttpHeaderFW> response)
@@ -192,7 +163,9 @@ public final class CacheUtils
 
     // takes care of multi header values during match
     // for e.g requestHeader = "gzip", cachedRequest = "gzip, deflate, br"
-    private static boolean doesNotVary(String requestHeader, String cachedRequest)
+    public static boolean doesNotVary(
+        String requestHeader,
+        String cachedRequest)
     {
         if (requestHeader == cachedRequest)
         {

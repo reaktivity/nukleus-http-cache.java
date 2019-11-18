@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
@@ -33,10 +34,6 @@ final class HttpCacheProxyNotModifiedResponse
 {
     private final HttpCacheProxyFactory factory;
 
-    private final int initialWindow;
-    private final int requestHash;
-    private final short authScope;
-
     private final MessageConsumer accept;
     private final long acceptRouteId;
     private final long acceptReplyId;
@@ -45,9 +42,13 @@ final class HttpCacheProxyNotModifiedResponse
     private final long connectRouteId;
     private final long connectReplyId;
 
-    private int connectReplyBudget;
+    private final int initialWindow;
+    private final int requestHash;
+    private final short authScope;
     private final String preferWait;
     private final String requestURL;
+
+    private int connectReplyBudget;
 
     HttpCacheProxyNotModifiedResponse(
         HttpCacheProxyFactory factory,
