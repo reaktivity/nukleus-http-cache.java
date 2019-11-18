@@ -302,7 +302,7 @@ public final class DefaultCacheEntry
         evictResponseIfNecessary();
     }
 
-    public boolean canServeRequest(
+    public boolean  canServeRequest(
         ArrayFW<HttpHeaderFW> request,
         short authScope)
     {

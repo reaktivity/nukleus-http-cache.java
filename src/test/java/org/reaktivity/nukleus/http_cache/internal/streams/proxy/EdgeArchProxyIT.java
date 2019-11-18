@@ -86,7 +86,7 @@ public class EdgeArchProxyIT
         "${streams}/serve.from.cache.when.freshness.extension.is.valid/accept/client",
         "${streams}/serve.from.cache.when.freshness.extension.is.valid/connect/server",
     })
-    public void serveFromCacheWhenFreshnessExtensionIsValid() throws Exception
+    public void shouldServeFromCacheWhenFreshnessExtensionIsValid() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);

@@ -81,7 +81,7 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
-    public final Int2ObjectHashMap<HttpProxyCacheableRequestGroup> requestGroups;
+    final Int2ObjectHashMap<HttpProxyCacheableRequestGroup> requestGroups;
 
     final LongUnaryOperator supplyInitialId;
     final LongUnaryOperator supplyReplyId;
@@ -138,6 +138,11 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.executor = executor;
+    }
+
+    public Int2ObjectHashMap<HttpProxyCacheableRequestGroup> getRequestGroups()
+    {
+        return requestGroups;
     }
 
     @Override
