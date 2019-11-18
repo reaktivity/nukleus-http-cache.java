@@ -238,7 +238,7 @@ public class DefaultCache
                     {
                         requestHashWithoutQueryList.forEach((hash, entry) ->
                         {
-                            final HttpProxyCacheableRequestGroup requestGroup = factory.getRequestGroups().get(hash);
+                            final HttpProxyCacheableRequestGroup requestGroup = factory.getRequestGroup(hash);
                             if (requestGroup != null)
                             {
                                 requestGroup.onCacheEntryInvalidated();
