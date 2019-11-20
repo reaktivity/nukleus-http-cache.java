@@ -52,7 +52,7 @@ public final class HttpProxyCacheableRequestGroup
     private String vary;
     private long acceptReplyId;
     private long connectRouteId;
-    private long connectId;
+    private long connectInitialId;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
@@ -105,9 +105,9 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     boolean isRequestStillQueued(
-        long replyId)
+        long initialId)
     {
-        return connectId == replyId;
+        return connectInitialId == initialId;
     }
 
     void enqueue(
@@ -238,7 +238,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         writer.doSignal(connect,
                         connectRouteId,
-            connectId,
+                        connectInitialId,
                         factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_INVALIDATED_SIGNAL);
     }
@@ -252,7 +252,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         BeginFW begin = factory.beginRO.wrap(buffer, index, length);
         connectRouteId = begin.routeId();
-        connectId = begin.streamId();
+        connectInitialId = begin.streamId();
         connect = new HttpCacheProxyGroupRequest(factory, this, sender)::onRequestMessage;
         return connect;
     }
@@ -325,7 +325,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         factory.writer.doReset(connect,
                                connectRouteId,
-                               connectId,
+            connectInitialId,
                                factory.supplyTraceId.getAsLong());
     }
 
@@ -334,6 +334,6 @@ public final class HttpProxyCacheableRequestGroup
         activeRouteId.value = 0L;
         activeReplyId.value = 0L;
         connectRouteId = 0L;
-        connectId = 0L;
+        connectInitialId = 0L;
     }
 }
