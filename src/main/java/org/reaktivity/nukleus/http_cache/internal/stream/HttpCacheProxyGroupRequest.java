@@ -92,6 +92,11 @@ final class HttpCacheProxyGroupRequest
     MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
+        if (!requestGroup.isRequestStillQueued(initialId))
+        {
+            return null;
+        }
+
         MessageConsumer newStream = null;
         ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
@@ -350,11 +355,16 @@ final class HttpCacheProxyGroupRequest
 
         if (signalId == CACHE_ENTRY_INVALIDATED_SIGNAL)
         {
-            if (retryRequest != null)
-            {
-                retryRequest.cancel(true);
-                retryCacheableRequest();
-            }
+            onRequestCacheEntryInvalidatedSignal();
+        }
+    }
+
+    private void onRequestCacheEntryInvalidatedSignal()
+    {
+        if (retryRequest != null)
+        {
+            retryRequest.cancel(true);
+            retryCacheableRequest();
         }
     }
 
