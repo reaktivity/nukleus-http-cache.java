@@ -325,7 +325,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         factory.writer.doReset(connect,
                                connectRouteId,
-            connectInitialId,
+                               connectInitialId,
                                factory.supplyTraceId.getAsLong());
     }
 
