@@ -19,7 +19,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_INVALIDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RESET_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
@@ -93,6 +92,11 @@ final class HttpCacheProxyGroupRequest
     MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
+        if (!requestGroup.isRequestStillQueued(initialId))
+        {
+            return null;
+        }
+
         MessageConsumer newStream = null;
         ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         boolean retry = HttpHeadersUtil.retry(responseHeaders);
@@ -315,24 +319,10 @@ final class HttpCacheProxyGroupRequest
     {
         final int signalId = signal.signalId();
 
-        switch (signalId)
+        if (signalId == GROUP_REQUEST_RETRY_SIGNAL)
         {
-        case GROUP_REQUEST_RETRY_SIGNAL:
             retryCacheableRequest();
-            break;
-        case GROUP_REQUEST_RESET_SIGNAL:
-            onRequestSignalGroupRequestResetSignal(signal);
         }
-    }
-
-    private void onRequestSignalGroupRequestResetSignal(
-        SignalFW signal)
-    {
-        factory.writer.doReset(connectInitial,
-                               routeId,
-                               connectReplyId,
-                               signal.traceId());
-        cleanupRequestIfNecessary();
     }
 
     private void onWindow(
@@ -365,11 +355,16 @@ final class HttpCacheProxyGroupRequest
 
         if (signalId == CACHE_ENTRY_INVALIDATED_SIGNAL)
         {
-            if (retryRequest != null)
-            {
-                retryRequest.cancel(true);
-                retryCacheableRequest();
-            }
+            onRequestCacheEntryInvalidatedSignal();
+        }
+    }
+
+    private void onRequestCacheEntryInvalidatedSignal()
+    {
+        if (retryRequest != null)
+        {
+            retryRequest.cancel(true);
+            retryCacheableRequest();
         }
     }
 

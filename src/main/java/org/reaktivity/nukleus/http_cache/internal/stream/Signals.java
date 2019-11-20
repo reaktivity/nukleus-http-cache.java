@@ -26,7 +26,6 @@ final class Signals
     static final int CACHE_ENTRY_NOT_MODIFIED_SIGNAL = 8;
     static final int CACHE_ENTRY_READY_SIGNAL = 9;
     static final int REQUEST_ABORTED_SIGNAL = 10;
-    static final int GROUP_REQUEST_RESET_SIGNAL = 11;
 
     private Signals()
     {

@@ -19,7 +19,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_EN
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_INVALIDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_NOT_MODIFIED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_UPDATED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RESET_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_GROUP_LEADER_UPDATED_SIGNAL;
 
 import java.util.HashMap;
@@ -53,7 +52,7 @@ public final class HttpProxyCacheableRequestGroup
     private String vary;
     private long acceptReplyId;
     private long connectRouteId;
-    private long connectReplyId;
+    private long connectId;
 
     HttpProxyCacheableRequestGroup(
         int requestHash,
@@ -103,6 +102,12 @@ public final class HttpProxyCacheableRequestGroup
         long acceptReplyId)
     {
         return this.acceptReplyId == acceptReplyId;
+    }
+
+    boolean isRequestStillQueued(
+        long replyId)
+    {
+        return connectId == replyId;
     }
 
     void enqueue(
@@ -159,8 +164,7 @@ public final class HttpProxyCacheableRequestGroup
 
         if (!queuedRequestsByEtag.isEmpty())
         {
-            activeRouteId.value = 0L;
-            activeReplyId.value = 0L;
+            resetActiveRequestValue();
 
             if (!routeIdsByReplyId.isEmpty())
             {
@@ -201,11 +205,7 @@ public final class HttpProxyCacheableRequestGroup
         }
         else if (isRequestGroupLeader(acceptReplyId))
         {
-            factory.writer.doSignal(connect,
-                                    connectRouteId,
-                                    connectReplyId,
-                                    factory.supplyTraceId.getAsLong(),
-                                    GROUP_REQUEST_RESET_SIGNAL);
+            resetActiveRequestValue();
         }
     }
 
@@ -238,7 +238,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         writer.doSignal(connect,
                         connectRouteId,
-                        connectReplyId,
+            connectId,
                         factory.supplyTraceId.getAsLong(),
                         CACHE_ENTRY_INVALIDATED_SIGNAL);
     }
@@ -252,7 +252,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         BeginFW begin = factory.beginRO.wrap(buffer, index, length);
         connectRouteId = begin.routeId();
-        connectReplyId = begin.streamId();
+        connectId = begin.streamId();
         connect = new HttpCacheProxyGroupRequest(factory, this, sender)::onRequestMessage;
         return connect;
     }
@@ -325,7 +325,15 @@ public final class HttpProxyCacheableRequestGroup
     {
         factory.writer.doReset(connect,
                                connectRouteId,
-                               connectReplyId,
+                               connectId,
                                factory.supplyTraceId.getAsLong());
+    }
+
+    private void resetActiveRequestValue()
+    {
+        activeRouteId.value = 0L;
+        activeReplyId.value = 0L;
+        connectRouteId = 0L;
+        connectId = 0L;
     }
 }

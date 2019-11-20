@@ -140,4 +140,15 @@ public class ProxyExceptionsIT
         //counters.assertExpectedCacheEntries(0); // TODO, fix. Sporadically failing today,
     }
 
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/reset.connect.reply.if.accept.reply.reset/accept/client",
+        "${streams}/reset.connect.reply.if.accept.reply.reset/connect/server",
+    })
+    public void shouldResetConnectReplyIfAcceptReplyReset() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(0);
+    }
 }
