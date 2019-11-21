@@ -26,18 +26,14 @@ public class HttpCacheCounters
 
     public final LongSupplier requests;
     public final LongSupplier requestsCacheable;
-    public final LongSupplier requestsPreferWait;
     public final LongSupplier requestsRetry;
     public final LongSupplier responses;
     public final LongSupplier responsesRetry;
+    public final LongSupplier responsesNotModified;
     public final LongSupplier responsesCached;
-    public final LongSupplier responsesAbortedPurge;
+    public final LongSupplier responsesPurged;
     public final LongSupplier responsesAbortedVary;
-    public final LongSupplier responsesAbortedMiss;
-    public final LongSupplier responsesAbortedEvicted;
-    public final LongSupplier responsesAbortedUncommited;
     public final LongSupplier promises;
-    public final LongSupplier promisesCanceled;
 
     public HttpCacheCounters(
         Function<String, LongSupplier> supplyCounter,
@@ -48,17 +44,13 @@ public class HttpCacheCounters
 
         this.requests = supplyCounter.apply("http-cache.requests");
         this.requestsCacheable = supplyCounter.apply("http-cache.requests.cacheable");
-        this.requestsPreferWait = supplyCounter.apply("http-cache.requests.prefer.wait");
         this.requestsRetry = supplyCounter.apply("http-cache.requests.retry");
         this.responses = supplyCounter.apply("http-cache.responses");
         this.responsesRetry = supplyCounter.apply("http-cache.responses.retry");
+        this.responsesNotModified = supplyCounter.apply("http-cache.responses.not.modified");
         this.responsesCached = supplyCounter.apply("http-cache.responses.cached");
         this.responsesAbortedVary = supplyCounter.apply("http-cache.responses.aborted.vary");
-        this.responsesAbortedMiss = supplyCounter.apply("http-cache.responses.aborted.miss");
-        this.responsesAbortedEvicted = supplyCounter.apply("http-cache.responses.aborted.evicted");
-        this.responsesAbortedUncommited = supplyCounter.apply("http-cache.responses.aborted.uncommited");
-        this.responsesAbortedPurge = supplyCounter.apply("http-cache.responses.aborted.purge");
+        this.responsesPurged = supplyCounter.apply("http-cache.responses.purge");
         this.promises = supplyCounter.apply("http-cache.promises");
-        this.promisesCanceled = supplyCounter.apply("http-cache.promises.canceled");
     }
 }

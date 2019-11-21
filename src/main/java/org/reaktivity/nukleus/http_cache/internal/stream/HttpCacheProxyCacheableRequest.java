@@ -19,6 +19,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_ABORTED_SIGNAL;
@@ -60,7 +61,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 final class HttpCacheProxyCacheableRequest
 {
     private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
-    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW("503");
+    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW(SERVICE_UNAVAILABLE_503);
 
     private final HttpCacheProxyFactory factory;
     private final HttpProxyCacheableRequestGroup requestGroup;
@@ -381,6 +382,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalRequestExpired(
         SignalFW signal)
     {
+        factory.counters.responses.getAsLong();
         factory.defaultCache.send304(ifNoneMatch,
                                      prefer,
                                      accept,
@@ -452,6 +454,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalCacheEntryNotModified(
         SignalFW signal)
     {
+        factory.counters.responses.getAsLong();
         factory.defaultCache.send304(ifNoneMatch,
                                      prefer,
                                      accept,
@@ -471,6 +474,8 @@ final class HttpCacheProxyCacheableRequest
                 final DefaultCacheEntry entry = factory.defaultCache.get(requestGroup.getRequestHash());
                 if (entry != null)
                 {
+                    factory.counters.promises.getAsLong();
+
                     factory.writer.doHttpPushPromise(accept,
                         acceptRouteId,
                         acceptReplyId,
@@ -613,6 +618,7 @@ final class HttpCacheProxyCacheableRequest
         {
             if (isEmulatedProtocolStack)
             {
+                factory.counters.promises.getAsLong();
                 factory.writer.doHttpPushPromise(accept,
                                                  acceptRouteId,
                                                  acceptReplyId,

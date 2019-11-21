@@ -134,6 +134,8 @@ final class HttpCacheProxyNotModifiedResponse
                                      acceptReplyId);
         sendWindow(initialWindow, begin.traceId());
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
+        factory.counters.responses.getAsLong();
+        factory.counters.responsesNotModified.getAsLong();
     }
 
     private void onData(

@@ -304,6 +304,7 @@ final class HttpCacheProxyCachedRequest
         {
             if (isEmulatedProtocolStack)
             {
+                factory.counters.promises.getAsLong();
                 factory.writer.doHttpPushPromise(acceptReply,
                                                  acceptRouteId,
                                                  acceptReplyId,
