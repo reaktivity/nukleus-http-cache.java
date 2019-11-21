@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_INVALIDATED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
@@ -54,7 +55,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 final class HttpCacheProxyGroupRequest
 {
     private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
-    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW("503");
+    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW(SERVICE_UNAVAILABLE_503);
     private final HttpBeginExFW.Builder beginExRW = new HttpBeginExFW.Builder();
 
     private final int httpTypeId;
@@ -389,7 +390,6 @@ final class HttpCacheProxyGroupRequest
     private void retryCacheableRequest()
     {
         incAttempts();
-
         factory.counters.requestsRetry.getAsLong();
         doHttpBegin(getRequestHeaders());
     }
@@ -480,6 +480,9 @@ final class HttpCacheProxyGroupRequest
                       .item(h -> h.name(RETRY_AFTER).value("0"));
 
             beginExRW.typeId(httpTypeId).headers(mutator);
+
+            // count retry responses
+            factory.counters.responsesRetry.getAsLong();
 
             MessageConsumer newResponse = responseFactory.apply(beginExRW.build());
 

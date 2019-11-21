@@ -100,6 +100,9 @@ final class HttpCacheProxyCachedNotModifiedRequest
                                 initialWindow,
                                 0);
 
+        // count all responses
+        factory.counters.responses.getAsLong();
+
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
