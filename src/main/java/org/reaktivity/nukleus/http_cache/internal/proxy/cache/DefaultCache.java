@@ -15,9 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.requireNonNull;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isMatchByEtag;
@@ -81,7 +79,7 @@ public class DefaultCache
 
     private final LongConsumer entryCount;
     private final LongSupplier supplyTraceId;
-    public final HttpCacheCounters counters;
+    private final HttpCacheCounters counters;
     private final int allowedSlots;
 
     public DefaultCache(
@@ -187,6 +185,7 @@ public class DefaultCache
 
             entryCount.accept(-1);
             cacheEntry.purge();
+            counters.responsesPurged.getAsLong();
         }
     }
 
@@ -317,12 +316,6 @@ public class DefaultCache
         long acceptRouteId,
         long acceptReplyId)
     {
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] ACCEPT %016x %s [sent response]\n",
-                              currentTimeMillis(), acceptReplyId, "304");
-        }
-
         if (preferWait != null)
         {
             writer.doHttpResponse(acceptReply,
@@ -345,8 +338,6 @@ public class DefaultCache
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag)));
         }
-        // count all responses
-        counters.responses.getAsLong();
     }
 
     public boolean isRequestCacheable(

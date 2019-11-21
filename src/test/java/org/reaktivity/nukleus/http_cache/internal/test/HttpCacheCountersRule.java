@@ -188,10 +188,4 @@ public class HttpCacheCountersRule implements TestRule
     {
         assertEquals(expected, promises());
     }
-
-    public void assertPromisesCanceled(
-        int expected)
-    {
-        assertEquals(expected, promisesCanceled());
-    }
 }

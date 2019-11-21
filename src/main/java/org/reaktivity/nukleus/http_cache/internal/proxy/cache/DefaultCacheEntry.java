@@ -254,10 +254,8 @@ public final class DefaultCacheEntry
                                                    .toLowerCase().equals(":status"))).value().asString();
 
         final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
-        oldHeaders.forEach(h ->
-                               newHeadersMap.put(h.name().asString(), h.value().asString()));
-        newHeaders.forEach(h ->
-                               newHeadersMap.put(h.name().asString(), h.value().asString()));
+        oldHeaders.forEach(h -> newHeadersMap.put(h.name().asString(), h.value().asString()));
+        newHeaders.forEach(h -> newHeadersMap.put(h.name().asString(), h.value().asString()));
         newHeadersMap.put(":status", statusCode);
 
         if (NOT_MODIFIED_304.equals(status) &&
