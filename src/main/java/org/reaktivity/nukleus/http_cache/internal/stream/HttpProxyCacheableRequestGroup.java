@@ -322,10 +322,13 @@ public final class HttpProxyCacheableRequestGroup
 
     private void resetInFlightRequest()
     {
-        factory.writer.doReset(connect,
-                               connectRouteId,
-                               connectInitialId,
-                               factory.supplyTraceId.getAsLong());
+        if (connect != null)
+        {
+            factory.writer.doReset(connect,
+                connectRouteId,
+                connectInitialId,
+                factory.supplyTraceId.getAsLong());
+        }
     }
 
     private void resetActiveRequestValue()

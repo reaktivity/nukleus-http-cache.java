@@ -415,20 +415,23 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalRequestGroupLeaderUpdated(
         SignalFW signal)
     {
-        final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
-        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-            builder -> requestHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value())));
+        if (requestGroup.isRequestGroupLeader(acceptReplyId))
+        {
+            final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
+            Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+                builder -> requestHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value())));
 
-        connect = factory.writer.newHttpStream(requestGroup::newRequest, connectRouteId, connectInitialId,
-            factory.supplyTraceId.getAsLong(), mutator, this::onConnectMessage);
+            connect = factory.writer.newHttpStream(requestGroup::newRequest, connectRouteId, connectInitialId,
+                factory.supplyTraceId.getAsLong(), mutator, this::onConnectMessage);
 
-        factory.writer.doHttpRequest(connect,
-                                     connectRouteId,
-                                     connectInitialId,
-                                     signal.traceId(),
-                                     authorization,
-                                     mutator);
-        cleanupRequestSlotIfNecessary();
+            factory.writer.doHttpRequest(connect,
+                connectRouteId,
+                connectInitialId,
+                signal.traceId(),
+                authorization,
+                mutator);
+            cleanupRequestSlotIfNecessary();
+        }
     }
 
     private void onConnectMessage(
