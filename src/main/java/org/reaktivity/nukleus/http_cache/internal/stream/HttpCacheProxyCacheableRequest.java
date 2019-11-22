@@ -125,7 +125,7 @@ final class HttpCacheProxyCacheableRequest
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
-        this.initialWindow = factory.responseBufferPool.slotCapacity();
+        this.initialWindow = factory.writeBuffer.capacity();
         this.requestSlot =  new MutableInteger(NO_SLOT);
     }
 

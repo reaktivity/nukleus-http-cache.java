@@ -80,7 +80,7 @@ final class HttpCacheProxyCacheableResponse
         this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
-        this.initialWindow = factory.responseBufferPool.slotCapacity();
+        this.initialWindow = factory.writeBuffer.capacity();
         this.ifNoneMatch = requestGroup.getEtag();
         this.retryRequest = retryRequest;
         assert requestSlot.value != NO_SLOT;
