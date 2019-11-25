@@ -382,6 +382,11 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalRequestExpired(
         SignalFW signal)
     {
+        send304();
+    }
+
+    private void send304()
+    {
         factory.counters.responses.getAsLong();
         factory.defaultCache.send304(ifNoneMatch,
                                      prefer,
@@ -417,20 +422,39 @@ final class HttpCacheProxyCacheableRequest
     {
         if (requestGroup.isRequestGroupLeader(acceptReplyId))
         {
-            final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
-            Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                builder -> requestHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value())));
+            if (requestSlot.value != NO_SLOT)
+            {
+                final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
+                Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
+                    builder -> requestHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value())));
 
-            connect = factory.writer.newHttpStream(requestGroup::newRequest, connectRouteId, connectInitialId,
-                factory.supplyTraceId.getAsLong(), mutator, this::onConnectMessage);
+                connect = factory.writer.newHttpStream(requestGroup::newRequest,
+                                                       connectRouteId,
+                                                       connectInitialId,
+                                                       factory.supplyTraceId.getAsLong(),
+                                                       mutator,
+                                                       this::onConnectMessage);
 
-            factory.writer.doHttpRequest(connect,
-                connectRouteId,
-                connectInitialId,
-                signal.traceId(),
-                authorization,
-                mutator);
-            cleanupRequestSlotIfNecessary();
+                factory.writer.doHttpRequest(connect,
+                                             connectRouteId,
+                                             connectInitialId,
+                                             signal.traceId(),
+                                             authorization,
+                                             mutator);
+                cleanupRequestSlotIfNecessary();
+            }
+            else
+            {
+                if (ifNoneMatch != null)
+                {
+                    send304();
+                }
+                else
+                {
+                    send503RetryAfter();
+                }
+                cleanupRequestTimeoutIfNecessary();
+            }
         }
     }
 
@@ -457,14 +481,8 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalCacheEntryNotModified(
         SignalFW signal)
     {
-        factory.counters.responses.getAsLong();
-        factory.defaultCache.send304(ifNoneMatch,
-                                     prefer,
-                                     accept,
-                                     acceptRouteId,
-                                     acceptReplyId);
+        send304();
         cleanupRequestTimeoutIfNecessary();
-        responseClosing = true;
     }
 
     private void onResponseWindow(
@@ -480,12 +498,12 @@ final class HttpCacheProxyCacheableRequest
                     factory.counters.promises.getAsLong();
 
                     factory.writer.doHttpPushPromise(accept,
-                        acceptRouteId,
-                        acceptReplyId,
-                        authScope,
-                        entry.getRequestHeaders(),
-                        entry.getCachedResponseHeaders(),
-                        entry.etag());
+                                                     acceptRouteId,
+                                                     acceptReplyId,
+                                                     authScope,
+                                                     entry.getRequestHeaders(),
+                                                     entry.getCachedResponseHeaders(),
+                                                     entry.etag());
                 }
             }
             factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, factory.supplyTraceId.getAsLong());
