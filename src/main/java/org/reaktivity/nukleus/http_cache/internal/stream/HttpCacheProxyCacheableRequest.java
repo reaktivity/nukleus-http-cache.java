@@ -125,7 +125,7 @@ final class HttpCacheProxyCacheableRequest
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.connectInitialId = connectInitialId;
-        this.initialWindow = factory.writeBuffer.capacity();
+        this.initialWindow = factory.initialWindowSize;
         this.requestSlot =  new MutableInteger(NO_SLOT);
     }
 
@@ -445,17 +445,23 @@ final class HttpCacheProxyCacheableRequest
             }
             else
             {
-                if (ifNoneMatch != null)
-                {
-                    send304();
-                }
-                else
+                if (!canSend304())
                 {
                     send503RetryAfter();
                 }
                 cleanupRequestTimeoutIfNecessary();
             }
         }
+    }
+
+    private boolean canSend304()
+    {
+        boolean canSend304 = ifNoneMatch != null;
+        if (canSend304)
+        {
+            send304();
+        }
+        return canSend304;
     }
 
     private void onConnectMessage(

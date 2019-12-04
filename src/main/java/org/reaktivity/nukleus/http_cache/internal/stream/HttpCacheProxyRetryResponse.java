@@ -63,7 +63,7 @@ final class HttpCacheProxyRetryResponse
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
         this.scheduleRequest = scheduleRequest;
-        this.initialWindow = factory.writeBuffer.capacity();
+        this.initialWindow = factory.initialWindowSize;
     }
 
     @Override

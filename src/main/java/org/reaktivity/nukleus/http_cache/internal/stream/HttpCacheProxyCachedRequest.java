@@ -74,7 +74,7 @@ final class HttpCacheProxyCachedRequest
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
         this.acceptInitialId = acceptInitialId;
-        this.initialWindow = factory.writeBuffer.capacity();
+        this.initialWindow = factory.initialWindowSize;
     }
 
     void onAccept(
