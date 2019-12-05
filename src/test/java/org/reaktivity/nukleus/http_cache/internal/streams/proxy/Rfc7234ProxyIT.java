@@ -890,10 +890,10 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/noncacheable.response.dequeue.changes.request.leader/accept/client",
-        "${streams}/noncacheable.response.dequeue.changes.request.leader/connect/server",
+        "${streams}/change.request.leader.if.initial.response.not.cacheable/accept/client",
+        "${streams}/change.request.leader.if.initial.response.not.cacheable/connect/server",
     })
-    public void shouldNoncacheablResponseDequeueChangesRequestLeader() throws Exception
+    public void shouldChangeRequestLeaderIfInitialResponseNotCacheable() throws Exception
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);

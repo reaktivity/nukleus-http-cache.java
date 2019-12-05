@@ -50,7 +50,6 @@ public final class HttpProxyCacheableRequestGroup
     private String etag;
     private String recentAuthorizationToken;
     private String vary;
-    private long acceptReplyId;
     private long connectRouteId;
     private long connectInitialId;
 
@@ -101,7 +100,7 @@ public final class HttpProxyCacheableRequestGroup
     boolean isRequestGroupLeader(
         long acceptReplyId)
     {
-        return this.acceptReplyId == acceptReplyId;
+        return this.activeReplyId.value == acceptReplyId;
     }
 
     boolean isRequestStillQueued(
@@ -163,6 +162,7 @@ public final class HttpProxyCacheableRequestGroup
 
         if (!queuedRequestsByEtag.isEmpty())
         {
+            final long previousAcceptReplyId = activeReplyId.value;
             resetActiveRequestValue();
 
             if (!routeIdsByReplyId.isEmpty())
@@ -170,11 +170,10 @@ public final class HttpProxyCacheableRequestGroup
                 routeIdsByReplyId.forEach((replyId, routeId) ->
                 {
                     if (!responsesInFlight.contains(replyId) &&
-                        this.acceptReplyId == acceptReplyId)
+                        previousAcceptReplyId == acceptReplyId)
                     {
                         activeRouteId.value = routeId;
                         activeReplyId.value = replyId;
-                        this.acceptReplyId = replyId;
                     }
                 });
             }
@@ -185,11 +184,10 @@ public final class HttpProxyCacheableRequestGroup
                     value.forEach((replyId, routeId) ->
                     {
                         if (!responsesInFlight.contains(replyId) &&
-                            this.acceptReplyId == acceptReplyId)
+                            previousAcceptReplyId == acceptReplyId)
                         {
                             activeRouteId.value = routeId;
                             activeReplyId.value = replyId;
-                            this.acceptReplyId = replyId;
                         }
                     });
                 });
@@ -266,7 +264,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         this.etag = etag;
         this.vary = newVary;
-        this.acceptReplyId = acceptReplyId;
+        this.activeReplyId.value = acceptReplyId;
         writer.doSignal(acceptRouteId,
                         acceptReplyId,
                         factory.supplyTraceId.getAsLong(),
