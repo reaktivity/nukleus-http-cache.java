@@ -97,7 +97,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final HttpCacheCounters counters;
     final SignalingExecutor executor;
     final int preferWaitMaximum;
-
+    final int initialWindowSize;
 
     public HttpCacheProxyFactory(
         HttpCacheConfiguration config,
@@ -119,6 +119,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.supplyTraceId = requireNonNull(supplyTraceId);
         this.supplyReplyId = requireNonNull(supplyReplyId);
         this.preferWaitMaximum = config.preferWaitMaximum();
+        this.initialWindowSize = config.initialWindowSize();
         this.supplyTypeId = supplyTypeId;
         this.supplyDebitor = supplyDebitor;
         this.requestBufferPool = new CountingBufferPool(
@@ -245,7 +246,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         MessageConsumer newStream = null;
         counters.requests.getAsLong();
 
-        if (defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
+        if (defaultCache.isRequestCacheable(requestHeaders) &&
+            defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
         {
             newStream = createCachedStream(requestHeaders,
                                            acceptReply,

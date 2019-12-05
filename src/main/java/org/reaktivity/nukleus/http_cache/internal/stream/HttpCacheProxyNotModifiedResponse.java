@@ -74,7 +74,7 @@ final class HttpCacheProxyNotModifiedResponse
         this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
-        this.initialWindow = factory.responseBufferPool.slotCapacity();
+        this.initialWindow = factory.initialWindowSize;
     }
 
     @Override
