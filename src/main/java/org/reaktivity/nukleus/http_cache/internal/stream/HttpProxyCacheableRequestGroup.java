@@ -127,13 +127,12 @@ public final class HttpProxyCacheableRequestGroup
         }
         else
         {
-            if (this.etag != null &&
-                !this.etag.equals(etag))
+            if (this.etag != null && !this.etag.equals(etag))
             {
                 resetInFlightRequest();
                 initiateRequest(null, newVary, acceptRouteId, acceptReplyId);
             }
-            else if (vary != null && !vary.equalsIgnoreCase(newVary))
+            else if (vary != null && !vary.equals(newVary))
             {
                 resetInFlightRequest();
                 initiateRequest(etag, newVary, acceptRouteId, acceptReplyId);
@@ -323,10 +322,13 @@ public final class HttpProxyCacheableRequestGroup
 
     private void resetInFlightRequest()
     {
-        factory.writer.doReset(connect,
-                               connectRouteId,
-                               connectInitialId,
-                               factory.supplyTraceId.getAsLong());
+        if (connect != null)
+        {
+            factory.writer.doReset(connect,
+                connectRouteId,
+                connectInitialId,
+                factory.supplyTraceId.getAsLong());
+        }
     }
 
     private void resetActiveRequestValue()
