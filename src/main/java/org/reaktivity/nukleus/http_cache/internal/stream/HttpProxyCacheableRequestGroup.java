@@ -238,10 +238,10 @@ public final class HttpProxyCacheableRequestGroup
     public void onCacheEntryInvalidated()
     {
         writer.doSignal(connect,
-            connectRouteId,
-            connectInitialId,
-            factory.supplyTraceId.getAsLong(),
-            CACHE_ENTRY_INVALIDATED_SIGNAL);
+                        connectRouteId,
+                        connectInitialId,
+                        factory.supplyTraceId.getAsLong(),
+                        CACHE_ENTRY_INVALIDATED_SIGNAL);
     }
 
     MessageConsumer newRequest(
