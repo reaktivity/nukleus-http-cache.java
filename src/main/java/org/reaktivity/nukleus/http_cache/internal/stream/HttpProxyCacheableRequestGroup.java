@@ -174,6 +174,7 @@ public final class HttpProxyCacheableRequestGroup
                     {
                         activeRouteId.value = routeId;
                         activeReplyId.value = replyId;
+                        this.acceptReplyId = replyId;
                     }
                 });
             }
@@ -188,6 +189,7 @@ public final class HttpProxyCacheableRequestGroup
                         {
                             activeRouteId.value = routeId;
                             activeReplyId.value = replyId;
+                            this.acceptReplyId = replyId;
                         }
                     });
                 });

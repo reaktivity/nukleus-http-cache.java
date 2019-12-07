@@ -879,11 +879,23 @@ public class Rfc7234ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/invalidate.cache.for.unsafe.request/connect/client",
+        "${streams}/invalidate.cache.for.unsafe.request/accept/client",
         "${streams}/invalidate.cache.for.unsafe.request/connect/server",
     })
     public void shouldInvalidateCacheForUnsafeRequest() throws Exception
     {
         k3po.finish();
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/change.request.leader.if.initial.response.not.cacheable/accept/client",
+        "${streams}/change.request.leader.if.initial.response.not.cacheable/connect/server",
+    })
+    public void shouldChangeRequestLeaderIfInitialResponseNotCacheable() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(0);
     }
 }
