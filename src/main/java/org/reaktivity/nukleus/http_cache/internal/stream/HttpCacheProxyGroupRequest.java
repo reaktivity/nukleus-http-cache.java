@@ -77,6 +77,7 @@ final class HttpCacheProxyGroupRequest
     private int attempts;
     private int state;
     private short authScope;
+    private long traceId;
 
     HttpCacheProxyGroupRequest(
         HttpCacheProxyFactory factory,
@@ -256,14 +257,14 @@ final class HttpCacheProxyGroupRequest
         authScope = authorizationScope(authorization);
 
         boolean stored = storeRequest(requestHeaders);
+        traceId = begin.traceId();
         if (!stored)
         {
-            final long traceId = begin.traceId();
             send503RetryAfter(traceId);
             cleanupRequestIfNecessary();
             return;
         }
-        doHttpBegin(requestHeaders);
+        doHttpBegin(requestHeaders, traceId);
         state = RequestState.openingInitial(state);
     }
 
@@ -391,7 +392,7 @@ final class HttpCacheProxyGroupRequest
     {
         incAttempts();
         factory.counters.requestsRetry.getAsLong();
-        doHttpBegin(getRequestHeaders());
+        doHttpBegin(getRequestHeaders(), traceId);
     }
 
     private boolean storeRequest(
@@ -450,7 +451,8 @@ final class HttpCacheProxyGroupRequest
     }
 
     private void doHttpBegin(
-        ArrayFW<HttpHeaderFW> requestHeaders)
+        ArrayFW<HttpHeaderFW> requestHeaders,
+        long traceId)
     {
         connectInitialId = factory.supplyInitialId.applyAsLong(routeId);
         connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
@@ -460,7 +462,7 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doHttpRequest(connectInitial,
                                      routeId,
                                      connectInitialId,
-                                     factory.supplyTraceId.getAsLong(),
+                                     traceId,
                                      0L,
                                      mutateRequestHeaders(requestHeaders));
         factory.router.setThrottle(connectInitialId, this::onResponseMessage);

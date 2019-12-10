@@ -139,8 +139,8 @@ public class Rfc7240ProxyIT
     @Test
     @Specification({
         "${route}/proxy/controller",
-        "${streams}/server.next.request.if.current.request.expired/accept/client",
-        "${streams}/server.next.request.if.current.request.expired/connect/server",
+        "${streams}/serve.next.request.if.current.request.expired/accept/client",
+        "${streams}/serve.next.request.if.current.request.expired/connect/server",
     })
     public void shouldServeNextRequestIfCurrentRequestExpired() throws Exception
     {
