@@ -66,8 +66,8 @@ public class DefaultCache
     final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
     final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
-    final CacheControl responseCacheControlFW = new CacheControl();
-    final CacheControl cachedRequestCacheControlFW = new CacheControl();
+    final CacheControl responseCacheControl = new CacheControl();
+    final CacheControl cachedRequestCacheControl = new CacheControl();
 
     private final BufferPool cachedRequestBufferPool;
     private final BufferPool cachedResponseBufferPool;
@@ -167,10 +167,10 @@ public class DefaultCache
         int requestHash)
     {
         final DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
+
         return satisfiedByCache(requestHeaders) &&
-                cacheEntry != null &&
-                cacheEntry.canServeRequest(requestHeaders, authScope) &&
-                cacheEntry.isValid();
+               cacheEntry != null &&
+               cacheEntry.canServeRequest(requestHeaders, authScope);
     }
 
     public void purge(

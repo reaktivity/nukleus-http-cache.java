@@ -898,4 +898,24 @@ public class Rfc7234ProxyIT
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/update.freshness.of.expired.entry/accept/client",
+        "${streams}/update.freshness.of.expired.entry/connect/server",
+    })
+    public void shouldUpdateFreshnessOfExpiredEntry() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(1);
+        counters.assertExpectedCacheEntries(1);
+    }
 }
