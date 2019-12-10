@@ -88,7 +88,6 @@ public final class DefaultCacheEntry
         this.responseSlots = new IntArrayList();
     }
 
-
     public String getVaryBy()
     {
         return varyBy;
@@ -114,7 +113,8 @@ public final class DefaultCacheEntry
         return etag;
     }
 
-    public void setEtag(String etag)
+    public void setEtag(
+        String etag)
     {
         this.etag = etag;
     }
@@ -124,15 +124,15 @@ public final class DefaultCacheEntry
         return responseCompleted;
     }
 
-    public void setResponseCompleted(boolean responseCompleted)
+    public void setResponseCompleted(
+        boolean responseCompleted)
     {
-        validationRequired = false;
-        this.responseCompleted = responseCompleted;
-    }
+        if (responseCompleted)
+        {
+            validationRequired = false;
+        }
 
-    public boolean isValid()
-    {
-        return !validationRequired;
+        this.responseCompleted = responseCompleted;
     }
 
     public void invalidate()
@@ -140,7 +140,8 @@ public final class DefaultCacheEntry
         validationRequired = true;
     }
 
-    public void setSubscribers(int numberOfSubscribers)
+    public void setSubscribers(
+        int numberOfSubscribers)
     {
         this.subscribers += numberOfSubscribers;
     }
@@ -311,11 +312,13 @@ public final class DefaultCacheEntry
         final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
         final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now);
         final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
+
         return canBeServedToAuthorized &&
                doesNotVaryBy &&
                satisfiesFreshnessRequirements &&
                satisfiesStalenessRequirements &&
-               satisfiesAgeRequirements;
+               satisfiesAgeRequirements &&
+               !validationRequired;
     }
 
     public void evictRequestIfNecessary()
@@ -391,7 +394,7 @@ public final class DefaultCacheEntry
     {
         ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
         String cacheControl = getHeader(responseHeaders, CACHE_CONTROL);
-        return cache.responseCacheControlFW.parse(cacheControl);
+        return cache.responseCacheControl.parse(cacheControl);
     }
 
     public boolean doesNotVaryBy(
@@ -430,7 +433,7 @@ public final class DefaultCacheEntry
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeaderValue);
+        final CacheControl requestCacheControl = cache.cachedRequestCacheControl.parse(requestCacheControlHeaderValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MIN_FRESH))
@@ -445,8 +448,8 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> request,
         Instant now)
     {
-        final String requestCacheControlHeacerValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeacerValue);
+        final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
+        final CacheControl requestCacheControl = cache.cachedRequestCacheControl.parse(requestCacheControlHeaderValue);
 
         Instant staleAt = staleAt();
         if (requestCacheControl.contains(MAX_STALE))
@@ -454,10 +457,7 @@ public final class DefaultCacheEntry
             final String maxStale = requestCacheControl.getValue(MAX_STALE);
             final int maxStaleSec = (maxStale != null) ? parseInt(maxStale) : MAX_VALUE;
             final Instant acceptable = staleAt.plusSeconds(maxStaleSec);
-            if (now.isAfter(acceptable))
-            {
-                return false;
-            }
+            return !now.isAfter(acceptable);
         }
         else if (now.isAfter(staleAt))
         {
@@ -472,54 +472,42 @@ public final class DefaultCacheEntry
         Instant now)
     {
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
-        final CacheControl requestCacheControl = cache.cachedRequestCacheControlFW.parse(requestCacheControlHeaderValue);
+        final CacheControl requestCacheControl = cache.cachedRequestCacheControl.parse(requestCacheControlHeaderValue);
 
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
             Instant receivedAt = responseReceivedAt();
-            if (receivedAt.plusSeconds(requestMaxAge).isBefore(now))
-            {
-                return false;
-            }
+            return !receivedAt.plusSeconds(requestMaxAge).isBefore(now);
         }
         return true;
     }
 
     private Instant staleAt()
     {
-        if (lazyInitiatedResponseStaleAt == null)
-        {
-            CacheControl cacheControl = responseCacheControl();
-            Instant receivedAt = responseReceivedAt();
-            int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
-                parseInt(cacheControl.getValue(S_MAXAGE))
-                : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-            int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
-            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
-            lazyInitiatedResponseStaleAt = receivedAt.plusSeconds(staleInSeconds);
-        }
-        return lazyInitiatedResponseStaleAt;
+        final CacheControl cacheControl = responseCacheControl();
+        final Instant receivedAt = responseReceivedAt();
+        int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
+            parseInt(cacheControl.getValue(S_MAXAGE))
+            : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
+        final int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
+        staleInSeconds = Math.max(staleInSeconds, surrogateAge);
+        return receivedAt.plusSeconds(staleInSeconds);
     }
 
     private Instant responseReceivedAt()
     {
-        if (lazyInitiatedResponseReceivedAt == null)
+        final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+        final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
+            getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
+        try
         {
-            final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
-            final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
-                getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
-            try
-            {
-                Date receivedDate = DATE_FORMAT.parse(dateHeaderValue);
-                lazyInitiatedResponseReceivedAt = receivedDate.toInstant();
-            }
-            catch (Exception e)
-            {
-                lazyInitiatedResponseReceivedAt = Instant.EPOCH;
-            }
+            return DATE_FORMAT.parse(dateHeaderValue).toInstant();
         }
-        return lazyInitiatedResponseReceivedAt;
+        catch (Exception e)
+        {
+            return Instant.EPOCH;
+        }
     }
 
 }

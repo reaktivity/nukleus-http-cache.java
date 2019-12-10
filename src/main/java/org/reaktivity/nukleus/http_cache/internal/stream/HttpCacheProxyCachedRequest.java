@@ -281,15 +281,14 @@ final class HttpCacheProxyCachedRequest
     {
         ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
-        factory.writer.doHttpResponseWithUpdatedHeaders(
-            acceptReply,
-            acceptRouteId,
-            acceptReplyId,
-            responseHeaders,
-            cacheEntry.getRequestHeaders(),
-            cacheEntry.etag(),
-            cacheEntry.isStale(),
-            factory.supplyTraceId.getAsLong());
+        factory.writer.doHttpResponseWithUpdatedHeaders(acceptReply,
+                                                        acceptRouteId,
+                                                        acceptReplyId,
+                                                        responseHeaders,
+                                                        cacheEntry.getRequestHeaders(),
+                                                        cacheEntry.etag(),
+                                                        cacheEntry.isStale(),
+                                                        signalId);
 
 
         payloadWritten = 0;
