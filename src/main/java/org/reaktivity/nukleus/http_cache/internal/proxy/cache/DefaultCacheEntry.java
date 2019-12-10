@@ -59,9 +59,6 @@ public final class DefaultCacheEntry
     private final int requestHashWithoutQuery;
     private final short authScope;
 
-    private Instant lazyInitiatedResponseReceivedAt;
-    private Instant lazyInitiatedResponseStaleAt;
-
     private String etag;
     private String varyBy;
     private int requestSlot = NO_SLOT;
