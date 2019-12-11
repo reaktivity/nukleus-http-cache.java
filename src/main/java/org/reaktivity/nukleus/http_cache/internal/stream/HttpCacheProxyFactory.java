@@ -345,7 +345,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         counters.requestsCacheable.getAsLong();
         MessageConsumer newStream;
         HttpProxyCacheableRequestGroup group = requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);
-        System.out.println(group.hashCode());
 
         HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
         if (authorizationHeader != null)
