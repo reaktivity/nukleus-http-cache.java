@@ -918,4 +918,148 @@ public class Rfc7234ProxyIT
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.payload/accept/client",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.payload/connect/server",
+    })
+    public void shouldRespondNewRequestWhenInflightResponseExpiresWhileSendingPayload() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(0);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.close/accept/client",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.close/connect/server",
+    })
+    public void shouldRespondNewRequestWhenInflightResponseExpiresWhileSendingClose() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(0);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.payload.and.trailer/accept/client",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.payload.and.trailer/connect/server",
+    })
+    public void shouldRespondNewRequestWhenInflightResponseExpiresWhileSendingPayloadAndTrailer() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(0);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.trailer/accept/client",
+        "${streams}/respond.new.request.when.inflight.response.expires.while.sending.trailer/connect/server",
+    })
+    public void shouldRespondNewRequestWhenInflightResponseExpiresWhileSendingTrailer() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("REQUEST_CACHED");
+        sleep(1000);
+        k3po.notifyBarrier("CACHE_EXPIRED");
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(0);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.request.leader.sending.payload.and.trailer/accept/client",
+        "${streams}/respond.new.request.when.request.leader.sending.payload.and.trailer/connect/server",
+    })
+    public void shouldRespondNewRequestWhenRequestLeaderSendingPayloadAndTrailer() throws Exception
+    {
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(1);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.request.leader.sending.trailer/accept/client",
+        "${streams}/respond.new.request.when.request.leader.sending.trailer/connect/server",
+    })
+    public void shouldRespondNewRequestWhenRequestLeaderSendingTrailer() throws Exception
+    {
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(1);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.request.leader.sending.close/accept/client",
+        "${streams}/respond.new.request.when.request.leader.sending.close/connect/server",
+    })
+    public void shouldRespondNewRequestWhenRequestLeaderSendingClose() throws Exception
+    {
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(1);
+        counters.assertExpectedCacheEntries(1);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/respond.new.request.when.request.leader.sending.payload/accept/client",
+        "${streams}/respond.new.request.when.request.leader.sending.payload/connect/server",
+    })
+    public void shouldRespondNewRequestWhenRequestLeaderSendingPayload() throws Exception
+    {
+        k3po.finish();
+        counters.assertRequests(3);
+        counters.assertRequestsCacheable(3);
+        counters.assertResponses(3);
+        counters.assertResponsesCached(1);
+        counters.assertExpectedCacheEntries(1);
+    }
 }
