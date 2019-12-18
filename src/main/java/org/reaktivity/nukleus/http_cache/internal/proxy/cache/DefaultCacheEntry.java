@@ -218,8 +218,7 @@ public final class DefaultCacheEntry
         evictResponseIfNecessary();
         varyBy = getHeader(responseHeaders, HttpHeaders.VARY);
         etag = getHeader(responseHeaders, ETAG);
-        cacheStaleAt = null;
-        cacheReceivedAt = null;
+        resetCacheTiming();
 
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
@@ -246,6 +245,12 @@ public final class DefaultCacheEntry
         return true;
     }
 
+    private void resetCacheTiming()
+    {
+        cacheStaleAt = null;
+        cacheReceivedAt = null;
+    }
+
     public void updateResponseHeader(
         String status,
         ArrayFW<HttpHeaderFW> newHeaders)
@@ -254,6 +259,7 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
         String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
                                                    .toLowerCase().equals(":status"))).value().asString();
+        resetCacheTiming();
 
         final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
         oldHeaders.forEach(h -> newHeadersMap.put(h.name().asString(), h.value().asString()));
