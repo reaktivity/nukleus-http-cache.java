@@ -66,6 +66,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -78,6 +79,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -90,6 +92,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -102,6 +105,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -114,6 +118,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(2);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -126,6 +131,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(1);
     }
 
     @Test
@@ -138,6 +144,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -150,6 +157,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -162,6 +170,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -174,6 +183,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -186,6 +196,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -198,6 +209,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -210,6 +222,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -222,6 +235,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -234,6 +248,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -246,6 +261,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -258,6 +274,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -271,6 +288,7 @@ public class EdgeArchProxyIT
         k3po.finish();
         Thread.sleep(100); // Wait for response to be processed
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -282,6 +300,7 @@ public class EdgeArchProxyIT
     public void sends304ForMatchingEtagRequest() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -293,6 +312,7 @@ public class EdgeArchProxyIT
     public void sends503RetryAfterForSecondRequest() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
 }

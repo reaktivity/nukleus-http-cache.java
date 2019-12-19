@@ -518,6 +518,7 @@ final class HttpCacheProxyCacheableRequest
         }
         else
         {
+            assert payloadWritten != -1;
             acceptReplyDebitorId = window.budgetId();
             acceptReplyPadding = window.padding();
             final long traceId = window.traceId();

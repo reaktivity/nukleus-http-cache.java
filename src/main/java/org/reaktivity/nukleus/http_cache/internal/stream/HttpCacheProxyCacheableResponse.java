@@ -177,6 +177,7 @@ final class HttpCacheProxyCacheableResponse
         else
         {
             requestGroup.onCacheableResponseUpdated(etag);
+            purgeRequestSlotIfNecessary();
         }
     }
 
@@ -185,7 +186,7 @@ final class HttpCacheProxyCacheableResponse
         assert requestSlot.value != NO_SLOT;
         requestGroup.onCacheableResponseAborted();
 
-        purgeRequest();
+        purgeRequestSlotIfNecessary();
         factory.defaultCache.purge(requestHash);
     }
 
@@ -230,7 +231,7 @@ final class HttpCacheProxyCacheableResponse
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
-    private void purgeRequest()
+    private void purgeRequestSlotIfNecessary()
     {
         if (requestSlot.value != NO_SLOT)
         {

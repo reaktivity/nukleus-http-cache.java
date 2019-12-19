@@ -140,6 +140,7 @@ final class HttpCacheProxyGroupRequest
                 MessageConsumer newResponse = responseFactory.apply(beginEx);
                 newStream = onResponseMessage(newResponse);
             }
+            cleanupRequestIfNecessary();
         }
 
         return newStream;
@@ -343,10 +344,14 @@ final class HttpCacheProxyGroupRequest
     private void onReset(
         final ResetFW reset)
     {
-        factory.writer.doReset(connectInitial,
-                               routeId,
-                               connectReplyId,
-                               reset.traceId());
+        Function<HttpBeginExFW, MessageConsumer> responseFactory = factory.correlations.remove(replyId);
+        if (connectInitial != null && responseFactory != null)
+        {
+            factory.writer.doReset(connectInitial,
+                                  routeId,
+                                  connectReplyId,
+                                  reset.traceId());
+        }
         cleanupRequestIfNecessary();
     }
 
@@ -412,6 +417,7 @@ final class HttpCacheProxyGroupRequest
 
     private ArrayFW<HttpHeaderFW> getRequestHeaders()
     {
+        assert requestSlot.value != NO_SLOT;
         final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot.value);
         return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
@@ -506,16 +512,21 @@ final class HttpCacheProxyGroupRequest
         factory.correlations.remove(connectReplyId);
         factory.correlations.remove(replyId);
         factory.router.clearThrottle(replyId);
-        if (requestSlot.value != NO_SLOT)
-        {
-            factory.requestBufferPool.release(requestSlot.value);
-            requestSlot.value = NO_SLOT;
-        }
+        releaseRequestSlotIfNecessary();
 
         if (retryRequest != null)
         {
             retryRequest.cancel(true);
             retryRequest = null;
+        }
+    }
+
+    private void releaseRequestSlotIfNecessary()
+    {
+        if (requestSlot.value != NO_SLOT)
+        {
+            factory.requestBufferPool.release(requestSlot.value);
+            requestSlot.value = NO_SLOT;
         }
     }
 

@@ -112,6 +112,12 @@ public class HttpCacheCountersRule implements TestRule
         return reaktor.counter("http-cache.cached.response.releases");
     }
 
+    private long requestSlots()
+    {
+        return reaktor.counter("http-cache.request.acquires") -
+               reaktor.counter("http-cache.request.releases");
+    }
+
     public long cacheSlots()
     {
         return cachedRequestAcquires() + cachedResponseAcquires() - cachedRequestReleases() - cachedResponseReleases();
@@ -138,13 +144,10 @@ public class HttpCacheCountersRule implements TestRule
         assertExpectedCacheRefreshes(cacheInitiatedRefreshes);
     }
 
-    public void assertExpectedCacheEntries(
-        int numberOfResponses,
-        int cacheInitiatedRefreshes,
-        int requestPendingCacheUpdate)
+    public void assertRequestsSlots(
+        int expected)
     {
-        assertExpectedCacheEntries(numberOfResponses);
-        assertExpectedCacheRefreshes(cacheInitiatedRefreshes);
+        assertEquals(expected, requestSlots());
     }
 
     public void assertRequests(

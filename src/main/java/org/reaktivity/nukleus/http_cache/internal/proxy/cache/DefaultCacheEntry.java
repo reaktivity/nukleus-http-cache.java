@@ -245,12 +245,6 @@ public final class DefaultCacheEntry
         return true;
     }
 
-    private void resetCacheTiming()
-    {
-        cacheStaleAt = null;
-        cacheReceivedAt = null;
-    }
-
     public void updateResponseHeader(
         String status,
         ArrayFW<HttpHeaderFW> newHeaders)
@@ -527,6 +521,12 @@ public final class DefaultCacheEntry
         }
 
         return cacheReceivedAt;
+    }
+
+    private void resetCacheTiming()
+    {
+        cacheStaleAt = null;
+        cacheReceivedAt = null;
     }
 
 }
