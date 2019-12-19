@@ -69,6 +69,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -85,6 +86,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -101,6 +103,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -117,6 +120,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
 
@@ -134,6 +138,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(1);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -147,6 +152,7 @@ public class Rfc7234ProxyIT
         k3po.finish();
         counters.assertRequests(2);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -163,6 +169,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -175,6 +182,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -195,6 +203,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -215,6 +224,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -235,6 +245,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -255,6 +266,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -275,6 +287,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -295,6 +308,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -315,6 +329,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1); // NOTE lazy cache purge
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -331,6 +346,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -347,6 +363,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -363,6 +380,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -379,6 +397,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -396,6 +415,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -416,6 +436,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -432,6 +453,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -448,6 +470,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -459,6 +482,7 @@ public class Rfc7234ProxyIT
     public void shouldRequestOnlyIfCachedAnd504() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -479,6 +503,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -495,6 +520,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -511,6 +537,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -531,6 +558,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -551,6 +579,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -567,6 +596,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -587,6 +617,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -603,6 +634,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -619,6 +651,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -635,6 +668,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -651,6 +685,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -667,6 +702,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -682,6 +718,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(1);
+        counters.assertRequestsSlots(0);
     }
 
 
@@ -695,6 +732,7 @@ public class Rfc7234ProxyIT
     public void shouldNotCacheWithMultipleMaxAge() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Ignore("Refer to issues/66")
@@ -707,6 +745,7 @@ public class Rfc7234ProxyIT
     public void shouldServeFromCacheIfServerReturns503OnForcedRevalidation() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -722,6 +761,7 @@ public class Rfc7234ProxyIT
         sleep(3000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -737,6 +777,7 @@ public class Rfc7234ProxyIT
         sleep(3000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -748,6 +789,7 @@ public class Rfc7234ProxyIT
     public void shouldNotCacheWithRequestAuthorizationHeader() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -759,6 +801,7 @@ public class Rfc7234ProxyIT
     public void shouldRevalidateOnResponseNoCache() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Ignore("Refer to issues/63")
@@ -771,6 +814,7 @@ public class Rfc7234ProxyIT
     public void shouldNotUseCacheForRequestThatHasAsteriskSymbolValueInVary() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -782,6 +826,7 @@ public class Rfc7234ProxyIT
     public void shouldCacheWithRequestAuthorizationHeaderAndSmaxage() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -793,6 +838,7 @@ public class Rfc7234ProxyIT
     public void shouldCacheWithFreshenedResponseThatUpdatedByStrongValidator() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -809,6 +855,7 @@ public class Rfc7234ProxyIT
         sleep(3000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -820,6 +867,7 @@ public class Rfc7234ProxyIT
     public void shouldNotCacheResponseWithResponseNoStore() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -831,6 +879,7 @@ public class Rfc7234ProxyIT
     public void shouldNotCacheResponseWithSMaxageInPrivateCache() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -846,6 +895,7 @@ public class Rfc7234ProxyIT
         sleep(3000);
         k3po.notifyBarrier("MAX_AGE_EXPIRED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -862,6 +912,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -874,6 +925,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -885,6 +937,7 @@ public class Rfc7234ProxyIT
     public void shouldInvalidateCacheForUnsafeRequest() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -897,6 +950,7 @@ public class Rfc7234ProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -917,6 +971,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -937,6 +992,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -957,6 +1013,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -977,6 +1034,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -997,6 +1055,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -1013,6 +1072,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -1029,6 +1089,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -1045,6 +1106,7 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -1061,5 +1123,6 @@ public class Rfc7234ProxyIT
         counters.assertResponses(3);
         counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 }

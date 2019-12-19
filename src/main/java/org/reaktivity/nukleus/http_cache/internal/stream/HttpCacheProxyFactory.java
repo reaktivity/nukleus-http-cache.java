@@ -89,7 +89,6 @@ public class HttpCacheProxyFactory implements StreamFactory
     final ToIntFunction<String> supplyTypeId;
     final LongFunction<BudgetDebitor> supplyDebitor;
     final BufferPool requestBufferPool;
-    final BufferPool responseBufferPool;
     final MutableDirectBuffer writeBuffer;
 
     final Writer writer;
@@ -126,10 +125,6 @@ public class HttpCacheProxyFactory implements StreamFactory
             requestBufferPool,
             counters.supplyCounter.apply("http-cache.request.acquires"),
             counters.supplyCounter.apply("http-cache.request.releases"));
-        this.responseBufferPool = new CountingBufferPool(
-                requestBufferPool,
-                counters.supplyCounter.apply("http-cache.response.acquires"),
-                counters.supplyCounter.apply("http-cache.response.releases"));
         this.writeBuffer = new UnsafeBuffer(new byte[writeBuffer.capacity()]);
 
         this.correlations = requireNonNull(correlations);
