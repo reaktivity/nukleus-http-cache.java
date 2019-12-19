@@ -75,6 +75,7 @@ public class Rfc7240ProxyIT
         sleep(4000);
         k3po.notifyBarrier("PREFER_WAIT_REQUEST_THREE_COMPLETED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -86,6 +87,7 @@ public class Rfc7240ProxyIT
     public void shouldSend304OnPreferWaitTimeout() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -97,6 +99,7 @@ public class Rfc7240ProxyIT
     public void shouldHandleMissingPreferenceAppliedHeaderOnPreferWait() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -108,6 +111,7 @@ public class Rfc7240ProxyIT
     public void shouldHandleMissingPreferenceAppliedHeaderWithTrailer() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -119,6 +123,7 @@ public class Rfc7240ProxyIT
     public void shouldHandleMissingPreferenceAppliedHeaderWithRetryAfter() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -134,6 +139,7 @@ public class Rfc7240ProxyIT
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
         counters.assertExpectedCacheEntries(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -149,6 +155,7 @@ public class Rfc7240ProxyIT
         sleep(2000);
         k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -164,6 +171,7 @@ public class Rfc7240ProxyIT
         sleep(2000);
         k3po.notifyBarrier("CACHED_RESPONSE_EXPIRED");
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -175,6 +183,7 @@ public class Rfc7240ProxyIT
     public void shouldServeImmediatelyWhenIfNoneMatchMissingWhilePolling() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -186,6 +195,7 @@ public class Rfc7240ProxyIT
     public void shouldReceive503OnGroupRequestReset() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -197,6 +207,7 @@ public class Rfc7240ProxyIT
     public void shouldPollImmediatelyIfCacheEntryInvalidated() throws Exception
     {
         k3po.finish();
+        counters.assertRequestsSlots(0);
     }
 
 }

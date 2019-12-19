@@ -65,6 +65,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -77,6 +78,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         assertEquals(1, counters.requestsCachable());
+        counters.assertRequestsSlots(0);
         // We proceed with request out back anyways, TODO, consider adding to test response returning and getting cached
     }
 
@@ -90,6 +92,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -102,6 +105,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -114,6 +118,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -126,6 +131,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -150,5 +156,6 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlots(0);
     }
 }

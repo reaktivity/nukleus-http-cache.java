@@ -67,6 +67,8 @@ public final class DefaultCacheEntry
     private int subscribers;
     private boolean validationRequired;
     private boolean responseCompleted;
+    private Instant cacheStaleAt;
+    private Instant cacheReceivedAt;
 
     DefaultCacheEntry(
         DefaultCache cache,
@@ -216,6 +218,7 @@ public final class DefaultCacheEntry
         evictResponseIfNecessary();
         varyBy = getHeader(responseHeaders, HttpHeaders.VARY);
         etag = getHeader(responseHeaders, ETAG);
+        resetCacheTiming();
 
         final int slotCapacity = responsePool.slotCapacity();
         if (slotCapacity < responseHeaders.sizeof())
@@ -250,6 +253,7 @@ public final class DefaultCacheEntry
         ArrayFW<HttpHeaderFW> oldHeaders = getResponseHeaders(responseHeadersSO);
         String statusCode = Objects.requireNonNull(oldHeaders.matchFirst(h -> Objects.requireNonNull(h.name().asString())
                                                    .toLowerCase().equals(":status"))).value().asString();
+        resetCacheTiming();
 
         final LinkedHashMap<String, String> newHeadersMap = new LinkedHashMap<>();
         oldHeaders.forEach(h -> newHeadersMap.put(h.name().asString(), h.value().asString()));
@@ -482,29 +486,47 @@ public final class DefaultCacheEntry
 
     private Instant staleAt()
     {
-        final CacheControl cacheControl = responseCacheControl();
-        final Instant receivedAt = responseReceivedAt();
-        int staleInSeconds = cacheControl.contains(S_MAXAGE) ?
-            parseInt(cacheControl.getValue(S_MAXAGE))
-            : cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-        final int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
-        staleInSeconds = Math.max(staleInSeconds, surrogateAge);
-        return receivedAt.plusSeconds(staleInSeconds);
+        if (cacheStaleAt == null)
+        {
+            final CacheControl cacheControl = responseCacheControl();
+            final Instant receivedAt = responseReceivedAt();
+            int staleInSeconds = cacheControl.contains(S_MAXAGE) ? parseInt(cacheControl.getValue(S_MAXAGE)) :
+                cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
+            final int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
+            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
+            cacheStaleAt = receivedAt.plusSeconds(staleInSeconds);
+
+            return  cacheStaleAt;
+        }
+
+        return cacheStaleAt;
     }
 
     private Instant responseReceivedAt()
     {
-        final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
-        final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
-            getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
-        try
+        if (cacheReceivedAt == null)
         {
-            return DATE_FORMAT.parse(dateHeaderValue).toInstant();
+            final ArrayFW<HttpHeaderFW> responseHeaders = getCachedResponseHeaders();
+            final String dateHeaderValue = getHeader(responseHeaders, HttpHeaders.DATE) != null ?
+                getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
+            try
+            {
+                cacheReceivedAt = DATE_FORMAT.parse(dateHeaderValue).toInstant();
+                return cacheReceivedAt;
+            }
+            catch (Exception e)
+            {
+                return Instant.EPOCH;
+            }
         }
-        catch (Exception e)
-        {
-            return Instant.EPOCH;
-        }
+
+        return cacheReceivedAt;
+    }
+
+    private void resetCacheTiming()
+    {
+        cacheStaleAt = null;
+        cacheReceivedAt = null;
     }
 
 }

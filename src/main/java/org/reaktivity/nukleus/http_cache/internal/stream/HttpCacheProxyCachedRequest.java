@@ -202,6 +202,8 @@ final class HttpCacheProxyCachedRequest
     private void onWindow(
         WindowFW window)
     {
+
+        assert payloadWritten != -1;
         final long traceId = window.traceId();
 
         acceptReplyDebitorId = window.budgetId();

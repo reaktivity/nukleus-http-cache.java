@@ -206,6 +206,7 @@ public final class HttpProxyCacheableRequestGroup
         }
         else if (isRequestGroupLeader(acceptReplyId))
         {
+            resetInFlightRequest();
             resetActiveRequestValue();
         }
     }
@@ -327,9 +328,9 @@ public final class HttpProxyCacheableRequestGroup
         if (connect != null)
         {
             factory.writer.doReset(connect,
-                connectRouteId,
-                connectInitialId,
-                factory.supplyTraceId.getAsLong());
+                                   connectRouteId,
+                                   connectInitialId,
+                                   factory.supplyTraceId.getAsLong());
         }
     }
 
