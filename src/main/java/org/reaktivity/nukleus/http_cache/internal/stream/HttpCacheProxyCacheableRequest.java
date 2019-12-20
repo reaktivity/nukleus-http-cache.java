@@ -232,6 +232,13 @@ final class HttpCacheProxyCacheableRequest
         boolean stored = storeRequest(requestHeaders);
         if (!stored)
         {
+            factory.writer.doWindow(accept,
+                                    acceptRouteId,
+                                    acceptInitialId,
+                                    traceId,
+                                    0L,
+                                    initialWindow,
+                                    0);
             send503RetryAfter();
             return;
         }
