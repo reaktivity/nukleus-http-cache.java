@@ -26,6 +26,7 @@ import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.kaazing.k3po.junit.annotation.ScriptProperty;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
@@ -567,6 +568,7 @@ public class Rfc7234ProxyIT
         "${streams}/expire.cache.by.default.for.0.seconds/accept/client",
         "${streams}/expire.cache.by.default.for.0.seconds/connect/server",
     })
+    @ScriptProperty("statusCode 200")
     public void shouldExpireCacheDefaultCacheableFor0Second() throws Exception
     {
         k3po.start();

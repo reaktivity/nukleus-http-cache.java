@@ -389,7 +389,9 @@ public final class DefaultCacheEntry
 
     public boolean isStale()
     {
-        return Instant.now().isAfter(staleAt());
+        final Instant staleAt = staleAt();
+        final Instant now = Instant.now();
+        return now.isAfter(staleAt);
     }
 
     private CacheControl responseCacheControl()
