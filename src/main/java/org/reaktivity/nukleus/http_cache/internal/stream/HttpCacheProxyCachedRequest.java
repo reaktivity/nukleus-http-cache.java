@@ -15,16 +15,9 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.CACHE_ENTRY_READY_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.REQUEST_ABORTED_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
 import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
-import org.reaktivity.nukleus.budget.BudgetDebitor;
-import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
@@ -35,49 +28,36 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyCachedRequest
 {
     private final HttpCacheProxyFactory factory;
-    private final MessageConsumer acceptReply;
-    private final long acceptRouteId;
-    private final long acceptReplyId;
-    private final long acceptInitialId;
+    private final MessageConsumer reply;
+    private final long routeId;
+    private final long initialId;
     private final int requestHash;
     private final int initialWindow;
 
-    private int acceptReplyBudget;
-    private int acceptReplyPadding;
-    private long acceptReplyDebitorId;
-    private BudgetDebitor acceptReplyDebitor;
-    private long acceptReplyDebitorIndex = NO_DEBITOR_INDEX;
-
-    private int payloadWritten = -1;
-    private DefaultCacheEntry cacheEntry;
     private long authorization;
-    private boolean isEmulatedProtocolStack;
+    private DefaultCacheEntry cacheEntry;
+    private boolean promiseNextPollRequest;
 
     HttpCacheProxyCachedRequest(
         HttpCacheProxyFactory factory,
         int requestHash,
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptReplyId,
         long acceptInitialId)
     {
         this.factory = factory;
         this.requestHash = requestHash;
-        this.acceptReply = acceptReply;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptReplyId = acceptReplyId;
-        this.acceptInitialId = acceptInitialId;
+        this.reply = acceptReply;
+        this.routeId = acceptRouteId;
+        this.initialId = acceptInitialId;
         this.initialWindow = factory.initialWindowSize;
     }
 
-    void onAccept(
+    void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -87,288 +67,85 @@ final class HttpCacheProxyCachedRequest
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
+            onRequestBegin(begin);
             break;
         case DataFW.TYPE_ID:
             final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-            onData(data);
+            onRequestData(data);
             break;
         case EndFW.TYPE_ID:
             final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-            onEnd(end);
+            onRequestEnd(end);
             break;
         case AbortFW.TYPE_ID:
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-            onAbort(abort);
-            break;
-        case WindowFW.TYPE_ID:
-            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-            onWindow(window);
-            break;
-        case SignalFW.TYPE_ID:
-            final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
-            onSignal(signal);
-            break;
-        case ResetFW.TYPE_ID:
-            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-            onReset(reset);
-            break;
-        default:
+            onRequestAbort(abort);
             break;
         }
     }
 
-
-    private void onBegin(
+    private void onRequestBegin(
         BeginFW begin)
     {
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final long traceId = begin.traceId();
         authorization = begin.authorization();
-        isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
+        promiseNextPollRequest = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
         cacheEntry = factory.defaultCache.get(requestHash);
         cacheEntry.setSubscribers(1);
 
-        factory.writer.doWindow(acceptReply,
-                                acceptRouteId,
-                                acceptInitialId,
-                                begin.traceId(),
+        factory.writer.doWindow(reply,
+                                routeId,
+                                initialId,
+                                traceId,
                                 0L,
                                 initialWindow,
                                 0);
-
-        factory.writer.doSignal(acceptRouteId,
-                                acceptReplyId,
-                                factory.supplyTraceId.getAsLong(),
-                                CACHE_ENTRY_READY_SIGNAL);
     }
 
-    private void onData(
+    private void onRequestData(
         final DataFW data)
     {
-        factory.writer.doWindow(acceptReply,
-                                acceptRouteId,
-                                acceptInitialId,
-                                data.traceId(),
-                                data.budgetId(),
-                                data.reserved(),
-                                0);
+        final long traceId = data.traceId();
+        final long budgetId = data.budgetId();
+        final int reserved = data.reserved();
+        final int padding = 0;
+
+        doRequestWindow(traceId, budgetId, reserved, padding);
     }
 
-    private void onEnd(
+    private void onRequestEnd(
         final EndFW end)
     {
-        //NOOP
+        final long traceId = end.traceId();
+
+        final long replyId = factory.supplyReplyId.applyAsLong(initialId);
+        final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
+                factory, reply, routeId, replyId, authorization,
+                cacheEntry, promiseNextPollRequest, r -> {});
+        response.doResponseBegin(traceId);
     }
 
-    private void onAbort(
+    private void onRequestAbort(
         final AbortFW abort)
     {
-        factory.writer.doSignal(acceptRouteId,
-                                acceptReplyId,
-                                factory.supplyTraceId.getAsLong(),
-                                REQUEST_ABORTED_SIGNAL);
-
+        // nop, response not started
     }
 
-    private void onSignal(
-        SignalFW signal)
+    private void doRequestWindow(
+        long traceId,
+        long budgetId,
+        int reserved,
+        int padding)
     {
-        final int signalId = signal.signalId();
-
-        switch (signalId)
-        {
-        case CACHE_ENTRY_READY_SIGNAL:
-            onServeCacheEntrySignal(signal);
-            break;
-        case REQUEST_ABORTED_SIGNAL:
-            onRequestAbortedSignal(signal);
-            break;
-        default:
-            break;
-        }
-    }
-
-    private void onRequestAbortedSignal(SignalFW signal)
-    {
-        factory.writer.doAbort(acceptReply,
-                               acceptRouteId,
-                               acceptReplyId,
-                               signal.traceId());
-        cacheEntry.setSubscribers(-1);
-    }
-
-    private void onWindow(
-        WindowFW window)
-    {
-
-        assert payloadWritten != -1;
-        final long traceId = window.traceId();
-
-        acceptReplyDebitorId = window.budgetId();
-        acceptReplyPadding = window.padding();
-        int credit = window.credit();
-        acceptReplyBudget += credit;
-
-        if (acceptReplyDebitorId != 0L && acceptReplyDebitor == null)
-        {
-            acceptReplyDebitor = factory.supplyDebitor.apply(acceptReplyDebitorId);
-            acceptReplyDebitorIndex = acceptReplyDebitor.acquire(acceptReplyDebitorId, acceptReplyId, this::doResponseFlush);
-        }
-
-        doResponseFlush(traceId);
-    }
-
-    private void onReset(
-        ResetFW reset)
-    {
-        cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
-    }
-
-    private void onServeCacheEntrySignal(
-        SignalFW signal)
-    {
-        cacheEntry = factory.defaultCache.get(requestHash);
-        sendHttpResponseHeaders(cacheEntry, signal.signalId());
-    }
-
-    private void doResponseFlush(
-        long traceId)
-    {
-        final int remaining = cacheEntry.responseSize() - payloadWritten;
-        final int writable = Math.min(acceptReplyBudget - acceptReplyPadding, remaining);
-
-        if (writable > 0)
-        {
-            final int maximum = writable + acceptReplyPadding;
-            final int minimum = Math.min(maximum, 1024);
-
-            int claimed = maximum;
-            if (acceptReplyDebitorIndex != NO_DEBITOR_INDEX)
-            {
-                claimed = acceptReplyDebitor.claim(acceptReplyDebitorIndex, acceptReplyId, minimum, maximum);
-            }
-
-            final int required = claimed;
-            final int writableMax = required - acceptReplyPadding;
-            if (writableMax > 0)
-            {
-                final BufferPool cacheResponsePool = factory.defaultCache.getResponsePool();
-
-                factory.writer.doHttpData(
-                    acceptReply,
-                    acceptRouteId,
-                    acceptReplyId,
-                    traceId,
-                    acceptReplyDebitorId,
-                    required,
-                    p -> buildResponsePayload(payloadWritten, writableMax, p, cacheResponsePool));
-
-                payloadWritten += writableMax;
-
-                acceptReplyBudget -= required;
-                assert acceptReplyBudget >= 0;
-
-            }
-        }
-
-        sendEndIfNecessary(traceId);
-    }
-
-    private void sendHttpResponseHeaders(
-        DefaultCacheEntry cacheEntry,
-        long signalId)
-    {
-        ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
-
-        factory.writer.doHttpResponseWithUpdatedHeaders(acceptReply,
-                                                        acceptRouteId,
-                                                        acceptReplyId,
-                                                        responseHeaders,
-                                                        cacheEntry.getRequestHeaders(),
-                                                        cacheEntry.etag(),
-                                                        cacheEntry.isStale(),
-                                                        signalId);
-
-
-        payloadWritten = 0;
-
-        factory.counters.responses.getAsLong();
-    }
-
-    private void sendEndIfNecessary(
-        long traceId)
-    {
-        if (payloadWritten == cacheEntry.responseSize())
-        {
-            if (isEmulatedProtocolStack)
-            {
-                factory.counters.promises.getAsLong();
-                factory.writer.doHttpPushPromise(acceptReply,
-                                                 acceptRouteId,
-                                                 acceptReplyId,
-                                                 authorization,
-                                                 cacheEntry.getRequestHeaders(),
-                                                 cacheEntry.getCachedResponseHeaders(),
-                                                 cacheEntry.etag());
-            }
-            factory.writer.doHttpEnd(acceptReply,
-                                     acceptRouteId,
-                                     acceptReplyId,
-                                     traceId);
-
-            cleanupResponseIfNecessary();
-            cacheEntry.setSubscribers(-1);
-        }
-    }
-
-    private void buildResponsePayload(
-        int index,
-        int length,
-        OctetsFW.Builder p,
-        BufferPool bp)
-    {
-        final int slotCapacity = bp.slotCapacity();
-        final int startSlot = Math.floorDiv(index, slotCapacity) + NUM_OF_HEADER_SLOTS;
-        buildResponsePayload(index, length, p, bp, startSlot);
-    }
-
-    private void buildResponsePayload(
-        int index,
-        int length,
-        OctetsFW.Builder builder,
-        BufferPool bp,
-        int slotCnt)
-    {
-        if (length == 0)
-        {
-            return;
-        }
-
-        final int slotCapacity = bp.slotCapacity();
-        int chunkedWrite = (slotCnt * slotCapacity) - index;
-        int slot = cacheEntry.getResponseSlots().get(slotCnt);
-        if (chunkedWrite > 0)
-        {
-            MutableDirectBuffer buffer = bp.buffer(slot);
-            int offset = slotCapacity - chunkedWrite;
-            int chunkLength = Math.min(chunkedWrite, length);
-            builder.put(buffer, offset, chunkLength);
-            index += chunkLength;
-            length -= chunkLength;
-        }
-        buildResponsePayload(index, length, builder, bp, ++slotCnt);
-    }
-
-    private void cleanupResponseIfNecessary()
-    {
-        if (acceptReplyDebitorIndex != NO_DEBITOR_INDEX)
-        {
-            acceptReplyDebitor.release(acceptReplyDebitorIndex, acceptReplyId);
-            acceptReplyDebitorIndex = NO_DEBITOR_INDEX;
-            acceptReplyDebitor = null;
-        }
+        factory.writer.doWindow(reply,
+                                routeId,
+                                initialId,
+                                traceId,
+                                budgetId,
+                                reserved,
+                                padding);
     }
 }

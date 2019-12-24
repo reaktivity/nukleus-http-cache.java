@@ -15,12 +15,37 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-final class Signals
+final class HttpCacheRequestState
 {
-    static final int PREFER_WAIT_EXPIRED_SIGNAL = 4;
-    static final int GROUP_REQUEST_RETRY_SIGNAL = 7;
+    private static final int INITIAL_OPENING = 0x10;
+    private static final int INITIAL_OPENED = 0x20;
+    private static final int INITIAL_CLOSED = 0x40;
 
-    private Signals()
+    static int openingInitial(
+        int state)
+    {
+        return state | INITIAL_OPENING;
+    }
+
+    static int openInitial(
+        int state)
+    {
+        return openingInitial(state) | INITIAL_OPENED;
+    }
+
+    static int closeInitial(
+        int state)
+    {
+        return state | INITIAL_CLOSED;
+    }
+
+    static boolean initialClosed(
+        int state)
+    {
+        return (state & INITIAL_CLOSED) != 0;
+    }
+
+    private HttpCacheRequestState()
     {
         // utility
     }

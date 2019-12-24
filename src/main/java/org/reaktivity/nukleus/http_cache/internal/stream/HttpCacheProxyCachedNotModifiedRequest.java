@@ -40,18 +40,17 @@ final class HttpCacheProxyCachedNotModifiedRequest
         HttpCacheProxyFactory factory,
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptReplyId,
         long acceptInitialId)
     {
         this.factory = factory;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
-        this.acceptReplyId = acceptReplyId;
         this.acceptInitialId = acceptInitialId;
+        this.acceptReplyId = factory.supplyReplyId.applyAsLong(acceptInitialId);
         this.initialWindow = factory.initialWindowSize;
     }
 
-    void onAccept(
+    void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
         int index,
@@ -61,30 +60,24 @@ final class HttpCacheProxyCachedNotModifiedRequest
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
+            onRequestBegin(begin);
             break;
         case DataFW.TYPE_ID:
             final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-            onData(data);
+            onRequestData(data);
             break;
         case EndFW.TYPE_ID:
             final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-            onEnd(end);
+            onRequestEnd(end);
             break;
         case AbortFW.TYPE_ID:
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-            onAbort(abort);
-            break;
-        case ResetFW.TYPE_ID:
-            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-            onReset(reset);
-            break;
-        default:
+            onRequestAbort(abort);
             break;
         }
     }
 
-    private void onBegin(
+    private void onRequestBegin(
         BeginFW begin)
     {
         final OctetsFW extension = begin.extension();
@@ -103,6 +96,8 @@ final class HttpCacheProxyCachedNotModifiedRequest
         // count all responses
         factory.counters.responses.getAsLong();
 
+        factory.router.setThrottle(acceptReplyId, this::onResponseMessage);
+
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
@@ -110,7 +105,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
                              requestHeaders);
     }
 
-    private void onData(
+    private void onRequestData(
         final DataFW data)
     {
         factory.writer.doWindow(acceptReply,
@@ -122,7 +117,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
                                 0);
     }
 
-    private void onEnd(
+    private void onRequestEnd(
         final EndFW end)
     {
         factory.writer.doHttpEnd(acceptReply,
@@ -131,7 +126,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
                                  end.traceId());
     }
 
-    private void onAbort(
+    private void onRequestAbort(
         final AbortFW abort)
     {
         factory.writer.doAbort(acceptReply,
@@ -140,7 +135,24 @@ final class HttpCacheProxyCachedNotModifiedRequest
                                abort.traceId());
     }
 
-    private void onReset(
+    private void onResponseMessage(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        switch (msgTypeId)
+        {
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+            onResponseReset(reset);
+            break;
+        default:
+            break;
+        }
+    }
+
+    private void onResponseReset(
         ResetFW reset)
     {
         factory.writer.doReset(acceptReply,

@@ -1087,7 +1087,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
+        counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1121,7 +1121,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
+        counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }

@@ -33,47 +33,42 @@ final class HttpCacheProxyNonCacheableRequest
 {
     private final HttpCacheProxyFactory factory;
 
-    private final MessageConsumer acceptReply;
-    private final long acceptRouteId;
-    private final long acceptInitialId;
-    private final long acceptReplyId;
+    private final MessageConsumer initial;
+    private final long routeId;
+    private final long initialId;
+    final long replyId;
 
     private final MessageConsumer connectInitial;
     private final long connectRouteId;
     private final long connectInitialId;
 
     private final MessageConsumer connectReply;
-    private final long connectReplyId;
+    final long connectReplyId;
 
     private final String requestURL;
     private final int requestHash;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory factory,
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        long resolveId,
         int requestHash,
-        String requestURL,
-        MessageConsumer accept,
-        long acceptRouteId,
-        long acceptReplyId,
-        long acceptInitialId,
-        MessageConsumer connectInitial,
-        MessageConsumer connectReply,
-        long connectInitialId,
-        long connectReplyId,
-        long connectRouteId)
+        String requestURL)
     {
         this.factory = factory;
+        this.initial = initial;
+        this.routeId = routeId;
+        this.initialId = initialId;
+        this.replyId = factory.supplyReplyId.applyAsLong(initialId);
         this.requestHash = requestHash;
         this.requestURL = requestURL;
-        this.acceptReply = accept;
-        this.acceptRouteId = acceptRouteId;
-        this.acceptInitialId = acceptInitialId;
-        this.acceptReplyId = acceptReplyId;
-        this.connectInitial = connectInitial;
-        this.connectReply = connectReply;
-        this.connectRouteId = connectRouteId;
-        this.connectReplyId = connectReplyId;
-        this.connectInitialId = connectInitialId;
+        this.connectRouteId = resolveId;
+        this.connectInitialId = factory.supplyInitialId.applyAsLong(resolveId);
+        this.connectInitial = factory.router.supplyReceiver(connectInitialId);
+        this.connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
+        this.connectReply = factory.router.supplyReceiver(connectReplyId);
     }
 
     MessageConsumer newResponse(
@@ -86,10 +81,10 @@ final class HttpCacheProxyNonCacheableRequest
                                                    connectReply,
                                                    connectRouteId,
                                                    connectReplyId,
-                                                   acceptReply,
-                                                   acceptRouteId,
-                                                   acceptReplyId);
-        factory.router.setThrottle(acceptReplyId, nonCacheableResponse::onResponseMessage);
+                                                   initial,
+                                                   routeId,
+                                                   replyId);
+        factory.router.setThrottle(replyId, nonCacheableResponse::onResponseMessage);
         return nonCacheableResponse::onResponseMessage;
     }
 
@@ -109,9 +104,9 @@ final class HttpCacheProxyNonCacheableRequest
     private void onResponseReset(
         ResetFW reset)
     {
-        factory.writer.doReset(acceptReply,
-                               acceptRouteId,
-                               acceptInitialId,
+        factory.writer.doReset(initial,
+                               routeId,
+                               initialId,
                                reset.traceId());
         factory.correlations.remove(connectReplyId);
     }
@@ -159,7 +154,7 @@ final class HttpCacheProxyNonCacheableRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
         assert httpBeginEx != null;
-        final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginEx.headers();
+        final ArrayFW<HttpHeaderFW> headers = httpBeginEx.headers();
 
         factory.writer.doHttpRequest(
             connectInitial,
@@ -167,7 +162,7 @@ final class HttpCacheProxyNonCacheableRequest
             connectInitialId,
             factory.supplyTraceId.getAsLong(),
             0L,
-            builder -> requestHeaders.forEach(h ->  builder.item(item -> item.name(h.name()).value(h.value()))));
+            hs -> headers.forEach(h -> hs.item(item -> item.name(h.name()).value(h.value()))));
 
         factory.router.setThrottle(connectInitialId, this::onRequestMessage);
     }
@@ -211,14 +206,14 @@ final class HttpCacheProxyNonCacheableRequest
         final long budgetId = window.budgetId();
         final int credit = window.credit();
         final int padding = window.padding();
-        factory.writer.doWindow(acceptReply, acceptRouteId, acceptInitialId, traceId, budgetId, credit, padding);
+        factory.writer.doWindow(initial, routeId, initialId, traceId, budgetId, credit, padding);
     }
 
     private void onReset(
         final ResetFW reset)
     {
         final long traceId = reset.traceId();
-        factory.writer.doReset(acceptReply, acceptRouteId, acceptInitialId, traceId);
+        factory.writer.doReset(initial, routeId, initialId, traceId);
     }
 
 }

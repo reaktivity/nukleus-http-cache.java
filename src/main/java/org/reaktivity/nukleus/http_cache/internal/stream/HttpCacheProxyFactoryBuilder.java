@@ -39,7 +39,6 @@ import org.reaktivity.nukleus.stream.StreamFactoryBuilder;
 
 public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 {
-
     private final HttpCacheConfiguration config;
     private final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
 

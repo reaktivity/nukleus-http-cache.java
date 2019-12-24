@@ -132,6 +132,7 @@ final class HttpCacheProxyNonCacheableResponse
         factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
                                                              requestHash,
                                                              requestURL,
+                                                             traceId,
                                                              responseHeaders);
     }
 

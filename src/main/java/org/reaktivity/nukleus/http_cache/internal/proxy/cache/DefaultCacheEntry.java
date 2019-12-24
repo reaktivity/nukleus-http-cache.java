@@ -303,16 +303,16 @@ public final class DefaultCacheEntry
     }
 
     public boolean  canServeRequest(
-        ArrayFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
         Instant now = Instant.now();
 
-        final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
-        final boolean doesNotVaryBy = doesNotVaryBy(request);
-        final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now);
-        final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
+        final boolean canBeServedToAuthorized = canBeServedToAuthorized(requestHeaders, authScope);
+        final boolean doesNotVaryBy = doesNotVaryBy(requestHeaders);
+        final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(requestHeaders, now);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(requestHeaders, now);
+        final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(requestHeaders, now);
 
         return canBeServedToAuthorized &&
                doesNotVaryBy &&

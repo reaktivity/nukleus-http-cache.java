@@ -77,7 +77,9 @@ public class HttpCacheProxyFactory implements StreamFactory
 
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
-    final ArrayFW<HttpHeaderFW> requestHeadersRO = new ArrayFW<>(new HttpHeaderFW());
+    final ArrayFW<HttpHeaderFW> httpHeadersRO = new ArrayFW<>(new HttpHeaderFW());
+
+    final HttpBeginExFW.Builder beginExRW = new HttpBeginExFW.Builder();
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
@@ -88,7 +90,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final LongSupplier supplyTraceId;
     final ToIntFunction<String> supplyTypeId;
     final LongFunction<BudgetDebitor> supplyDebitor;
-    final BufferPool requestBufferPool;
+    final BufferPool headersPool;
     final MutableDirectBuffer writeBuffer;
 
     final Writer writer;
@@ -121,7 +123,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.initialWindowSize = config.initialWindowSize();
         this.supplyTypeId = supplyTypeId;
         this.supplyDebitor = supplyDebitor;
-        this.requestBufferPool = new CountingBufferPool(
+        this.headersPool = new CountingBufferPool(
             requestBufferPool,
             counters.supplyCounter.apply("http-cache.request.acquires"),
             counters.supplyCounter.apply("http-cache.request.releases"));
@@ -157,17 +159,17 @@ public class HttpCacheProxyFactory implements StreamFactory
 
         if ((streamId & 0x0000_0000_0000_0001L) != 0L)
         {
-            newStream = newInitialStream(begin, source);
+            newStream = newRequestStream(begin, source);
         }
         else
         {
-            newStream = newReplyStream(begin);
+            newStream = newResponseStream(begin);
         }
 
         return newStream;
     }
 
-    private MessageConsumer newInitialStream(
+    private MessageConsumer newRequestStream(
         final BeginFW begin,
         final MessageConsumer acceptReply)
     {
@@ -187,20 +189,20 @@ public class HttpCacheProxyFactory implements StreamFactory
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
             final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
 
-            newStream = newNativeInitialStream(requestHeaders,
-                                               acceptReply,
+            newStream = newNativeRequestStream(acceptReply,
+                                               acceptRouteId,
+                                               acceptInitialId,
+                                               begin.traceId(),
                                                authorization,
                                                connectRouteId,
-                                               acceptInitialId,
-                                               acceptRouteId,
-                                               begin.traceId());
+                                               requestHeaders);
 
         }
 
         return newStream;
     }
 
-    private MessageConsumer newReplyStream(
+    private MessageConsumer newResponseStream(
         final BeginFW begin)
     {
         final long sourceId = begin.streamId();
@@ -221,175 +223,137 @@ public class HttpCacheProxyFactory implements StreamFactory
         return newStream;
     }
 
-    private MessageConsumer newNativeInitialStream(
-        ArrayFW<HttpHeaderFW> requestHeaders,
-        MessageConsumer acceptReply,
+    private MessageConsumer newNativeRequestStream(
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        long traceId,
         long authorization,
-        long connectRouteId,
-        long acceptInitialId,
-        long acceptRouteId,
-        long traceId)
+        long resolveId,
+        ArrayFW<HttpHeaderFW> requestHeaders)
     {
         final String requestURL = getRequestURL(requestHeaders);
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = RequestUtil.requestHash(authorizationScope, requestURL.hashCode());
-        final long connectInitialId = supplyInitialId.applyAsLong(connectRouteId);
-        final MessageConsumer connectInitial = router.supplyReceiver(connectInitialId);
-        final long connectReplyId = supplyReplyId.applyAsLong(connectInitialId);
-        final long acceptReplyId = supplyReplyId.applyAsLong(acceptInitialId);
-        final MessageConsumer connectReply = router.supplyReceiver(connectReplyId);
-        MessageConsumer newStream = null;
+
         counters.requests.getAsLong();
+
+        MessageConsumer newStream = null;
 
         if (defaultCache.isRequestCacheable(requestHeaders) &&
             defaultCache.matchCacheableRequest(requestHeaders, authorizationScope, requestHash))
         {
-            newStream = createCachedStream(requestHeaders,
-                                           acceptReply,
-                                           acceptInitialId,
-                                           acceptRouteId,
-                                           requestHash,
-                                           acceptReplyId);
+            newStream = newCachedStream(requestHeaders,
+                                        initial,
+                                        routeId,
+                                        initialId,
+                                        requestHash);
         }
         else if (requestHeaders.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
         {
-            handleOnlyIfCachedRequest(acceptReply,
-                             acceptInitialId,
-                             acceptRouteId,
-                             traceId,
-                             acceptReplyId);
+            handleOnlyIfCachedRequest(initial,
+                                      routeId,
+                                      initialId,
+                                      traceId);
         }
         else if (defaultCache.isRequestCacheable(requestHeaders))
         {
-            newStream = createCacheableRequestStream(requestHeaders,
-                                                     acceptReply,
-                                                     connectRouteId,
-                                                     acceptInitialId,
-                                                     acceptRouteId,
-                                                     requestURL,
-                                                     requestHash,
-                                                     connectInitialId,
-                                                     connectInitial,
-                                                     connectReplyId,
-                                                     acceptReplyId);
+            newStream = newCacheableRequestStream(initial,
+                                                  routeId,
+                                                  initialId,
+                                                  resolveId,
+                                                  requestHeaders,
+                                                  requestHash);
         }
         else
         {
-            newStream = createNonCacheableRequestStream(acceptReply,
-                                                        connectRouteId,
-                                                        acceptInitialId,
-                                                        acceptRouteId,
-                                                        requestURL,
-                                                        requestHash,
-                                                        connectInitialId,
-                                                        connectInitial,
-                                                        connectReplyId,
-                                                        acceptReplyId,
-                                                        connectReply);
+            newStream = newNonCacheableRequestStream(initial,
+                                                     routeId,
+                                                     initialId,
+                                                     resolveId,
+                                                     requestURL,
+                                                     requestHash);
         }
 
         return newStream;
     }
 
-    private MessageConsumer createNonCacheableRequestStream(
-        MessageConsumer acceptReply,
-        long connectRouteId,
-        long acceptInitialId,
-        long acceptRouteId,
+    private MessageConsumer newNonCacheableRequestStream(
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        long resolveId,
         String requestURL,
-        int requestHash,
-        long connectInitialId,
-        MessageConsumer connectInitial,
-        long connectReplyId,
-        long acceptReplyId,
-        MessageConsumer connectReply)
+        int requestHash)
     {
         MessageConsumer newStream;
         final HttpCacheProxyNonCacheableRequest nonCacheableRequest =
             new HttpCacheProxyNonCacheableRequest(this,
+                                                  initial,
+                                                  routeId,
+                                                  initialId,
+                                                  resolveId,
                                                   requestHash,
-                                                  requestURL,
-                                                  acceptReply,
-                                                  acceptRouteId,
-                                                  acceptReplyId,
-                                                  acceptInitialId,
-                                                  connectInitial,
-                                                  connectReply,
-                                                  connectInitialId,
-                                                  connectReplyId,
-                                                  connectRouteId);
+                                                  requestURL);
         newStream = nonCacheableRequest::onRequestMessage;
-        correlations.put(connectReplyId, nonCacheableRequest::newResponse);
-        router.setThrottle(acceptReplyId, nonCacheableRequest::onResponseMessage);
+        correlations.put(nonCacheableRequest.connectReplyId, nonCacheableRequest::newResponse);
+        router.setThrottle(nonCacheableRequest.replyId, nonCacheableRequest::onResponseMessage);
         return newStream;
     }
 
-    private MessageConsumer createCacheableRequestStream(
+    private MessageConsumer newCacheableRequestStream(
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        long resolveId,
         ArrayFW<HttpHeaderFW> requestHeaders,
-        MessageConsumer acceptReply,
-        long connectRouteId,
-        long acceptInitialId,
-        long acceptRouteId,
-        String requestURL,
-        int requestHash,
-        long connectInitialId,
-        MessageConsumer connectInitial,
-        long connectReplyId,
-        long acceptReplyId)
+        int requestHash)
     {
         counters.requestsCacheable.getAsLong();
-        MessageConsumer newStream;
-        HttpProxyCacheableRequestGroup group = requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);
+        HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
 
         HttpHeaderFW authorizationHeader = requestHeaders.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
         if (authorizationHeader != null)
         {
-            group.setRecentAuthorizationToken(authorizationHeader.value().asString());
+            group.setAuthorizationHeader(authorizationHeader.value().asString());
         }
         final HttpCacheProxyCacheableRequest cacheableRequest =
             new HttpCacheProxyCacheableRequest(this,
-                                                group,
-                                                requestHash,
-                                                requestURL,
-                                                acceptReply,
-                                                acceptRouteId,
-                                                acceptInitialId,
-                                                acceptReplyId,
-                                                connectInitial,
-                                                connectInitialId,
-                                                connectReplyId,
-                                                connectRouteId);
-        correlations.put(connectReplyId, cacheableRequest::newResponse);
-        newStream = cacheableRequest::onAcceptMessage;
-        router.setThrottle(acceptReplyId, newStream);
+                                               group,
+                                               initial,
+                                               routeId,
+                                               initialId,
+                                               resolveId);
+        MessageConsumer newStream = cacheableRequest::onRequestMessage;
+        router.setThrottle(cacheableRequest.replyId, newStream);
         return newStream;
     }
 
     private void handleOnlyIfCachedRequest(
-        MessageConsumer acceptReply,
-        long acceptInitialId,
-        long acceptRouteId,
-        long traceId,
-        long acceptReplyId)
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        long traceId)
     {
         counters.requestsCacheable.getAsLong();
-        writer.doWindow(acceptReply,
-                        acceptRouteId,
-                        acceptInitialId,
+        writer.doWindow(initial,
+                        routeId,
+                        initialId,
                         traceId,
                         0L,
                         0,
                         0);
-        send504(acceptReply, acceptRouteId, acceptReplyId, supplyTraceId.getAsLong());
+
+        final long replyId = supplyReplyId.applyAsLong(initialId);
+        send504(initial, routeId, replyId, traceId);
     }
 
-    private MessageConsumer createCachedStream(
+    private MessageConsumer newCachedStream(
         ArrayFW<HttpHeaderFW> requestHeaders,
-        MessageConsumer acceptReply,
-        long acceptInitialId,
-        long acceptRouteId,
-        int requestHash,
-        long acceptReplyId)
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        int requestHash)
     {
         counters.requestsCacheable.getAsLong();
         counters.responsesCached.getAsLong();
@@ -400,24 +364,20 @@ public class HttpCacheProxyFactory implements StreamFactory
         {
             final HttpCacheProxyCachedNotModifiedRequest cachedNotModifiedRequest =
                 new HttpCacheProxyCachedNotModifiedRequest(this,
-                                                          acceptReply,
-                                                          acceptRouteId,
-                                                          acceptReplyId,
-                                                          acceptInitialId);
-            newStream = cachedNotModifiedRequest::onAccept;
-            router.setThrottle(acceptReplyId, newStream);
+                                                          initial,
+                                                          routeId,
+                                                          initialId);
+            newStream = cachedNotModifiedRequest::onRequestMessage;
         }
         else
         {
             final HttpCacheProxyCachedRequest cachedRequest =
                 new HttpCacheProxyCachedRequest(this,
                                                 requestHash,
-                                                acceptReply,
-                                                acceptRouteId,
-                                                acceptReplyId,
-                                                acceptInitialId);
-            newStream = cachedRequest::onAccept;
-            router.setThrottle(acceptReplyId, newStream);
+                                                initial,
+                                                routeId,
+                                                initialId);
+            newStream = cachedRequest::onRequestMessage;
         }
         return newStream;
     }
@@ -446,9 +406,15 @@ public class HttpCacheProxyFactory implements StreamFactory
         counters.responses.getAsLong();
     }
 
+    private HttpProxyCacheableRequestGroup supplyCacheableRequestGroup(
+        int requestHash)
+    {
+        return requestGroups.computeIfAbsent(requestHash, this::newCacheableRequestGroup);
+    }
+
     private HttpProxyCacheableRequestGroup newCacheableRequestGroup(
         int requestHash)
     {
-        return new HttpProxyCacheableRequestGroup(requestHash, writer, this, requestGroups::remove);
+        return new HttpProxyCacheableRequestGroup(this, requestGroups::remove, requestHash);
     }
 }
