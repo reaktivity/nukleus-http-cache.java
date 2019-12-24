@@ -110,11 +110,14 @@ final class HttpCacheProxyCacheableRequest
                                      replyId);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
+        cleanupRequestHeadersIfNecessary();
     }
 
     HttpCacheProxyRelayedResponse newRelayedResponse()
     {
+        factory.counters.responses.getAsLong();
         requestGroup.onResponseNonCacheable(this);
+        cleanupRequestHeadersIfNecessary();
         return new HttpCacheProxyRelayedResponse(factory, reply, routeId, initialId, replyId);
     }
 

@@ -68,11 +68,13 @@ public final class HttpCacheProxyRelayedResponse
         {
         case BeginFW.TYPE_ID:
         case DataFW.TYPE_ID:
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, routeId);
             writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
             initial.accept(msgTypeId, writeBuffer, 0, length);
             break;
         case EndFW.TYPE_ID:
         case AbortFW.TYPE_ID:
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, routeId);
             writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
             initial.accept(msgTypeId, writeBuffer, 0, length);
             factory.router.clearThrottle(replyId);
@@ -80,6 +82,7 @@ public final class HttpCacheProxyRelayedResponse
         case ResetFW.TYPE_ID:
         case WindowFW.TYPE_ID:
         case SignalFW.TYPE_ID:
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, routeId);
             writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, initialId);
             initial.accept(msgTypeId, writeBuffer, 0, length);
             break;

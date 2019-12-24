@@ -81,12 +81,6 @@ public final class HttpProxyCacheableRequestGroup
     void enqueue(
         HttpCacheProxyCacheableRequest request)
     {
-        final Deque<HttpCacheProxyCacheableRequest> queuedRequests =
-            queuedRequestsByEtag.computeIfAbsent(request.ifNoneMatch, e -> new LinkedList<>());
-
-        final boolean added = queuedRequests.add(request);
-        assert added;
-
         if (groupRequest == null)
         {
             doRequest(request, request.ifNoneMatch);
@@ -94,6 +88,14 @@ public final class HttpProxyCacheableRequestGroup
         else if (!groupRequest.satisfiesRequest(request))
         {
             doRequest(request, null);
+        }
+        else
+        {
+            final Deque<HttpCacheProxyCacheableRequest> queuedRequests =
+                    queuedRequestsByEtag.computeIfAbsent(request.ifNoneMatch, e -> new LinkedList<>());
+
+            final boolean added = queuedRequests.add(request);
+            assert added;
         }
     }
 
@@ -137,20 +139,23 @@ public final class HttpProxyCacheableRequestGroup
 
     private void flushNextRequest()
     {
-        String nextIfNoneMatch = ifNoneMatch;
-        Deque<HttpCacheProxyCacheableRequest> queuedRequests = queuedRequestsByEtag.get(nextIfNoneMatch);
-        if (queuedRequests == null || queuedRequests.isEmpty())
+        if (!queuedRequestsByEtag.isEmpty())
         {
-            Map.Entry<String, Deque<HttpCacheProxyCacheableRequest>> entry =
-                    queuedRequestsByEtag.entrySet().iterator().next();
-            nextIfNoneMatch = entry.getKey();
-            queuedRequests = entry.getValue();
-        }
+            String nextIfNoneMatch = ifNoneMatch;
+            Deque<HttpCacheProxyCacheableRequest> queuedRequests = queuedRequestsByEtag.get(nextIfNoneMatch);
+            if (queuedRequests == null || queuedRequests.isEmpty())
+            {
+                Map.Entry<String, Deque<HttpCacheProxyCacheableRequest>> entry =
+                        queuedRequestsByEtag.entrySet().iterator().next();
+                nextIfNoneMatch = entry.getKey();
+                queuedRequests = entry.getValue();
+            }
 
-        if (queuedRequests != null && !queuedRequests.isEmpty())
-        {
-            final HttpCacheProxyCacheableRequest nextRequest = queuedRequests.getFirst();
-            doRequest(nextRequest, nextIfNoneMatch);
+            if (queuedRequests != null && !queuedRequests.isEmpty())
+            {
+                final HttpCacheProxyCacheableRequest nextRequest = queuedRequests.getFirst();
+                doRequest(nextRequest, nextIfNoneMatch);
+            }
         }
     }
 
