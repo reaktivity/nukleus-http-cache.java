@@ -160,9 +160,9 @@ public final class HttpHeadersUtil
                 else
                 {
                     final Date date = DATE_FORMAT.parse(retryAfter);
-                    final long epochSeconds = date.toInstant().toEpochMilli() / 1000;
-                    final long nowSeconds = Instant.now().toEpochMilli() / 1000;
-                    final long waitSeconds = epochSeconds - nowSeconds;
+                    final long epochSecond = date.toInstant().getEpochSecond();
+                    final long nowSecond = Instant.now().getEpochSecond();
+                    final long waitSeconds = epochSecond - nowSecond;
                     return Math.max(waitSeconds, 0);
                 }
             }

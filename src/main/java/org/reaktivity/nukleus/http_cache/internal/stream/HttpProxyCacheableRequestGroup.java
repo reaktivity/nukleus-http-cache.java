@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntConsumer;
 
@@ -158,7 +159,8 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     void onCacheableResponseUpdated(
-        long traceId)
+        long traceId,
+        String ifNoneMatch)
     {
         final Deque<HttpCacheProxyCacheableRequest> noEtagRequests = queuedRequestsByEtag.remove(null);
         if (noEtagRequests != null && !noEtagRequests.isEmpty())
@@ -169,13 +171,21 @@ public final class HttpProxyCacheableRequestGroup
             }
         }
 
-        final String etag = cacheEntry.etag();
-        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(etag);
+        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(ifNoneMatch);
         if (etagRequests != null && !etagRequests.isEmpty())
         {
+            final String etag = cacheEntry.etag();
+            final boolean notModified = Objects.equals(ifNoneMatch, etag);
             for (HttpCacheProxyCacheableRequest etagRequest : etagRequests)
             {
-                etagRequest.doNotModifiedResponse(traceId);
+                if (notModified)
+                {
+                    etagRequest.doNotModifiedResponse(traceId);
+                }
+                else
+                {
+                    etagRequest.doCachedResponse(traceId);
+                }
             }
         }
 

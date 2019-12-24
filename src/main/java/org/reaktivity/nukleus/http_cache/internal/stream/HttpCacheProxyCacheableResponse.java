@@ -160,7 +160,9 @@ final class HttpCacheProxyCacheableResponse
         }
         cacheEntry.setResponseCompleted(true);
 
-        if (!hasEtagHeader &&
+        requestGroup.onCacheableResponseUpdated(traceId, ifNoneMatch);
+
+        if (hasEtagHeader &&
             factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
                                                      cacheEntry))
         {
@@ -169,10 +171,8 @@ final class HttpCacheProxyCacheableResponse
         }
         else
         {
-            requestGroup.onCacheableResponseUpdated(traceId);
+            requestGroup.onGroupRequestComplete(request);
         }
-
-        requestGroup.onGroupRequestComplete(request);
     }
 
     private void onResponseAbort(

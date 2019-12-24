@@ -391,7 +391,7 @@ public final class DefaultCacheEntry
     {
         final Instant staleAt = staleAt();
         final Instant now = Instant.now();
-        return now.isAfter(staleAt);
+        return now.getEpochSecond() > staleAt.getEpochSecond();
     }
 
     private CacheControl responseCacheControl()
