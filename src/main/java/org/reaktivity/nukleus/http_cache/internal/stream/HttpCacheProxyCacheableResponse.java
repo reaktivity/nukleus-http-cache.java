@@ -58,8 +58,8 @@ final class HttpCacheProxyCacheableResponse
     {
         this.factory = factory;
         this.requestGroup = requestGroup;
-        this.routeId = routeId;
         this.initial = initial;
+        this.routeId = routeId;
         this.replyId = replyId;
         this.ifNoneMatch = requestGroup.ifNoneMatchHeader(); // can this be removed?
         this.scheduleRetryAfter = scheduleRetryAfter;

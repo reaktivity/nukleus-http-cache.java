@@ -41,7 +41,7 @@ final class HttpCacheProxyRetryResponse
     private final MessageConsumer initial;
     private final long routeId;
     private final long replyId;
-    private final LongConsumer scheduleRetryAfter;
+    private final LongConsumer retryRequestAfter;
 
     private int replyBudget;
     private long retryAfter;
@@ -52,14 +52,14 @@ final class HttpCacheProxyRetryResponse
         MessageConsumer initial,
         long routeId,
         long initialId,
-        LongConsumer scheduleRetryAfter)
+        LongConsumer retryRequestAfter)
     {
         this.factory = factory;
         this.requestHash = requestHash;
         this.initial = initial;
         this.routeId = routeId;
         this.replyId = factory.supplyReplyId.applyAsLong(initialId);
-        this.scheduleRetryAfter = scheduleRetryAfter;
+        this.retryRequestAfter = retryRequestAfter;
     }
 
     @Override
@@ -136,13 +136,13 @@ final class HttpCacheProxyRetryResponse
     private void onResponseEnd(
         EndFW end)
     {
-        scheduleRetryAfter.accept(retryAfter);
+        retryRequestAfter.accept(retryAfter);
     }
 
     private void onResponseAbort(
         AbortFW abort)
     {
-        scheduleRetryAfter.accept(retryAfter);
+        retryRequestAfter.accept(retryAfter);
     }
 
     private void doResponseWindow(

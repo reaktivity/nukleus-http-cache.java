@@ -15,7 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
@@ -42,6 +42,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
 import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyGroupRequest
@@ -54,6 +55,7 @@ final class HttpCacheProxyGroupRequest
     private final HttpProxyCacheableRequestGroup requestGroup;
     private final HttpCacheProxyCacheableRequest request;
     private final long routeId;
+    private final long notifyId;
     private final int httpTypeId;
 
     private MessageConsumer initial;
@@ -76,6 +78,7 @@ final class HttpCacheProxyGroupRequest
         this.requestGroup = requestGroup;
         this.request = request;
         this.routeId = request.resolveId;
+        this.notifyId = factory.supplyInitialId.applyAsLong(routeId);
         this.httpTypeId = factory.supplyTypeId.applyAsInt("http");
     }
 
@@ -122,7 +125,7 @@ final class HttpCacheProxyGroupRequest
         if (retryRequest != null)
         {
             retryRequest.cancel(true);
-            retryCacheableRequest(traceId);
+            doRetryRequest(traceId);
         }
     }
 
@@ -131,6 +134,8 @@ final class HttpCacheProxyGroupRequest
     {
         final ArrayFW<HttpHeaderFW> headers = getRequestHeaders();
         final int initialState = 0;
+
+        attempts++;
 
         state = HttpCacheRequestState.openingInitial(initialState);
         initialId = factory.supplyInitialId.applyAsLong(routeId);
@@ -173,6 +178,35 @@ final class HttpCacheProxyGroupRequest
         };
     }
 
+    private void onNotifyMessage(
+        int msgTypeId,
+        DirectBuffer buffer,
+        int index,
+        int length)
+    {
+        switch (msgTypeId)
+        {
+        case SignalFW.TYPE_ID:
+            final SignalFW signal = factory.signalRO.wrap(buffer, index, index + length);
+            onNotifySignal(signal);
+            break;
+        default:
+            break;
+        }
+    }
+
+    private void onNotifySignal(
+        SignalFW signal)
+    {
+        final long traceId = signal.traceId();
+        final int signalId = signal.signalId();
+
+        if (signalId == GROUP_REQUEST_RETRY_SIGNAL)
+        {
+            doRetryRequest(traceId);
+        }
+    }
+
     private void onRequestMessage(
         int msgTypeId,
         DirectBuffer buffer,
@@ -210,28 +244,28 @@ final class HttpCacheProxyGroupRequest
         cleanupRequestIfNecessary();
     }
 
-    private void scheduleRetryAfter(
+    private void doRetryRequestAfter(
         long retryAfter)
     {
         if (retryAfter <= 0L)
         {
             final long newTraceId = factory.supplyTraceId.getAsLong();
-            retryCacheableRequest(newTraceId);
+            doRetryRequest(newTraceId);
         }
         else
         {
             retryRequest = factory.executor.schedule(retryAfter,
-                                                     MILLISECONDS,
+                                                     SECONDS,
                                                      routeId,
-                                                     replyId,
+                                                     notifyId,
                                                      GROUP_REQUEST_RETRY_SIGNAL);
+            factory.router.setThrottle(notifyId, this::onNotifyMessage);
         }
     }
 
-    private void retryCacheableRequest(
+    private void doRetryRequest(
         long traceId)
     {
-        incAttempts();
         factory.counters.requestsRetry.getAsLong();
         doRequestAttempt(traceId);
     }
@@ -241,11 +275,6 @@ final class HttpCacheProxyGroupRequest
         assert headersSlot != NO_SLOT;
         final MutableDirectBuffer buffer = factory.headersPool.buffer(headersSlot);
         return factory.httpHeadersRO.wrap(buffer, 0, buffer.capacity());
-    }
-
-    private void incAttempts()
-    {
-        attempts++;
     }
 
     private void send503RetryAfter(
@@ -312,7 +341,7 @@ final class HttpCacheProxyGroupRequest
 
         MessageConsumer newStream = null;
 
-        if ((retry && attempts < 3) ||
+        if ((retry && attempts <= 3) ||
             (factory.defaultCache.checkToRetry(getRequestHeaders(),
                                                responseHeaders,
                                                requestGroup.ifNoneMatchHeader(),
@@ -324,7 +353,7 @@ final class HttpCacheProxyGroupRequest
                                                 initial,
                                                 routeId,
                                                 initialId,
-                                                this::scheduleRetryAfter);
+                                                this::doRetryRequestAfter);
             newStream = cacheProxyRetryResponse::onResponseMessage;
             resetHandler = cacheProxyRetryResponse::doResponseReset;
         }
@@ -346,7 +375,7 @@ final class HttpCacheProxyGroupRequest
                                                     routeId,
                                                     replyId,
                                                     cacheEntry,
-                                                    this::scheduleRetryAfter);
+                                                    this::doRetryRequestAfter);
 
             newStream = cacheableResponse::onResponseMessage;
             resetHandler = cacheableResponse::doResponseReset;
@@ -366,6 +395,7 @@ final class HttpCacheProxyGroupRequest
     void doResponseReset(
         long traceId)
     {
+        factory.router.clearThrottle(notifyId);
         factory.correlations.remove(replyId);
         resetHandler.accept(traceId);
     }

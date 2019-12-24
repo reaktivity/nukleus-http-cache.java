@@ -136,7 +136,7 @@ public final class HttpHeadersUtil
      * Retry-After: Wed, 21 Oct 2015 07:28:00 GMT
      * Retry-After: 120
      *
-     * @return wait time in millis from now for both formats
+     * @return wait time in seconds from now for both formats
      */
     public static long retryAfter(
         ArrayFW<HttpHeaderFW> responseHeaders)
@@ -155,13 +155,15 @@ public final class HttpHeadersUtil
             {
                 if (Character.isDigit(retryAfter.charAt(0)))
                 {
-                    return Integer.valueOf(retryAfter) * 1000;
+                    return Integer.valueOf(retryAfter);
                 }
                 else
                 {
-                    Date date = DATE_FORMAT.parse(retryAfter);
-                    long wait = date.toInstant().toEpochMilli() - Instant.now().toEpochMilli();
-                    return Math.max(wait, 0);
+                    final Date date = DATE_FORMAT.parse(retryAfter);
+                    final long epochSeconds = date.toInstant().toEpochMilli() / 1000;
+                    final long nowSeconds = Instant.now().toEpochMilli() / 1000;
+                    final long waitSeconds = epochSeconds - nowSeconds;
+                    return Math.max(waitSeconds, 0);
                 }
             }
         }
