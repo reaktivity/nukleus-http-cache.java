@@ -491,7 +491,7 @@ public final class DefaultCacheEntry
         {
             final CacheControl cacheControl = responseCacheControl();
             final Instant receivedAt = responseReceivedAt();
-            int staleInSeconds = 5;
+            int staleInSeconds = 0;
 
             final String sMaxAge = cacheControl.getValue(S_MAXAGE);
             if (sMaxAge != null)
@@ -531,12 +531,12 @@ public final class DefaultCacheEntry
                 }
                 else
                 {
-                    cacheReceivedAt = Instant.now();
+                    cacheReceivedAt = Instant.EPOCH;
                 }
             }
             catch (Exception e)
             {
-                cacheReceivedAt = Instant.now();
+                cacheReceivedAt = Instant.EPOCH;
             }
         }
 
