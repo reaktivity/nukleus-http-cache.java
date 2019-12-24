@@ -20,6 +20,8 @@ import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
@@ -137,8 +139,38 @@ final class HttpCacheProxyGroupRequest
 
         factory.router.setThrottle(initialId, this::onRequestMessage);
         factory.writer.doHttpRequest(initial, routeId, initialId, traceId, request.authorization,
-            hs -> headers.forEach(h -> hs.item(item -> item.name(h.name()).value(h.value()))));
+                                     mutateRequestHeaders(headers));
         factory.correlations.put(replyId, this::newResponse);
+    }
+
+    private Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(
+        ArrayFW<HttpHeaderFW> requestHeaders)
+    {
+        return (ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder) ->
+        {
+            requestHeaders.forEach(h ->
+            {
+                final String name = h.name().asString();
+                final String value = h.value().asString();
+                if (!AUTHORIZATION.equals(name) &&
+                    !IF_NONE_MATCH.equals(name))
+                {
+                    builder.item(item -> item.name(name).value(value));
+                }
+            });
+
+            final String authorizationHeader = requestGroup.authorizationHeader();
+            if (authorizationHeader != null)
+            {
+                builder.item(item -> item.name(AUTHORIZATION).value(authorizationHeader));
+            }
+
+            final String ifNoneMatchHeader = requestGroup.ifNoneMatchHeader();
+            if (ifNoneMatchHeader != null)
+            {
+                builder.item(item -> item.name(IF_NONE_MATCH).value(ifNoneMatchHeader));
+            }
+        };
     }
 
     private void onRequestMessage(
@@ -283,7 +315,7 @@ final class HttpCacheProxyGroupRequest
         if ((retry && attempts < 3) ||
             (factory.defaultCache.checkToRetry(getRequestHeaders(),
                                                responseHeaders,
-                                               requestGroup.etag(),
+                                               requestGroup.ifNoneMatchHeader(),
                                                requestGroup.requestHash())))
         {
             final HttpCacheProxyRetryResponse cacheProxyRetryResponse =

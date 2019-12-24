@@ -21,6 +21,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.PREFER_WAIT_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
@@ -173,12 +174,24 @@ final class HttpCacheProxyCacheableRequest
         else
         {
             final MutableDirectBuffer headersBuffer = factory.headersPool.buffer(headersSlot);
-            headersBuffer.putBytes(0, headers.buffer(), headers.offset(), headers.sizeof());
+            final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> newHeaders =
+                    factory.httpHeadersRW.wrap(headersBuffer, 0, headersBuffer.capacity());
+            headers.forEach(h ->
+            {
+                final String name = h.name().asString();
+                final String value = h.value().asString();
+                if (!CONTENT_LENGTH.equals(name))
+                {
+                    newHeaders.item(item -> item.name(name).value(value));
+                }
+            });
+            newHeaders.build();
 
             ifNoneMatch = getHeader(headers, IF_NONE_MATCH);
             prefer = getHeader(headers, PREFER);
 
-            final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.requestHash());
+            final int requestHash = requestGroup.requestHash();
+            final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
             vary = cacheEntry != null && cacheEntry.getVaryBy() != null ?
                 getHeader(headers, cacheEntry.getVaryBy()) : null;
 

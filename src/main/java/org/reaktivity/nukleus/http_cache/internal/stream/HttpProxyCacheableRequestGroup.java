@@ -66,7 +66,7 @@ public final class HttpProxyCacheableRequestGroup
         return authorizationHeader;
     }
 
-    String etag()
+    String ifNoneMatchHeader()
     {
         return groupRequest != null ? groupRequest.request().ifNoneMatch : null;
     }

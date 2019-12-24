@@ -61,7 +61,7 @@ final class HttpCacheProxyCacheableResponse
         this.routeId = routeId;
         this.initial = initial;
         this.replyId = replyId;
-        this.ifNoneMatch = requestGroup.etag(); // can this be removed?
+        this.ifNoneMatch = requestGroup.ifNoneMatchHeader(); // can this be removed?
         this.scheduleRetryAfter = scheduleRetryAfter;
         this.cacheEntry = cacheEntry;
     }
