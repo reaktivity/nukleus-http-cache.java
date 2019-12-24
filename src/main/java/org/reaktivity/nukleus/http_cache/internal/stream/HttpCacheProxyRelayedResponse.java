@@ -30,29 +30,35 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 public final class HttpCacheProxyRelayedResponse
 {
     private final HttpCacheProxyFactory factory;
-    private final MessageConsumer initial;
-    private final long routeId;
-    private final long initialId;
-    private final long replyId;
+    private final MessageConsumer receiver;
+    private final long receiverRouteId;
+    private final long receiverReplyId;
+    private final MessageConsumer sender;
+    private final long senderRouteId;
+    private final long senderReplyId;
 
     HttpCacheProxyRelayedResponse(
         HttpCacheProxyFactory factory,
-        MessageConsumer initial,
-        long routeId,
-        long initialId,
-        long replyId)
+        MessageConsumer receiver,
+        long receiverRouteId,
+        long receiverReplyId,
+        MessageConsumer sender,
+        long senderRouteId,
+        long senderReplyId)
     {
         this.factory = factory;
-        this.routeId = routeId;
-        this.initial = initial;
-        this.initialId = initialId;
-        this.replyId = replyId;
+        this.receiver = receiver;
+        this.receiverRouteId = receiverRouteId;
+        this.receiverReplyId = receiverReplyId;
+        this.sender = sender;
+        this.senderRouteId = senderRouteId;
+        this.senderReplyId = senderReplyId;
     }
 
     void doResponseReset(
         long traceId)
     {
-        factory.writer.doReset(initial, routeId, replyId, traceId);
+        factory.writer.doReset(receiver, receiverRouteId, senderReplyId, traceId);
     }
 
     void onResponseMessage(
@@ -67,24 +73,29 @@ public final class HttpCacheProxyRelayedResponse
         switch (msgTypeId)
         {
         case BeginFW.TYPE_ID:
+            factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, receiverRouteId);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, receiverReplyId);
+            receiver.accept(msgTypeId, writeBuffer, 0, length);
+            break;
         case DataFW.TYPE_ID:
-            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, routeId);
-            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
-            initial.accept(msgTypeId, writeBuffer, 0, length);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, receiverRouteId);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, receiverReplyId);
+            receiver.accept(msgTypeId, writeBuffer, 0, length);
             break;
         case EndFW.TYPE_ID:
         case AbortFW.TYPE_ID:
-            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, routeId);
-            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, replyId);
-            initial.accept(msgTypeId, writeBuffer, 0, length);
-            factory.router.clearThrottle(replyId);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, receiverRouteId);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, receiverReplyId);
+            receiver.accept(msgTypeId, writeBuffer, 0, length);
+            factory.router.clearThrottle(receiverReplyId);
             break;
         case ResetFW.TYPE_ID:
         case WindowFW.TYPE_ID:
         case SignalFW.TYPE_ID:
-            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, routeId);
-            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, initialId);
-            initial.accept(msgTypeId, writeBuffer, 0, length);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_ROUTE_ID, senderRouteId);
+            writeBuffer.putLong(FrameFW.FIELD_OFFSET_STREAM_ID, senderReplyId);
+            sender.accept(msgTypeId, writeBuffer, 0, length);
             break;
         default:
             break;

@@ -113,12 +113,15 @@ final class HttpCacheProxyCacheableRequest
         cleanupRequestHeadersIfNecessary();
     }
 
-    HttpCacheProxyRelayedResponse newRelayedResponse()
+    HttpCacheProxyRelayedResponse newRelayedResponse(
+        MessageConsumer sender,
+        long senderRouteId,
+        long senderReplyId)
     {
         factory.counters.responses.getAsLong();
         requestGroup.dequeue(this);
         cleanupRequestHeadersIfNecessary();
-        return new HttpCacheProxyRelayedResponse(factory, reply, routeId, initialId, replyId);
+        return new HttpCacheProxyRelayedResponse(factory, reply, routeId, replyId, sender, senderRouteId, senderReplyId);
     }
 
     void onRequestMessage(

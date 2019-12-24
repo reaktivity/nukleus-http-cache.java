@@ -384,11 +384,12 @@ final class HttpCacheProxyGroupRequest
         }
         else
         {
-            requestGroup.onGroupRequestComplete(request);
-            final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse();
+            final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
             newStream = relayedResponse::onResponseMessage;
             resetHandler = relayedResponse::doResponseReset;
             cleanupRequestIfNecessary();
+
+            requestGroup.onGroupRequestComplete(request);
         }
 
         return newStream;
