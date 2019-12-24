@@ -52,7 +52,7 @@ final class HttpCacheProxyCacheableRequest
     private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW(SERVICE_UNAVAILABLE_503);
 
     private final HttpCacheProxyFactory factory;
-    private final HttpProxyCacheableRequestGroup requestGroup;
+    final HttpProxyCacheableRequestGroup requestGroup;
 
     private final MessageConsumer reply;
     private final long routeId;
@@ -117,7 +117,6 @@ final class HttpCacheProxyCacheableRequest
     {
         factory.counters.responses.getAsLong();
         requestGroup.dequeue(this);
-        requestGroup.onResponseNonCacheable(this);
         cleanupRequestHeadersIfNecessary();
         return new HttpCacheProxyRelayedResponse(factory, reply, routeId, initialId, replyId);
     }

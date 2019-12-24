@@ -119,7 +119,7 @@ final class HttpCacheProxyGroupRequest
         return satisfiesIfNoneMatch && satisfiesVary;
     }
 
-    void onCacheEntryInvalidated(
+    void doRetryRequestImmediatelyIfPending(
         long traceId)
     {
         if (retryRequest != null)
@@ -237,11 +237,12 @@ final class HttpCacheProxyGroupRequest
     }
 
     private void onRequestReset(
-        final ResetFW reset)
+        ResetFW reset)
     {
-        requestGroup.onCacheableRequestReset();
         factory.correlations.remove(replyId);
         cleanupRequestIfNecessary();
+
+        requestGroup.onGroupRequestComplete(request);
     }
 
     private void doRetryRequestAfter(
@@ -370,7 +371,7 @@ final class HttpCacheProxyGroupRequest
 
             final HttpCacheProxyCacheableResponse cacheableResponse =
                 new HttpCacheProxyCacheableResponse(factory,
-                                                    requestGroup,
+                                                    request,
                                                     initial,
                                                     routeId,
                                                     replyId,
@@ -383,6 +384,7 @@ final class HttpCacheProxyGroupRequest
         }
         else
         {
+            requestGroup.onGroupRequestComplete(request);
             final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse();
             newStream = relayedResponse::onResponseMessage;
             resetHandler = relayedResponse::doResponseReset;
@@ -398,5 +400,11 @@ final class HttpCacheProxyGroupRequest
         factory.router.clearThrottle(notifyId);
         factory.correlations.remove(replyId);
         resetHandler.accept(traceId);
+    }
+
+    void onResponseAborted(
+        long traceId)
+    {
+        requestGroup.onCacheableResponseAborted(request, traceId);
     }
 }

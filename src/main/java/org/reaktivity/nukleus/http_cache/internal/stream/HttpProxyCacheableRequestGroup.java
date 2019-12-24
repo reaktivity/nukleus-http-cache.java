@@ -157,11 +157,6 @@ public final class HttpProxyCacheableRequestGroup
         }
     }
 
-    void onCacheableRequestReset()
-    {
-        // TODO Auto-generated method stub
-    }
-
     void onCacheableResponseUpdated(
         long traceId)
     {
@@ -188,6 +183,7 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     void onCacheableResponseAborted(
+        HttpCacheProxyCacheableRequest request,
         long traceId)
     {
         for (HttpCacheProxyCachedResponse flushableResponse : flushableResponses)
@@ -201,7 +197,7 @@ public final class HttpProxyCacheableRequestGroup
     public void onCacheEntryInvalidated(
         long traceId)
     {
-        groupRequest.onCacheEntryInvalidated(traceId);
+        groupRequest.doRetryRequestImmediatelyIfPending(traceId);
     }
 
     private void doRequest(
@@ -223,7 +219,7 @@ public final class HttpProxyCacheableRequestGroup
         groupRequest.doRequest(traceId);
     }
 
-    void onResponseNonCacheable(
+    void onGroupRequestComplete(
         HttpCacheProxyCacheableRequest request)
     {
         assert groupRequest.request() == request;

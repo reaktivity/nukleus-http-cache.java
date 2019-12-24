@@ -36,6 +36,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 final class HttpCacheProxyCacheableResponse
 {
     private final HttpCacheProxyFactory factory;
+    private final HttpCacheProxyCacheableRequest request;
     private final HttpProxyCacheableRequestGroup requestGroup;
 
     private final MessageConsumer initial;
@@ -49,7 +50,7 @@ final class HttpCacheProxyCacheableResponse
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
-        HttpProxyCacheableRequestGroup requestGroup,
+        HttpCacheProxyCacheableRequest request,
         MessageConsumer initial,
         long routeId,
         long replyId,
@@ -57,7 +58,8 @@ final class HttpCacheProxyCacheableResponse
         LongConsumer scheduleRetryAfter)
     {
         this.factory = factory;
-        this.requestGroup = requestGroup;
+        this.request = request;
+        this.requestGroup = request.requestGroup;
         this.initial = initial;
         this.routeId = routeId;
         this.replyId = replyId;
@@ -169,13 +171,16 @@ final class HttpCacheProxyCacheableResponse
         {
             requestGroup.onCacheableResponseUpdated(traceId);
         }
+
+        requestGroup.onGroupRequestComplete(request);
     }
 
     private void onResponseAbort(
         AbortFW abort)
     {
         final long traceId = abort.traceId();
-        requestGroup.onCacheableResponseAborted(traceId);
+        requestGroup.onCacheableResponseAborted(request, traceId);
+        requestGroup.onGroupRequestComplete(request);
     }
 
     private void doResponseWindow(
