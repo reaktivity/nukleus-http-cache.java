@@ -119,10 +119,7 @@ final class HttpCacheProxyCacheableResponse
 
         requestGroup.cacheEntry(cacheEntry);
 
-        if (cacheEntry.etag() != null)
-        {
-            requestGroup.onCacheableResponseUpdated(traceId);
-        }
+        // TODO: notify request group immediately if not too early
 
         doResponseWindow(traceId, factory.initialWindowSize);
     }
@@ -138,10 +135,7 @@ final class HttpCacheProxyCacheableResponse
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
 
-        if (cacheEntry.etag() != null)
-        {
-            requestGroup.onCacheableResponseUpdated(traceId);
-        }
+        // TODO: notify request group immediately if not too early
     }
 
     private void onResponseEnd(

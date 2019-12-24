@@ -81,6 +81,12 @@ public final class HttpProxyCacheableRequestGroup
     void enqueue(
         HttpCacheProxyCacheableRequest request)
     {
+        final Deque<HttpCacheProxyCacheableRequest> queuedRequests =
+                queuedRequestsByEtag.computeIfAbsent(request.ifNoneMatch, e -> new LinkedList<>());
+
+        final boolean added = queuedRequests.add(request);
+        assert added;
+
         if (groupRequest == null)
         {
             doRequest(request, request.ifNoneMatch);
@@ -88,14 +94,6 @@ public final class HttpProxyCacheableRequestGroup
         else if (!groupRequest.satisfiesRequest(request))
         {
             doRequest(request, null);
-        }
-        else
-        {
-            final Deque<HttpCacheProxyCacheableRequest> queuedRequests =
-                    queuedRequestsByEtag.computeIfAbsent(request.ifNoneMatch, e -> new LinkedList<>());
-
-            final boolean added = queuedRequests.add(request);
-            assert added;
         }
     }
 
