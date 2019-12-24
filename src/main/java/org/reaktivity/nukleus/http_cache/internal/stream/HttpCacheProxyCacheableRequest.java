@@ -66,7 +66,7 @@ final class HttpCacheProxyCacheableRequest
     private Future<?> preferWaitExpired;
     private boolean promiseNextPollRequest;
 
-    private int requestSlot = NO_SLOT;
+    private int headersSlot = NO_SLOT;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -96,6 +96,7 @@ final class HttpCacheProxyCacheableRequest
 
         response.doResponseBegin(traceId);
         requestGroup.attach(response);
+        cleanupRequestHeadersIfNecessary();
     }
 
     void doNotModifiedResponse(
@@ -163,8 +164,8 @@ final class HttpCacheProxyCacheableRequest
                 factory.initialWindowSize,
                 0);
 
-        assert requestSlot == NO_SLOT;
-        int headersSlot = factory.headersPool.acquire(initialId);
+        assert headersSlot == NO_SLOT;
+        headersSlot = factory.headersPool.acquire(initialId);
         if (headersSlot == NO_SLOT)
         {
             doResponseBeginEnd503RetryAfter();
@@ -205,7 +206,7 @@ final class HttpCacheProxyCacheableRequest
     private void onRequestEnd(
         final EndFW end)
     {
-        if (requestSlot != NO_SLOT)
+        if (headersSlot != NO_SLOT)
         {
             requestGroup.enqueue(this);
         }
@@ -215,7 +216,7 @@ final class HttpCacheProxyCacheableRequest
         final AbortFW abort)
     {
         // note: not enqueued
-        cleanupRequestIfNecessary();
+        cleanupRequest();
         cleanupRequestTimeoutIfNecessary();
     }
 
@@ -238,7 +239,7 @@ final class HttpCacheProxyCacheableRequest
 
     ArrayFW<HttpHeaderFW> getHeaders()
     {
-        final MutableDirectBuffer buffer = factory.headersPool.buffer(requestSlot);
+        final MutableDirectBuffer buffer = factory.headersPool.buffer(headersSlot);
         return factory.httpHeadersRO.wrap(buffer, 0, buffer.capacity());
     }
 
@@ -266,7 +267,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseReset(
         ResetFW reset)
     {
-        cleanupRequestIfNecessary();
+        cleanupRequest();
     }
 
     private void onResponseSignal(
@@ -328,14 +329,19 @@ final class HttpCacheProxyCacheableRequest
         }
     }
 
-    private void cleanupRequestIfNecessary()
+    private void cleanupRequest()
     {
-        if (requestSlot != NO_SLOT)
-        {
-            factory.headersPool.release(requestSlot);
-            requestSlot = NO_SLOT;
-        }
+        cleanupRequestHeadersIfNecessary();
 
         factory.router.clearThrottle(replyId);
+    }
+
+    private void cleanupRequestHeadersIfNecessary()
+    {
+        if (headersSlot != NO_SLOT)
+        {
+            factory.headersPool.release(headersSlot);
+            headersSlot = NO_SLOT;
+        }
     }
 }

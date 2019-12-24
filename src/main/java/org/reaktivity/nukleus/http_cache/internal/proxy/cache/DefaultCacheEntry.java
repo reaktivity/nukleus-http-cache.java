@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -490,13 +491,26 @@ public final class DefaultCacheEntry
         {
             final CacheControl cacheControl = responseCacheControl();
             final Instant receivedAt = responseReceivedAt();
-            int staleInSeconds = cacheControl.contains(S_MAXAGE) ? parseInt(cacheControl.getValue(S_MAXAGE)) :
-                cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-            final int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
-            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
-            cacheStaleAt = receivedAt.plusSeconds(staleInSeconds);
+            int staleInSeconds = 5;
 
-            return  cacheStaleAt;
+            final String sMaxAge = cacheControl.getValue(S_MAXAGE);
+            if (sMaxAge != null)
+            {
+                staleInSeconds = parseInt(sMaxAge);
+            }
+            else
+            {
+                final String maxAge = cacheControl.getValue(MAX_AGE);
+                if (maxAge != null)
+                {
+                    staleInSeconds = parseInt(maxAge);
+                }
+            }
+
+            final int surrogateAge = getSurrogateAge(this.getCachedResponseHeaders());
+            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
+
+            cacheStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
 
         return cacheStaleAt;
@@ -511,12 +525,18 @@ public final class DefaultCacheEntry
                 getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
             try
             {
-                cacheReceivedAt = DATE_FORMAT.parse(dateHeaderValue).toInstant();
-                return cacheReceivedAt;
+                if (dateHeaderValue != null)
+                {
+                    cacheReceivedAt = DATE_FORMAT.parse(dateHeaderValue).toInstant();
+                }
+                else
+                {
+                    cacheReceivedAt = Instant.now();
+                }
             }
             catch (Exception e)
             {
-                return Instant.EPOCH;
+                cacheReceivedAt = Instant.now();
             }
         }
 

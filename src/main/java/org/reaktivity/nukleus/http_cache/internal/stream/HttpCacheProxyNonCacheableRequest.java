@@ -94,20 +94,24 @@ final class HttpCacheProxyNonCacheableRequest
         int index,
         int length)
     {
-        if (msgTypeId == ResetFW.TYPE_ID)
+        switch (msgTypeId)
         {
-            ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
+        case ResetFW.TYPE_ID:
+            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
+            break;
         }
     }
 
     private void onResponseReset(
         ResetFW reset)
     {
-        factory.writer.doReset(initial,
-                               routeId,
-                               initialId,
-                               reset.traceId());
+        final long traceId = reset.traceId();
+
+        factory.writer.doReset(connectInitial,
+                               connectRouteId,
+                               connectReplyId,
+                               traceId);
         factory.correlations.remove(connectReplyId);
     }
 
@@ -121,34 +125,34 @@ final class HttpCacheProxyNonCacheableRequest
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
+            onRequestBegin(begin);
             break;
         case DataFW.TYPE_ID:
             final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-            onData(data);
+            onRequestData(data);
             break;
         case EndFW.TYPE_ID:
             final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-            onEnd(end);
+            onRequestEnd(end);
             break;
         case AbortFW.TYPE_ID:
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-            onAbort(abort);
+            onRequestAbort(abort);
             break;
         case WindowFW.TYPE_ID:
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-            onWindow(window);
+            onRequestWindow(window);
             break;
         case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-            onReset(reset);
+            onRequestReset(reset);
             break;
         default:
             break;
         }
     }
 
-    private void onBegin(
+    private void onRequestBegin(
         BeginFW begin)
     {
         final OctetsFW extension = begin.extension();
@@ -156,6 +160,7 @@ final class HttpCacheProxyNonCacheableRequest
         assert httpBeginEx != null;
         final ArrayFW<HttpHeaderFW> headers = httpBeginEx.headers();
 
+        factory.router.setThrottle(connectInitialId, this::onRequestMessage);
         factory.writer.doHttpRequest(
             connectInitial,
             connectRouteId,
@@ -163,15 +168,15 @@ final class HttpCacheProxyNonCacheableRequest
             factory.supplyTraceId.getAsLong(),
             0L,
             hs -> headers.forEach(h -> hs.item(item -> item.name(h.name()).value(h.value()))));
-
-        factory.router.setThrottle(connectInitialId, this::onRequestMessage);
+        factory.correlations.put(connectReplyId, this::newResponse);
     }
 
-    private void onData(
+    private void onRequestData(
         final DataFW data)
     {
         final long traceId = data.traceId();
         final long budgetId = data.budgetId();
+        final int reserved = data.reserved();
         final OctetsFW payload = data.payload();
 
         factory.writer.doHttpData(connectInitial,
@@ -182,38 +187,39 @@ final class HttpCacheProxyNonCacheableRequest
                                   payload.buffer(),
                                   payload.offset(),
                                   payload.sizeof(),
-                                  data.reserved());
+                                  reserved);
     }
 
-    private void onEnd(
+    private void onRequestEnd(
         final EndFW end)
     {
         final long traceId = end.traceId();
         factory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
-    private void onAbort(
+    private void onRequestAbort(
         final AbortFW abort)
     {
         final long traceId = abort.traceId();
         factory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
     }
 
-    private void onWindow(
+    private void onRequestWindow(
         final WindowFW window)
     {
         final long traceId = window.traceId();
         final long budgetId = window.budgetId();
         final int credit = window.credit();
         final int padding = window.padding();
+
         factory.writer.doWindow(initial, routeId, initialId, traceId, budgetId, credit, padding);
     }
 
-    private void onReset(
+    private void onRequestReset(
         final ResetFW reset)
     {
         final long traceId = reset.traceId();
+
         factory.writer.doReset(initial, routeId, initialId, traceId);
     }
-
 }

@@ -51,10 +51,10 @@ final class HttpCacheProxyGroupRequest
     private final HttpCacheProxyFactory factory;
     private final HttpProxyCacheableRequestGroup requestGroup;
     private final HttpCacheProxyCacheableRequest request;
-    private final MessageConsumer initial;
     private final long routeId;
     private final int httpTypeId;
 
+    private MessageConsumer initial;
     private long initialId;
     private long replyId;
     private int state;
@@ -74,7 +74,6 @@ final class HttpCacheProxyGroupRequest
         this.requestGroup = requestGroup;
         this.request = request;
         this.routeId = request.resolveId;
-        this.initial = factory.router.supplyReceiver(routeId);
         this.httpTypeId = factory.supplyTypeId.applyAsInt("http");
     }
 
@@ -86,6 +85,7 @@ final class HttpCacheProxyGroupRequest
     void doRequest(
         long traceId)
     {
+        assert headersSlot == NO_SLOT;
         headersSlot = factory.headersPool.acquire(replyId);
         if (headersSlot == NO_SLOT)
         {
@@ -132,6 +132,7 @@ final class HttpCacheProxyGroupRequest
 
         state = HttpCacheRequestState.openingInitial(initialState);
         initialId = factory.supplyInitialId.applyAsLong(routeId);
+        initial = factory.router.supplyReceiver(initialId);
         replyId = factory.supplyReplyId.applyAsLong(initialId);
 
         factory.router.setThrottle(initialId, this::onRequestMessage);
@@ -164,7 +165,9 @@ final class HttpCacheProxyGroupRequest
     private void onRequestWindow(
         final WindowFW window)
     {
+        final long traceId = window.traceId();
         state = HttpCacheRequestState.openInitial(state);
+        factory.writer.doHttpEnd(initial, routeId, initialId, traceId);
     }
 
     private void onRequestReset(
@@ -295,13 +298,13 @@ final class HttpCacheProxyGroupRequest
         }
         else if (isCacheableResponse(responseHeaders))
         {
-            final ArrayFW<HttpHeaderFW> headers = getRequestHeaders();
+            final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
             final short authScope = authorizationScope(request.authorization);
-            final String requestURL = getRequestURL(headers);
+            final String requestURL = getRequestURL(requestHeaders);
             final int requestHash = requestGroup.requestHash();
             final DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
 
-            final boolean stored = cacheEntry.storeRequestHeaders(headers);
+            final boolean stored = cacheEntry.storeRequestHeaders(requestHeaders);
             assert stored;
 
             final HttpCacheProxyCacheableResponse cacheableResponse =
@@ -309,7 +312,7 @@ final class HttpCacheProxyGroupRequest
                                                     requestGroup,
                                                     initial,
                                                     routeId,
-                                                    initialId,
+                                                    replyId,
                                                     cacheEntry,
                                                     this::scheduleRetryAfter);
 
