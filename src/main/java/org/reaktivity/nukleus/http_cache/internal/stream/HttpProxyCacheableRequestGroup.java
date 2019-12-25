@@ -29,7 +29,8 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 public final class HttpProxyCacheableRequestGroup
 {
     private final Map<String, Deque<HttpCacheProxyCacheableRequest>> queuedRequestsByEtag;
-    private final Set<HttpCacheProxyCachedResponse> flushableResponses;
+    private final Set<HttpCacheProxyCachedResponse> attachedResponses;
+    private final Set<HttpCacheProxyCachedResponse> detachedResponses;
     private final HttpCacheProxyFactory factory;
     private final IntConsumer cleaner;
     private final int requestHash;
@@ -48,7 +49,8 @@ public final class HttpProxyCacheableRequestGroup
         this.cleaner = cleaner;
         this.requestHash = requestHash;
         this.queuedRequestsByEtag = new HashMap<>();
-        this.flushableResponses = new HashSet<>();
+        this.attachedResponses = new HashSet<>();
+        this.detachedResponses = new HashSet<>();
     }
 
     int requestHash()
@@ -75,7 +77,7 @@ public final class HttpProxyCacheableRequestGroup
     void cacheEntry(
         DefaultCacheEntry cacheEntry)
     {
-        cacheEntry.setSubscribers(flushableResponses.size());
+        cacheEntry.setSubscribers(attachedResponses.size());
         this.cacheEntry = cacheEntry;
     }
 
@@ -122,18 +124,13 @@ public final class HttpProxyCacheableRequestGroup
     void attach(
         HttpCacheProxyCachedResponse response)
     {
-        flushableResponses.add(response);
+        attachedResponses.add(response);
     }
 
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        flushableResponses.remove(response);
-
-        if (flushableResponses.isEmpty() && !queuedRequestsByEtag.isEmpty())
-        {
-            flushNextRequest();
-        }
+        detachedResponses.add(response);
     }
 
     private void flushNextRequest()
@@ -189,14 +186,20 @@ public final class HttpProxyCacheableRequestGroup
             }
         }
 
-        flushableResponses.forEach(r -> r.doResponseFlush(traceId));
+        attachedResponses.forEach(r -> r.doResponseFlush(traceId));
+
+        if (!detachedResponses.isEmpty())
+        {
+            attachedResponses.removeAll(detachedResponses);
+            detachedResponses.clear();
+        }
     }
 
     void onCacheableResponseAborted(
         HttpCacheProxyCacheableRequest request,
         long traceId)
     {
-        for (HttpCacheProxyCachedResponse flushableResponse : flushableResponses)
+        for (HttpCacheProxyCachedResponse flushableResponse : attachedResponses)
         {
             flushableResponse.doResponseAbort(traceId);
         }
