@@ -217,17 +217,17 @@ public class Writer
                                          .value(ETAG));
         }
 
-        if (isStale)
-        {
-            builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
-        }
-
         if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL) && isEmulatedProtocolStack)
         {
             final String value = hasPreferWait
                 ? "private, stale-while-revalidate=" + staleWhileRevalidate
                 : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
+        }
+
+        if (isStale)
+        {
+            builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
         }
     }
 
