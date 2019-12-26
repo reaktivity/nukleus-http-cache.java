@@ -401,6 +401,7 @@ final class HttpCacheProxyGroupRequest
         factory.router.clearThrottle(notifyId);
         factory.correlations.remove(replyId);
         resetHandler.accept(traceId);
+        cleanupRequestIfNecessary();
     }
 
     void onResponseAborted(

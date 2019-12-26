@@ -39,6 +39,7 @@ public final class HttpProxyCacheableRequestGroup
     private HttpCacheProxyGroupRequest groupRequest;
     private String ifNoneMatch;
     private DefaultCacheEntry cacheEntry;
+    private boolean flushing;
 
     HttpProxyCacheableRequestGroup(
         HttpCacheProxyFactory factory,
@@ -119,6 +120,15 @@ public final class HttpProxyCacheableRequestGroup
                 cleaner.accept(requestHash);
             }
         }
+
+        if (groupRequest != null &&
+            groupRequest.request() == request &&
+            attachedResponses.isEmpty())
+        {
+            final long traceId = factory.supplyTraceId.getAsLong();
+            groupRequest.doResponseReset(traceId);
+            groupRequest = null;
+        }
     }
 
     void attach(
@@ -130,7 +140,14 @@ public final class HttpProxyCacheableRequestGroup
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        detachedResponses.add(response);
+        if (flushing)
+        {
+            detachedResponses.add(response);
+        }
+        else
+        {
+            attachedResponses.remove(response);
+        }
     }
 
     private void flushNextRequest()
@@ -186,7 +203,9 @@ public final class HttpProxyCacheableRequestGroup
             }
         }
 
+        flushing = true;
         attachedResponses.forEach(r -> r.doResponseFlush(traceId));
+        flushing = false;
 
         if (!detachedResponses.isEmpty())
         {
