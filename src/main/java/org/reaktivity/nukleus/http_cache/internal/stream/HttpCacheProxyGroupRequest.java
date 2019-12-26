@@ -143,7 +143,8 @@ final class HttpCacheProxyGroupRequest
         replyId = factory.supplyReplyId.applyAsLong(initialId);
 
         factory.router.setThrottle(initialId, this::onRequestMessage);
-        factory.writer.doHttpRequest(initial, routeId, initialId, traceId, request.authorization,
+        final long authorization = 0; // TODO: request.authorization
+        factory.writer.doHttpRequest(initial, routeId, initialId, traceId, authorization,
                                      mutateRequestHeaders(headers));
         factory.correlations.put(replyId, this::newResponse);
     }
@@ -376,11 +377,11 @@ final class HttpCacheProxyGroupRequest
                                                     routeId,
                                                     replyId,
                                                     cacheEntry,
-                                                    this::doRetryRequestAfter);
+                                                    this::doRetryRequestAfter,
+                                                    this::cleanupRequestIfNecessary);
 
             newStream = cacheableResponse::onResponseMessage;
             resetHandler = cacheableResponse::doResponseReset;
-            cleanupRequestIfNecessary();
         }
         else
         {
@@ -402,6 +403,7 @@ final class HttpCacheProxyGroupRequest
         factory.router.clearThrottle(notifyId);
         factory.correlations.remove(replyId);
         resetHandler.accept(traceId);
+        cleanupRequestIfNecessary();
     }
 
     void onResponseAborted(

@@ -332,12 +332,14 @@ public class DefaultCache
         long routeId,
         long replyId)
     {
+        final long traceId = supplyTraceId.getAsLong();
+
         if (preferWait != null)
         {
             writer.doHttpResponse(reply,
                 routeId,
                 replyId,
-                supplyTraceId.getAsLong(),
+                traceId,
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
@@ -350,10 +352,12 @@ public class DefaultCache
                 reply,
                 routeId,
                 replyId,
-                supplyTraceId.getAsLong(),
+                traceId,
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag)));
         }
+
+        writer.doHttpEnd(reply, routeId, replyId, traceId);
     }
 
     public boolean isRequestCacheable(

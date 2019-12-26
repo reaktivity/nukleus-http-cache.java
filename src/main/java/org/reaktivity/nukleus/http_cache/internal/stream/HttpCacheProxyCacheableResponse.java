@@ -43,7 +43,8 @@ final class HttpCacheProxyCacheableResponse
     private final long routeId;
     private final long replyId;
     private final DefaultCacheEntry cacheEntry;
-    private final LongConsumer scheduleRetryAfter;
+    private final LongConsumer retryRequestAfter;
+    private final Runnable cleanupRequest;
 
     private String ifNoneMatch;
     private int replyBudget;
@@ -55,7 +56,8 @@ final class HttpCacheProxyCacheableResponse
         long routeId,
         long replyId,
         DefaultCacheEntry cacheEntry,
-        LongConsumer scheduleRetryAfter)
+        LongConsumer retryRequestAfter,
+        Runnable cleanupRequest)
     {
         this.factory = factory;
         this.request = request;
@@ -64,8 +66,9 @@ final class HttpCacheProxyCacheableResponse
         this.routeId = routeId;
         this.replyId = replyId;
         this.ifNoneMatch = requestGroup.ifNoneMatchHeader(); // can this be removed?
-        this.scheduleRetryAfter = scheduleRetryAfter;
         this.cacheEntry = cacheEntry;
+        this.retryRequestAfter = retryRequestAfter;
+        this.cleanupRequest = cleanupRequest;
     }
 
     @Override
@@ -160,17 +163,17 @@ final class HttpCacheProxyCacheableResponse
         }
         cacheEntry.setResponseCompleted(true);
 
-        requestGroup.onCacheableResponseUpdated(traceId, ifNoneMatch);
-
-        if (hasEtagHeader &&
+        if (!hasEtagHeader &&
             factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
                                                      cacheEntry))
         {
             long retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
-            scheduleRetryAfter.accept(retryAfter);
+            retryRequestAfter.accept(retryAfter);
         }
         else
         {
+            cleanupRequest.run();
+            requestGroup.onCacheableResponseUpdated(traceId, ifNoneMatch);
             requestGroup.onGroupRequestComplete(request);
         }
     }
@@ -179,6 +182,7 @@ final class HttpCacheProxyCacheableResponse
         AbortFW abort)
     {
         final long traceId = abort.traceId();
+        cleanupRequest.run();
         requestGroup.onCacheableResponseAborted(request, traceId);
         requestGroup.onGroupRequestComplete(request);
     }

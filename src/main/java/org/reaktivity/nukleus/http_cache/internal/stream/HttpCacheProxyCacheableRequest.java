@@ -314,6 +314,7 @@ final class HttpCacheProxyCacheableRequest
                                      replyId);
 
         requestGroup.dequeue(this);
+        cleanupRequest();
     }
 
     private void doResponseBeginEnd503RetryAfter()
