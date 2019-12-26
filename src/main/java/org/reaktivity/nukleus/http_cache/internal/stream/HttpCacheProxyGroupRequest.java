@@ -376,11 +376,11 @@ final class HttpCacheProxyGroupRequest
                                                     routeId,
                                                     replyId,
                                                     cacheEntry,
-                                                    this::doRetryRequestAfter);
+                                                    this::doRetryRequestAfter,
+                                                    this::cleanupRequestIfNecessary);
 
             newStream = cacheableResponse::onResponseMessage;
             resetHandler = cacheableResponse::doResponseReset;
-            cleanupRequestIfNecessary();
         }
         else
         {
