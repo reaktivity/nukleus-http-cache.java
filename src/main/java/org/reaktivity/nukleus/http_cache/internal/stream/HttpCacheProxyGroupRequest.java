@@ -143,7 +143,8 @@ final class HttpCacheProxyGroupRequest
         replyId = factory.supplyReplyId.applyAsLong(initialId);
 
         factory.router.setThrottle(initialId, this::onRequestMessage);
-        factory.writer.doHttpRequest(initial, routeId, initialId, traceId, request.authorization,
+        final long authorization = 0; // TODO: request.authorization
+        factory.writer.doHttpRequest(initial, routeId, initialId, traceId, authorization,
                                      mutateRequestHeaders(headers));
         factory.correlations.put(replyId, this::newResponse);
     }

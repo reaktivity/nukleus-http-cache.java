@@ -218,9 +218,9 @@ public final class HttpProxyCacheableRequestGroup
         HttpCacheProxyCacheableRequest request,
         long traceId)
     {
-        for (HttpCacheProxyCachedResponse flushableResponse : attachedResponses)
+        for (HttpCacheProxyCachedResponse response : attachedResponses)
         {
-            flushableResponse.doResponseAbort(traceId);
+            response.doResponseAbort(traceId);
         }
 
         factory.defaultCache.purge(requestHash);
