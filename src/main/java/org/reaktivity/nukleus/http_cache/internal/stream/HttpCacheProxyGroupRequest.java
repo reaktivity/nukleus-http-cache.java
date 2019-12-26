@@ -388,6 +388,7 @@ final class HttpCacheProxyGroupRequest
             newStream = relayedResponse::onResponseMessage;
             resetHandler = relayedResponse::doResponseReset;
             cleanupRequestIfNecessary();
+            factory.defaultCache.purge(requestGroup.requestHash());
 
             requestGroup.onGroupRequestComplete(request);
         }
