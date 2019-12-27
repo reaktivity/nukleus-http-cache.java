@@ -314,8 +314,10 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseReset(
         ResetFW reset)
     {
+        final long traceId = reset.traceId();
         requestGroup.dequeue(this);
         cleanupRequest();
+        requestGroup.onResponseAbandoned(this, traceId);
     }
 
     private void onResponseSignal(
@@ -343,6 +345,7 @@ final class HttpCacheProxyCacheableRequest
                                      replyId);
 
         requestGroup.dequeue(this);
+        requestGroup.onResponseAbandoned(this, traceId);
         cleanupRequest();
     }
 

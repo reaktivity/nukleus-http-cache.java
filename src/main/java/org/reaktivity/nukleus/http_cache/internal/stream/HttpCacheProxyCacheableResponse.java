@@ -176,7 +176,7 @@ final class HttpCacheProxyCacheableResponse
         else
         {
             cleanupRequest.run();
-            requestGroup.onCacheableResponseUpdated(responseAt, traceId, ifNoneMatch);
+            requestGroup.onGroupResponseUpdated(responseAt, traceId, ifNoneMatch);
             requestGroup.onGroupRequestComplete(request);
         }
     }
@@ -186,7 +186,7 @@ final class HttpCacheProxyCacheableResponse
     {
         final long traceId = abort.traceId();
         cleanupRequest.run();
-        requestGroup.onCacheableResponseAborted(request, traceId);
+        requestGroup.onGroupResponseAborted(request, traceId);
         requestGroup.onGroupRequestComplete(request);
     }
 
