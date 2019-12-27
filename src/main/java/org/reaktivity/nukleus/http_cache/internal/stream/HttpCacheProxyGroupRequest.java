@@ -18,17 +18,14 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.LongConsumer;
 
 import org.agrona.DirectBuffer;
@@ -38,8 +35,6 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
-import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
@@ -47,8 +42,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyGroupRequest
 {
-    private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
-    private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW(SERVICE_UNAVAILABLE_503);
     private static final LongConsumer NOOP_RESET_HANDLER = t -> {};
 
     private final HttpCacheProxyFactory factory;
@@ -56,7 +49,6 @@ final class HttpCacheProxyGroupRequest
     private final HttpCacheProxyCacheableRequest request;
     private final long routeId;
     private final long notifyId;
-    private final int httpTypeId;
 
     private MessageConsumer initial;
     private long initialId;
@@ -79,7 +71,6 @@ final class HttpCacheProxyGroupRequest
         this.request = request;
         this.routeId = request.resolveId;
         this.notifyId = factory.supplyInitialId.applyAsLong(routeId);
-        this.httpTypeId = factory.supplyTypeId.applyAsInt("http");
     }
 
     HttpCacheProxyCacheableRequest request()
@@ -94,7 +85,7 @@ final class HttpCacheProxyGroupRequest
         headersSlot = factory.headersPool.acquire(replyId);
         if (headersSlot == NO_SLOT)
         {
-            send503RetryAfter(traceId);
+            requestGroup.onGroupRequestReset(request, traceId);
             cleanupRequestIfNecessary();
         }
         else
@@ -281,40 +272,6 @@ final class HttpCacheProxyGroupRequest
         assert headersSlot != NO_SLOT;
         final MutableDirectBuffer buffer = factory.headersPool.buffer(headersSlot);
         return factory.httpHeadersRO.wrap(buffer, 0, buffer.capacity());
-    }
-
-    private void send503RetryAfter(
-        long traceId)
-    {
-        final Function<HttpBeginExFW, MessageConsumer> responseFactory = factory.correlations.remove(replyId);
-        if (responseFactory != null)
-        {
-            final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
-                e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
-                      .item(h -> h.name(RETRY_AFTER).value("0"));
-
-            final HttpBeginExFW beginEx =
-                    factory.beginExRW.wrap(factory.writeBuffer, 0, factory.writeBuffer.capacity())
-                           .typeId(httpTypeId)
-                           .headers(mutator)
-                           .build();
-
-            // count retry responses
-            factory.counters.responsesRetry.getAsLong();
-
-            final MessageConsumer newResponse = responseFactory.apply(beginEx);
-
-            factory.writer.doHttpResponse(newResponse,
-                                          routeId,
-                                          replyId,
-                                          traceId,
-                                          mutator);
-
-            factory.writer.doHttpEnd(newResponse,
-                                     routeId,
-                                     replyId,
-                                     traceId);
-        }
     }
 
     private void cleanupRequestIfNecessary()
