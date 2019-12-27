@@ -183,7 +183,7 @@ public final class HttpProxyCacheableRequestGroup
         }
     }
 
-    void onGroupResponseUpdated(
+    void onGroupResponseBegin(
         Instant now,
         long traceId,
         String ifNoneMatch)
@@ -214,7 +214,11 @@ public final class HttpProxyCacheableRequestGroup
                 }
             }
         }
+    }
 
+    void onGroupResponseData(
+        long traceId)
+    {
         flushing = true;
         attachedResponses.forEach(r -> r.doResponseFlush(traceId));
         flushing = false;
@@ -226,7 +230,7 @@ public final class HttpProxyCacheableRequestGroup
         }
     }
 
-    void onGroupResponseAborted(
+    void onGroupResponseAbort(
         HttpCacheProxyCacheableRequest request,
         long traceId)
     {
@@ -254,7 +258,7 @@ public final class HttpProxyCacheableRequestGroup
         }
     }
 
-    void onGroupRequestComplete(
+    void onGroupRequestEnd(
         HttpCacheProxyCacheableRequest request)
     {
         assert groupRequest.request() == request;

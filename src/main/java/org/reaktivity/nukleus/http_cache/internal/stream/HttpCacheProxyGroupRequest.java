@@ -370,7 +370,7 @@ final class HttpCacheProxyGroupRequest
             else
             {
                 cleanupRequestIfNecessary();
-                requestGroup.onGroupRequestComplete(request);
+                requestGroup.onGroupRequestEnd(request);
             }
         }
         else if (isCacheableResponse(responseHeaders))
@@ -403,7 +403,7 @@ final class HttpCacheProxyGroupRequest
             resetHandler = relayedResponse::doResponseReset;
             cleanupRequestIfNecessary();
 
-            requestGroup.onGroupRequestComplete(request);
+            requestGroup.onGroupRequestEnd(request);
         }
 
         return newStream;
@@ -423,7 +423,7 @@ final class HttpCacheProxyGroupRequest
     void onResponseAborted(
         long traceId)
     {
-        requestGroup.onGroupResponseAborted(request, traceId);
+        requestGroup.onGroupResponseAbort(request, traceId);
     }
 
     private void flushResetIfNecessary(
