@@ -183,7 +183,7 @@ public class DefaultCache
 
         return satisfiedByCache(requestHeaders) &&
                cacheEntry != null &&
-               cacheEntry.isResponseCompleted() &&
+               (cacheEntry.etag() != null || cacheEntry.isResponseCompleted()) &&
                cacheEntry.canServeRequest(requestHeaders, authScope);
     }
 
