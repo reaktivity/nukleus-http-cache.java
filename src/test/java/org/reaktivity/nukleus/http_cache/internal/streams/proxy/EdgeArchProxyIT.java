@@ -71,7 +71,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -138,7 +137,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(1);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -152,7 +150,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
