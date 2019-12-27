@@ -1108,7 +1108,6 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -1121,7 +1120,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
