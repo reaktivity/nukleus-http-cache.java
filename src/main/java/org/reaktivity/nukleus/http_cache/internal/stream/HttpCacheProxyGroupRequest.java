@@ -299,69 +299,76 @@ final class HttpCacheProxyGroupRequest
     private MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
-        final ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
-        final boolean retry = HttpHeadersUtil.retry(responseHeaders);
-        final int requestHash = requestGroup.requestHash();
-        final String ifNoneMatch = requestGroup.ifNoneMatchHeader();
-
         MessageConsumer newStream = null;
 
-        if ((retry && attempts <= 3) ||
-            (factory.defaultCache.checkToRetry(getRequestHeaders(),
-                                               responseHeaders,
-                                               ifNoneMatch,
-                                               requestHash)))
+        if (beginEx != null)
         {
-            if (requestGroup.hasQueuedRequests(ifNoneMatch) || requestGroup.hasAttachedResponses())
+            final ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
+            final boolean retry = HttpHeadersUtil.retry(responseHeaders);
+            final int requestHash = requestGroup.requestHash();
+            final String ifNoneMatch = requestGroup.ifNoneMatchHeader();
+
+            if ((retry && attempts <= 3) ||
+                (factory.defaultCache.checkToRetry(getRequestHeaders(),
+                    responseHeaders,
+                    ifNoneMatch,
+                    requestHash)))
             {
-                final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
-                    new HttpCacheProxyRetryResponse(factory,
-                                                    requestHash,
-                                                    initial,
-                                                    routeId,
-                                                    initialId,
-                                                    this::doRetryRequestAfter);
-                newStream = cacheProxyRetryResponse::onResponseMessage;
-                resetHandler = cacheProxyRetryResponse::doResponseReset;
+                if (requestGroup.hasQueuedRequests(ifNoneMatch) || requestGroup.hasAttachedResponses())
+                {
+                    final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
+                        new HttpCacheProxyRetryResponse(factory,
+                            requestHash,
+                            initial,
+                            routeId,
+                            initialId,
+                            this::doRetryRequestAfter);
+                    newStream = cacheProxyRetryResponse::onResponseMessage;
+                    resetHandler = cacheProxyRetryResponse::doResponseReset;
+                }
+                else
+                {
+                    cleanupRequestIfNecessary();
+                    requestGroup.onGroupRequestComplete(request);
+                }
+            }
+            else if (isCacheableResponse(responseHeaders))
+            {
+                final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
+                final short authScope = authorizationScope(request.authorization);
+                final String requestURL = getRequestURL(requestHeaders);
+                final DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
+
+                final boolean stored = cacheEntry.storeRequestHeaders(requestHeaders);
+                assert stored;
+
+                final HttpCacheProxyCacheableResponse cacheableResponse =
+                    new HttpCacheProxyCacheableResponse(factory,
+                        request,
+                        initial,
+                        routeId,
+                        replyId,
+                        cacheEntry,
+                        this::doRetryRequestAfter,
+                        this::cleanupRequestIfNecessary);
+
+                newStream = cacheableResponse::onResponseMessage;
+                resetHandler = cacheableResponse::doResponseReset;
             }
             else
             {
+                final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
+                newStream = relayedResponse::onResponseMessage;
+                resetHandler = relayedResponse::doResponseReset;
                 cleanupRequestIfNecessary();
+                factory.defaultCache.purge(requestGroup.requestHash());
+
                 requestGroup.onGroupRequestComplete(request);
             }
         }
-        else if (isCacheableResponse(responseHeaders))
-        {
-            final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
-            final short authScope = authorizationScope(request.authorization);
-            final String requestURL = getRequestURL(requestHeaders);
-            final DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
-
-            final boolean stored = cacheEntry.storeRequestHeaders(requestHeaders);
-            assert stored;
-
-            final HttpCacheProxyCacheableResponse cacheableResponse =
-                new HttpCacheProxyCacheableResponse(factory,
-                                                    request,
-                                                    initial,
-                                                    routeId,
-                                                    replyId,
-                                                    cacheEntry,
-                                                    this::doRetryRequestAfter,
-                                                    this::cleanupRequestIfNecessary);
-
-            newStream = cacheableResponse::onResponseMessage;
-            resetHandler = cacheableResponse::doResponseReset;
-        }
         else
         {
-            final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
-            newStream = relayedResponse::onResponseMessage;
-            resetHandler = relayedResponse::doResponseReset;
             cleanupRequestIfNecessary();
-            factory.defaultCache.purge(requestGroup.requestHash());
-
-            requestGroup.onGroupRequestComplete(request);
         }
 
         return newStream;
@@ -382,6 +389,7 @@ final class HttpCacheProxyGroupRequest
         long traceId)
     {
         requestGroup.onGroupResponseAborted(request, traceId);
+        cleanupRequestIfNecessary();
     }
 
     private void flushResetIfNecessary(
