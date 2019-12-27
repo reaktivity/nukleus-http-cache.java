@@ -289,7 +289,6 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -300,7 +299,7 @@ public class Rfc7234ProxyIT
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(1000);
+        sleep(2000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
@@ -561,7 +560,6 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -600,7 +598,6 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -673,7 +670,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TEST")
+    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
