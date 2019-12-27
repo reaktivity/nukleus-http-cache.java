@@ -146,6 +146,7 @@ final class HttpCacheProxyCacheableRequest
         long senderRouteId,
         long senderReplyId)
     {
+        factory.defaultCache.purge(requestGroup.requestHash());
         factory.counters.responses.getAsLong();
         requestGroup.dequeue(this);
         cleanupRequestHeadersIfNecessary();
