@@ -36,6 +36,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 
 final class HttpCacheProxyCacheableResponse
 {
+    private static final long NO_RETRY_AFTER = Long.MIN_VALUE;
     private final HttpCacheProxyFactory factory;
     private final HttpCacheProxyCacheableRequest request;
     private final HttpProxyCacheableRequestGroup requestGroup;
@@ -50,6 +51,7 @@ final class HttpCacheProxyCacheableResponse
     private String ifNoneMatch;
     private int replyBudget;
     private Instant responseAt;
+    private long retryAfter = NO_RETRY_AFTER;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
@@ -129,7 +131,18 @@ final class HttpCacheProxyCacheableResponse
         responseAt = receivedAt.isBefore(now) ? receivedAt : now;
         requestGroup.cacheEntry(cacheEntry);
 
-        // TODO: notify request group immediately if not too early
+        final boolean hasEtagHeader = cacheEntry.etag() != null;
+        if (hasEtagHeader &&
+            factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
+                                                     cacheEntry))
+        {
+            retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
+        }
+
+        if (hasEtagHeader && retryAfter == NO_RETRY_AFTER)
+        {
+            requestGroup.onGroupResponseUpdated(responseAt, traceId, ifNoneMatch);
+        }
 
         doResponseWindow(traceId, factory.initialWindowSize);
     }
@@ -145,7 +158,11 @@ final class HttpCacheProxyCacheableResponse
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
 
-        // TODO: notify request group immediately if not too early
+        final boolean hasEtagHeader = cacheEntry.etag() != null;
+        if (hasEtagHeader && retryAfter == NO_RETRY_AFTER)
+        {
+            requestGroup.onGroupResponseUpdated(responseAt, traceId, ifNoneMatch);
+        }
     }
 
     private void onResponseEnd(
@@ -172,7 +189,11 @@ final class HttpCacheProxyCacheableResponse
             factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
                                                      cacheEntry))
         {
-            long retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
+            retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
+        }
+
+        if (retryAfter != NO_RETRY_AFTER)
+        {
             retryRequestAfter.accept(retryAfter);
         }
         else
@@ -186,6 +207,9 @@ final class HttpCacheProxyCacheableResponse
     private void onResponseAbort(
         AbortFW abort)
     {
+        final int requestHash = requestGroup.requestHash();
+        factory.defaultCache.purge(requestHash);
+
         final long traceId = abort.traceId();
         cleanupRequest.run();
         requestGroup.onGroupResponseAborted(request, traceId);

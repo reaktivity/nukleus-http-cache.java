@@ -252,8 +252,6 @@ public final class HttpProxyCacheableRequestGroup
         {
             response.doResponseAbort(traceId);
         }
-
-        factory.defaultCache.purge(requestHash);
     }
 
     void onGroupRequestComplete(
