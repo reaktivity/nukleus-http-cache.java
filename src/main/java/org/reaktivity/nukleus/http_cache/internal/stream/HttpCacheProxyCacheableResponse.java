@@ -124,7 +124,9 @@ final class HttpCacheProxyCacheableResponse
         final boolean stored = cacheEntry.storeResponseHeaders(headers);
         assert stored;
 
-        responseAt = Instant.now();
+        final Instant receivedAt = cacheEntry.receivedAt();
+        final Instant now = Instant.now();
+        responseAt = receivedAt.isBefore(now) ? receivedAt : now;
         requestGroup.cacheEntry(cacheEntry);
 
         // TODO: notify request group immediately if not too early
