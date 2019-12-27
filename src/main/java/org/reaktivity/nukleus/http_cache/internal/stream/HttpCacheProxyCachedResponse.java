@@ -156,7 +156,7 @@ final class HttpCacheProxyCachedResponse
             }
         }
 
-        if (responseProgress == cacheEntry.responseSize())
+        if (cacheEntry.isResponseCompleted() && responseProgress == cacheEntry.responseSize())
         {
             doResponseEnd(traceId);
         }

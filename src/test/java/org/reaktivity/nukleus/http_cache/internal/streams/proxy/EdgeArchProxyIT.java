@@ -133,7 +133,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
-        counters.assertRequestsSlots(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test

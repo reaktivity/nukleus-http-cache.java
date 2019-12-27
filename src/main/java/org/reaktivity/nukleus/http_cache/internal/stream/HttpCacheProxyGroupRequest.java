@@ -329,7 +329,7 @@ final class HttpCacheProxyGroupRequest
                 else
                 {
                     cleanupRequestIfNecessary();
-                    requestGroup.onGroupRequestComplete(request);
+                    requestGroup.onGroupRequestEnd(request);
                 }
             }
             else if (isCacheableResponse(responseHeaders))
@@ -360,15 +360,15 @@ final class HttpCacheProxyGroupRequest
                 final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
                 newStream = relayedResponse::onResponseMessage;
                 resetHandler = relayedResponse::doResponseReset;
-                cleanupRequestIfNecessary();
                 factory.defaultCache.purge(requestGroup.requestHash());
-
-                requestGroup.onGroupRequestComplete(request);
+                cleanupRequestIfNecessary();
+                requestGroup.onGroupRequestEnd(request);
             }
         }
         else
         {
             cleanupRequestIfNecessary();
+            requestGroup.onGroupRequestEnd(request);
         }
 
         return newStream;
@@ -383,13 +383,6 @@ final class HttpCacheProxyGroupRequest
         cleanupRequestIfNecessary();
         state = HttpCacheRequestState.closingReply(state);
         flushResetIfNecessary(traceId);
-    }
-
-    void onResponseAborted(
-        long traceId)
-    {
-        requestGroup.onGroupResponseAborted(request, traceId);
-        cleanupRequestIfNecessary();
     }
 
     private void flushResetIfNecessary(

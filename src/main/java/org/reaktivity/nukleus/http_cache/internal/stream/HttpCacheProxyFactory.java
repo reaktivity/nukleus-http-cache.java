@@ -236,12 +236,13 @@ public class HttpCacheProxyFactory implements StreamFactory
         final String requestURL = getRequestURL(headers);
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = requestHash(authorizationScope, requestURL.hashCode());
+        final boolean isRequestCacheable = defaultCache.isRequestCacheable(headers);
 
         counters.requests.getAsLong();
 
         MessageConsumer newStream = null;
 
-        if (defaultCache.isRequestCacheable(headers) &&
+        if (isRequestCacheable &&
             defaultCache.matchCacheableRequest(headers, authorizationScope, requestHash))
         {
             newStream = newCachedStream(headers,
@@ -257,7 +258,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                       initialId,
                                       traceId);
         }
-        else if (defaultCache.isRequestCacheable(headers))
+        else if (isRequestCacheable)
         {
             newStream = newCacheableRequestStream(initial,
                                                   routeId,
