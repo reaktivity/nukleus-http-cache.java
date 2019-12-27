@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 
+import java.time.Instant;
 import java.util.function.LongConsumer;
 
 import org.agrona.DirectBuffer;
@@ -48,6 +49,7 @@ final class HttpCacheProxyCacheableResponse
 
     private String ifNoneMatch;
     private int replyBudget;
+    private Instant responseAt;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
@@ -122,6 +124,9 @@ final class HttpCacheProxyCacheableResponse
         final boolean stored = cacheEntry.storeResponseHeaders(headers);
         assert stored;
 
+        final Instant receivedAt = cacheEntry.receivedAt();
+        final Instant now = Instant.now();
+        responseAt = receivedAt.isBefore(now) ? receivedAt : now;
         requestGroup.cacheEntry(cacheEntry);
 
         // TODO: notify request group immediately if not too early
@@ -173,7 +178,7 @@ final class HttpCacheProxyCacheableResponse
         else
         {
             cleanupRequest.run();
-            requestGroup.onCacheableResponseUpdated(traceId, ifNoneMatch);
+            requestGroup.onGroupResponseUpdated(responseAt, traceId, ifNoneMatch);
             requestGroup.onGroupRequestComplete(request);
         }
     }
@@ -183,7 +188,7 @@ final class HttpCacheProxyCacheableResponse
     {
         final long traceId = abort.traceId();
         cleanupRequest.run();
-        requestGroup.onCacheableResponseAborted(request, traceId);
+        requestGroup.onGroupResponseAborted(request, traceId);
         requestGroup.onGroupRequestComplete(request);
     }
 

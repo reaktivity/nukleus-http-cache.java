@@ -17,6 +17,8 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 
+import java.time.Instant;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
@@ -125,7 +127,8 @@ final class HttpCacheProxyCachedRequest
         final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
                 factory, reply, routeId, replyId, authorization,
                 cacheEntry, promiseNextPollRequest, r -> {});
-        response.doResponseBegin(traceId);
+        final Instant now = Instant.now();
+        response.doResponseBegin(now, traceId);
     }
 
     private void onRequestAbort(

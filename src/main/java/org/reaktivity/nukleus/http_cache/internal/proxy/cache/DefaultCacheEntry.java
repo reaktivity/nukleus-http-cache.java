@@ -387,10 +387,10 @@ public final class DefaultCacheEntry
         return storeResponseData(data, written);
     }
 
-    public boolean isStale()
+    public boolean isStale(
+        Instant now)
     {
         final Instant staleAt = staleAt();
-        final Instant now = Instant.now();
         return now.getEpochSecond() > staleAt.getEpochSecond();
     }
 
@@ -481,7 +481,7 @@ public final class DefaultCacheEntry
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
-            Instant receivedAt = responseReceivedAt();
+            Instant receivedAt = receivedAt();
             return !receivedAt.plusSeconds(requestMaxAge).isBefore(now);
         }
         return true;
@@ -492,7 +492,7 @@ public final class DefaultCacheEntry
         if (cacheStaleAt == null)
         {
             final CacheControl cacheControl = responseCacheControl();
-            final Instant receivedAt = responseReceivedAt();
+            final Instant receivedAt = receivedAt();
             int staleInSeconds = 0;
 
             final String sMaxAge = cacheControl.getValue(S_MAXAGE);
@@ -518,7 +518,7 @@ public final class DefaultCacheEntry
         return cacheStaleAt;
     }
 
-    private Instant responseReceivedAt()
+    public Instant receivedAt()
     {
         if (cacheReceivedAt == null)
         {

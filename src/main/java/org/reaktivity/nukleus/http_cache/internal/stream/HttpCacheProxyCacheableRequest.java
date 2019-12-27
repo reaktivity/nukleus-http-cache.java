@@ -27,6 +27,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.time.Instant;
 import java.util.concurrent.Future;
 
 import org.agrona.DirectBuffer;
@@ -87,6 +88,7 @@ final class HttpCacheProxyCacheableRequest
     }
 
     void doCachedResponse(
+        Instant now,
         long traceId)
     {
         final int requestHash = requestGroup.requestHash();
@@ -95,7 +97,7 @@ final class HttpCacheProxyCacheableRequest
             factory, reply, routeId, replyId, authorization,
             cacheEntry, promiseNextPollRequest, requestGroup::detach);
 
-        response.doResponseBegin(traceId);
+        response.doResponseBegin(now, traceId);
         requestGroup.attach(response);
         cleanupRequestHeadersIfNecessary();
     }
@@ -110,6 +112,32 @@ final class HttpCacheProxyCacheableRequest
                                      replyId);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
+        cleanupRequestHeadersIfNecessary();
+    }
+
+    void do503RetryResponse(
+        long traceId)
+    {
+        factory.writer.doHttpResponse(
+            reply,
+            routeId,
+            replyId,
+            traceId,
+            e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
+                  .item(h -> h.name("retry-after").value("0")));
+
+        factory.writer.doHttpEnd(
+            reply,
+            routeId,
+            replyId,
+            traceId);
+
+        // count all responses
+        factory.counters.responses.getAsLong();
+
+        // count retry responses
+        factory.counters.responsesRetry.getAsLong();
+
         cleanupRequestHeadersIfNecessary();
     }
 
@@ -175,7 +203,7 @@ final class HttpCacheProxyCacheableRequest
         headersSlot = factory.headersPool.acquire(initialId);
         if (headersSlot == NO_SLOT)
         {
-            doResponseBeginEnd503RetryAfter();
+            do503RetryResponse(traceId);
         }
         else
         {
@@ -286,7 +314,10 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseReset(
         ResetFW reset)
     {
+        final long traceId = reset.traceId();
+        requestGroup.dequeue(this);
         cleanupRequest();
+        requestGroup.onResponseAbandoned(this, traceId);
     }
 
     private void onResponseSignal(
@@ -314,30 +345,8 @@ final class HttpCacheProxyCacheableRequest
                                      replyId);
 
         requestGroup.dequeue(this);
+        requestGroup.onResponseAbandoned(this, traceId);
         cleanupRequest();
-    }
-
-    private void doResponseBeginEnd503RetryAfter()
-    {
-        factory.writer.doHttpResponse(
-            reply,
-            routeId,
-            replyId,
-            factory.supplyTraceId.getAsLong(),
-            e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
-                  .item(h -> h.name("retry-after").value("0")));
-
-        factory.writer.doHttpEnd(
-            reply,
-            routeId,
-            replyId,
-            factory.supplyTraceId.getAsLong());
-
-        // count all responses
-        factory.counters.responses.getAsLong();
-
-        // count retry responses
-        factory.counters.responsesRetry.getAsLong();
     }
 
     private void cleanupRequestTimeoutIfNecessary()

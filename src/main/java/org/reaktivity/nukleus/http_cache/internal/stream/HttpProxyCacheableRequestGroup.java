@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import java.time.Instant;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +41,12 @@ public final class HttpProxyCacheableRequestGroup
     private String ifNoneMatch;
     private DefaultCacheEntry cacheEntry;
     private boolean flushing;
+
+    public void onCacheEntryInvalidated(
+        long traceId)
+    {
+        groupRequest.doRetryRequestImmediatelyIfPending(traceId);
+    }
 
     HttpProxyCacheableRequestGroup(
         HttpCacheProxyFactory factory,
@@ -120,15 +127,6 @@ public final class HttpProxyCacheableRequestGroup
                 cleaner.accept(requestHash);
             }
         }
-
-        if (groupRequest != null &&
-            groupRequest.request() == request &&
-            attachedResponses.isEmpty())
-        {
-            final long traceId = factory.supplyTraceId.getAsLong();
-            groupRequest.doResponseReset(traceId);
-            groupRequest = null;
-        }
     }
 
     void attach(
@@ -148,6 +146,142 @@ public final class HttpProxyCacheableRequestGroup
         {
             attachedResponses.remove(response);
         }
+    }
+
+    void onResponseAbandoned(
+        HttpCacheProxyCacheableRequest request,
+        long traceId)
+    {
+        if (groupRequest != null &&
+            groupRequest.request() == request)
+        {
+            groupRequest.doResponseReset(traceId);
+            groupRequest = null;
+        }
+    }
+
+    void onGroupRequestReset(
+        HttpCacheProxyCacheableRequest request,
+        long traceId)
+    {
+        final Deque<HttpCacheProxyCacheableRequest> noEtagRequests = queuedRequestsByEtag.remove(null);
+        if (noEtagRequests != null && !noEtagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest noEtagRequest : noEtagRequests)
+            {
+                noEtagRequest.do503RetryResponse(traceId);
+            }
+        }
+
+        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(ifNoneMatch);
+        if (etagRequests != null && !etagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest etagRequest : etagRequests)
+            {
+                etagRequest.do503RetryResponse(traceId);
+            }
+        }
+    }
+
+    void onGroupResponseUpdated(
+        Instant now,
+        long traceId,
+        String ifNoneMatch)
+    {
+        final Deque<HttpCacheProxyCacheableRequest> noEtagRequests = queuedRequestsByEtag.remove(null);
+        if (noEtagRequests != null && !noEtagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest noEtagRequest : noEtagRequests)
+            {
+                noEtagRequest.doCachedResponse(now, traceId);
+            }
+        }
+
+        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(ifNoneMatch);
+        if (etagRequests != null && !etagRequests.isEmpty())
+        {
+            final String etag = cacheEntry.etag();
+            final boolean notModified = Objects.equals(ifNoneMatch, etag);
+            for (HttpCacheProxyCacheableRequest etagRequest : etagRequests)
+            {
+                if (notModified)
+                {
+                    etagRequest.doNotModifiedResponse(traceId);
+                }
+                else
+                {
+                    etagRequest.doCachedResponse(now, traceId);
+                }
+            }
+        }
+
+        flushing = true;
+        attachedResponses.forEach(r -> r.doResponseFlush(traceId));
+        flushing = false;
+
+        if (!detachedResponses.isEmpty())
+        {
+            attachedResponses.removeAll(detachedResponses);
+            detachedResponses.clear();
+        }
+    }
+
+    void onGroupResponseAborted(
+        HttpCacheProxyCacheableRequest request,
+        long traceId)
+    {
+        final Deque<HttpCacheProxyCacheableRequest> noEtagRequests = queuedRequestsByEtag.remove(null);
+        if (noEtagRequests != null && !noEtagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest noEtagRequest : noEtagRequests)
+            {
+                noEtagRequest.do503RetryResponse(traceId);
+            }
+        }
+
+        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(ifNoneMatch);
+        if (etagRequests != null && !etagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest etagRequest : etagRequests)
+            {
+                etagRequest.do503RetryResponse(traceId);
+            }
+        }
+
+        for (HttpCacheProxyCachedResponse response : attachedResponses)
+        {
+            response.doResponseAbort(traceId);
+        }
+
+        factory.defaultCache.purge(requestHash);
+    }
+
+    void onGroupRequestComplete(
+        HttpCacheProxyCacheableRequest request)
+    {
+        assert groupRequest.request() == request;
+        groupRequest = null;
+
+        flushNextRequest();
+    }
+
+    private void doRequest(
+        HttpCacheProxyCacheableRequest request,
+        String ifNoneMatch)
+    {
+        final long traceId = factory.supplyTraceId.getAsLong();
+
+        if (groupRequest != null)
+        {
+            groupRequest.doResponseReset(traceId);
+            groupRequest = null;
+        }
+
+        assert groupRequest == null;
+        this.groupRequest = new HttpCacheProxyGroupRequest(factory, this, request);
+        this.ifNoneMatch = ifNoneMatch;
+
+        groupRequest.doRequest(traceId);
     }
 
     private void flushNextRequest()
@@ -172,91 +306,14 @@ public final class HttpProxyCacheableRequestGroup
         }
     }
 
-    void onCacheableResponseUpdated(
-        long traceId,
+    boolean hasQueuedRequests(
         String ifNoneMatch)
     {
-        final Deque<HttpCacheProxyCacheableRequest> noEtagRequests = queuedRequestsByEtag.remove(null);
-        if (noEtagRequests != null && !noEtagRequests.isEmpty())
-        {
-            for (HttpCacheProxyCacheableRequest noEtagRequest : noEtagRequests)
-            {
-                noEtagRequest.doCachedResponse(traceId);
-            }
-        }
-
-        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(ifNoneMatch);
-        if (etagRequests != null && !etagRequests.isEmpty())
-        {
-            final String etag = cacheEntry.etag();
-            final boolean notModified = Objects.equals(ifNoneMatch, etag);
-            for (HttpCacheProxyCacheableRequest etagRequest : etagRequests)
-            {
-                if (notModified)
-                {
-                    etagRequest.doNotModifiedResponse(traceId);
-                }
-                else
-                {
-                    etagRequest.doCachedResponse(traceId);
-                }
-            }
-        }
-
-        flushing = true;
-        attachedResponses.forEach(r -> r.doResponseFlush(traceId));
-        flushing = false;
-
-        if (!detachedResponses.isEmpty())
-        {
-            attachedResponses.removeAll(detachedResponses);
-            detachedResponses.clear();
-        }
+        return queuedRequestsByEtag.get(ifNoneMatch) != null || queuedRequestsByEtag.get(null) != null;
     }
 
-    void onCacheableResponseAborted(
-        HttpCacheProxyCacheableRequest request,
-        long traceId)
+    boolean hasAttachedResponses()
     {
-        for (HttpCacheProxyCachedResponse response : attachedResponses)
-        {
-            response.doResponseAbort(traceId);
-        }
-
-        factory.defaultCache.purge(requestHash);
-    }
-
-    public void onCacheEntryInvalidated(
-        long traceId)
-    {
-        groupRequest.doRetryRequestImmediatelyIfPending(traceId);
-    }
-
-    private void doRequest(
-        HttpCacheProxyCacheableRequest request,
-        String ifNoneMatch)
-    {
-        final long traceId = factory.supplyTraceId.getAsLong();
-
-        if (groupRequest != null)
-        {
-            groupRequest.doResponseReset(traceId);
-            groupRequest = null;
-        }
-
-        assert groupRequest == null;
-        this.groupRequest = new HttpCacheProxyGroupRequest(factory, this, request);
-        this.ifNoneMatch = ifNoneMatch;
-
-        groupRequest.doRequest(traceId);
-    }
-
-    void onGroupRequestComplete(
-        HttpCacheProxyCacheableRequest request)
-    {
-        assert groupRequest.request() == request;
-        groupRequest = null;
-
-        flushNextRequest();
+        return !attachedResponses.isEmpty();
     }
 }

@@ -128,6 +128,7 @@ public class Rfc7240ProxyIT
         counters.assertRequestsSlots(0);
     }
 
+    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -144,7 +145,6 @@ public class Rfc7240ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -161,7 +161,6 @@ public class Rfc7240ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -191,7 +190,6 @@ public class Rfc7240ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",

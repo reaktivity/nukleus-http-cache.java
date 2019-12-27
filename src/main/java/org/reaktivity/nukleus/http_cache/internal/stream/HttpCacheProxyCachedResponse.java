@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
 
+import java.time.Instant;
 import java.util.function.Consumer;
 
 import org.agrona.DirectBuffer;
@@ -97,6 +98,7 @@ final class HttpCacheProxyCachedResponse
     }
 
     void doResponseBegin(
+        Instant now,
         long traceId)
     {
         ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
@@ -108,7 +110,7 @@ final class HttpCacheProxyCachedResponse
                                                         responseHeaders,
                                                         cacheEntry.getRequestHeaders(),
                                                         cacheEntry.etag(),
-                                                        cacheEntry.isStale(),
+                                                        cacheEntry.isStale(now),
                                                         traceId);
         responseProgress = 0;
 
