@@ -705,7 +705,6 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO - passing, but only after test times out")
     @Test
     @Specification({
         "${route}/proxy/controller",
