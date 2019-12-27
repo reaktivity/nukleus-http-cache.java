@@ -27,6 +27,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.time.Instant;
 import java.util.concurrent.Future;
 
 import org.agrona.DirectBuffer;
@@ -87,6 +88,7 @@ final class HttpCacheProxyCacheableRequest
     }
 
     void doCachedResponse(
+        Instant now,
         long traceId)
     {
         final int requestHash = requestGroup.requestHash();
@@ -95,7 +97,7 @@ final class HttpCacheProxyCacheableRequest
             factory, reply, routeId, replyId, authorization,
             cacheEntry, promiseNextPollRequest, requestGroup::detach);
 
-        response.doResponseBegin(traceId);
+        response.doResponseBegin(now, traceId);
         requestGroup.attach(response);
         cleanupRequestHeadersIfNecessary();
     }

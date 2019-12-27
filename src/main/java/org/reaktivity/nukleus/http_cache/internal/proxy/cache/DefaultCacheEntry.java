@@ -387,10 +387,10 @@ public final class DefaultCacheEntry
         return storeResponseData(data, written);
     }
 
-    public boolean isStale()
+    public boolean isStale(
+        Instant now)
     {
         final Instant staleAt = staleAt();
-        final Instant now = Instant.now();
         return now.getEpochSecond() > staleAt.getEpochSecond();
     }
 

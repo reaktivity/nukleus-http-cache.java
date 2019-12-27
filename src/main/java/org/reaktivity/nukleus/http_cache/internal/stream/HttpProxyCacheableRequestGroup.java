@@ -15,6 +15,7 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import java.time.Instant;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -173,6 +174,7 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     void onCacheableResponseUpdated(
+        Instant now,
         long traceId,
         String ifNoneMatch)
     {
@@ -181,7 +183,7 @@ public final class HttpProxyCacheableRequestGroup
         {
             for (HttpCacheProxyCacheableRequest noEtagRequest : noEtagRequests)
             {
-                noEtagRequest.doCachedResponse(traceId);
+                noEtagRequest.doCachedResponse(now, traceId);
             }
         }
 
@@ -198,7 +200,7 @@ public final class HttpProxyCacheableRequestGroup
                 }
                 else
                 {
-                    etagRequest.doCachedResponse(traceId);
+                    etagRequest.doCachedResponse(now, traceId);
                 }
             }
         }
