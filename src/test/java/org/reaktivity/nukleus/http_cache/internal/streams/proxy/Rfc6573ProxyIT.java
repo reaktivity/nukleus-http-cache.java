@@ -54,7 +54,6 @@ public class Rfc6573ProxyIT
     @Rule
     public final TestRule chain = outerRule(reaktor).around(k3po).around(timeout).around(counters);
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -67,7 +66,6 @@ public class Rfc6573ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -80,7 +78,6 @@ public class Rfc6573ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
