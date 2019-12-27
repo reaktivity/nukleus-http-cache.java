@@ -113,6 +113,32 @@ final class HttpCacheProxyCacheableRequest
         cleanupRequestHeadersIfNecessary();
     }
 
+    void do503RetryResponse(
+        long traceId)
+    {
+        factory.writer.doHttpResponse(
+            reply,
+            routeId,
+            replyId,
+            traceId,
+            e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
+                  .item(h -> h.name("retry-after").value("0")));
+
+        factory.writer.doHttpEnd(
+            reply,
+            routeId,
+            replyId,
+            traceId);
+
+        // count all responses
+        factory.counters.responses.getAsLong();
+
+        // count retry responses
+        factory.counters.responsesRetry.getAsLong();
+
+        cleanupRequestHeadersIfNecessary();
+    }
+
     HttpCacheProxyRelayedResponse newRelayedResponse(
         MessageConsumer sender,
         long senderRouteId,
@@ -175,7 +201,7 @@ final class HttpCacheProxyCacheableRequest
         headersSlot = factory.headersPool.acquire(initialId);
         if (headersSlot == NO_SLOT)
         {
-            doResponseBeginEnd503RetryAfter();
+            do503RetryResponse(traceId);
         }
         else
         {
@@ -286,6 +312,7 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseReset(
         ResetFW reset)
     {
+        requestGroup.dequeue(this);
         cleanupRequest();
     }
 
@@ -315,29 +342,6 @@ final class HttpCacheProxyCacheableRequest
 
         requestGroup.dequeue(this);
         cleanupRequest();
-    }
-
-    private void doResponseBeginEnd503RetryAfter()
-    {
-        factory.writer.doHttpResponse(
-            reply,
-            routeId,
-            replyId,
-            factory.supplyTraceId.getAsLong(),
-            e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
-                  .item(h -> h.name("retry-after").value("0")));
-
-        factory.writer.doHttpEnd(
-            reply,
-            routeId,
-            replyId,
-            factory.supplyTraceId.getAsLong());
-
-        // count all responses
-        factory.counters.responses.getAsLong();
-
-        // count retry responses
-        factory.counters.responsesRetry.getAsLong();
     }
 
     private void cleanupRequestTimeoutIfNecessary()

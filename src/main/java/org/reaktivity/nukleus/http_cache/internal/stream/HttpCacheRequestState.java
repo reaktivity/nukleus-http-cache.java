@@ -17,9 +17,12 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 final class HttpCacheRequestState
 {
-    private static final int INITIAL_OPENING = 0x10;
-    private static final int INITIAL_OPENED = 0x20;
-    private static final int INITIAL_CLOSED = 0x40;
+    private static final int INITIAL_OPENING = 0x01;
+    private static final int INITIAL_OPENED = 0x02;
+    private static final int INITIAL_CLOSED = 0x04;
+    private static final int REPLY_OPENED = 0x10;
+    private static final int REPLY_CLOSING = 0x20;
+    private static final int REPLY_CLOSED = 0x40;
 
     static int openingInitial(
         int state)
@@ -33,7 +36,7 @@ final class HttpCacheRequestState
         return openingInitial(state) | INITIAL_OPENED;
     }
 
-    static int closeInitial(
+    static int closedInitial(
         int state)
     {
         return state | INITIAL_CLOSED;
@@ -43,6 +46,42 @@ final class HttpCacheRequestState
         int state)
     {
         return (state & INITIAL_CLOSED) != 0;
+    }
+
+    static int openedReply(
+        int state)
+    {
+        return state | REPLY_OPENED;
+    }
+
+    static int closingReply(
+        int state)
+    {
+        return state | REPLY_CLOSING;
+    }
+
+    static int closedReply(
+        int state)
+    {
+        return closingReply(state) | REPLY_CLOSED;
+    }
+
+    static boolean replyOpened(
+        int state)
+    {
+        return (state & REPLY_OPENED) != 0;
+    }
+
+    static boolean replyClosing(
+        int state)
+    {
+        return (state & REPLY_CLOSING) != 0;
+    }
+
+    static boolean replyClosed(
+        int state)
+    {
+        return (state & REPLY_CLOSED) != 0;
     }
 
     private HttpCacheRequestState()

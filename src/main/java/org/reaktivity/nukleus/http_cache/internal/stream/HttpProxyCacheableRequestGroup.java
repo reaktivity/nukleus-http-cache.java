@@ -218,6 +218,24 @@ public final class HttpProxyCacheableRequestGroup
         HttpCacheProxyCacheableRequest request,
         long traceId)
     {
+        final Deque<HttpCacheProxyCacheableRequest> noEtagRequests = queuedRequestsByEtag.remove(null);
+        if (noEtagRequests != null && !noEtagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest noEtagRequest : noEtagRequests)
+            {
+                noEtagRequest.do503RetryResponse(traceId);
+            }
+        }
+
+        final Deque<HttpCacheProxyCacheableRequest> etagRequests = queuedRequestsByEtag.remove(ifNoneMatch);
+        if (etagRequests != null && !etagRequests.isEmpty())
+        {
+            for (HttpCacheProxyCacheableRequest etagRequest : etagRequests)
+            {
+                etagRequest.do503RetryResponse(traceId);
+            }
+        }
+
         for (HttpCacheProxyCachedResponse response : attachedResponses)
         {
             response.doResponseAbort(traceId);

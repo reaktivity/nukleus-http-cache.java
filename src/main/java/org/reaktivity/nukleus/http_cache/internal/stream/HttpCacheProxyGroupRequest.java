@@ -235,6 +235,9 @@ final class HttpCacheProxyGroupRequest
         final long traceId = window.traceId();
         state = HttpCacheRequestState.openInitial(state);
         factory.writer.doHttpEnd(initial, routeId, initialId, traceId);
+        state = HttpCacheRequestState.closedInitial(state);
+
+        flushResetIfNecessary(traceId);
     }
 
     private void onRequestReset(
@@ -403,11 +406,24 @@ final class HttpCacheProxyGroupRequest
         factory.correlations.remove(replyId);
         resetHandler.accept(traceId);
         cleanupRequestIfNecessary();
+        state = HttpCacheRequestState.closingReply(state);
+        flushResetIfNecessary(traceId);
     }
 
     void onResponseAborted(
         long traceId)
     {
         requestGroup.onCacheableResponseAborted(request, traceId);
+    }
+
+    private void flushResetIfNecessary(
+        long traceId)
+    {
+        if (HttpCacheRequestState.initialClosed(state) &&
+            HttpCacheRequestState.replyClosing(state))
+        {
+            factory.writer.doReset(initial, routeId, replyId, traceId);
+            state = HttpCacheRequestState.closedReply(state);
+        }
     }
 }
