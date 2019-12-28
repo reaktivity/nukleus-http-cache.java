@@ -188,6 +188,7 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
+    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",

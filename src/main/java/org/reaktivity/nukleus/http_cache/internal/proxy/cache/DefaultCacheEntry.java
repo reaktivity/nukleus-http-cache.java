@@ -439,9 +439,9 @@ public final class DefaultCacheEntry
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
         final CacheControl requestCacheControl = cache.cachedRequestCacheControl.parse(requestCacheControlHeaderValue);
 
-        Instant staleAt = staleAt();
         if (requestCacheControl.contains(MIN_FRESH))
         {
+            Instant staleAt = staleAt();
             final String minFresh = requestCacheControl.getValue(MIN_FRESH);
             return now.plusSeconds(parseInt(minFresh)).isBefore(staleAt);
         }

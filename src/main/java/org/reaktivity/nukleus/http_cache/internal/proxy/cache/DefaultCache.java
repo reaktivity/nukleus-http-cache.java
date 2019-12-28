@@ -179,12 +179,22 @@ public class DefaultCache
         short authScope,
         int requestHash)
     {
-        final DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
+        boolean matchCacheableRequest = false;
+        if (satisfiedByCache(requestHeaders))
+        {
+            final DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
+            boolean isCompleted = false;
+            boolean canServe = false;
 
-        return satisfiedByCache(requestHeaders) &&
-               cacheEntry != null &&
-               (cacheEntry.etag() != null || cacheEntry.isResponseCompleted()) &&
-               cacheEntry.canServeRequest(requestHeaders, authScope);
+            if (cacheEntry != null)
+            {
+                isCompleted  = cacheEntry.etag() != null || cacheEntry.isResponseCompleted();
+                canServe = cacheEntry.canServeRequest(requestHeaders, authScope);
+            }
+            matchCacheableRequest = isCompleted && canServe;
+        }
+
+        return  matchCacheableRequest;
     }
 
     public void purge(
