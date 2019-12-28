@@ -79,8 +79,9 @@ public class HttpCacheProxyFactory implements StreamFactory
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
     final ArrayFW<HttpHeaderFW> httpHeadersRO = new ArrayFW<>(new HttpHeaderFW());
 
+    final BeginFW.Builder beginRW = new BeginFW.Builder();
 
-    final HttpBeginExFW.Builder beginExRW = new HttpBeginExFW.Builder();
+    final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
     final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> httpHeadersRW =
             new ArrayFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
 

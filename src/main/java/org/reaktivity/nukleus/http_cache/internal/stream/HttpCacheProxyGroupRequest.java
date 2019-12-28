@@ -294,7 +294,7 @@ final class HttpCacheProxyGroupRequest
                       .item(h -> h.name(RETRY_AFTER).value("0"));
 
             final HttpBeginExFW beginEx =
-                    factory.beginExRW.wrap(factory.writeBuffer, 0, factory.writeBuffer.capacity())
+                    factory.httpBeginExRW.wrap(factory.writeBuffer, 0, factory.writeBuffer.capacity())
                            .typeId(httpTypeId)
                            .headers(mutator)
                            .build();
@@ -371,6 +371,7 @@ final class HttpCacheProxyGroupRequest
             {
                 cleanupRequestIfNecessary();
                 requestGroup.onGroupRequestEnd(request);
+                state = HttpCacheRequestState.closedReply(state);
             }
         }
         else if (isCacheableResponse(responseHeaders))
@@ -418,12 +419,6 @@ final class HttpCacheProxyGroupRequest
         cleanupRequestIfNecessary();
         state = HttpCacheRequestState.closingReply(state);
         flushResetIfNecessary(traceId);
-    }
-
-    void onResponseAborted(
-        long traceId)
-    {
-        requestGroup.onGroupResponseAbort(request, traceId);
     }
 
     private void flushResetIfNecessary(
