@@ -15,9 +15,11 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.Integer.parseInt;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 
 import java.util.function.Consumer;
 
@@ -126,10 +128,12 @@ public final class HttpCacheProxyRelayedResponse
 
         final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::wrap);
         final boolean hasEtag = httpBeginEx.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
+        final HttpHeaderFW status = httpBeginEx.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
+        final int statusGroup = status != null ? parseInt(status.value().asString()) / 100 : 0;
         final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
         {
             httpBeginEx.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
-            if (prefer != null)
+            if ((statusGroup == 2 || statusGroup == 3) && prefer != null)
             {
                 hs.item(h -> h.name(PREFERENCE_APPLIED).value(prefer));
                 hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED));

@@ -134,7 +134,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
-        counters.assertRequestsSlots(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -176,7 +176,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -186,7 +185,7 @@ public class EdgeArchProxyIT
     public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdates() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
 
@@ -204,7 +203,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -214,7 +212,7 @@ public class EdgeArchProxyIT
     public void shouldCancelPushPromisesOn403() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
 
@@ -309,7 +307,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Configure(name = HTTP_CACHE_MAXIMUM_REQUESTS_NAME, value = "1")  // 1 buffer slot
     @Specification({
@@ -321,5 +318,4 @@ public class EdgeArchProxyIT
         k3po.finish();
         counters.assertRequestsSlots(0);
     }
-
 }

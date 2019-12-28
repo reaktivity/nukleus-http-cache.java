@@ -45,7 +45,10 @@ public final class HttpProxyCacheableRequestGroup
     public void onCacheEntryInvalidated(
         long traceId)
     {
-        groupRequest.doRetryRequestImmediatelyIfPending(traceId);
+        if (groupRequest != null)
+        {
+            groupRequest.doRetryRequestImmediatelyIfPending(traceId);
+        }
     }
 
     HttpProxyCacheableRequestGroup(
