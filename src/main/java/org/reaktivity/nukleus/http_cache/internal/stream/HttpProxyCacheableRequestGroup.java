@@ -156,7 +156,8 @@ public final class HttpProxyCacheableRequestGroup
         long traceId)
     {
         if (groupRequest != null &&
-            groupRequest.request() == request)
+            !hasQueuedRequests(ifNoneMatch) &&
+            !hasAttachedResponses())
         {
             groupRequest.doResponseReset(traceId);
             groupRequest = null;

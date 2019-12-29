@@ -363,6 +363,7 @@ final class HttpCacheProxyGroupRequest
                 factory.defaultCache.purge(requestGroup.requestHash());
                 cleanupRequestIfNecessary();
                 requestGroup.onGroupRequestEnd(request);
+                state = HttpCacheRequestState.closedReply(state);
             }
         }
         else

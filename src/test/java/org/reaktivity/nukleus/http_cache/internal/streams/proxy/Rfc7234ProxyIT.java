@@ -378,7 +378,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
 
