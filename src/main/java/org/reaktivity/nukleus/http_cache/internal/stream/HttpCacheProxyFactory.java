@@ -403,7 +403,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         long acceptReplyId,
         long trace)
     {
-
         writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e ->
             e.item(h -> h.name(STATUS).value("504")));
         writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, trace);
