@@ -304,12 +304,13 @@ final class HttpCacheProxyGroupRequest
     private MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
-        MessageConsumer newStream = null;
 
         final ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         final boolean retry = HttpHeadersUtil.retry(responseHeaders);
         final int requestHash = requestGroup.requestHash();
         final String ifNoneMatch = requestGroup.ifNoneMatchHeader();
+
+        MessageConsumer newStream = null;
 
         if ((retry && attempts <= 3) ||
             (factory.defaultCache.checkToRetry(getRequestHeaders(),

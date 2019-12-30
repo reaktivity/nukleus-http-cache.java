@@ -129,10 +129,10 @@ final class HttpCacheProxyNonCacheableResponse
         factory.counters.responses.getAsLong();
 
         factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
-            requestHash,
-            requestURL,
-            traceId,
-            headers);
+                                                             requestHash,
+                                                             requestURL,
+                                                             traceId,
+                                                             headers);
     }
 
     private void onResponseData(
