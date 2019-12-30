@@ -17,10 +17,12 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.PREFER_WAIT_EXPIRED_SIGNAL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
@@ -64,7 +66,9 @@ final class HttpCacheProxyCacheableRequest
 
     String ifNoneMatch;
     String vary;
-    private String prefer;
+    String prefer;
+    boolean maxAgeZero;
+
     private Future<?> preferWaitExpired;
     private boolean promiseNextPollRequest;
 
@@ -223,6 +227,13 @@ final class HttpCacheProxyCacheableRequest
 
             ifNoneMatch = getHeader(headers, IF_NONE_MATCH);
             prefer = getHeader(headers, PREFER);
+            maxAgeZero = !headers.anyMatch(h ->
+            {
+                final String name = h.name().asString();
+                final String value = h.value().asString();
+                return CACHE_CONTROL.equals(name) && value.contains(MAX_AGE_0);
+            });
+
 
             final int requestHash = requestGroup.requestHash();
             final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
