@@ -348,13 +348,13 @@ final class HttpCacheProxyGroupRequest
 
             final HttpCacheProxyCacheableResponse cacheableResponse =
                 new HttpCacheProxyCacheableResponse(factory,
-                    request,
-                    initial,
-                    routeId,
-                    replyId,
-                    cacheEntry,
-                    this::doRetryRequestAfter,
-                    this::cleanupRequestIfNecessary);
+                                                    request,
+                                                    initial,
+                                                    routeId,
+                                                    replyId,
+                                                    cacheEntry,
+                                                    this::doRetryRequestAfter,
+                                                    this::cleanupRequestIfNecessary);
 
             newStream = cacheableResponse::onResponseMessage;
             resetHandler = cacheableResponse::doResponseReset;

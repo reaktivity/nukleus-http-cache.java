@@ -115,27 +115,24 @@ final class HttpCacheProxyNonCacheableResponse
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::tryWrap);
 
-        if (httpBeginFW != null)
-        {
-            final long traceId = begin.traceId();
-            final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+        final long traceId = begin.traceId();
+        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
 
-            factory.writer.doHttpResponse(
-                accept,
-                acceptRouteId,
-                acceptReplyId,
-                traceId,
-                builder -> headers.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
+        factory.writer.doHttpResponse(
+            accept,
+            acceptRouteId,
+            acceptReplyId,
+            traceId,
+            builder -> headers.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
 
-            // count all responses
-            factory.counters.responses.getAsLong();
+        // count all responses
+        factory.counters.responses.getAsLong();
 
-            factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
-                requestHash,
-                requestURL,
-                traceId,
-                headers);
-        }
+        factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
+            requestHash,
+            requestURL,
+            traceId,
+            headers);
     }
 
     private void onResponseData(
