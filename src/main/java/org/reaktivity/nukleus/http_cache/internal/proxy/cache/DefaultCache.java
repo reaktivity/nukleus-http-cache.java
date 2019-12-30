@@ -149,19 +149,8 @@ public class DefaultCache
                              requestURI.getPath()).hashCode();
     }
 
-    public boolean matchCacheableResponse(
-        int requestHash,
-        String newEtag,
-        boolean hasIfNoneMatch)
-    {
-        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
-        return hasIfNoneMatch &&
-               cacheEntry != null &&
-               cacheEntry.etag() != null &&
-               cacheEntry.etag().equals(newEtag);
-    }
 
-    public boolean matchCacheableRequestInFlight(
+    public boolean matchCacheableRequest(
         ArrayFW<HttpHeaderFW> requestHeaders,
         short authScope,
         int requestHash)
@@ -172,29 +161,6 @@ public class DefaultCache
                cacheEntry != null &&
                (cacheEntry.etag() != null || cacheEntry.isResponseCompleted()) &&
                cacheEntry.canServeRequest(requestHeaders, authScope);
-    }
-
-    public boolean matchCacheableRequest(
-        ArrayFW<HttpHeaderFW> requestHeaders,
-        short authScope,
-        int requestHash)
-    {
-        boolean matchCacheableRequest = false;
-        if (satisfiedByCache(requestHeaders))
-        {
-            final DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
-            boolean isCompleted = false;
-            boolean canServe = false;
-
-            if (cacheEntry != null)
-            {
-                isCompleted  = cacheEntry.etag() != null || cacheEntry.isResponseCompleted();
-                canServe = cacheEntry.canServeRequest(requestHeaders, authScope);
-            }
-            matchCacheableRequest = isCompleted && canServe;
-        }
-
-        return  matchCacheableRequest;
     }
 
     public void purge(
