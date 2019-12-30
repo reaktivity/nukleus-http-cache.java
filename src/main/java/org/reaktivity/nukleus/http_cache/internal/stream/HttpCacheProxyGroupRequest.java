@@ -105,7 +105,8 @@ final class HttpCacheProxyGroupRequest
     boolean canDeferRequest(
         HttpCacheProxyCacheableRequest newRequest)
     {
-        return request.prefer == null || request.ifNoneMatch == null || !request.maxAgeZero;
+        return request.prefer == null || request.ifNoneMatch == null || !request.maxAgeZero ||
+                (request.ifNoneMatch != null && request.ifNoneMatch.equals(newRequest.ifNoneMatch));
     }
 
     String withIfNoneMatch(
