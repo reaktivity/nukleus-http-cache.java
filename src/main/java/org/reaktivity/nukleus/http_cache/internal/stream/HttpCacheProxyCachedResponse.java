@@ -51,7 +51,7 @@ final class HttpCacheProxyCachedResponse
     private long replyDebitorIndex = NO_DEBITOR_INDEX;
 
     private int responseProgress = -1;
-    private Consumer<HttpCacheProxyCachedResponse> cleanupHandler;
+    private Consumer<HttpCacheProxyCachedResponse> resetHandler;
 
     HttpCacheProxyCachedResponse(
         HttpCacheProxyFactory factory,
@@ -61,7 +61,7 @@ final class HttpCacheProxyCachedResponse
         long authorization,
         DefaultCacheEntry cacheEntry,
         boolean promiseNextPollRequest,
-        Consumer<HttpCacheProxyCachedResponse> cleanupHandler)
+        Consumer<HttpCacheProxyCachedResponse> resetHandler)
     {
         this.factory = factory;
         this.reply = reply;
@@ -70,7 +70,7 @@ final class HttpCacheProxyCachedResponse
         this.authorization = authorization;
         this.cacheEntry = cacheEntry;
         this.promiseNextPollRequest = promiseNextPollRequest;
-        this.cleanupHandler = cleanupHandler;
+        this.resetHandler = resetHandler;
     }
 
     void onResponseMessage(
@@ -172,7 +172,6 @@ final class HttpCacheProxyCachedResponse
 
         cleanupResponseIfNecessary();
         cacheEntry.setSubscribers(-1);
-        cleanupHandler.accept(this);
     }
 
     private void doResponseEnd(
@@ -199,8 +198,6 @@ final class HttpCacheProxyCachedResponse
 
         cleanupResponseIfNecessary();
         cacheEntry.setSubscribers(-1);
-
-        cleanupHandler.accept(this);
     }
 
     private void onResponseReset(
@@ -208,7 +205,7 @@ final class HttpCacheProxyCachedResponse
     {
         cleanupResponseIfNecessary();
         cacheEntry.setSubscribers(-1);
-        cleanupHandler.accept(this);
+        resetHandler.accept(this);
     }
 
     private void onResponseWindow(

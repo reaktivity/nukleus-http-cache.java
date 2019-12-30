@@ -31,7 +31,6 @@ public final class HttpProxyCacheableRequestGroup
 {
     private final Map<String, Deque<HttpCacheProxyCacheableRequest>> queuedRequestsByEtag;
     private final Set<HttpCacheProxyCachedResponse> attachedResponses;
-    private final Set<HttpCacheProxyCachedResponse> detachedResponses;
     private final HttpCacheProxyFactory factory;
     private final IntConsumer cleaner;
     private final int requestHash;
@@ -40,7 +39,6 @@ public final class HttpProxyCacheableRequestGroup
     private HttpCacheProxyGroupRequest groupRequest;
     private String ifNoneMatch;
     private DefaultCacheEntry cacheEntry;
-    private boolean flushing;
 
     public void onCacheEntryInvalidated(
         long traceId)
@@ -61,7 +59,6 @@ public final class HttpProxyCacheableRequestGroup
         this.requestHash = requestHash;
         this.queuedRequestsByEtag = new HashMap<>();
         this.attachedResponses = new HashSet<>();
-        this.detachedResponses = new HashSet<>();
     }
 
     int requestHash()
@@ -141,14 +138,7 @@ public final class HttpProxyCacheableRequestGroup
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        if (flushing)
-        {
-            detachedResponses.add(response);
-        }
-        else
-        {
-            attachedResponses.remove(response);
-        }
+        attachedResponses.remove(response);
     }
 
     void onResponseAbandoned(
@@ -223,15 +213,7 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupResponseData(
         long traceId)
     {
-        flushing = true;
         attachedResponses.forEach(r -> r.doResponseFlush(traceId));
-        flushing = false;
-
-        if (!detachedResponses.isEmpty())
-        {
-            attachedResponses.removeAll(detachedResponses);
-            detachedResponses.clear();
-        }
     }
 
     void onGroupResponseAbort(
@@ -267,6 +249,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         assert groupRequest.request() == request;
         groupRequest = null;
+        attachedResponses.clear();
 
         flushNextRequest();
     }
