@@ -319,7 +319,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
         if (authorizationHeader != null)
         {
-            group.setAuthorizationHeader(authorizationHeader.value().asString());
+            group.authorizationHeader(authorizationHeader.value().asString());
         }
         final HttpCacheProxyCacheableRequest cacheableRequest =
             new HttpCacheProxyCacheableRequest(this,

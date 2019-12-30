@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
+import java.util.Objects;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
@@ -101,13 +102,16 @@ final class HttpCacheProxyGroupRequest
         }
     }
 
-    boolean satisfiesRequest(
+    boolean canDeferRequest(
         HttpCacheProxyCacheableRequest newRequest)
     {
-        boolean satisfiesIfNoneMatch = request.ifNoneMatch == null || request.ifNoneMatch.equals(newRequest.ifNoneMatch);
-        boolean satisfiesVary = request.vary == null || request.vary.equals(newRequest.vary);
+        return request.prefer == null || request.ifNoneMatch == null || !request.maxAgeZero;
+    }
 
-        return satisfiesIfNoneMatch && satisfiesVary;
+    String withIfNoneMatch(
+        String ifNoneMatch)
+    {
+        return Objects.equals(request.ifNoneMatch, ifNoneMatch) ? ifNoneMatch : null;
     }
 
     void doRetryRequestImmediatelyIfPending(
@@ -312,7 +316,7 @@ final class HttpCacheProxyGroupRequest
                                                ifNoneMatch,
                                                requestHash)))
         {
-            if (requestGroup.hasQueuedRequests(ifNoneMatch) || requestGroup.hasAttachedResponses())
+            if (requestGroup.hasQueuedRequests() || requestGroup.hasAttachedResponses())
             {
                 final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
                     new HttpCacheProxyRetryResponse(factory,
