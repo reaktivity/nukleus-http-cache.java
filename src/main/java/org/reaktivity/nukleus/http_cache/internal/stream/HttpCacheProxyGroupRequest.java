@@ -313,19 +313,19 @@ final class HttpCacheProxyGroupRequest
 
         if ((retry && attempts <= 3) ||
             (factory.defaultCache.checkToRetry(getRequestHeaders(),
-                responseHeaders,
-                ifNoneMatch,
-                requestHash)))
+                                               responseHeaders,
+                                               ifNoneMatch,
+                                               requestHash)))
         {
             if (requestGroup.hasQueuedRequests() || requestGroup.hasAttachedResponses())
             {
                 final HttpCacheProxyRetryResponse cacheProxyRetryResponse =
                     new HttpCacheProxyRetryResponse(factory,
-                        requestHash,
-                        initial,
-                        routeId,
-                        initialId,
-                        this::doRetryRequestAfter);
+                                                    requestHash,
+                                                    initial,
+                                                    routeId,
+                                                    initialId,
+                                                    this::doRetryRequestAfter);
                 newStream = cacheProxyRetryResponse::onResponseMessage;
                 resetHandler = cacheProxyRetryResponse::doResponseReset;
             }

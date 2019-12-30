@@ -96,7 +96,6 @@ public class HttpCacheProxyFactory implements StreamFactory
     final LongFunction<BudgetDebitor> supplyDebitor;
     final BufferPool headersPool;
     final MutableDirectBuffer writeBuffer;
-    final MutableDirectBuffer tempWriteBuffer;
 
     final Writer writer;
     final DefaultCache defaultCache;
@@ -133,7 +132,6 @@ public class HttpCacheProxyFactory implements StreamFactory
             counters.supplyCounter.apply("http-cache.request.acquires"),
             counters.supplyCounter.apply("http-cache.request.releases"));
         this.writeBuffer = new UnsafeBuffer(new byte[writeBuffer.capacity()]);
-        this.tempWriteBuffer = new UnsafeBuffer(new byte[1024]);
 
         this.correlations = requireNonNull(correlations);
         this.defaultCache = defaultCache;
