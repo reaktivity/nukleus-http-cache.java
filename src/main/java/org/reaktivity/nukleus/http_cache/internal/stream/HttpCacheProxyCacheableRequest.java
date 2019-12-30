@@ -109,11 +109,14 @@ final class HttpCacheProxyCacheableRequest
     void doNotModifiedResponse(
         long traceId)
     {
-        factory.defaultCache.send304(ifNoneMatch,
+        factory.defaultCache.send304(requestGroup.requestHash(),
+                                     ifNoneMatch,
                                      prefer,
                                      reply,
                                      routeId,
-                                     replyId);
+                                     replyId,
+                                     authorization,
+                                     promiseNextPollRequest);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
         cleanupRequestHeadersIfNecessary();
@@ -349,11 +352,14 @@ final class HttpCacheProxyCacheableRequest
         long traceId)
     {
         factory.counters.responses.getAsLong();
-        factory.defaultCache.send304(ifNoneMatch,
+        factory.defaultCache.send304(requestGroup.requestHash(),
+                                     ifNoneMatch,
                                      prefer,
                                      reply,
                                      routeId,
-                                     replyId);
+                                     replyId,
+                                     authorization,
+                                     promiseNextPollRequest);
 
         requestGroup.dequeue(this);
         requestGroup.onResponseAbandoned(this, traceId);
@@ -376,7 +382,7 @@ final class HttpCacheProxyCacheableRequest
         factory.router.clearThrottle(replyId);
     }
 
-    private void cleanupRequestHeadersIfNecessary()
+    void cleanupRequestHeadersIfNecessary()
     {
         if (headersSlot != NO_SLOT)
         {

@@ -336,17 +336,21 @@ public class DefaultCache
     }
 
     public void send304(
+        int requestHash,
         String etag,
         String preferWait,
         MessageConsumer reply,
         long routeId,
-        long replyId)
+        long replyId,
+        long authorization,
+        boolean promiseNextPollRequest)
     {
         final long traceId = supplyTraceId.getAsLong();
 
         if (preferWait != null)
         {
-            writer.doHttpResponse(reply,
+            writer.doHttpResponse(
+                reply,
                 routeId,
                 replyId,
                 traceId,
@@ -355,6 +359,19 @@ public class DefaultCache
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG)));
+
+            if (promiseNextPollRequest)
+            {
+                DefaultCacheEntry cacheEntry = get(requestHash);
+                writer.doHttpPushPromise(
+                    reply,
+                    routeId,
+                    replyId,
+                    authorization,
+                    cacheEntry.getRequestHeaders(),
+                    cacheEntry.getCachedResponseHeaders(),
+                    cacheEntry.etag());
+            }
         }
         else
         {

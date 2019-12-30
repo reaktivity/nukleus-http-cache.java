@@ -125,6 +125,7 @@ public final class HttpCacheProxyRelayedResponse
         final long authorization = begin.authorization();
         final long affinity = begin.affinity();
         final OctetsFW extension = begin.extension();
+        assert extension.sizeof() > 0;
 
         final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::wrap);
         final boolean hasEtag = httpBeginEx.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
