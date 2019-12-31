@@ -226,14 +226,15 @@ public class HttpCacheProxyFactory implements StreamFactory
         if (newResponse != null)
         {
             final OctetsFW extension = begin.extension();
-            final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
+            HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
             if (httpBeginFW != null)
             {
                 newStream = newResponse.apply(httpBeginFW);
             }
             else
             {
-                newStream = newResponse.apply(defaultHttpBeginExRO);
+                httpBeginFW = defaultHttpBeginExRO;
+                newStream = newResponse.apply(httpBeginFW);
             }
         }
 

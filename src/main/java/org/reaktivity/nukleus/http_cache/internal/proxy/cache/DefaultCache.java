@@ -34,7 +34,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.net.URI;
-import java.time.Instant;
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
@@ -162,21 +161,6 @@ public class DefaultCache
                cacheEntry != null &&
                (cacheEntry.etag() != null || cacheEntry.isResponseCompleted()) &&
                cacheEntry.canServeRequest(requestHeaders, authScope);
-    }
-
-    public void purgeIfNecessary(
-        int requestHash,
-        ArrayFW<HttpHeaderFW> responseHeaders)
-    {
-        final DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
-
-        if (cacheEntry != null &&
-            !HttpHeadersUtil.hasStatusCode(responseHeaders, 304) &&
-            !CacheUtils.isCacheControlCacheable(responseHeaders) &&
-            cacheEntry.isStale(Instant.now()))
-        {
-            purge(requestHash);
-        }
     }
 
     public void purge(

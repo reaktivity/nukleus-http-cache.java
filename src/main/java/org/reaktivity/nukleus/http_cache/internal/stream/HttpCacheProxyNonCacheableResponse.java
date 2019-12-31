@@ -113,10 +113,11 @@ final class HttpCacheProxyNonCacheableResponse
         BeginFW begin)
     {
         final OctetsFW extension = begin.extension();
-        final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::tryWrap);
+        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
+        final HttpBeginExFW httpBeginExFinal = (httpBeginEx == null) ? factory.defaultHttpBeginExRO : httpBeginEx;
 
         final long traceId = begin.traceId();
-        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+        final ArrayFW<HttpHeaderFW> headers = httpBeginExFinal.headers();
 
         factory.writer.doHttpResponse(
             accept,
