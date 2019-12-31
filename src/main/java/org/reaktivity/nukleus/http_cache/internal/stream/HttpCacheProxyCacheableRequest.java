@@ -91,6 +91,11 @@ final class HttpCacheProxyCacheableRequest
         this.replyId = factory.supplyReplyId.applyAsLong(initialId);
     }
 
+    void onQueuedRequestSent()
+    {
+        cleanupRequestHeadersIfNecessary();
+    }
+
     void doCachedResponse(
         Instant now,
         long traceId)
@@ -199,12 +204,12 @@ final class HttpCacheProxyCacheableRequest
         promiseNextPollRequest = headers.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
 
         factory.writer.doWindow(reply,
-                routeId,
-                initialId,
-                traceId,
-                0L,
-                factory.initialWindowSize,
-                0);
+                                routeId,
+                                initialId,
+                                traceId,
+                                0L,
+                                factory.initialWindowSize,
+                                0);
 
         assert headersSlot == NO_SLOT;
         headersSlot = factory.headersPool.acquire(initialId);
@@ -216,7 +221,7 @@ final class HttpCacheProxyCacheableRequest
         {
             final MutableDirectBuffer headersBuffer = factory.headersPool.buffer(headersSlot);
             final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> newHeaders =
-                    factory.httpHeadersRW.wrap(headersBuffer, 0, headersBuffer.capacity());
+                factory.httpHeadersRW.wrap(headersBuffer, 0, headersBuffer.capacity());
             headers.forEach(h ->
             {
                 final String name = h.name().asString();
@@ -382,7 +387,7 @@ final class HttpCacheProxyCacheableRequest
         factory.router.clearThrottle(replyId);
     }
 
-    void cleanupRequestHeadersIfNecessary()
+    private void cleanupRequestHeadersIfNecessary()
     {
         if (headersSlot != NO_SLOT)
         {

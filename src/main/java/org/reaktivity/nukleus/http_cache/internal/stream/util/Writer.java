@@ -147,7 +147,6 @@ public class Writer
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
 
-
     public void doHttpResponseWithUpdatedHeaders(
         MessageConsumer receiver,
         long routeId,
@@ -427,43 +426,6 @@ public class Writer
         sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
-    public void doSignal(
-        long routeId,
-        long streamId,
-        long traceId,
-        int signalId)
-    {
-        long acceptInitialId = streamId | 0x01;
-        MessageConsumer receiver = router.supplyReceiver(acceptInitialId);
-        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .routeId(routeId)
-            .streamId(streamId)
-            .traceId(traceId)
-            .cancelId(NO_CANCEL_ID)
-            .signalId(signalId)
-            .build();
-
-        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
-    }
-
-    public void doSignal(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        long traceId,
-        int signalId)
-    {
-        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                        .routeId(routeId)
-                                        .streamId(streamId)
-                                        .traceId(traceId)
-                                        .cancelId(NO_CANCEL_ID)
-                                        .signalId(signalId)
-                                        .build();
-
-        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
-    }
-
     private Flyweight.Builder.Visitor visitHttpBeginEx(
         Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
@@ -646,4 +608,13 @@ public class Writer
         });
     }
 
+    public void send500(
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long traceId)
+    {
+        doHttpResponse(receiver, routeId, streamId, traceId, e ->
+            e.item(h -> h.name(STATUS).value("500")));
+    }
 }

@@ -304,7 +304,6 @@ final class HttpCacheProxyGroupRequest
     private MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
-
         final ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
         final boolean retry = HttpHeadersUtil.retry(responseHeaders);
         final int requestHash = requestGroup.requestHash();

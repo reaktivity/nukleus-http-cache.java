@@ -126,43 +126,52 @@ public final class HttpCacheProxyRelayedResponse
         final long affinity = begin.affinity();
         final OctetsFW extension = begin.extension();
 
-        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::wrap);
-        final boolean hasEtag = httpBeginEx.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
-        final HttpHeaderFW status = httpBeginEx.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
-        final int statusGroup = status != null ? parseInt(status.value().asString()) / 100 : 0;
-        final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
+        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
+        if (httpBeginEx != null)
         {
-            httpBeginEx.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
-            if ((statusGroup == 2 || statusGroup == 3) && prefer != null)
+            final boolean hasEtag = httpBeginEx.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
+            final HttpHeaderFW status = httpBeginEx.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
+            final int statusGroup = status != null ? parseInt(status.value().asString()) / 100 : 0;
+            final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
             {
-                hs.item(h -> h.name(PREFERENCE_APPLIED).value(prefer));
-                hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED));
-
-                if (hasEtag)
+                httpBeginEx.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
+                if ((statusGroup == 2 || statusGroup == 3) && prefer != null)
                 {
-                    hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG));
+                    hs.item(h -> h.name(PREFERENCE_APPLIED).value(prefer));
+                    hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED));
+
+                    if (hasEtag)
+                    {
+                        hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG));
+                    }
                 }
-            }
-        };
+            };
 
-        Flyweight.Builder.Visitor mutator = (b, o, l) ->
-            factory.httpBeginExRW.wrap(b, o, l)
-                         .typeId(httpBeginEx.typeId())
-                         .headers(headers)
-                         .build()
-                         .sizeof();
+            Flyweight.Builder.Visitor mutator = (b, o, l) ->
+                factory.httpBeginExRW.wrap(b, o, l)
+                                     .typeId(httpBeginEx.typeId())
+                                     .headers(headers)
+                                     .build()
+                                     .sizeof();
 
-        final MutableDirectBuffer writeBuffer = factory.writeBuffer;
-        final BeginFW newBegin = factory.beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .routeId(receiverRouteId)
-                .streamId(receiverReplyId)
-                .traceId(traceId)
-                .authorization(authorization)
-                .affinity(affinity)
-                .extension(e -> e.set(mutator))
-                .build();
+            final MutableDirectBuffer writeBuffer = factory.writeBuffer;
+            final BeginFW newBegin = factory.beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
+                                                    .routeId(receiverRouteId)
+                                                    .streamId(receiverReplyId)
+                                                    .traceId(traceId)
+                                                    .authorization(authorization)
+                                                    .affinity(affinity)
+                                                    .extension(e -> e.set(mutator))
+                                                    .build();
 
-        factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
-        receiver.accept(newBegin.typeId(), newBegin.buffer(), newBegin.offset(), newBegin.sizeof());
+            factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
+            receiver.accept(newBegin.typeId(), newBegin.buffer(), newBegin.offset(), newBegin.sizeof());
+        }
+        else
+        {
+            factory.writer.send500(receiver, receiverRouteId, receiverReplyId, traceId);
+            factory.router.clearThrottle(receiverReplyId);
+            factory.counters.responses.getAsLong();
+        }
     }
 }

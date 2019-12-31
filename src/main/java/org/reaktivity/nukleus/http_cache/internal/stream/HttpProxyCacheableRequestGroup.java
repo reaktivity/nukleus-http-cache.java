@@ -113,7 +113,7 @@ public final class HttpProxyCacheableRequestGroup
             {
                 request.doCachedResponse(Instant.now(), traceId);
             }
-            queuedRequests.clear();
+            queuedRequests.remove(request);
         }
     }
 
@@ -226,7 +226,7 @@ public final class HttpProxyCacheableRequestGroup
         this.groupRequest = new HttpCacheProxyGroupRequest(factory, this, request);
 
         groupRequest.doRequest(traceId);
-        request.cleanupRequestHeadersIfNecessary();
+        request.onQueuedRequestSent();
     }
 
     private void flushNextRequest()

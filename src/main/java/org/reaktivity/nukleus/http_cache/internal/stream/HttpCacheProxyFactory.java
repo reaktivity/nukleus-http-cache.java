@@ -75,6 +75,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final ResetFW resetRO = new ResetFW();
     final SignalFW signalRO = new SignalFW();
 
+    final HttpBeginExFW defaultHttpBeginExRO;
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
     final ArrayFW<HttpHeaderFW> httpHeadersRO = new ArrayFW<>(new HttpHeaderFW());
@@ -140,6 +141,13 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.executor = executor;
+
+        this.defaultHttpBeginExRO = new HttpBeginExFW.Builder()
+            .wrap(new UnsafeBuffer(new byte[64]), 0, 64)
+            .typeId(supplyTypeId.applyAsInt("http"))
+            .headersItem(h -> h.name(STATUS).value("500"))
+            .build();
+
     }
 
     public HttpProxyCacheableRequestGroup getRequestGroup(
@@ -222,6 +230,10 @@ public class HttpCacheProxyFactory implements StreamFactory
             if (httpBeginFW != null)
             {
                 newStream = newResponse.apply(httpBeginFW);
+            }
+            else
+            {
+                newStream = newResponse.apply(defaultHttpBeginExRO);
             }
         }
 
