@@ -52,7 +52,8 @@ public final class CacheUtils
         // utility class
     }
 
-    public static boolean isCacheableResponse(ArrayFW<HttpHeaderFW> response)
+    public static boolean isCacheableResponse(
+        ArrayFW<HttpHeaderFW> response)
     {
         if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
                               h.value().asString().contains(CacheDirectives.PRIVATE)) ||
@@ -65,9 +66,27 @@ public final class CacheUtils
         return isPrivatelyCacheable(response);
     }
 
-    public static boolean isPrivatelyCacheable(ArrayFW<HttpHeaderFW> response)
+    public static boolean isPrivatelyCacheable(
+        ArrayFW<HttpHeaderFW> response)
     {
         // TODO force passing of CacheControl as FW
+        boolean isCacheableByCacheControl = isCacheControlCacheable(response);
+        boolean isCacheableByStatusCode = response.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            if (STATUS.equals(name))
+            {
+                return CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
+            }
+            return false;
+        });
+        return isCacheableByCacheControl && isCacheableByStatusCode;
+    }
+
+    public static Boolean isCacheControlCacheable(
+        ArrayFW<HttpHeaderFW> response)
+    {
         String cacheControl = getHeader(response, HttpHeaders.CACHE_CONTROL);
         if (cacheControl != null)
         {
@@ -91,16 +110,7 @@ public final class CacheUtils
                 }
             }
         }
-        return response.anyMatch(h ->
-        {
-            final String name = h.name().asString();
-            final String value = h.value().asString();
-            if (STATUS.equals(name))
-            {
-                return CACHEABLE_BY_DEFAULT_STATUS_CODES.contains(value);
-            }
-            return false;
-        });
+        return true;
     }
 
     public static boolean sameAuthorizationScope(
