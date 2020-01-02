@@ -127,15 +127,15 @@ public final class HttpCacheProxyRelayedResponse
         final OctetsFW extension = begin.extension();
 
 
-        HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
-        final HttpBeginExFW httpBeginExFinal = (httpBeginEx == null) ? factory.defaultHttpBeginExRO : httpBeginEx;
+        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
+        final HttpBeginExFW httpBeginEx0 = (httpBeginEx == null) ? factory.defaultHttpBeginExRO : httpBeginEx;
 
-        final boolean hasEtag = httpBeginExFinal.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
-        final HttpHeaderFW status = httpBeginExFinal.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
+        final boolean hasEtag = httpBeginEx0.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
+        final HttpHeaderFW status = httpBeginEx0.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
         final int statusGroup = status != null ? parseInt(status.value().asString()) / 100 : 0;
         final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
         {
-            httpBeginExFinal.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
+            httpBeginEx0.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
             if ((statusGroup == 2 || statusGroup == 3) && prefer != null)
             {
                 hs.item(h -> h.name(PREFERENCE_APPLIED).value(prefer));
@@ -150,7 +150,7 @@ public final class HttpCacheProxyRelayedResponse
 
         Flyweight.Builder.Visitor mutator = (b, o, l) ->
             factory.httpBeginExRW.wrap(b, o, l)
-                                 .typeId(httpBeginExFinal.typeId())
+                                 .typeId(httpBeginEx0.typeId())
                                  .headers(headers)
                                  .build()
                                  .sizeof();

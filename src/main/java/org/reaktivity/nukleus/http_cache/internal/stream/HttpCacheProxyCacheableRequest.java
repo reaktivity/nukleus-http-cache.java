@@ -18,6 +18,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.hasMaxAgeZero;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
@@ -235,12 +236,7 @@ final class HttpCacheProxyCacheableRequest
 
             ifNoneMatch = getHeader(headers, IF_NONE_MATCH);
             prefer = getHeader(headers, PREFER);
-            maxAgeZero = !headers.anyMatch(h ->
-            {
-                final String name = h.name().asString();
-                final String value = h.value().asString();
-                return CACHE_CONTROL.equals(name) && value.contains(MAX_AGE_0);
-            });
+            maxAgeZero = hasMaxAgeZero(headers);
 
 
             final int requestHash = requestGroup.requestHash();

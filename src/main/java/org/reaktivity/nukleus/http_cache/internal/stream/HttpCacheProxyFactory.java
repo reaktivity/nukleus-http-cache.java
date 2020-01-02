@@ -16,8 +16,11 @@
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.Objects.requireNonNull;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.hasMaxAgeZero;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.requestHash;
@@ -226,16 +229,12 @@ public class HttpCacheProxyFactory implements StreamFactory
         if (newResponse != null)
         {
             final OctetsFW extension = begin.extension();
-            HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
-            if (httpBeginFW != null)
+            HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::tryWrap);
+            if (httpBeginEx == null)
             {
-                newStream = newResponse.apply(httpBeginFW);
+                httpBeginEx = defaultHttpBeginExRO;
             }
-            else
-            {
-                httpBeginFW = defaultHttpBeginExRO;
-                newStream = newResponse.apply(httpBeginFW);
-            }
+            newStream = newResponse.apply(httpBeginEx);
         }
 
         return newStream;
@@ -277,12 +276,43 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else if (isRequestCacheable)
         {
-            newStream = newCacheableRequestStream(initial,
-                                                  routeId,
-                                                  initialId,
-                                                  resolveId,
-                                                  headers,
-                                                  requestHash);
+            counters.requestsCacheable.getAsLong();
+            HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
+
+            HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
+            if (authorizationHeader != null)
+            {
+                group.authorizationHeader(authorizationHeader.value().asString());
+            }
+
+            String ifNoneMatch = getHeader(headers, IF_NONE_MATCH);
+            DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
+
+            if (hasMaxAgeZero(headers) &&
+                group.hasQueuedRequests() &&
+                (ifNoneMatch == null || ifNoneMatch.equals(group.ifNoneMatchHeader())) &&
+                cacheEntry != null &&
+                cacheEntry.canServeRequest(headers, authorizationScope))
+            {
+                final HttpCacheProxyCachedRequest cachedRequest =
+                    new HttpCacheProxyCachedRequest(this,
+                        requestHash,
+                        initial,
+                        routeId,
+                        initialId);
+                newStream = cachedRequest::onRequestMessage;
+            }
+            else
+            {
+                newStream = newCacheableRequestStream(initial,
+                                                      routeId,
+                                                      initialId,
+                                                      resolveId,
+                                                      group);
+            }
+
+
+
         }
         else
         {
@@ -323,17 +353,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         long routeId,
         long initialId,
         long resolveId,
-        ArrayFW<HttpHeaderFW> headers,
-        int requestHash)
+        HttpProxyCacheableRequestGroup group)
     {
-        counters.requestsCacheable.getAsLong();
-        HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
-
-        HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
-        if (authorizationHeader != null)
-        {
-            group.authorizationHeader(authorizationHeader.value().asString());
-        }
         final HttpCacheProxyCacheableRequest cacheableRequest =
             new HttpCacheProxyCacheableRequest(this,
                                                group,

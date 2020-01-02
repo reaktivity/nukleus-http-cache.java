@@ -52,6 +52,17 @@ public final class CacheUtils
         // utility class
     }
 
+    public static boolean hasMaxAgeZero(
+        ArrayFW<HttpHeaderFW> headers)
+    {
+        return headers.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            return CACHE_CONTROL.equals(name) && value.contains(MAX_AGE_0);
+        });
+    }
+
     public static boolean isCacheableResponse(
         ArrayFW<HttpHeaderFW> response)
     {

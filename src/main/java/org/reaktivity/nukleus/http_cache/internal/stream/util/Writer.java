@@ -606,14 +606,4 @@ public class Writer
             builder.item(h -> h.name(ETAG).value(getHeader(requestHeaders, IF_NONE_MATCH)));
         });
     }
-
-    public void send500(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        long traceId)
-    {
-        doHttpResponse(receiver, routeId, streamId, traceId, e ->
-            e.item(h -> h.name(STATUS).value("500")));
-    }
 }
