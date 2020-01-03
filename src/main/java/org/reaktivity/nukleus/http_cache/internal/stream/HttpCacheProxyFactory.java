@@ -288,12 +288,15 @@ public class HttpCacheProxyFactory implements StreamFactory
             String ifNoneMatch = getHeader(headers, IF_NONE_MATCH);
             DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
 
+            System.out.printf("[newNativeRequestStream] [%d] [0x%16x] [%s] \n", requestHash, initialId, requestURL);
+
             if (hasMaxAgeZero(headers) &&
                 group.hasQueuedRequests() &&
                 (ifNoneMatch == null || ifNoneMatch.equals(group.ifNoneMatchHeader())) &&
                 cacheEntry != null &&
                 cacheEntry.canServeRequest(headers, authorizationScope))
             {
+                System.out.printf("[MAXAGE0] [%d] \n", requestHash);
                 final HttpCacheProxyCachedRequest cachedRequest =
                     new HttpCacheProxyCachedRequest(this,
                         requestHash,
@@ -397,6 +400,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         counters.responsesCached.getAsLong();
         MessageConsumer newStream;
         DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
+        System.out.printf("[newCachedStream] [%d] [0x%16x] \n", requestHash, initialId);
         boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
         if (etagMatched)
         {

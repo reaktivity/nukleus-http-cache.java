@@ -86,7 +86,7 @@ final class HttpCacheProxyGroupRequest
         headersSlot = factory.headersPool.acquire(replyId);
         if (headersSlot == NO_SLOT)
         {
-            requestGroup.onGroupRequestReset(request, traceId);
+            requestGroup.onGroupRequestReset(traceId);
             cleanupRequestIfNecessary();
         }
         else
@@ -105,7 +105,7 @@ final class HttpCacheProxyGroupRequest
     boolean canDeferRequest(
         HttpCacheProxyCacheableRequest newRequest)
     {
-        return request.prefer == null || request.ifNoneMatch == null || request.maxAgeZero ||
+        return request.prefer == null || request.ifNoneMatch == null || !request.maxAgeZero ||
                 (request.ifNoneMatch != null && request.ifNoneMatch.equals(newRequest.ifNoneMatch));
     }
 
@@ -243,7 +243,7 @@ final class HttpCacheProxyGroupRequest
         factory.correlations.remove(replyId);
         cleanupRequestIfNecessary();
 
-        requestGroup.onGroupRequestReset(request, traceId);
+        requestGroup.onGroupRequestReset(traceId);
     }
 
     private void doRetryRequestAfter(

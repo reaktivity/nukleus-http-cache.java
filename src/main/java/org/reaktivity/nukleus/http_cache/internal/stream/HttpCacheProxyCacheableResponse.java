@@ -141,7 +141,7 @@ final class HttpCacheProxyCacheableResponse
 
         if (hasEtagHeader && retryAfter == NO_RETRY_AFTER)
         {
-            requestGroup.onGroupResponseBegin(responseAt, traceId, ifNoneMatch);
+            requestGroup.onGroupResponseBegin(responseAt, traceId);
         }
 
         doResponseWindow(traceId, factory.initialWindowSize);
@@ -200,7 +200,7 @@ final class HttpCacheProxyCacheableResponse
         {
             if (!hasEtagHeader)
             {
-                requestGroup.onGroupResponseBegin(responseAt, traceId, ifNoneMatch);
+                requestGroup.onGroupResponseBegin(responseAt, traceId);
             }
 
             cleanupRequest.run();
@@ -217,7 +217,7 @@ final class HttpCacheProxyCacheableResponse
 
         final long traceId = abort.traceId();
         cleanupRequest.run();
-        requestGroup.onGroupResponseAbort(request, traceId);
+        requestGroup.onGroupResponseAbort(traceId);
         requestGroup.onGroupRequestEnd(request);
     }
 

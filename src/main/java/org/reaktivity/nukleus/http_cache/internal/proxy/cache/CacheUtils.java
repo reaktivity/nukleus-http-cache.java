@@ -30,8 +30,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,7 +42,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 
 public final class CacheUtils
 {
-
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
     public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
@@ -99,29 +98,29 @@ public final class CacheUtils
         ArrayFW<HttpHeaderFW> response)
     {
         String cacheControl = getHeader(response, HttpHeaders.CACHE_CONTROL);
+        boolean isCacheable = true;
         if (cacheControl != null)
         {
             CacheControl parser = new CacheControl().parse(cacheControl);
-            Iterator<String> iter = parser.iterator();
-            while (iter.hasNext())
+            loop:
+            for (Map.Entry<String, String> directive : parser.getValues().entrySet())
             {
-                String directive = iter.next();
-                switch (directive)
+                switch (directive.getKey())
                 {
-                // TODO expires
                 case NO_STORE:
                 case NO_CACHE:
-                    return false;
+                    isCacheable = false;
+                    break loop;
                 case PUBLIC:
                 case MAX_AGE:
                 case S_MAXAGE:
-                    return true;
+                    break loop;
                 default:
                     break;
                 }
             }
         }
-        return true;
+        return isCacheable;
     }
 
     public static boolean sameAuthorizationScope(

@@ -17,13 +17,11 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.hasMaxAgeZero;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.PREFER_WAIT_EXPIRED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
@@ -332,7 +330,7 @@ final class HttpCacheProxyCacheableRequest
         final long traceId = reset.traceId();
         requestGroup.dequeue(this);
         cleanupRequest();
-        requestGroup.onResponseAbandoned(this, traceId);
+        requestGroup.onResponseAbandoned(traceId);
     }
 
     private void onResponseSignal(
@@ -363,7 +361,7 @@ final class HttpCacheProxyCacheableRequest
                                      promiseNextPollRequest);
 
         requestGroup.dequeue(this);
-        requestGroup.onResponseAbandoned(this, traceId);
+        requestGroup.onResponseAbandoned(traceId);
         cleanupRequest();
     }
 
