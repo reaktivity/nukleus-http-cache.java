@@ -88,7 +88,6 @@ public final class HttpProxyCacheableRequestGroup
     void enqueue(
         HttpCacheProxyCacheableRequest request)
     {
-        System.out.printf("[enqueue] [%d] [0x%16x] \n", requestHash, request.replyId);
         final boolean added = queuedRequests.add(request);
         assert added;
 
@@ -116,7 +115,6 @@ public final class HttpProxyCacheableRequestGroup
     void dequeue(
         HttpCacheProxyCacheableRequest request)
     {
-        System.out.printf("[dequeue] [%d] [0x%16x] \n", requestHash, request.replyId);
         boolean removed = queuedRequests.remove(request);
         assert removed;
 
@@ -129,21 +127,18 @@ public final class HttpProxyCacheableRequestGroup
     void attach(
         HttpCacheProxyCachedResponse response)
     {
-        System.out.printf("[attach] [%d] [0x%16x] \n", requestHash, response.replyId);
         attachedResponses.add(response);
     }
 
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        System.out.printf("[detach] [%d] [0x%16x] \n", requestHash, response.replyId);
         attachedResponses.remove(response);
     }
 
     void onResponseAbandoned(
         long traceId)
     {
-        System.out.printf("[onResponseAbandoned] [%d] \n", requestHash);
         if (groupRequest != null &&
             !hasQueuedRequests() &&
             !hasAttachedResponses())
@@ -156,7 +151,6 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupRequestReset(
         long traceId)
     {
-        System.out.printf("[onGroupRequestReset] [%d] \n", requestHash);
         queuedRequests.forEach(r -> r.do503RetryResponse(traceId));
         queuedRequests.clear();
     }
@@ -165,7 +159,6 @@ public final class HttpProxyCacheableRequestGroup
         Instant now,
         long traceId)
     {
-        System.out.printf("[onGroupResponseBegin] [%d] \n", requestHash);
         final String etag = cacheEntry.etag();
         for (HttpCacheProxyCacheableRequest queuedRequest : queuedRequests)
         {
@@ -185,14 +178,12 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupResponseData(
         long traceId)
     {
-        System.out.printf("[onGroupResponseData] [%d] \n", requestHash);
         attachedResponses.forEach(r -> r.doResponseFlush(traceId));
     }
 
     void onGroupResponseAbort(
         long traceId)
     {
-        System.out.printf("[onGroupResponseAbort] [%d] \n", requestHash);
         queuedRequests.forEach(r -> r.do503RetryResponse(traceId));
         queuedRequests.clear();
 
@@ -203,7 +194,6 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupRequestEnd(
         HttpCacheProxyCacheableRequest request)
     {
-        System.out.printf("[onGroupRequestEnd] [%d] \n", requestHash);
         assert groupRequest.request() == request;
         groupRequest = null;
         attachedResponses.clear();
@@ -214,7 +204,6 @@ public final class HttpProxyCacheableRequestGroup
     private void doRequest(
         HttpCacheProxyCacheableRequest request)
     {
-        System.out.printf("[doRequest] [%d] [0x%16x] \n", requestHash, request.replyId);
         final long traceId = factory.supplyTraceId.getAsLong();
 
         if (groupRequest != null)

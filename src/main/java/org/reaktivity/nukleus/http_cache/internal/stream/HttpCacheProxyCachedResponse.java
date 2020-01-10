@@ -107,7 +107,6 @@ final class HttpCacheProxyCachedResponse
         factory.router.setThrottle(replyId, this::onResponseMessage);
         final ArrayFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
         final String requestURL = getRequestURL(requestHeaders);
-        System.out.printf("[doResponseBegin] [%s] [0x%16x] \n", requestURL, replyId);
         factory.writer.doHttpResponseWithUpdatedHeaders(reply,
                                                         routeId,
                                                         replyId,
