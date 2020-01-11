@@ -405,7 +405,7 @@ public class DefaultCache
         return isSelectedForUpdate;
     }
 
-    private boolean satisfiedByCache(
+    public boolean satisfiedByCache(
         ArrayFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->

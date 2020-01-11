@@ -27,6 +27,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.time.Instant;
 import java.util.concurrent.Future;
@@ -266,10 +267,45 @@ final class HttpCacheProxyCacheableRequest
     private void onRequestEnd(
         final EndFW end)
     {
-        if (headersSlot != NO_SLOT)
+        assert  headersSlot != NO_SLOT;
+
+        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.requestHash());
+        final ArrayFW<HttpHeaderFW> headers = getHeaders();
+        final short authScope = authorizationScope(authorization);
+        final boolean isCacheEntryUpToDate = isCacheEntryUpdatedToBeServed(headers, authScope, cacheEntry);
+        final boolean canBeCachedServed =
+            factory.defaultCache.matchCacheableRequest(headers, authScope, requestGroup.requestHash());
+
+        if (canBeCachedServed || isCacheEntryUpToDate)
+        {
+            final long traceId = end.traceId();
+
+            final long replyId = factory.supplyReplyId.applyAsLong(initialId);
+            final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
+                factory, reply, routeId, replyId, authorization,
+                cacheEntry, promiseNextPollRequest, r -> {});
+            final Instant now = Instant.now();
+            response.doResponseBegin(now, traceId);
+            cleanupRequestHeadersIfNecessary();
+
+            factory.counters.responsesCached.getAsLong();
+        }
+        else
         {
             requestGroup.enqueue(this);
         }
+    }
+
+    private boolean isCacheEntryUpdatedToBeServed(
+        ArrayFW<HttpHeaderFW> headers,
+        short authScope,
+        DefaultCacheEntry cacheEntry)
+    {
+        return cacheEntry != null &&
+               hasMaxAgeZero(headers) &&
+               requestGroup.hasQueuedRequests() &&
+               (ifNoneMatch == null || ifNoneMatch.equals(requestGroup.ifNoneMatchHeader())) &&
+               cacheEntry.canServeRequest(headers, authScope);
     }
 
     private void onRequestAbort(
