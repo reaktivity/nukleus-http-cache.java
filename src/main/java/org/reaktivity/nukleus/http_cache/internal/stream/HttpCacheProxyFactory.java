@@ -255,10 +255,11 @@ public class HttpCacheProxyFactory implements StreamFactory
         MessageConsumer newStream = null;
 
         final boolean isRequestCacheable = defaultCache.isRequestCacheable(headers);
+        final boolean matchCacheableRequest = defaultCache.matchCacheableRequest(headers, authorizationScope, requestHash);
         DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
 
         if (isRequestCacheable &&
-            defaultCache.matchCacheableRequest(headers, authorizationScope, requestHash) &&
+            matchCacheableRequest &&
             CacheUtils.isMatchByEtag(headers, cacheEntry.etag()))
         {
             counters.requestsCacheable.getAsLong();
@@ -271,12 +272,12 @@ public class HttpCacheProxyFactory implements StreamFactory
                     initialId);
             newStream = cachedNotModifiedRequest::onRequestMessage;
         }
-        else if (headers.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+        else if (headers.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED) && !matchCacheableRequest)
         {
             handleOnlyIfCachedRequest(initial,
-                                      routeId,
-                                      initialId,
-                                      traceId);
+                routeId,
+                initialId,
+                traceId);
         }
         else if (isRequestCacheable)
         {
