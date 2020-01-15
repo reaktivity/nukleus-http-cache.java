@@ -98,7 +98,8 @@ final class HttpCacheProxyCacheableRequest
 
     void doCachedResponse(
         Instant now,
-        long traceId)
+        long traceId,
+        boolean requestLeader)
     {
         final int requestHash = requestGroup.requestHash();
         final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
@@ -106,13 +107,14 @@ final class HttpCacheProxyCacheableRequest
             factory, reply, routeId, replyId, authorization,
             cacheEntry, promiseNextPollRequest, requestGroup::detach);
 
-        response.doResponseBegin(now, traceId);
+        response.doResponseBegin(now, traceId, requestLeader);
         requestGroup.attach(response);
         cleanupRequestHeadersIfNecessary();
     }
 
     void doNotModifiedResponse(
-        long traceId)
+        long traceId,
+        boolean requestLeader)
     {
         factory.defaultCache.send304(requestGroup.requestHash(),
                                      ifNoneMatch,
@@ -121,9 +123,14 @@ final class HttpCacheProxyCacheableRequest
                                      routeId,
                                      replyId,
                                      authorization,
-                                     promiseNextPollRequest);
+                                     promiseNextPollRequest,
+                                     traceId);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
+        if (!requestLeader)
+        {
+            factory.counters.responsesCached.getAsLong();
+        }
         cleanupRequestHeadersIfNecessary();
     }
 
@@ -245,6 +252,8 @@ final class HttpCacheProxyCacheableRequest
 
             doResponseTimeoutIfNecessary(headers);
         }
+
+        factory.counters.requestsCacheable.getAsLong();
     }
 
     private void onRequestData(
@@ -285,10 +294,8 @@ final class HttpCacheProxyCacheableRequest
                 factory, reply, routeId, replyId, authorization,
                 cacheEntry, promiseNextPollRequest, r -> {});
             final Instant now = Instant.now();
-            response.doResponseBegin(now, traceId);
+            response.doResponseBegin(now, traceId, false);
             cleanupRequestHeadersIfNecessary();
-
-            factory.counters.responsesCached.getAsLong();
         }
         else
         {
@@ -386,7 +393,6 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalPreferWaitExpired(
         long traceId)
     {
-        factory.counters.responses.getAsLong();
         factory.defaultCache.send304(requestGroup.requestHash(),
                                      ifNoneMatch,
                                      prefer,
@@ -394,11 +400,14 @@ final class HttpCacheProxyCacheableRequest
                                      routeId,
                                      replyId,
                                      authorization,
-                                     promiseNextPollRequest);
+                                     promiseNextPollRequest,
+                                     traceId);
 
         requestGroup.dequeue(this);
         requestGroup.onResponseAbandoned(traceId);
         cleanupRequest();
+
+        factory.counters.responses.getAsLong();
     }
 
     private void cleanupRequestTimeoutIfNecessary()

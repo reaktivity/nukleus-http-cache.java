@@ -309,9 +309,9 @@ public class DefaultCache
         long routeId,
         long replyId,
         long authorization,
-        boolean promiseNextPollRequest)
+        boolean promiseNextPollRequest,
+        long traceId)
     {
-        final long traceId = supplyTraceId.getAsLong();
 
         if (preferWait != null)
         {

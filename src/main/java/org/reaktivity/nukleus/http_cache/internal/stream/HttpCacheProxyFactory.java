@@ -250,7 +250,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = requestHash(authorizationScope, requestURL.hashCode());
 
-        counters.requests.getAsLong();
 
         MessageConsumer newStream = null;
 
@@ -262,9 +261,6 @@ public class HttpCacheProxyFactory implements StreamFactory
             matchCacheableRequest &&
             CacheUtils.isMatchByEtag(headers, cacheEntry.etag()))
         {
-            counters.requestsCacheable.getAsLong();
-            counters.responsesCached.getAsLong();
-
             final HttpCacheProxyCachedNotModifiedRequest cachedNotModifiedRequest =
                 new HttpCacheProxyCachedNotModifiedRequest(this,
                     initial,
@@ -281,7 +277,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else if (isRequestCacheable)
         {
-            counters.requestsCacheable.getAsLong();
             HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
 
             HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
@@ -304,6 +299,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                      requestURL,
                                                      requestHash);
         }
+        counters.requests.getAsLong();
 
         return newStream;
     }

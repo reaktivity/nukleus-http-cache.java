@@ -102,11 +102,11 @@ public final class HttpProxyCacheableRequestGroup
             final long traceId = factory.supplyTraceId.getAsLong();
             if (notModified)
             {
-                request.doNotModifiedResponse(traceId);
+                request.doNotModifiedResponse(traceId, false);
             }
             else
             {
-                request.doCachedResponse(Instant.now(), traceId);
+                request.doCachedResponse(Instant.now(), traceId, false);
             }
             queuedRequests.remove(request);
         }
@@ -163,13 +163,14 @@ public final class HttpProxyCacheableRequestGroup
         for (HttpCacheProxyCacheableRequest queuedRequest : queuedRequests)
         {
             final boolean notModified = etag != null && etag.equals(queuedRequest.ifNoneMatch);
+            final boolean requestLeader = groupRequest.request() == queuedRequest;
             if (notModified)
             {
-                queuedRequest.doNotModifiedResponse(traceId);
+                queuedRequest.doNotModifiedResponse(traceId, requestLeader);
             }
             else
             {
-                queuedRequest.doCachedResponse(now, traceId);
+                queuedRequest.doCachedResponse(now, traceId, requestLeader);
             }
         }
         queuedRequests.clear();
