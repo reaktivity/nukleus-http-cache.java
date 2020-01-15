@@ -190,9 +190,7 @@ public class Writer
         if (isPreferWait(requestHeaders))
         {
             builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
-                                         .value(PREFERENCE_APPLIED))
-                   .item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
-                                         .value(ETAG));
+                                         .value(String.format("%s, %s", PREFERENCE_APPLIED, ETAG)));
         }
 
         if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL) && isEmulatedProtocolStack)

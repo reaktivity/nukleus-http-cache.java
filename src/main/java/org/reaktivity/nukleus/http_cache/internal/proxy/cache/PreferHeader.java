@@ -44,8 +44,8 @@ public final class PreferHeader
     public static boolean isPreferenceApplied(
         ArrayFW<HttpHeaderFW> headers)
     {
-        String preferecenceApplied = getHeader(headers, PREFERENCE_APPLIED);
-        return preferecenceApplied != null;
+        String preferenceApplied = getHeader(headers, PREFERENCE_APPLIED);
+        return preferenceApplied != null;
     }
 
     public static final Predicate<? super HttpHeaderFW> PREFER_HEADER_NAME = h ->
