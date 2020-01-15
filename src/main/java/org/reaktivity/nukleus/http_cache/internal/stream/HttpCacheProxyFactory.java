@@ -75,6 +75,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final ResetFW resetRO = new ResetFW();
     final SignalFW signalRO = new SignalFW();
 
+    final HttpBeginExFW defaultHttpBeginExRO;
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
     final ArrayFW<HttpHeaderFW> httpHeadersRO = new ArrayFW<>(new HttpHeaderFW());
@@ -140,6 +141,13 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.executor = executor;
+
+        this.defaultHttpBeginExRO = new HttpBeginExFW.Builder()
+            .wrap(new UnsafeBuffer(new byte[64]), 0, 64)
+            .typeId(supplyTypeId.applyAsInt("http"))
+            .headersItem(h -> h.name(STATUS).value("500"))
+            .build();
+
     }
 
     public HttpProxyCacheableRequestGroup getRequestGroup(
@@ -218,11 +226,12 @@ public class HttpCacheProxyFactory implements StreamFactory
         if (newResponse != null)
         {
             final OctetsFW extension = begin.extension();
-            final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::tryWrap);
-            if (httpBeginFW != null)
+            HttpBeginExFW httpBeginEx = extension.get(httpBeginExRO::tryWrap);
+            if (httpBeginEx == null)
             {
-                newStream = newResponse.apply(httpBeginFW);
+                httpBeginEx = defaultHttpBeginExRO;
             }
+            newStream = newResponse.apply(httpBeginEx);
         }
 
         return newStream;
@@ -240,36 +249,51 @@ public class HttpCacheProxyFactory implements StreamFactory
         final String requestURL = getRequestURL(headers);
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = requestHash(authorizationScope, requestURL.hashCode());
-        final boolean isRequestCacheable = defaultCache.isRequestCacheable(headers);
 
         counters.requests.getAsLong();
 
         MessageConsumer newStream = null;
 
+        final boolean isRequestCacheable = defaultCache.isRequestCacheable(headers);
+        final boolean matchCacheableRequest = defaultCache.matchCacheableRequest(headers, authorizationScope, requestHash);
+        DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
+
         if (isRequestCacheable &&
-            defaultCache.matchCacheableRequest(headers, authorizationScope, requestHash))
+            matchCacheableRequest &&
+            CacheUtils.isMatchByEtag(headers, cacheEntry.etag()))
         {
-            newStream = newCachedStream(headers,
-                                        initial,
-                                        routeId,
-                                        initialId,
-                                        requestHash);
+            counters.requestsCacheable.getAsLong();
+            counters.responsesCached.getAsLong();
+
+            final HttpCacheProxyCachedNotModifiedRequest cachedNotModifiedRequest =
+                new HttpCacheProxyCachedNotModifiedRequest(this,
+                    initial,
+                    routeId,
+                    initialId);
+            newStream = cachedNotModifiedRequest::onRequestMessage;
         }
-        else if (headers.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED))
+        else if (headers.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED) && !matchCacheableRequest)
         {
             handleOnlyIfCachedRequest(initial,
-                                      routeId,
-                                      initialId,
-                                      traceId);
+                routeId,
+                initialId,
+                traceId);
         }
         else if (isRequestCacheable)
         {
+            counters.requestsCacheable.getAsLong();
+            HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
+
+            HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
+            if (authorizationHeader != null)
+            {
+                group.authorizationHeader(authorizationHeader.value().asString());
+            }
             newStream = newCacheableRequestStream(initial,
                                                   routeId,
                                                   initialId,
                                                   resolveId,
-                                                  headers,
-                                                  requestHash);
+                                                  group);
         }
         else
         {
@@ -310,17 +334,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         long routeId,
         long initialId,
         long resolveId,
-        ArrayFW<HttpHeaderFW> headers,
-        int requestHash)
+        HttpProxyCacheableRequestGroup group)
     {
-        counters.requestsCacheable.getAsLong();
-        HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
-
-        HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
-        if (authorizationHeader != null)
-        {
-            group.authorizationHeader(authorizationHeader.value().asString());
-        }
         final HttpCacheProxyCacheableRequest cacheableRequest =
             new HttpCacheProxyCacheableRequest(this,
                                                group,
@@ -352,40 +367,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         send504(initial, routeId, replyId, traceId);
     }
 
-    private MessageConsumer newCachedStream(
-        ArrayFW<HttpHeaderFW> requestHeaders,
-        MessageConsumer initial,
-        long routeId,
-        long initialId,
-        int requestHash)
-    {
-        counters.requestsCacheable.getAsLong();
-        counters.responsesCached.getAsLong();
-        MessageConsumer newStream;
-        DefaultCacheEntry cacheEntry = defaultCache.get(requestHash);
-        boolean etagMatched = CacheUtils.isMatchByEtag(requestHeaders, cacheEntry.etag());
-        if (etagMatched)
-        {
-            final HttpCacheProxyCachedNotModifiedRequest cachedNotModifiedRequest =
-                new HttpCacheProxyCachedNotModifiedRequest(this,
-                                                          initial,
-                                                          routeId,
-                                                          initialId);
-            newStream = cachedNotModifiedRequest::onRequestMessage;
-        }
-        else
-        {
-            final HttpCacheProxyCachedRequest cachedRequest =
-                new HttpCacheProxyCachedRequest(this,
-                                                requestHash,
-                                                initial,
-                                                routeId,
-                                                initialId);
-            newStream = cachedRequest::onRequestMessage;
-        }
-        return newStream;
-    }
-
     private RouteFW wrapRoute(
         int msgTypeId,
         DirectBuffer buffer,
@@ -401,7 +382,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         long acceptReplyId,
         long trace)
     {
-
         writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e ->
             e.item(h -> h.name(STATUS).value("504")));
         writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, trace);

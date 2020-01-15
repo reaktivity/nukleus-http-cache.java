@@ -15,8 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
@@ -109,12 +107,6 @@ final class HttpCacheProxyRetryResponse
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
         final String status = getHeader(headers, STATUS);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] onResponseBegin %016x %s\n", currentTimeMillis(), replyId, status);
-        }
-
         assert status != null;
 
         retryAfter = HttpHeadersUtil.retryAfter(headers);

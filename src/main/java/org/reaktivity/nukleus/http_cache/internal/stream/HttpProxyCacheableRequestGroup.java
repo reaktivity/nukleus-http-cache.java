@@ -91,14 +91,24 @@ public final class HttpProxyCacheableRequestGroup
         final boolean added = queuedRequests.add(request);
         assert added;
 
-        if (groupRequest == null)
+        if (groupRequest == null || !groupRequest.canDeferRequest(request))
         {
-            doRequest(request, request.ifNoneMatch);
+            doRequest(request);
         }
-        else if (!groupRequest.canDeferRequest(request))
+        else if (!attachedResponses.isEmpty())
         {
-            final String newIfNoneMatch = groupRequest.withIfNoneMatch(request.ifNoneMatch);
-            doRequest(request, newIfNoneMatch);
+            final String etag = cacheEntry.etag();
+            final boolean notModified = etag != null && etag.equals(request.ifNoneMatch);
+            final long traceId = factory.supplyTraceId.getAsLong();
+            if (notModified)
+            {
+                request.doNotModifiedResponse(traceId);
+            }
+            else
+            {
+                request.doCachedResponse(Instant.now(), traceId);
+            }
+            queuedRequests.remove(request);
         }
     }
 
@@ -127,7 +137,6 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     void onResponseAbandoned(
-        HttpCacheProxyCacheableRequest request,
         long traceId)
     {
         if (groupRequest != null &&
@@ -140,7 +149,6 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     void onGroupRequestReset(
-        HttpCacheProxyCacheableRequest request,
         long traceId)
     {
         queuedRequests.forEach(r -> r.do503RetryResponse(traceId));
@@ -149,8 +157,7 @@ public final class HttpProxyCacheableRequestGroup
 
     void onGroupResponseBegin(
         Instant now,
-        long traceId,
-        String ifNoneMatch)
+        long traceId)
     {
         final String etag = cacheEntry.etag();
         for (HttpCacheProxyCacheableRequest queuedRequest : queuedRequests)
@@ -175,7 +182,6 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     void onGroupResponseAbort(
-        HttpCacheProxyCacheableRequest request,
         long traceId)
     {
         queuedRequests.forEach(r -> r.do503RetryResponse(traceId));
@@ -196,8 +202,7 @@ public final class HttpProxyCacheableRequestGroup
     }
 
     private void doRequest(
-        HttpCacheProxyCacheableRequest request,
-        String ifNoneMatch)
+        HttpCacheProxyCacheableRequest request)
     {
         final long traceId = factory.supplyTraceId.getAsLong();
 
@@ -211,17 +216,15 @@ public final class HttpProxyCacheableRequestGroup
         this.groupRequest = new HttpCacheProxyGroupRequest(factory, this, request);
 
         groupRequest.doRequest(traceId);
+        request.onQueuedRequestSent();
     }
 
     private void flushNextRequest()
     {
         if (!queuedRequests.isEmpty())
         {
-            if (queuedRequests != null && !queuedRequests.isEmpty())
-            {
-                final HttpCacheProxyCacheableRequest nextRequest = queuedRequests.getFirst();
-                doRequest(nextRequest, nextRequest.ifNoneMatch);
-            }
+            final HttpCacheProxyCacheableRequest nextRequest = queuedRequests.getFirst();
+            doRequest(nextRequest);
         }
     }
 

@@ -20,7 +20,6 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_REQUESTS_NAME;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -123,7 +122,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -189,7 +187,6 @@ public class EdgeArchProxyIT
         counters.assertRequestsSlots(0);
     }
 
-    @Ignore("TODO")
     @Test
     @Specification({
         "${route}/proxy/controller",

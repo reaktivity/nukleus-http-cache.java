@@ -86,7 +86,7 @@ final class HttpCacheProxyGroupRequest
         headersSlot = factory.headersPool.acquire(replyId);
         if (headersSlot == NO_SLOT)
         {
-            requestGroup.onGroupRequestReset(request, traceId);
+            requestGroup.onGroupRequestReset(traceId);
             cleanupRequestIfNecessary();
         }
         else
@@ -243,7 +243,7 @@ final class HttpCacheProxyGroupRequest
         factory.correlations.remove(replyId);
         cleanupRequestIfNecessary();
 
-        requestGroup.onGroupRequestReset(request, traceId);
+        requestGroup.onGroupRequestReset(traceId);
     }
 
     private void doRetryRequestAfter(
@@ -365,7 +365,6 @@ final class HttpCacheProxyGroupRequest
             newStream = relayedResponse::onResponseMessage;
             resetHandler = relayedResponse::doResponseReset;
             cleanupRequestIfNecessary();
-
             requestGroup.onGroupRequestEnd(request);
         }
 

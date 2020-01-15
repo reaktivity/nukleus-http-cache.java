@@ -30,8 +30,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,7 +42,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 
 public final class CacheUtils
 {
-
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
     public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
@@ -52,7 +51,19 @@ public final class CacheUtils
         // utility class
     }
 
-    public static boolean isCacheableResponse(ArrayFW<HttpHeaderFW> response)
+    public static boolean hasMaxAgeZero(
+        ArrayFW<HttpHeaderFW> headers)
+    {
+        return headers.anyMatch(h ->
+        {
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            return CACHE_CONTROL.equals(name) && value.contains(MAX_AGE_0);
+        });
+    }
+
+    public static boolean isCacheableResponse(
+        ArrayFW<HttpHeaderFW> response)
     {
         if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
                               h.value().asString().contains(CacheDirectives.PRIVATE)) ||
@@ -65,33 +76,12 @@ public final class CacheUtils
         return isPrivatelyCacheable(response);
     }
 
-    public static boolean isPrivatelyCacheable(ArrayFW<HttpHeaderFW> response)
+    public static boolean isPrivatelyCacheable(
+        ArrayFW<HttpHeaderFW> response)
     {
         // TODO force passing of CacheControl as FW
-        String cacheControl = getHeader(response, HttpHeaders.CACHE_CONTROL);
-        if (cacheControl != null)
-        {
-            CacheControl parser = new CacheControl().parse(cacheControl);
-            Iterator<String> iter = parser.iterator();
-            while (iter.hasNext())
-            {
-                String directive = iter.next();
-                switch (directive)
-                {
-                // TODO expires
-                case NO_STORE:
-                case NO_CACHE:
-                    return false;
-                case PUBLIC:
-                case MAX_AGE:
-                case S_MAXAGE:
-                    return true;
-                default:
-                    break;
-                }
-            }
-        }
-        return response.anyMatch(h ->
+        boolean isCacheableByCacheControl = isCacheControlCacheable(response);
+        boolean isCacheableByStatusCode = response.anyMatch(h ->
         {
             final String name = h.name().asString();
             final String value = h.value().asString();
@@ -101,6 +91,36 @@ public final class CacheUtils
             }
             return false;
         });
+        return isCacheableByCacheControl && isCacheableByStatusCode;
+    }
+
+    public static Boolean isCacheControlCacheable(
+        ArrayFW<HttpHeaderFW> response)
+    {
+        String cacheControl = getHeader(response, HttpHeaders.CACHE_CONTROL);
+        boolean isCacheable = true;
+        if (cacheControl != null)
+        {
+            CacheControl parser = new CacheControl().parse(cacheControl);
+            loop:
+            for (Map.Entry<String, String> directive : parser.getValues().entrySet())
+            {
+                switch (directive.getKey())
+                {
+                case NO_STORE:
+                case NO_CACHE:
+                    isCacheable = false;
+                    break loop;
+                case PUBLIC:
+                case MAX_AGE:
+                case S_MAXAGE:
+                    break loop;
+                default:
+                    break;
+                }
+            }
+        }
+        return isCacheable;
     }
 
     public static boolean sameAuthorizationScope(

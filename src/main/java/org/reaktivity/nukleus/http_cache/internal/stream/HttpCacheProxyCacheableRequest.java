@@ -17,17 +17,17 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
-import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.hasMaxAgeZero;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferIfNoneMatch;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.PREFER_WAIT_EXPIRED_SIGNAL;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CONTENT_LENGTH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.time.Instant;
 import java.util.concurrent.Future;
@@ -91,6 +91,11 @@ final class HttpCacheProxyCacheableRequest
         this.replyId = factory.supplyReplyId.applyAsLong(initialId);
     }
 
+    void onQueuedRequestSent()
+    {
+        cleanupRequestHeadersIfNecessary();
+    }
+
     void doCachedResponse(
         Instant now,
         long traceId)
@@ -109,11 +114,14 @@ final class HttpCacheProxyCacheableRequest
     void doNotModifiedResponse(
         long traceId)
     {
-        factory.defaultCache.send304(ifNoneMatch,
+        factory.defaultCache.send304(requestGroup.requestHash(),
+                                     ifNoneMatch,
                                      prefer,
                                      reply,
                                      routeId,
-                                     replyId);
+                                     replyId,
+                                     authorization,
+                                     promiseNextPollRequest);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
         cleanupRequestHeadersIfNecessary();
@@ -196,12 +204,12 @@ final class HttpCacheProxyCacheableRequest
         promiseNextPollRequest = headers.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
 
         factory.writer.doWindow(reply,
-                routeId,
-                initialId,
-                traceId,
-                0L,
-                factory.initialWindowSize,
-                0);
+                                routeId,
+                                initialId,
+                                traceId,
+                                0L,
+                                factory.initialWindowSize,
+                                0);
 
         assert headersSlot == NO_SLOT;
         headersSlot = factory.headersPool.acquire(initialId);
@@ -213,7 +221,7 @@ final class HttpCacheProxyCacheableRequest
         {
             final MutableDirectBuffer headersBuffer = factory.headersPool.buffer(headersSlot);
             final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> newHeaders =
-                    factory.httpHeadersRW.wrap(headersBuffer, 0, headersBuffer.capacity());
+                factory.httpHeadersRW.wrap(headersBuffer, 0, headersBuffer.capacity());
             headers.forEach(h ->
             {
                 final String name = h.name().asString();
@@ -227,12 +235,7 @@ final class HttpCacheProxyCacheableRequest
 
             ifNoneMatch = getHeader(headers, IF_NONE_MATCH);
             prefer = getHeader(headers, PREFER);
-            maxAgeZero = !headers.anyMatch(h ->
-            {
-                final String name = h.name().asString();
-                final String value = h.value().asString();
-                return CACHE_CONTROL.equals(name) && value.contains(MAX_AGE_0);
-            });
+            maxAgeZero = hasMaxAgeZero(headers);
 
 
             final int requestHash = requestGroup.requestHash();
@@ -264,10 +267,45 @@ final class HttpCacheProxyCacheableRequest
     private void onRequestEnd(
         final EndFW end)
     {
-        if (headersSlot != NO_SLOT)
+        assert  headersSlot != NO_SLOT;
+
+        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.requestHash());
+        final ArrayFW<HttpHeaderFW> headers = getHeaders();
+        final short authScope = authorizationScope(authorization);
+        final boolean isCacheEntryUpToDate = isCacheEntryUpdatedToBeServed(headers, authScope, cacheEntry);
+        final boolean canBeCachedServed =
+            factory.defaultCache.matchCacheableRequest(headers, authScope, requestGroup.requestHash());
+
+        if (canBeCachedServed || isCacheEntryUpToDate)
+        {
+            final long traceId = end.traceId();
+
+            final long replyId = factory.supplyReplyId.applyAsLong(initialId);
+            final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
+                factory, reply, routeId, replyId, authorization,
+                cacheEntry, promiseNextPollRequest, r -> {});
+            final Instant now = Instant.now();
+            response.doResponseBegin(now, traceId);
+            cleanupRequestHeadersIfNecessary();
+
+            factory.counters.responsesCached.getAsLong();
+        }
+        else
         {
             requestGroup.enqueue(this);
         }
+    }
+
+    private boolean isCacheEntryUpdatedToBeServed(
+        ArrayFW<HttpHeaderFW> headers,
+        short authScope,
+        DefaultCacheEntry cacheEntry)
+    {
+        return cacheEntry != null &&
+               hasMaxAgeZero(headers) &&
+               requestGroup.hasQueuedRequests() &&
+               (ifNoneMatch == null || ifNoneMatch.equals(requestGroup.ifNoneMatchHeader())) &&
+               cacheEntry.canServeRequest(headers, authScope);
     }
 
     private void onRequestAbort(
@@ -328,7 +366,7 @@ final class HttpCacheProxyCacheableRequest
         final long traceId = reset.traceId();
         requestGroup.dequeue(this);
         cleanupRequest();
-        requestGroup.onResponseAbandoned(this, traceId);
+        requestGroup.onResponseAbandoned(traceId);
     }
 
     private void onResponseSignal(
@@ -349,14 +387,17 @@ final class HttpCacheProxyCacheableRequest
         long traceId)
     {
         factory.counters.responses.getAsLong();
-        factory.defaultCache.send304(ifNoneMatch,
+        factory.defaultCache.send304(requestGroup.requestHash(),
+                                     ifNoneMatch,
                                      prefer,
                                      reply,
                                      routeId,
-                                     replyId);
+                                     replyId,
+                                     authorization,
+                                     promiseNextPollRequest);
 
         requestGroup.dequeue(this);
-        requestGroup.onResponseAbandoned(this, traceId);
+        requestGroup.onResponseAbandoned(traceId);
         cleanupRequest();
     }
 

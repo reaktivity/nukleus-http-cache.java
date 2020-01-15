@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import java.time.Instant;
 import java.util.function.Consumer;
@@ -39,7 +40,7 @@ final class HttpCacheProxyCachedResponse
     private final HttpCacheProxyFactory factory;
     private final MessageConsumer reply;
     private final long routeId;
-    private final long replyId;
+    final long replyId;
     private final long authorization;
     private final DefaultCacheEntry cacheEntry;
     private final boolean promiseNextPollRequest;
@@ -104,11 +105,13 @@ final class HttpCacheProxyCachedResponse
         ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
         factory.router.setThrottle(replyId, this::onResponseMessage);
+        final ArrayFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
+        final String requestURL = getRequestURL(requestHeaders);
         factory.writer.doHttpResponseWithUpdatedHeaders(reply,
                                                         routeId,
                                                         replyId,
                                                         responseHeaders,
-                                                        cacheEntry.getRequestHeaders(),
+                                                        requestHeaders,
                                                         cacheEntry.etag(),
                                                         cacheEntry.isStale(now),
                                                         traceId);

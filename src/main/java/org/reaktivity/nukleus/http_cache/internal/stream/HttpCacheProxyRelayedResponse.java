@@ -126,13 +126,16 @@ public final class HttpCacheProxyRelayedResponse
         final long affinity = begin.affinity();
         final OctetsFW extension = begin.extension();
 
-        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::wrap);
-        final boolean hasEtag = httpBeginEx.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
-        final HttpHeaderFW status = httpBeginEx.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
+
+        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
+        final HttpBeginExFW httpBeginEx0 = (httpBeginEx == null) ? factory.defaultHttpBeginExRO : httpBeginEx;
+
+        final boolean hasEtag = httpBeginEx0.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
+        final HttpHeaderFW status = httpBeginEx0.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
         final int statusGroup = status != null ? parseInt(status.value().asString()) / 100 : 0;
         final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
         {
-            httpBeginEx.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
+            httpBeginEx0.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
             if ((statusGroup == 2 || statusGroup == 3) && prefer != null)
             {
                 hs.item(h -> h.name(PREFERENCE_APPLIED).value(prefer));
@@ -147,20 +150,20 @@ public final class HttpCacheProxyRelayedResponse
 
         Flyweight.Builder.Visitor mutator = (b, o, l) ->
             factory.httpBeginExRW.wrap(b, o, l)
-                         .typeId(httpBeginEx.typeId())
-                         .headers(headers)
-                         .build()
-                         .sizeof();
+                                 .typeId(httpBeginEx0.typeId())
+                                 .headers(headers)
+                                 .build()
+                                 .sizeof();
 
         final MutableDirectBuffer writeBuffer = factory.writeBuffer;
         final BeginFW newBegin = factory.beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                .routeId(receiverRouteId)
-                .streamId(receiverReplyId)
-                .traceId(traceId)
-                .authorization(authorization)
-                .affinity(affinity)
-                .extension(e -> e.set(mutator))
-                .build();
+                                                .routeId(receiverRouteId)
+                                                .streamId(receiverReplyId)
+                                                .traceId(traceId)
+                                                .authorization(authorization)
+                                                .affinity(affinity)
+                                                .extension(e -> e.set(mutator))
+                                                .build();
 
         factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
         receiver.accept(newBegin.typeId(), newBegin.buffer(), newBegin.offset(), newBegin.sizeof());
