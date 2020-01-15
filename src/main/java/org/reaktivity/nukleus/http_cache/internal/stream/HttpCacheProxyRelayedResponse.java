@@ -139,12 +139,8 @@ public final class HttpCacheProxyRelayedResponse
             if ((statusGroup == 2 || statusGroup == 3) && prefer != null)
             {
                 hs.item(h -> h.name(PREFERENCE_APPLIED).value(prefer));
-                hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED));
-
-                if (hasEtag)
-                {
-                    hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG));
-                }
+                final String exposedHeaders = hasEtag ? String.format("%s, %s", PREFERENCE_APPLIED, ETAG) : PREFERENCE_APPLIED;
+                hs.item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(exposedHeaders));
             }
         };
 
