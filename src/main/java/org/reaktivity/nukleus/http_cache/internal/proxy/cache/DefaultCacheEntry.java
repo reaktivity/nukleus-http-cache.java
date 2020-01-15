@@ -24,6 +24,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.sameAuthorizationScope;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.NOT_MODIFIED_304;
+import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl.getSurrogateAge;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -303,16 +304,16 @@ public final class DefaultCacheEntry
     }
 
     public boolean  canServeRequest(
-        ArrayFW<HttpHeaderFW> request,
+        ArrayFW<HttpHeaderFW> requestHeaders,
         short authScope)
     {
         Instant now = Instant.now();
 
-        final boolean canBeServedToAuthorized = canBeServedToAuthorized(request, authScope);
-        final boolean doesNotVaryBy = doesNotVaryBy(request);
-        final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(request, now);
-        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(request, now);
-        final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(request, now);
+        final boolean canBeServedToAuthorized = canBeServedToAuthorized(requestHeaders, authScope);
+        final boolean doesNotVaryBy = doesNotVaryBy(requestHeaders);
+        final boolean satisfiesFreshnessRequirements = satisfiesFreshnessRequirementsOf(requestHeaders, now);
+        final boolean satisfiesStalenessRequirements = satisfiesStalenessRequirementsOf(requestHeaders, now);
+        final boolean satisfiesAgeRequirements = satisfiesAgeRequirementsOf(requestHeaders, now);
 
         return canBeServedToAuthorized &&
                doesNotVaryBy &&
@@ -386,9 +387,11 @@ public final class DefaultCacheEntry
         return storeResponseData(data, written);
     }
 
-    public boolean isStale()
+    public boolean isStale(
+        Instant now)
     {
-        return Instant.now().isAfter(staleAt());
+        final Instant staleAt = staleAt();
+        return now.getEpochSecond() > staleAt.getEpochSecond();
     }
 
     private CacheControl responseCacheControl()
@@ -436,9 +439,9 @@ public final class DefaultCacheEntry
         final String requestCacheControlHeaderValue = getHeader(request, CACHE_CONTROL);
         final CacheControl requestCacheControl = cache.cachedRequestCacheControl.parse(requestCacheControlHeaderValue);
 
-        Instant staleAt = staleAt();
         if (requestCacheControl.contains(MIN_FRESH))
         {
+            Instant staleAt = staleAt();
             final String minFresh = requestCacheControl.getValue(MIN_FRESH);
             return now.plusSeconds(parseInt(minFresh)).isBefore(staleAt);
         }
@@ -478,7 +481,7 @@ public final class DefaultCacheEntry
         if (requestCacheControl.contains(MAX_AGE))
         {
             int requestMaxAge = parseInt(requestCacheControl.getValue(MAX_AGE));
-            Instant receivedAt = responseReceivedAt();
+            Instant receivedAt = receivedAt();
             return !receivedAt.plusSeconds(requestMaxAge).isBefore(now);
         }
         return true;
@@ -489,20 +492,33 @@ public final class DefaultCacheEntry
         if (cacheStaleAt == null)
         {
             final CacheControl cacheControl = responseCacheControl();
-            final Instant receivedAt = responseReceivedAt();
-            int staleInSeconds = cacheControl.contains(S_MAXAGE) ? parseInt(cacheControl.getValue(S_MAXAGE)) :
-                cacheControl.contains(MAX_AGE) ?  parseInt(cacheControl.getValue(MAX_AGE)) : 0;
-            final int surrogateAge = SurrogateControl.getSurrogateAge(this.getCachedResponseHeaders());
-            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
-            cacheStaleAt = receivedAt.plusSeconds(staleInSeconds);
+            final Instant receivedAt = receivedAt();
+            int staleInSeconds = 0;
 
-            return  cacheStaleAt;
+            final String sMaxAge = cacheControl.getValue(S_MAXAGE);
+            if (sMaxAge != null)
+            {
+                staleInSeconds = parseInt(sMaxAge);
+            }
+            else
+            {
+                final String maxAge = cacheControl.getValue(MAX_AGE);
+                if (maxAge != null)
+                {
+                    staleInSeconds = parseInt(maxAge);
+                }
+            }
+
+            final int surrogateAge = getSurrogateAge(this.getCachedResponseHeaders());
+            staleInSeconds = Math.max(staleInSeconds, surrogateAge);
+
+            cacheStaleAt = receivedAt.plusSeconds(staleInSeconds);
         }
 
         return cacheStaleAt;
     }
 
-    private Instant responseReceivedAt()
+    public Instant receivedAt()
     {
         if (cacheReceivedAt == null)
         {
@@ -511,12 +527,18 @@ public final class DefaultCacheEntry
                 getHeader(responseHeaders, HttpHeaders.DATE) : getHeader(responseHeaders, HttpHeaders.LAST_MODIFIED);
             try
             {
-                cacheReceivedAt = DATE_FORMAT.parse(dateHeaderValue).toInstant();
-                return cacheReceivedAt;
+                if (dateHeaderValue != null)
+                {
+                    cacheReceivedAt = DATE_FORMAT.parse(dateHeaderValue).toInstant();
+                }
+                else
+                {
+                    cacheReceivedAt = Instant.EPOCH;
+                }
             }
             catch (Exception e)
             {
-                return Instant.EPOCH;
+                cacheReceivedAt = Instant.EPOCH;
             }
         }
 

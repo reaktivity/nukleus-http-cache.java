@@ -15,12 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static java.lang.System.currentTimeMillis;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.DEBUG;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
-import java.util.function.Function;
+import java.util.function.LongConsumer;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -37,40 +35,41 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 final class HttpCacheProxyRetryResponse
 {
     private final HttpCacheProxyFactory factory;
-
-    private final int initialWindow;
-    private int connectReplyBudget;
-    private long retryAfter;
-
     private final int requestHash;
-    private final MessageConsumer connectReply;
-    private final long connectRouteId;
-    private final long connectReplyId;
-    private Function<Long, Boolean> scheduleRequest;
+    private final MessageConsumer initial;
+    private final long routeId;
+    private final long replyId;
+    private final LongConsumer retryRequestAfter;
 
+    private int replyBudget;
+    private long retryAfter;
 
     HttpCacheProxyRetryResponse(
         HttpCacheProxyFactory factory,
         int requestHash,
-        MessageConsumer connectReply,
-        long connectRouteId,
-        long connectReplyId,
-        Function<Long, Boolean> scheduleRequest)
+        MessageConsumer initial,
+        long routeId,
+        long initialId,
+        LongConsumer retryRequestAfter)
     {
         this.factory = factory;
         this.requestHash = requestHash;
-        this.connectReply = connectReply;
-        this.connectRouteId = connectRouteId;
-        this.connectReplyId = connectReplyId;
-        this.scheduleRequest = scheduleRequest;
-        this.initialWindow = factory.initialWindowSize;
+        this.initial = initial;
+        this.routeId = routeId;
+        this.replyId = factory.supplyReplyId.applyAsLong(initialId);
+        this.retryRequestAfter = retryRequestAfter;
     }
 
     @Override
     public String toString()
     {
-        return String.format("%s[connectRouteId=%016x, connectReplyStreamId=%d]",
-                             getClass().getSimpleName(), connectRouteId, connectReplyId);
+        return String.format("%s[routeId=%016x, replyId=%d]", getClass().getSimpleName(), routeId, replyId);
+    }
+
+    void doResponseReset(
+        long traceId)
+    {
+        factory.writer.doReset(initial, routeId, replyId, traceId);
     }
 
     void onResponseMessage(
@@ -83,72 +82,72 @@ final class HttpCacheProxyRetryResponse
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
+            onResponseBegin(begin);
             break;
         case DataFW.TYPE_ID:
             final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-            onData(data);
+            onResponseData(data);
             break;
         case EndFW.TYPE_ID:
             final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-            onEnd(end);
+            onResponseEnd(end);
             break;
         case AbortFW.TYPE_ID:
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-            onAbort(abort);
+            onResponseAbort(abort);
             break;
         }
     }
 
-    private void onBegin(
+    private void onResponseBegin(
         BeginFW begin)
     {
-        final long connectReplyId = begin.streamId();
+        final long traceId = begin.traceId();
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-
-        if (DEBUG)
-        {
-            System.out.printf("[%016x] CONNECT %016x %s [received response]\n", currentTimeMillis(), connectReplyId,
-                              getHeader(httpBeginFW.headers(), ":status"));
-        }
-
-        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
-        String status = getHeader(responseHeaders, STATUS);
-        retryAfter = HttpHeadersUtil.retryAfter(responseHeaders);
+        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+        final String status = getHeader(headers, STATUS);
         assert status != null;
 
-        factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, responseHeaders);
+        retryAfter = HttpHeadersUtil.retryAfter(headers);
 
-        sendWindow(initialWindow, begin.traceId());
+        factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, headers);
+
+        doResponseWindow(traceId, factory.initialWindowSize);
     }
 
-    private void onData(
+    private void onResponseData(
         DataFW data)
     {
-        sendWindow(data.reserved(), data.traceId());
+        final long traceId = data.traceId();
+        final int reserved = data.reserved();
+
+        doResponseWindow(traceId, reserved);
     }
 
-    private void onEnd(EndFW end)
+    private void onResponseEnd(
+        EndFW end)
     {
-        scheduleRequest.apply(retryAfter);
+        retryRequestAfter.accept(retryAfter);
     }
 
-    private void onAbort(AbortFW abort)
+    private void onResponseAbort(
+        AbortFW abort)
     {
-        scheduleRequest.apply(retryAfter);
+        retryRequestAfter.accept(retryAfter);
     }
 
-    private void sendWindow(
-        int credit,
-        long traceId)
+    private void doResponseWindow(
+        long traceId,
+        int credit)
     {
-        connectReplyBudget += credit;
-        if (connectReplyBudget > 0)
+        replyBudget += credit;
+
+        if (replyBudget > 0)
         {
-            factory.writer.doWindow(connectReply,
-                                    connectRouteId,
-                                    connectReplyId,
+            factory.writer.doWindow(initial,
+                                    routeId,
+                                    replyId,
                                     traceId,
                                     0L,
                                     credit,

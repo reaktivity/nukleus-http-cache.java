@@ -84,47 +84,47 @@ final class HttpCacheProxyNonCacheableResponse
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
+            onResponseBegin(begin);
             break;
         case DataFW.TYPE_ID:
             final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-            onData(data);
+            onResponseData(data);
             break;
         case EndFW.TYPE_ID:
             final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-            onEnd(end);
+            onResponseEnd(end);
             break;
         case AbortFW.TYPE_ID:
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-            onAbort(abort);
+            onResponseAbort(abort);
             break;
         case WindowFW.TYPE_ID:
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
-            onWindow(window);
+            onResponseWindow(window);
             break;
         case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-            onReset(reset);
+            onResponseReset(reset);
             break;
         }
     }
 
-    private void onBegin(
+    private void onResponseBegin(
         BeginFW begin)
     {
-        final long traceId = begin.traceId();
-
         final OctetsFW extension = begin.extension();
-        final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::tryWrap);
-        assert httpBeginFW != null;
-        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
+        final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
+        final HttpBeginExFW httpBeginExFinal = (httpBeginEx == null) ? factory.defaultHttpBeginExRO : httpBeginEx;
+
+        final long traceId = begin.traceId();
+        final ArrayFW<HttpHeaderFW> headers = httpBeginExFinal.headers();
 
         factory.writer.doHttpResponse(
             accept,
             acceptRouteId,
             acceptReplyId,
             traceId,
-            builder -> responseHeaders.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
+            builder -> headers.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
 
         // count all responses
         factory.counters.responses.getAsLong();
@@ -132,49 +132,59 @@ final class HttpCacheProxyNonCacheableResponse
         factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
                                                              requestHash,
                                                              requestURL,
-                                                             responseHeaders);
+                                                             traceId,
+                                                             headers);
     }
 
-    private void onData(
+    private void onResponseData(
         final DataFW data)
     {
+        final long traceId = data.traceId();
+        final long budgetId = data.budgetId();
+        final int reserved = data.reserved();
         final OctetsFW payload = data.payload();
-        acceptReplyBudget -= data.reserved();
+
+        acceptReplyBudget -= reserved;
         assert acceptReplyBudget >= 0;
 
         factory.writer.doHttpData(accept,
                                   acceptRouteId,
                                   acceptReplyId,
-                                  data.traceId(),
-                                  data.budgetId(),
+                                  traceId,
+                                  budgetId,
                                   payload.buffer(),
                                   payload.offset(),
                                   payload.sizeof(),
-                                  data.reserved());
+                                  reserved);
     }
 
-    private void onEnd(
+    private void onResponseEnd(
         final EndFW end)
     {
         final long traceId = end.traceId();
-        factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, traceId, end.extension());
+        final OctetsFW extension = end.extension();
+
+        factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, traceId, extension);
     }
 
-    private void onAbort(
+    private void onResponseAbort(
         final AbortFW abort)
     {
         final long traceId = abort.traceId();
+
         factory.writer.doAbort(accept, acceptRouteId, acceptReplyId, traceId);
     }
 
-    private void onWindow(
+    private void onResponseWindow(
         final WindowFW window)
     {
         final long traceId = window.traceId();
         final long budgetId = window.budgetId();
         final int credit = window.credit();
         final int padding = window.padding();
+
         acceptReplyBudget += credit;
+
         factory.writer.doWindow(connect,
                                 connectRouteId,
                                 connectReplyId,
@@ -184,7 +194,7 @@ final class HttpCacheProxyNonCacheableResponse
                                 padding);
     }
 
-    private void onReset(
+    private void onResponseReset(
         final ResetFW reset)
     {
         factory.writer.doReset(connect,

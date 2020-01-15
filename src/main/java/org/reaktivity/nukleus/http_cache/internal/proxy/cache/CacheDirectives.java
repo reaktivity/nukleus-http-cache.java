@@ -32,6 +32,7 @@ public final class CacheDirectives
     public static final String ONLY_IF_CACHED = "only-if-cached";
     public static final String MAX_STALE = "max-stale";
     public static final String MIN_FRESH = "min-fresh";
+    public static final String MAX_AGE_0 = "max-age=0";
 
     private CacheDirectives()
     {
@@ -44,5 +45,4 @@ public final class CacheDirectives
         String value = h.value().asString();
         return name.equals(HttpHeaders.CACHE_CONTROL) && value.contains(ONLY_IF_CACHED);
     };
-    public static final String MAX_AGE_0 = "max-age=0";
 }

@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream.util;
 
-import static org.reaktivity.nukleus.concurrent.Signaler.NO_CANCEL_ID;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.RESPONSE_IS_STALE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.isPreferWait;
@@ -61,7 +60,6 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 import org.reaktivity.nukleus.route.RouteManager;
-import org.reaktivity.nukleus.stream.StreamFactory;
 
 public class Writer
 {
@@ -88,25 +86,6 @@ public class Writer
         this.router = router;
         this.writeBuffer = writeBuffer;
         this.httpTypeId = supplyTypeId.applyAsInt("http");
-    }
-
-    public MessageConsumer newHttpStream(
-        StreamFactory factory,
-        long routeId,
-        long streamId,
-        long traceId,
-        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator,
-        MessageConsumer source)
-    {
-        final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                     .routeId(routeId)
-                                     .streamId(streamId)
-                                     .traceId(traceId)
-                                     .affinity(0L)
-                                     .extension(e -> e.set(visitHttpBeginEx(mutator)))
-                                     .build();
-
-        return factory.newStream(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof(), source);
     }
 
     public void doHttpRequest(
@@ -146,7 +125,6 @@ public class Writer
 
         receiver.accept(begin.typeId(), begin.buffer(), begin.offset(), begin.sizeof());
     }
-
 
     public void doHttpResponseWithUpdatedHeaders(
         MessageConsumer receiver,
@@ -217,17 +195,17 @@ public class Writer
                                          .value(ETAG));
         }
 
-        if (isStale)
-        {
-            builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
-        }
-
         if (!responseHeaders.anyMatch(HAS_CACHE_CONTROL) && isEmulatedProtocolStack)
         {
             final String value = hasPreferWait
                 ? "private, stale-while-revalidate=" + staleWhileRevalidate
                 : "stale-while-revalidate=" + staleWhileRevalidate;
             builder.item(header -> header.name("cache-control").value(value));
+        }
+
+        if (isStale)
+        {
+            builder.item(header -> header.name(WARNING).value(RESPONSE_IS_STALE));
         }
     }
 
@@ -427,43 +405,6 @@ public class Writer
         sender.accept(reset.typeId(), reset.buffer(), reset.offset(), reset.sizeof());
     }
 
-    public void doSignal(
-        long routeId,
-        long streamId,
-        long traceId,
-        int signalId)
-    {
-        long acceptInitialId = streamId | 0x01;
-        MessageConsumer receiver = router.supplyReceiver(acceptInitialId);
-        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-            .routeId(routeId)
-            .streamId(streamId)
-            .traceId(traceId)
-            .cancelId(NO_CANCEL_ID)
-            .signalId(signalId)
-            .build();
-
-        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
-    }
-
-    public void doSignal(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        long traceId,
-        int signalId)
-    {
-        final SignalFW signal = signalRW.wrap(writeBuffer, 0, writeBuffer.capacity())
-                                        .routeId(routeId)
-                                        .streamId(streamId)
-                                        .traceId(traceId)
-                                        .cancelId(NO_CANCEL_ID)
-                                        .signalId(signalId)
-                                        .build();
-
-        receiver.accept(signal.typeId(), signal.buffer(), signal.offset(), signal.sizeof());
-    }
-
     private Flyweight.Builder.Visitor visitHttpBeginEx(
         Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
@@ -645,5 +586,4 @@ public class Writer
             builder.item(h -> h.name(ETAG).value(getHeader(requestHeaders, IF_NONE_MATCH)));
         });
     }
-
 }

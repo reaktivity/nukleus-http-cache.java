@@ -149,17 +149,6 @@ public class DefaultCache
                              requestURI.getPath()).hashCode();
     }
 
-    public boolean matchCacheableResponse(
-        int requestHash,
-        String newEtag,
-        boolean hasIfNoneMatch)
-    {
-        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
-        return hasIfNoneMatch &&
-               cacheEntry != null &&
-               cacheEntry.etag() != null &&
-               cacheEntry.etag().equals(newEtag);
-    }
 
     public boolean matchCacheableRequest(
         ArrayFW<HttpHeaderFW> requestHeaders,
@@ -170,6 +159,7 @@ public class DefaultCache
 
         return satisfiedByCache(requestHeaders) &&
                cacheEntry != null &&
+               (cacheEntry.etag() != null || cacheEntry.isResponseCompleted()) &&
                cacheEntry.canServeRequest(requestHeaders, authScope);
     }
 
@@ -193,6 +183,7 @@ public class DefaultCache
         HttpCacheProxyFactory factory,
         int requestHash,
         String requestURL,
+        long traceId,
         ArrayFW<HttpHeaderFW> headers)
     {
         DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.remove(requestHash);
@@ -201,12 +192,13 @@ public class DefaultCache
             cacheEntry.invalidate();
         }
 
-        headers.forEach(header -> invalidateLinkCacheEntry(factory, requestURL, header));
+        headers.forEach(header -> invalidateLinkCacheEntry(factory, requestURL, traceId, header));
     }
 
     private void invalidateLinkCacheEntry(
         HttpCacheProxyFactory factory,
         String requestURL,
+        long traceId,
         HttpHeaderFW header)
     {
         final String linkName = header.name().asString();
@@ -240,7 +232,7 @@ public class DefaultCache
                             final HttpProxyCacheableRequestGroup requestGroup = factory.getRequestGroup(hash);
                             if (requestGroup != null)
                             {
-                                requestGroup.onCacheEntryInvalidated();
+                                requestGroup.onCacheEntryInvalidated(traceId);
                             }
                             entry.invalidate();
                         });
@@ -310,34 +302,55 @@ public class DefaultCache
     }
 
     public void send304(
+        int requestHash,
         String etag,
         String preferWait,
-        MessageConsumer acceptReply,
-        long acceptRouteId,
-        long acceptReplyId)
+        MessageConsumer reply,
+        long routeId,
+        long replyId,
+        long authorization,
+        boolean promiseNextPollRequest)
     {
+        final long traceId = supplyTraceId.getAsLong();
+
         if (preferWait != null)
         {
-            writer.doHttpResponse(acceptReply,
-                acceptRouteId,
-                acceptReplyId,
-                supplyTraceId.getAsLong(),
+            writer.doHttpResponse(
+                reply,
+                routeId,
+                replyId,
+                traceId,
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag))
                       .item(h -> h.name(PREFERENCE_APPLIED).value(preferWait))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(PREFERENCE_APPLIED))
                       .item(h -> h.name(ACCESS_CONTROL_EXPOSE_HEADERS).value(ETAG)));
+
+            if (promiseNextPollRequest)
+            {
+                DefaultCacheEntry cacheEntry = get(requestHash);
+                writer.doHttpPushPromise(
+                    reply,
+                    routeId,
+                    replyId,
+                    authorization,
+                    cacheEntry.getRequestHeaders(),
+                    cacheEntry.getCachedResponseHeaders(),
+                    cacheEntry.etag());
+            }
         }
         else
         {
             writer.doHttpResponse(
-                acceptReply,
-                acceptRouteId,
-                acceptReplyId,
-                supplyTraceId.getAsLong(),
+                reply,
+                routeId,
+                replyId,
+                traceId,
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag)));
         }
+
+        writer.doHttpEnd(reply, routeId, replyId, traceId);
     }
 
     public boolean isRequestCacheable(
@@ -388,10 +401,11 @@ public class DefaultCache
                 cacheEntry.updateResponseHeader(status, responseHeaders);
             }
         }
+
         return isSelectedForUpdate;
     }
 
-    private boolean satisfiedByCache(
+    public boolean satisfiedByCache(
         ArrayFW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
