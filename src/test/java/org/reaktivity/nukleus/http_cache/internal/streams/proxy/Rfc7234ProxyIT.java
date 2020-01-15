@@ -123,7 +123,6 @@ public class Rfc7234ProxyIT
         counters.assertRequestsSlots(0);
     }
 
-
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -237,7 +236,7 @@ public class Rfc7234ProxyIT
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(1000);
+        sleep(2000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertRequests(2);
@@ -300,7 +299,7 @@ public class Rfc7234ProxyIT
     {
         k3po.start();
         k3po.awaitBarrier("REQUEST_CACHED");
-        sleep(1000);
+        sleep(2000);
         k3po.notifyBarrier("CACHE_EXPIRED");
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
@@ -379,7 +378,7 @@ public class Rfc7234ProxyIT
         counters.assertRequestsCacheable(2);
         counters.assertResponses(2);
         counters.assertResponsesCached(0);
-        counters.assertExpectedCacheEntries(1); // In future this can change if we cache the entry
+        counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
 
@@ -1087,7 +1086,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
+        counters.assertResponsesCached(0);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }

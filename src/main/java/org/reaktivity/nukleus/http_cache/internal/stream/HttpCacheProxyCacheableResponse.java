@@ -15,15 +15,12 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
-import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.ETAG;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
-import java.util.function.Function;
+import java.time.Instant;
+import java.util.function.LongConsumer;
 
 import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
@@ -39,58 +36,56 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 
 final class HttpCacheProxyCacheableResponse
 {
+    private static final long NO_RETRY_AFTER = Long.MIN_VALUE;
     private final HttpCacheProxyFactory factory;
-
-    private final Function<Long, Boolean> retryRequest;
+    private final HttpCacheProxyCacheableRequest request;
     private final HttpProxyCacheableRequestGroup requestGroup;
 
-    private final MutableInteger requestSlot;
-    private final String requestURL;
-    private final int initialWindow;
-    private final int requestHash;
-    private final short authScope;
+    private final MessageConsumer initial;
+    private final long routeId;
+    private final long replyId;
+    private final DefaultCacheEntry cacheEntry;
+    private final LongConsumer retryRequestAfter;
+    private final Runnable cleanupRequest;
 
-    private DefaultCacheEntry cacheEntry;
-    private MessageConsumer connect;
     private String ifNoneMatch;
-    private String etag;
-    private long connectRouteId;
-    private long connectReplyId;
-
-    private int connectReplyBudget;
-    private boolean isResponseBuffering;
+    private int replyBudget;
+    private Instant responseAt;
+    private long retryAfter = NO_RETRY_AFTER;
 
     HttpCacheProxyCacheableResponse(
         HttpCacheProxyFactory factory,
-        HttpProxyCacheableRequestGroup requestGroup,
-        String requestURL,
-        MutableInteger requestSlot,
-        short authScope,
-        MessageConsumer connect,
-        long connectReplyId,
-        long connectRouteId,
-        Function<Long, Boolean> retryRequest)
+        HttpCacheProxyCacheableRequest request,
+        MessageConsumer initial,
+        long routeId,
+        long replyId,
+        DefaultCacheEntry cacheEntry,
+        LongConsumer retryRequestAfter,
+        Runnable cleanupRequest)
     {
         this.factory = factory;
-        this.requestGroup = requestGroup;
-        this.requestURL = requestURL;
-        this.requestSlot = requestSlot;
-        this.requestHash = requestGroup.getRequestHash();
-        this.authScope = authScope;
-        this.connect = connect;
-        this.connectRouteId = connectRouteId;
-        this.connectReplyId = connectReplyId;
-        this.initialWindow = factory.initialWindowSize;
-        this.ifNoneMatch = requestGroup.getEtag();
-        this.retryRequest = retryRequest;
-        assert requestSlot.value != NO_SLOT;
+        this.request = request;
+        this.requestGroup = request.requestGroup;
+        this.initial = initial;
+        this.routeId = routeId;
+        this.replyId = replyId;
+        this.ifNoneMatch = requestGroup.ifNoneMatchHeader(); // can this be removed?
+        this.cacheEntry = cacheEntry;
+        this.retryRequestAfter = retryRequestAfter;
+        this.cleanupRequest = cleanupRequest;
     }
 
     @Override
     public String toString()
     {
-        return String.format("%s[connectRouteId=%016x, connectReplyStreamId=%d, " +
-                "connectReplyBudget=%d]", getClass().getSimpleName(), connectRouteId, connectReplyId, connectReplyBudget);
+        return String.format("%s[routeId=%016x, replyId=%d, replyBudget=%d]",
+                getClass().getSimpleName(), routeId, replyId, replyBudget);
+    }
+
+    void doResponseReset(
+        long traceId)
+    {
+        factory.writer.doReset(initial, routeId, replyId, traceId);
     }
 
     void onResponseMessage(
@@ -103,140 +98,143 @@ final class HttpCacheProxyCacheableResponse
         {
         case BeginFW.TYPE_ID:
             final BeginFW begin = factory.beginRO.wrap(buffer, index, index + length);
-            onBegin(begin);
+            onResponseBegin(begin);
             break;
         case DataFW.TYPE_ID:
             final DataFW data = factory.dataRO.wrap(buffer, index, index + length);
-            onData(data);
+            onResponseData(data);
             break;
         case EndFW.TYPE_ID:
             final EndFW end = factory.endRO.wrap(buffer, index, index + length);
-            onEnd(end);
+            onResponseEnd(end);
             break;
         case AbortFW.TYPE_ID:
             final AbortFW abort = factory.abortRO.wrap(buffer, index, index + length);
-            onAbort(abort);
+            onResponseAbort(abort);
             break;
         }
     }
 
-    private void onBegin(
+    private void onResponseBegin(
         BeginFW begin)
     {
+        final long traceId = begin.traceId();
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ArrayFW<HttpHeaderFW> responseHeaders = httpBeginFW.headers();
-        final long traceId = begin.traceId();
+        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
 
-        cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);
-        cacheEntry.setSubscribers(requestGroup.getQueuedRequests());
-        etag = getHeader(responseHeaders, ETAG);
-        isResponseBuffering = etag == null;
-
-        if (!cacheEntry.storeRequestHeaders(getRequestHeaders()) ||
-            !cacheEntry.storeResponseHeaders(responseHeaders))
-        {
-            //This should never happen.
-            assert false;
-        }
-
-        cacheEntry.setEtag(etag);
-        if (!isResponseBuffering)
-        {
-            requestGroup.onCacheableResponseUpdated(etag);
-        }
-
-        sendWindow(initialWindow, traceId);
-    }
-
-    private void onData(
-        DataFW data)
-    {
-        sendWindow(data.reserved(), data.traceId());
-        boolean stored = cacheEntry.storeResponseData(data);
+        final boolean stored = cacheEntry.storeResponseHeaders(headers);
         assert stored;
-        if (!isResponseBuffering)
-        {
-            requestGroup.onCacheableResponseUpdated(etag);
-        }
-    }
 
-    private void onEnd(
-        EndFW end)
-    {
-        checkEtag(end, cacheEntry);
-        cacheEntry.setResponseCompleted(true);
+        final Instant receivedAt = cacheEntry.receivedAt();
+        final Instant now = Instant.now();
+        responseAt = receivedAt.isBefore(now) ? receivedAt : now;
+        requestGroup.cacheEntry(cacheEntry);
 
-        if (isResponseBuffering &&
+        final boolean hasEtagHeader = cacheEntry.etag() != null;
+        if (hasEtagHeader &&
             factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
                                                      cacheEntry))
         {
-            long retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
-            retryRequest.apply(retryAfter);
+            retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
         }
-        else
+
+        if (hasEtagHeader && retryAfter == NO_RETRY_AFTER)
         {
-            requestGroup.onCacheableResponseUpdated(etag);
-            purgeRequestSlotIfNecessary();
+            requestGroup.onGroupResponseBegin(responseAt, traceId);
+        }
+
+        doResponseWindow(traceId, factory.initialWindowSize);
+    }
+
+    private void onResponseData(
+        DataFW data)
+    {
+        final long traceId = data.traceId();
+        final int reserved = data.reserved();
+
+        doResponseWindow(traceId, reserved);
+
+        boolean stored = cacheEntry.storeResponseData(data);
+        assert stored;
+
+        final boolean hasEtagHeader = cacheEntry.etag() != null;
+        if (hasEtagHeader && retryAfter == NO_RETRY_AFTER)
+        {
+            requestGroup.onGroupResponseData(traceId);
         }
     }
 
-    private void onAbort(AbortFW abort)
+    private void onResponseEnd(
+        EndFW end)
     {
-        assert requestSlot.value != NO_SLOT;
-        requestGroup.onCacheableResponseAborted();
-
-        purgeRequestSlotIfNecessary();
-        factory.defaultCache.purge(requestHash);
-    }
-
-    private void checkEtag(
-        EndFW end,
-        DefaultCacheEntry cacheEntry)
-    {
+        final long traceId = end.traceId();
         final OctetsFW extension = end.extension();
-        if (extension.sizeof() > 0)
+        final HttpEndExFW httpEndEx = extension.get(factory.httpEndExRO::tryWrap);
+        final boolean hasEtagHeader = cacheEntry.etag() != null;
+
+        if (httpEndEx != null)
         {
-            final HttpEndExFW httpEndEx = extension.get(factory.httpEndExRO::wrap);
             ArrayFW<HttpHeaderFW> trailers = httpEndEx.trailers();
             HttpHeaderFW etag = trailers.matchFirst(h -> ETAG.equals(h.name().asString()));
             if (etag != null)
             {
-                this.etag = etag.value().asString();
-                cacheEntry.setEtag(this.etag);
+                String newEtag = etag.value().asString();
+                cacheEntry.setEtag(newEtag);
             }
+        }
+        cacheEntry.setResponseCompleted(true);
+
+        if (!hasEtagHeader &&
+            factory.defaultCache.checkTrailerToRetry(ifNoneMatch,
+                                                     cacheEntry))
+        {
+            retryAfter = HttpHeadersUtil.retryAfter(cacheEntry.getCachedResponseHeaders());
+        }
+
+        if (retryAfter != NO_RETRY_AFTER)
+        {
+            retryRequestAfter.accept(retryAfter);
+        }
+        else
+        {
+            if (!hasEtagHeader)
+            {
+                requestGroup.onGroupResponseBegin(responseAt, traceId);
+            }
+
+            cleanupRequest.run();
+            requestGroup.onGroupResponseData(traceId);
+            requestGroup.onGroupRequestEnd(request);
         }
     }
 
-    private void sendWindow(
-        int credit,
-        long traceId)
+    private void onResponseAbort(
+        AbortFW abort)
     {
-        connectReplyBudget += credit;
-        if (connectReplyBudget > 0)
+        final int requestHash = requestGroup.requestHash();
+        factory.defaultCache.purge(requestHash);
+
+        final long traceId = abort.traceId();
+        cleanupRequest.run();
+        requestGroup.onGroupResponseAbort(traceId);
+        requestGroup.onGroupRequestEnd(request);
+    }
+
+    private void doResponseWindow(
+        long traceId,
+        int credit)
+    {
+        replyBudget += credit;
+        if (replyBudget > 0)
         {
-            factory.writer.doWindow(connect,
-                                    connectRouteId,
-                                    connectReplyId,
+            factory.writer.doWindow(initial,
+                                    routeId,
+                                    replyId,
                                     traceId,
                                     0L,
                                     credit,
                                     0);
-        }
-    }
-
-    private ArrayFW<HttpHeaderFW> getRequestHeaders()
-    {
-        final MutableDirectBuffer buffer = factory.requestBufferPool.buffer(requestSlot.value);
-        return factory.requestHeadersRO.wrap(buffer, 0, buffer.capacity());
-    }
-
-    private void purgeRequestSlotIfNecessary()
-    {
-        if (requestSlot.value != NO_SLOT)
-        {
-            factory.requestBufferPool.release(requestSlot.value);
-            requestSlot.value = NO_SLOT;
         }
     }
 }

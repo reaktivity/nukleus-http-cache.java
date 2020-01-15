@@ -68,6 +68,7 @@ public class ProxyExceptionsIT
         counters.assertRequestsSlots(0);
     }
 
+    @Ignore("Request not processed until write closed")
     @Test
     @Specification({
         "${route}/proxy/controller",
@@ -95,6 +96,7 @@ public class ProxyExceptionsIT
         counters.assertRequestsSlots(0);
     }
 
+    @Ignore("Request not processed until write closed")
     @Test
     @Specification({
         "${route}/proxy/controller",

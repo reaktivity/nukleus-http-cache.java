@@ -20,7 +20,6 @@ import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_REQUESTS_NAME;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.DisableOnDebug;
@@ -29,6 +28,7 @@ import org.junit.rules.Timeout;
 import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
+import org.reaktivity.reaktor.ReaktorConfiguration;
 import org.reaktivity.reaktor.test.ReaktorRule;
 import org.reaktivity.reaktor.test.annotation.Configure;
 
@@ -49,6 +49,7 @@ public class EdgeArchProxyIT
             .counterValuesBufferCapacity(16384)
             .nukleus("http-cache"::equals)
             .affinityMask("target#0", EXTERNAL_AFFINITY_MASK)
+            .configure(ReaktorConfiguration.REAKTOR_DRAIN_ON_CLOSE, false)
             .clean();
 
     private final HttpCacheCountersRule counters = new HttpCacheCountersRule(reaktor);
@@ -131,7 +132,7 @@ public class EdgeArchProxyIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(1);
-        counters.assertRequestsSlots(1);
+        counters.assertRequestsSlots(0);
     }
 
     @Test
@@ -182,7 +183,7 @@ public class EdgeArchProxyIT
     public void shouldAbortPendingOnUpdateRequestsWhenFailedPollingUpdates() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
 
@@ -208,7 +209,7 @@ public class EdgeArchProxyIT
     public void shouldCancelPushPromisesOn403() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(0);
+        counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
 
@@ -314,5 +315,4 @@ public class EdgeArchProxyIT
         k3po.finish();
         counters.assertRequestsSlots(0);
     }
-
 }
