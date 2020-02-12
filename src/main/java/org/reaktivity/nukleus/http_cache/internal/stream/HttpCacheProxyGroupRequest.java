@@ -24,7 +24,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
-import java.util.Objects;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
@@ -109,12 +108,6 @@ final class HttpCacheProxyGroupRequest
                 (request.ifNoneMatch != null && request.ifNoneMatch.equals(newRequest.ifNoneMatch));
     }
 
-    String withIfNoneMatch(
-        String ifNoneMatch)
-    {
-        return Objects.equals(request.ifNoneMatch, ifNoneMatch) ? ifNoneMatch : null;
-    }
-
     void doRetryRequestImmediatelyIfPending(
         long traceId)
     {
@@ -143,6 +136,7 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doHttpRequest(initial, routeId, initialId, traceId, authorization,
                                      mutateRequestHeaders(headers));
         factory.correlations.put(replyId, this::newResponse);
+        factory.counters.requestsCacheableToOrigin.getAsLong();
     }
 
     private Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(

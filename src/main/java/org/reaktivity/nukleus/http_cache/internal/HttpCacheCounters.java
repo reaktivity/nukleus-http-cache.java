@@ -26,6 +26,7 @@ public class HttpCacheCounters
 
     public final LongSupplier requests;
     public final LongSupplier requestsCacheable;
+    public final LongSupplier requestsCacheableToOrigin;
     public final LongSupplier requestsRetry;
     public final LongSupplier responses;
     public final LongSupplier responsesRetry;
@@ -44,6 +45,7 @@ public class HttpCacheCounters
 
         this.requests = supplyCounter.apply("http-cache.requests");
         this.requestsCacheable = supplyCounter.apply("http-cache.requests.cacheable");
+        this.requestsCacheableToOrigin = supplyCounter.apply("http-cache.requests.cacheable.to.origin");
         this.requestsRetry = supplyCounter.apply("http-cache.requests.retry");
         this.responses = supplyCounter.apply("http-cache.responses");
         this.responsesRetry = supplyCounter.apply("http-cache.responses.retry");

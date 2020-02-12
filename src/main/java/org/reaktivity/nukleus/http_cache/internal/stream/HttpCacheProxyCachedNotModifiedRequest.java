@@ -95,7 +95,6 @@ final class HttpCacheProxyCachedNotModifiedRequest
 
         // count all responses
         factory.counters.requestsCacheable.getAsLong();
-        System.out.println("1");
         factory.counters.responsesCached.getAsLong();
         factory.counters.responses.getAsLong();
 
