@@ -99,8 +99,7 @@ final class HttpCacheProxyCachedResponse
 
     void doResponseBegin(
         Instant now,
-        long traceId,
-        boolean requestLeader)
+        long traceId)
     {
         ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
@@ -117,10 +116,7 @@ final class HttpCacheProxyCachedResponse
         responseProgress = 0;
 
         factory.counters.responses.getAsLong();
-        if (!requestLeader)
-        {
-            factory.counters.responsesCached.getAsLong();
-        }
+        factory.counters.responsesCached.getAsLong();
     }
 
     void doResponseFlush(
