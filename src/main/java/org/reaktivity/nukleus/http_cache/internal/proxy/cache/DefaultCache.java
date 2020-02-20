@@ -308,9 +308,9 @@ public class DefaultCache
         MessageConsumer reply,
         long routeId,
         long replyId,
+        long traceId,
         long authorization,
-        boolean promiseNextPollRequest,
-        long traceId)
+        boolean promiseNextPollRequest)
     {
 
         if (preferWait != null)

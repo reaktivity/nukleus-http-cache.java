@@ -120,9 +120,9 @@ final class HttpCacheProxyCacheableRequest
                                      reply,
                                      routeId,
                                      replyId,
+                                     traceId,
                                      authorization,
-                                     promiseNextPollRequest,
-                                     traceId);
+                                     promiseNextPollRequest);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
         factory.counters.responsesCached.getAsLong();
@@ -394,9 +394,9 @@ final class HttpCacheProxyCacheableRequest
                                      reply,
                                      routeId,
                                      replyId,
+                                     traceId,
                                      authorization,
-                                     promiseNextPollRequest,
-                                     traceId);
+                                     promiseNextPollRequest);
 
         requestGroup.dequeue(this);
         requestGroup.onResponseAbandoned(traceId);
