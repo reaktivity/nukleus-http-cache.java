@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -65,6 +65,11 @@ public class HttpCacheCountersRule implements TestRule
     public long responsesCached()
     {
         return reaktor.counter("http-cache.responses.cached");
+    }
+
+    public long groupRequestsCacheable()
+    {
+        return reaktor.counter("http-cache.group.requests.cacheable");
     }
 
     public long responsesAborted()
@@ -177,7 +182,7 @@ public class HttpCacheCountersRule implements TestRule
     public void assertResponsesCached(
         int expected)
     {
-        assertEquals(expected, responsesCached());
+        assertEquals(expected, Math.max(responsesCached() - groupRequestsCacheable(), 0));
     }
 
     public void assertResponsesAborted(

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -17,7 +17,6 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import static org.reaktivity.nukleus.budget.BudgetDebitor.NO_DEBITOR_INDEX;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry.NUM_OF_HEADER_SLOTS;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 
 import java.time.Instant;
 import java.util.function.Consumer;
@@ -106,7 +105,6 @@ final class HttpCacheProxyCachedResponse
 
         factory.router.setThrottle(replyId, this::onResponseMessage);
         final ArrayFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
-        final String requestURL = getRequestURL(requestHeaders);
         factory.writer.doHttpResponseWithUpdatedHeaders(reply,
                                                         routeId,
                                                         replyId,
@@ -118,6 +116,7 @@ final class HttpCacheProxyCachedResponse
         responseProgress = 0;
 
         factory.counters.responses.getAsLong();
+        factory.counters.responsesCached.getAsLong();
     }
 
     void doResponseFlush(

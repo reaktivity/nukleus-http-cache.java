@@ -6,7 +6,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.reaktivity</groupId>
   <artifactId>nukleus-http-cache</artifactId>
-  <version>0.124</version>
+  <version>0.125</version>
   <name>HTTP Cache Nukleus Implementation</name>
   <description>HTTP Cache Nukleus Implementation</description>
   <url>https://github.com/reaktivity/nukleus-http-cache.java</url>
@@ -139,7 +139,7 @@
         <configuration>
           <header>COPYRIGHT</header>
           <properties>
-            <copyrightYears>2016-2019</copyrightYears>
+            <copyrightYears>2016-2020</copyrightYears>
           </properties>
           <includes>
             <include>src/**</include>
@@ -179,7 +179,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>8.23</version>
+            <version>8.29</version>
           </dependency>
         </dependencies>
       </plugin>

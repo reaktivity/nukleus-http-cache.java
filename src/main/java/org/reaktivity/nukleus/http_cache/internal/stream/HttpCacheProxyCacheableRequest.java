@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -120,10 +120,12 @@ final class HttpCacheProxyCacheableRequest
                                      reply,
                                      routeId,
                                      replyId,
+                                     traceId,
                                      authorization,
                                      promiseNextPollRequest);
         factory.counters.responses.getAsLong();
         factory.counters.responsesNotModified.getAsLong();
+        factory.counters.responsesCached.getAsLong();
         cleanupRequestHeadersIfNecessary();
     }
 
@@ -245,6 +247,8 @@ final class HttpCacheProxyCacheableRequest
 
             doResponseTimeoutIfNecessary(headers);
         }
+
+        factory.counters.requestsCacheable.getAsLong();
     }
 
     private void onRequestData(
@@ -287,8 +291,6 @@ final class HttpCacheProxyCacheableRequest
             final Instant now = Instant.now();
             response.doResponseBegin(now, traceId);
             cleanupRequestHeadersIfNecessary();
-
-            factory.counters.responsesCached.getAsLong();
         }
         else
         {
@@ -386,19 +388,21 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseSignalPreferWaitExpired(
         long traceId)
     {
-        factory.counters.responses.getAsLong();
         factory.defaultCache.send304(requestGroup.requestHash(),
                                      ifNoneMatch,
                                      prefer,
                                      reply,
                                      routeId,
                                      replyId,
+                                     traceId,
                                      authorization,
                                      promiseNextPollRequest);
 
         requestGroup.dequeue(this);
         requestGroup.onResponseAbandoned(traceId);
         cleanupRequest();
+
+        factory.counters.responses.getAsLong();
     }
 
     private void cleanupRequestTimeoutIfNecessary()

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -26,6 +26,7 @@ public class HttpCacheCounters
 
     public final LongSupplier requests;
     public final LongSupplier requestsCacheable;
+    public final LongSupplier groupRequestsCacheable;
     public final LongSupplier requestsRetry;
     public final LongSupplier responses;
     public final LongSupplier responsesRetry;
@@ -44,6 +45,7 @@ public class HttpCacheCounters
 
         this.requests = supplyCounter.apply("http-cache.requests");
         this.requestsCacheable = supplyCounter.apply("http-cache.requests.cacheable");
+        this.groupRequestsCacheable = supplyCounter.apply("http-cache.group.requests.cacheable");
         this.requestsRetry = supplyCounter.apply("http-cache.requests.retry");
         this.responses = supplyCounter.apply("http-cache.responses");
         this.responsesRetry = supplyCounter.apply("http-cache.responses.retry");

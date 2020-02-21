@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -308,10 +308,10 @@ public class DefaultCache
         MessageConsumer reply,
         long routeId,
         long replyId,
+        long traceId,
         long authorization,
         boolean promiseNextPollRequest)
     {
-        final long traceId = supplyTraceId.getAsLong();
 
         if (preferWait != null)
         {

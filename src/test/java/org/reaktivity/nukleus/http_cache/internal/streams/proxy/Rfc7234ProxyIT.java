@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2019 The Reaktivity Project
+ * Copyright 2016-2020 The Reaktivity Project
  *
  * The Reaktivity Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -989,7 +989,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1010,7 +1010,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1031,7 +1031,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1052,7 +1052,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(1);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1069,7 +1069,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
+        counters.assertResponsesCached(2);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1086,7 +1086,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(0);
+        counters.assertResponsesCached(2);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1103,7 +1103,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
+        counters.assertResponsesCached(2);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
@@ -1120,7 +1120,7 @@ public class Rfc7234ProxyIT
         counters.assertRequests(3);
         counters.assertRequestsCacheable(3);
         counters.assertResponses(3);
-        counters.assertResponsesCached(1);
+        counters.assertResponsesCached(2);
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestsSlots(0);
     }
