@@ -136,7 +136,7 @@ final class HttpCacheProxyGroupRequest
         factory.writer.doHttpRequest(initial, routeId, initialId, traceId, authorization,
                                      mutateRequestHeaders(headers));
         factory.correlations.put(replyId, this::newResponse);
-        factory.counters.requestsCacheableToOrigin.getAsLong();
+        factory.counters.groupRequestsCacheable.getAsLong();
     }
 
     private Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(

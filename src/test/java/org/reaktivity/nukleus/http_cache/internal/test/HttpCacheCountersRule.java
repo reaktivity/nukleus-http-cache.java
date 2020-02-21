@@ -67,9 +67,9 @@ public class HttpCacheCountersRule implements TestRule
         return reaktor.counter("http-cache.responses.cached");
     }
 
-    public long requestToOrigin()
+    public long groupRequestsCacheable()
     {
-        return reaktor.counter("http-cache.requests.cacheable.to.origin");
+        return reaktor.counter("http-cache.group.requests.cacheable");
     }
 
     public long responsesAborted()
@@ -182,7 +182,7 @@ public class HttpCacheCountersRule implements TestRule
     public void assertResponsesCached(
         int expected)
     {
-        assertEquals(expected, Math.max(responsesCached() - requestToOrigin(), 0));
+        assertEquals(expected, Math.max(responsesCached() - groupRequestsCacheable(), 0));
     }
 
     public void assertResponsesAborted(
