@@ -308,10 +308,10 @@ public class DefaultCache
         MessageConsumer reply,
         long routeId,
         long replyId,
+        long traceId,
         long authorization,
         boolean promiseNextPollRequest)
     {
-        final long traceId = supplyTraceId.getAsLong();
 
         if (preferWait != null)
         {
