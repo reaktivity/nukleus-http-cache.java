@@ -31,6 +31,8 @@ public class HttpCacheCounters
     public final LongSupplier responses;
     public final LongSupplier responsesRetry;
     public final LongSupplier responsesNotModified;
+    public final LongSupplier responsesCacheable;
+    public final LongSupplier responsesNonCacheable;
     public final LongSupplier responsesCached;
     public final LongSupplier responsesPurged;
     public final LongSupplier responsesAbortedVary;
@@ -48,6 +50,8 @@ public class HttpCacheCounters
         this.groupRequestsCacheable = supplyCounter.apply("http-cache.group.requests.cacheable");
         this.requestsRetry = supplyCounter.apply("http-cache.requests.retry");
         this.responses = supplyCounter.apply("http-cache.responses");
+        this.responsesCacheable = supplyCounter.apply("http-cache.responses.cacheable");
+        this.responsesNonCacheable = supplyCounter.apply("http-cache.responses.non.cacheable");
         this.responsesRetry = supplyCounter.apply("http-cache.responses.retry");
         this.responsesNotModified = supplyCounter.apply("http-cache.responses.not.modified");
         this.responsesCached = supplyCounter.apply("http-cache.responses.cached");

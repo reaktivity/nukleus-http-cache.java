@@ -145,6 +145,8 @@ final class HttpCacheProxyCacheableResponse
         }
 
         doResponseWindow(traceId, factory.initialWindowSize);
+
+        factory.counters.responsesCacheable.getAsLong();
     }
 
     private void onResponseData(
