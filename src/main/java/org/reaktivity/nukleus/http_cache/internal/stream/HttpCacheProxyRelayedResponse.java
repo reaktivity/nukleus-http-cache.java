@@ -164,6 +164,5 @@ public final class HttpCacheProxyRelayedResponse
         factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
         receiver.accept(newBegin.typeId(), newBegin.buffer(), newBegin.offset(), newBegin.sizeof());
 
-        factory.counters.responsesNonCacheable.getAsLong();
     }
 }
