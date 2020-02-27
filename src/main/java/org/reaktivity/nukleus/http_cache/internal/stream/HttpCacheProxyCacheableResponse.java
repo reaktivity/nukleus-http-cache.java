@@ -145,8 +145,6 @@ final class HttpCacheProxyCacheableResponse
         }
 
         doResponseWindow(traceId, factory.initialWindowSize);
-
-        factory.counters.groupResponsesCacheable.getAsLong();
     }
 
     private void onResponseData(
@@ -208,6 +206,7 @@ final class HttpCacheProxyCacheableResponse
             cleanupRequest.run();
             requestGroup.onGroupResponseData(traceId);
             requestGroup.onGroupRequestEnd(request);
+            factory.counters.groupResponsesCacheable.getAsLong();
         }
     }
 
