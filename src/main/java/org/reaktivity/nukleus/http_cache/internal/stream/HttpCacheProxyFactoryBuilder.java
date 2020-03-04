@@ -49,7 +49,6 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private ToIntFunction<String> supplyTypeId;
     private LongUnaryOperator supplyReplyId;
     private LongFunction<BudgetDebitor> supplyDebitor;
-    private Slab cacheBufferPool;
     private HeapBufferPool requestBufferPool;
     private DefaultCache defaultCache;
     private Function<String, LongSupplier> supplyCounter;
@@ -57,6 +56,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private SignalingExecutor executor;
 
     private LongConsumer cacheEntries;
+    private LongConsumer requestGroupsCounter;
 
     public HttpCacheProxyFactoryBuilder(
             HttpCacheConfiguration config)
@@ -155,18 +155,19 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
             cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
-            cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
+            Slab cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
             requestBufferPool = new HeapBufferPool(config.maximumRequests(), httpCacheSlotCapacity);
             defaultCache = new DefaultCache(router,
                                             writeBuffer,
                                             cacheBufferPool,
                                             counters,
                                             cacheEntries,
-                                            supplyTraceId,
                                             supplyTypeId,
                                             config.allowedCachePercentage(),
                                             config.cacheCapacity());
         }
+
+        requestGroupsCounter = supplyAccumulator.apply("http-cache.request.groups");
 
         return new HttpCacheProxyFactory(config,
                                          router,
@@ -178,6 +179,7 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          correlations,
                                          defaultCache,
                                          counters,
+                                         requestGroupsCounter,
                                          supplyTraceId,
                                          supplyTypeId,
                                          executor);

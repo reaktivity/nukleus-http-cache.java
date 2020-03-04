@@ -92,11 +92,6 @@ public class HttpCacheCountersRule implements TestRule
         return reaktor.counter("http-cache.cache.entries");
     }
 
-    public long refreshRequests()
-    {
-        return reaktor.counter("http-cache.refresh.request.acquires");
-    }
-
     public long cachedRequestAcquires()
     {
         return reaktor.counter("http-cache.cached.request.acquires");
@@ -117,6 +112,11 @@ public class HttpCacheCountersRule implements TestRule
         return reaktor.counter("http-cache.cached.response.releases");
     }
 
+    public long requestGroups()
+    {
+        return reaktor.counter("http-cache.request.groups");
+    }
+
     private long requestSlots()
     {
         return reaktor.counter("http-cache.request.acquires") -
@@ -135,24 +135,17 @@ public class HttpCacheCountersRule implements TestRule
         assertEquals(NUM_OF_SLOTS_PER_CACHE_ENTRY * numberOfResponses, cacheSlots());
     }
 
-    public void assertExpectedCacheRefreshes(
-        int cacheInitiatedRefreshes)
-    {
-        assertEquals(cacheInitiatedRefreshes, refreshRequests());
-    }
-
-    public void assertExpectedCacheEntries(
-        int numberOfResponses,
-        int cacheInitiatedRefreshes)
-    {
-        assertExpectedCacheEntries(numberOfResponses);
-        assertExpectedCacheRefreshes(cacheInitiatedRefreshes);
-    }
-
-    public void assertRequestsSlots(
+    public void assertRequestsSlotsAndRequestGroups(
         int expected)
     {
         assertEquals(expected, requestSlots());
+        assertEquals(expected, requestGroups());
+    }
+
+    public void assertRequestGroups(
+        int expected)
+    {
+        assertEquals(expected, requestGroups());
     }
 
     public void assertRequests(

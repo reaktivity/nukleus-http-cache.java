@@ -103,7 +103,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
-                             factory.supplyTraceId.getAsLong(),
+                             traceId,
                              requestHeaders);
     }
 
@@ -143,14 +143,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
         int index,
         int length)
     {
-        switch (msgTypeId)
+        if (msgTypeId == ResetFW.TYPE_ID)
         {
-        case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
-            break;
-        default:
-            break;
         }
     }
 

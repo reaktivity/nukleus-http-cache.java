@@ -15,7 +15,6 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.proxy.cache;
 
-import static java.util.Objects.requireNonNull;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.MAX_AGE_0;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.NO_STORE;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isMatchByEtag;
@@ -34,8 +33,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.net.URI;
+import java.util.Set;
 import java.util.function.LongConsumer;
-import java.util.function.LongSupplier;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,7 +77,6 @@ public class DefaultCache
     private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> cachedEntriesByRequestHashWithoutQuery;
 
     private final LongConsumer entryCount;
-    private final LongSupplier supplyTraceId;
     private final HttpCacheCounters counters;
     private final int allowedSlots;
 
@@ -88,7 +86,6 @@ public class DefaultCache
         BufferPool cacheBufferPool,
         HttpCacheCounters counters,
         LongConsumer entryCount,
-        LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
         int allowedCachePercentage,
         int cacheCapacity)
@@ -108,7 +105,6 @@ public class DefaultCache
         this.cachedEntriesByRequestHash = new Int2ObjectHashMap<>();
         this.cachedEntriesByRequestHashWithoutQuery = new Int2ObjectHashMap<>();
         this.counters = counters;
-        this.supplyTraceId = requireNonNull(supplyTraceId);
         int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
         this.allowedSlots = (totalSlots * allowedCachePercentage) / 100;
     }
@@ -167,16 +163,15 @@ public class DefaultCache
         int requestHash)
     {
         DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.remove(requestHash);
-        if (cacheEntry != null)
-        {
-            final int requestHashWithoutQuery = cacheEntry.requestHashWithoutQuery();
-            cachedEntriesByRequestHashWithoutQuery.computeIfPresent(
-                requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
+        assert cacheEntry != null;
 
-            entryCount.accept(-1);
-            cacheEntry.purge();
-            counters.responsesPurged.getAsLong();
-        }
+        final int requestHashWithoutQuery = cacheEntry.requestHashWithoutQuery();
+        cachedEntriesByRequestHashWithoutQuery.computeIfPresent(
+            requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
+
+        entryCount.accept(-1);
+        cacheEntry.purge();
+        counters.responsesPurged.getAsLong();
     }
 
     public void invalidateCacheEntryIfNecessary(
@@ -186,7 +181,7 @@ public class DefaultCache
         long traceId,
         ArrayFW<HttpHeaderFW> headers)
     {
-        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.remove(requestHash);
+        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
         if (cacheEntry != null)
         {
             cacheEntry.invalidate();
@@ -352,40 +347,49 @@ public class DefaultCache
         writer.doHttpEnd(reply, routeId, replyId, traceId);
     }
 
+    public boolean isCacheFull()
+    {
+        return cacheBufferPool.acquiredSlots() >= allowedSlots;
+    }
+
     public boolean isRequestCacheable(
         ArrayFW<HttpHeaderFW> headers)
     {
-        return cacheBufferPool.acquiredSlots() <= allowedSlots &&
-            !headers.anyMatch(h ->
-            {
-                final String name = h.name().asString();
-                final String value = h.value().asString();
-                switch (name)
-                {
-                case CACHE_CONTROL:
-                    return value.contains(CacheDirectives.NO_STORE);
-                case METHOD:
-                    return !HttpMethods.GET.equalsIgnoreCase(value);
-                case TRANSFER_ENCODING:
-                    return true;
-                default:
-                    return false;
-                }
-            });
-    }
-
-    public void purgeEntriesForNonPendingRequests()
-    {
-        cachedEntriesByRequestHash.forEach((requestHash, cacheEntry) ->
+        return !headers.anyMatch(h ->
         {
-            if (cacheEntry.getSubscribers() == 0)
+            final String name = h.name().asString();
+            final String value = h.value().asString();
+            switch (name)
             {
-                purge(requestHash);
+            case CACHE_CONTROL:
+                return value.contains(CacheDirectives.NO_STORE);
+            case METHOD:
+                return !HttpMethods.GET.equalsIgnoreCase(value);
+            case TRANSFER_ENCODING:
+                return true;
+            default:
+                return false;
             }
         });
     }
 
-    public boolean updateResponseHeaderIfNecessary(
+    public boolean purgeEntriesForNonPendingRequests(
+        Set<Integer> requestHashes)
+    {
+        final boolean[] purgedCacheEntry = {false};
+        cachedEntriesByRequestHash.forEach((requestHash, cacheEntry) ->
+        {
+            if (!requestHashes.contains(requestHash))
+            {
+                purge(requestHash);
+                purgedCacheEntry[0] = true;
+            }
+        });
+
+        return purgedCacheEntry[0];
+    }
+
+    public void updateResponseHeaderIfNecessary(
         int requestHash,
         ArrayFW<HttpHeaderFW> responseHeaders)
     {
@@ -401,7 +405,6 @@ public class DefaultCache
             }
         }
 
-        return isSelectedForUpdate;
     }
 
     public boolean satisfiedByCache(

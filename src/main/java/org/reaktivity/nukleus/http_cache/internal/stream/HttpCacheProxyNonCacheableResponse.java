@@ -17,6 +17,7 @@ package org.reaktivity.nukleus.http_cache.internal.stream;
 
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -35,6 +36,7 @@ final class HttpCacheProxyNonCacheableResponse
     private final int requestHash;
     private final String requestURL;
 
+    private final String requestMethod;
     private final MessageConsumer connect;
     private final long connectRouteId;
     private final long connectReplyId;
@@ -49,6 +51,7 @@ final class HttpCacheProxyNonCacheableResponse
         HttpCacheProxyFactory factory,
         int requestHash,
         String requestURL,
+        String requestMethod,
         MessageConsumer connect,
         long connectRouteId,
         long connectReplyId,
@@ -59,6 +62,7 @@ final class HttpCacheProxyNonCacheableResponse
         this.factory = factory;
         this.requestHash = requestHash;
         this.requestURL = requestURL;
+        this.requestMethod = requestMethod;
         this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -129,11 +133,10 @@ final class HttpCacheProxyNonCacheableResponse
         // count all responses
         factory.counters.responses.getAsLong();
 
-        factory.defaultCache.invalidateCacheEntryIfNecessary(factory,
-                                                             requestHash,
-                                                             requestURL,
-                                                             traceId,
-                                                             headers);
+        if (CacheUtils.isMethodContentModifiable(requestMethod))
+        {
+            factory.defaultCache.invalidateCacheEntryIfNecessary(factory, requestHash, requestURL, traceId, headers);
+        }
     }
 
     private void onResponseData(

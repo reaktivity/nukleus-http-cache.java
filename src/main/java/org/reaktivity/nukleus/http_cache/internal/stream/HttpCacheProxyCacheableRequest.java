@@ -287,9 +287,10 @@ final class HttpCacheProxyCacheableRequest
             final long replyId = factory.supplyReplyId.applyAsLong(initialId);
             final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
                 factory, reply, routeId, replyId, authorization,
-                cacheEntry, promiseNextPollRequest, r -> {});
+                cacheEntry, promiseNextPollRequest, requestGroup::detach);
             final Instant now = Instant.now();
             response.doResponseBegin(now, traceId);
+            requestGroup.attach(response);
             cleanupRequestHeadersIfNecessary();
         }
         else
@@ -377,11 +378,9 @@ final class HttpCacheProxyCacheableRequest
         final long traceId = signal.traceId();
         final int signalId = signal.signalId();
 
-        switch (signalId)
+        if (signalId == PREFER_WAIT_EXPIRED_SIGNAL)
         {
-        case PREFER_WAIT_EXPIRED_SIGNAL:
             onResponseSignalPreferWaitExpired(traceId);
-            break;
         }
     }
 

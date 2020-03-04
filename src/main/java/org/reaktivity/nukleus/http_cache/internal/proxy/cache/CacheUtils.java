@@ -44,11 +44,19 @@ public final class CacheUtils
 {
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
+    public static final List<String> CONTENT_MODIFIABLE_METHODS = unmodifiableList(
+        asList("POST", "PUT", "DELETE", "PATCH"));
     public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
 
     private CacheUtils()
     {
         // utility class
+    }
+
+    public static boolean isMethodContentModifiable(
+        String method)
+    {
+        return CONTENT_MODIFIABLE_METHODS.contains(method);
     }
 
     public static boolean hasMaxAgeZero(

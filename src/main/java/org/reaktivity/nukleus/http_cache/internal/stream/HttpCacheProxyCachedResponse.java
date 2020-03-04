@@ -38,10 +38,10 @@ final class HttpCacheProxyCachedResponse
 {
     private final HttpCacheProxyFactory factory;
     private final MessageConsumer reply;
-    private final long routeId;
-    final long replyId;
-    private final long authorization;
     private final DefaultCacheEntry cacheEntry;
+    private final long routeId;
+    private final long replyId;
+    private final long authorization;
     private final boolean promiseNextPollRequest;
 
     private int replyBudget;
@@ -119,9 +119,10 @@ final class HttpCacheProxyCachedResponse
         factory.counters.responsesCached.getAsLong();
     }
 
-    void doResponseFlush(
+    boolean doResponseFlush(
         long traceId)
     {
+        boolean completed = false;
         final int remaining = cacheEntry.responseSize() - responseProgress;
         final int writable = Math.min(replyBudget - replyPadding, remaining);
 
@@ -161,7 +162,10 @@ final class HttpCacheProxyCachedResponse
         if (cacheEntry.isResponseCompleted() && responseProgress == cacheEntry.responseSize())
         {
             doResponseEnd(traceId);
+            completed = true;
         }
+
+        return completed;
     }
 
     void doResponseAbort(
@@ -173,7 +177,6 @@ final class HttpCacheProxyCachedResponse
                                traceId);
 
         cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
     }
 
     private void doResponseEnd(
@@ -199,14 +202,12 @@ final class HttpCacheProxyCachedResponse
                                  traceId);
 
         cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
     }
 
     private void onResponseReset(
         ResetFW reset)
     {
         cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
         resetHandler.accept(this);
     }
 
@@ -227,7 +228,10 @@ final class HttpCacheProxyCachedResponse
             replyDebitorIndex = replyDebitor.acquire(replyDebitorId, replyId, this::doResponseFlush);
         }
 
-        doResponseFlush(traceId);
+        if (doResponseFlush(traceId))
+        {
+            resetHandler.accept(this);
+        }
     }
 
     private void buildResponsePayload(

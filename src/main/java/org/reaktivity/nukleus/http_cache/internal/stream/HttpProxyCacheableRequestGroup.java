@@ -35,6 +35,7 @@ public final class HttpProxyCacheableRequestGroup
     private String authorizationHeader;
     private HttpCacheProxyGroupRequest groupRequest;
     private DefaultCacheEntry cacheEntry;
+    private boolean groupRequestDeleted;
 
     public void onCacheEntryInvalidated(
         long traceId)
@@ -81,7 +82,6 @@ public final class HttpProxyCacheableRequestGroup
     void cacheEntry(
         DefaultCacheEntry cacheEntry)
     {
-        cacheEntry.setSubscribers(attachedResponses.size());
         this.cacheEntry = cacheEntry;
     }
 
@@ -118,9 +118,16 @@ public final class HttpProxyCacheableRequestGroup
         boolean removed = queuedRequests.remove(request);
         assert removed;
 
-        if (queuedRequests.isEmpty())
+        cleanupRequestGroupIfNecessary();
+    }
+
+    private void cleanupRequestGroupIfNecessary()
+    {
+        if (!hasQueuedRequests() && !hasAttachedResponses() && !groupRequestDeleted)
         {
             cleaner.accept(requestHash);
+            factory.requestGroupsCounter.accept(-1);
+            groupRequestDeleted = true;
         }
     }
 
@@ -133,7 +140,8 @@ public final class HttpProxyCacheableRequestGroup
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        attachedResponses.remove(response);
+        assert attachedResponses.remove(response);
+        cleanupRequestGroupIfNecessary();
     }
 
     void onResponseAbandoned(
@@ -153,6 +161,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         queuedRequests.forEach(r -> r.do503RetryResponse(traceId));
         queuedRequests.clear();
+        cleanupRequestGroupIfNecessary();
     }
 
     void onGroupResponseBegin(
@@ -178,7 +187,8 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupResponseData(
         long traceId)
     {
-        attachedResponses.forEach(r -> r.doResponseFlush(traceId));
+        attachedResponses.removeIf(response -> response.doResponseFlush(traceId));
+        cleanupRequestGroupIfNecessary();
     }
 
     void onGroupResponseAbort(
@@ -189,6 +199,8 @@ public final class HttpProxyCacheableRequestGroup
 
         attachedResponses.forEach(r -> r.doResponseAbort(traceId));
         attachedResponses.clear();
+
+        cleanupRequestGroupIfNecessary();
     }
 
     void onGroupRequestEnd(
@@ -196,7 +208,6 @@ public final class HttpProxyCacheableRequestGroup
     {
         assert groupRequest.request() == request;
         groupRequest = null;
-        attachedResponses.clear();
 
         flushNextRequest();
     }
@@ -212,7 +223,6 @@ public final class HttpProxyCacheableRequestGroup
             groupRequest = null;
         }
 
-        assert groupRequest == null;
         this.groupRequest = new HttpCacheProxyGroupRequest(factory, this, request);
 
         groupRequest.doRequest(traceId);
