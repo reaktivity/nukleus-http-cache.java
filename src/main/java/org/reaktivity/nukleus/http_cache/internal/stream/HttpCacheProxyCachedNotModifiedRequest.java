@@ -143,10 +143,14 @@ final class HttpCacheProxyCachedNotModifiedRequest
         int index,
         int length)
     {
-        if (msgTypeId == ResetFW.TYPE_ID)
+        switch (msgTypeId)
         {
+        case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
+            break;
+        default:
+            break;
         }
     }
 
