@@ -369,6 +369,7 @@ final class HttpCacheProxyGroupRequest
         long traceId)
     {
         resetHandler.accept(traceId);
+        factory.router.clearThrottle(notifyId);
         cleanupRequestIfNecessary();
         state = HttpCacheRequestState.closingReply(state);
         flushResetIfNecessary(traceId);
