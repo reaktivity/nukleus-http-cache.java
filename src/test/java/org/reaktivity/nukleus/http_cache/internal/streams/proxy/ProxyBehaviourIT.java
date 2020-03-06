@@ -180,4 +180,20 @@ public class ProxyBehaviourIT
         counters.assertExpectedCacheEntries(1);
         counters.assertRequestGroups(0);
     }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/reset.stream.if.group.request.already.dequeued/accept/client",
+        "${streams}/reset.stream.if.group.request.already.dequeued/connect/server",
+    })
+    public void shouldResetStreamIfGroupRequestAlreadyDequeued() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("RESPONSE_ONE_RECEIVED");
+        k3po.notifyBarrier("SEND_GROUP_RESPONSE_ONE");
+        k3po.finish();
+        counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
+    }
 }

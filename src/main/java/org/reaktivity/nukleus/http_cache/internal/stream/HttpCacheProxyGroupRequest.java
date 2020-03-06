@@ -355,9 +355,12 @@ final class HttpCacheProxyGroupRequest
         }
         else
         {
-            final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
-            newStream = relayedResponse::onResponseMessage;
-            resetHandler = relayedResponse::doResponseReset;
+            if (requestGroup.isQueuedRequest(request))
+            {
+                final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
+                newStream = relayedResponse::onResponseMessage;
+                resetHandler = relayedResponse::doResponseReset;
+            }
             cleanupRequestIfNecessary();
             requestGroup.onGroupRequestEnd(request);
         }

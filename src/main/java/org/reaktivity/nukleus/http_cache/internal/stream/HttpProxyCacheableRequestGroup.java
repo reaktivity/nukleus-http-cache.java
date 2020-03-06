@@ -253,4 +253,10 @@ public final class HttpProxyCacheableRequestGroup
     {
         return attachedResponses.size() != detachedResponses.size();
     }
+
+    public boolean isQueuedRequest(
+        HttpCacheProxyCacheableRequest request)
+    {
+        return queuedRequests.contains(request);
+    }
 }
