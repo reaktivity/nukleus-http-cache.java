@@ -36,6 +36,8 @@ public class HttpCacheCounters
     public final LongSupplier responsesPurged;
     public final LongSupplier responsesAbortedVary;
     public final LongSupplier promises;
+    public final LongConsumer cacheEntries;
+    public final LongConsumer requestGroups;
 
     public HttpCacheCounters(
         Function<String, LongSupplier> supplyCounter,
@@ -56,5 +58,7 @@ public class HttpCacheCounters
         this.responsesAbortedVary = supplyCounter.apply("http-cache.responses.aborted.vary");
         this.responsesPurged = supplyCounter.apply("http-cache.responses.purge");
         this.promises = supplyCounter.apply("http-cache.promises");
+        this.cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
+        this.requestGroups = supplyAccumulator.apply("http-cache.request.groups");
     }
 }

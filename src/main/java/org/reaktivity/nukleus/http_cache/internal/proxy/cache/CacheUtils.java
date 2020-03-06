@@ -25,6 +25,7 @@ import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirect
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.PUBLIC;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives.S_MAXAGE;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.CACHE_CONTROL;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.METHOD;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.SURROGATE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
@@ -39,24 +40,28 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
+import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
+import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
 
 public final class CacheUtils
 {
     public static final List<String> CACHEABLE_BY_DEFAULT_STATUS_CODES = unmodifiableList(
             asList("200", "203", "204", "206", "300", "301", "404", "405", "410", "414", "501"));
-    public static final List<String> CONTENT_MODIFIABLE_METHODS = unmodifiableList(
-        asList("POST", "PUT", "DELETE", "PATCH"));
+    public static final List<String16FW> SAFE_METHOD = unmodifiableList(
+        asList(new String16FW("GET"), new String16FW("HEAD"), new String16FW("OPTIONS"),
+            new String16FW("TRACE")));
     public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
+    public static final StringFW METHOD_NAME = new StringFW(METHOD);
 
     private CacheUtils()
     {
         // utility class
     }
 
-    public static boolean isMethodContentModifiable(
-        String method)
+    public static boolean isMethodUnsafe(
+        ArrayFW<HttpHeaderFW> headers)
     {
-        return CONTENT_MODIFIABLE_METHODS.contains(method);
+        return headers.anyMatch(h -> METHOD_NAME.equals(h.name()) && !SAFE_METHOD.contains(h.value()));
     }
 
     public static boolean hasMaxAgeZero(

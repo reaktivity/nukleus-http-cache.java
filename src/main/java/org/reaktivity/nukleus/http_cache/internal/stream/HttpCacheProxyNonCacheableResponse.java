@@ -36,7 +36,7 @@ final class HttpCacheProxyNonCacheableResponse
     private final int requestHash;
     private final String requestURL;
 
-    private final String requestMethod;
+    private final boolean isMethodUnsafe;
     private final MessageConsumer connect;
     private final long connectRouteId;
     private final long connectReplyId;
@@ -51,7 +51,7 @@ final class HttpCacheProxyNonCacheableResponse
         HttpCacheProxyFactory factory,
         int requestHash,
         String requestURL,
-        String requestMethod,
+        boolean isMethodUnsafe,
         MessageConsumer connect,
         long connectRouteId,
         long connectReplyId,
@@ -62,7 +62,7 @@ final class HttpCacheProxyNonCacheableResponse
         this.factory = factory;
         this.requestHash = requestHash;
         this.requestURL = requestURL;
-        this.requestMethod = requestMethod;
+        this.isMethodUnsafe = isMethodUnsafe;
         this.connect = connect;
         this.connectRouteId = connectRouteId;
         this.connectReplyId = connectReplyId;
@@ -133,7 +133,7 @@ final class HttpCacheProxyNonCacheableResponse
         // count all responses
         factory.counters.responses.getAsLong();
 
-        if (CacheUtils.isMethodContentModifiable(requestMethod))
+        if (isMethodUnsafe)
         {
             factory.defaultCache.invalidateCacheEntryIfNecessary(factory, requestHash, requestURL, traceId, headers);
         }

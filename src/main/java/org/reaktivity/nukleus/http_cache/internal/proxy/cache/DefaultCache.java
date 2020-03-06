@@ -34,7 +34,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import java.net.URI;
 import java.util.Set;
-import java.util.function.LongConsumer;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -76,7 +75,6 @@ public class DefaultCache
     private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHash;
     private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> cachedEntriesByRequestHashWithoutQuery;
 
-    private final LongConsumer entryCount;
     private final HttpCacheCounters counters;
     private final int allowedSlots;
 
@@ -85,14 +83,12 @@ public class DefaultCache
         MutableDirectBuffer writeBuffer,
         BufferPool cacheBufferPool,
         HttpCacheCounters counters,
-        LongConsumer entryCount,
         ToIntFunction<String> supplyTypeId,
         int allowedCachePercentage,
         int cacheCapacity)
     {
         assert allowedCachePercentage >= 0 && allowedCachePercentage <= 100;
         this.cacheBufferPool = cacheBufferPool;
-        this.entryCount = entryCount;
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
@@ -169,7 +165,7 @@ public class DefaultCache
         cachedEntriesByRequestHashWithoutQuery.computeIfPresent(
             requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
 
-        entryCount.accept(-1);
+        counters.cacheEntries.accept(-1);
         cacheEntry.purge();
         counters.responsesPurged.getAsLong();
     }
@@ -373,20 +369,17 @@ public class DefaultCache
         });
     }
 
-    public boolean purgeEntriesForNonPendingRequests(
+    public void purgeEntriesForNonPendingRequests(
         Set<Integer> requestHashes)
     {
-        final boolean[] purgedCacheEntry = {false};
         cachedEntriesByRequestHash.forEach((requestHash, cacheEntry) ->
         {
             if (!requestHashes.contains(requestHash))
             {
                 purge(requestHash);
-                purgedCacheEntry[0] = true;
             }
         });
 
-        return purgedCacheEntry[0];
     }
 
     public void updateResponseHeaderIfNecessary(
@@ -404,7 +397,6 @@ public class DefaultCache
                 cacheEntry.updateResponseHeader(status, responseHeaders);
             }
         }
-
     }
 
     public boolean satisfiedByCache(
@@ -430,7 +422,7 @@ public class DefaultCache
         DefaultCacheEntry entry = get(requestHash);
         if (entry == null)
         {
-            entryCount.accept(1);
+            counters.cacheEntries.accept(1);
             return new DefaultCacheEntry(this,
                                          requestHash,
                                          authScope,

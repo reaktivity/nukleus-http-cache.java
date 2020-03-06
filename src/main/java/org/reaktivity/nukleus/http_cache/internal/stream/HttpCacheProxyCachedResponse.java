@@ -119,10 +119,9 @@ final class HttpCacheProxyCachedResponse
         factory.counters.responsesCached.getAsLong();
     }
 
-    boolean doResponseFlush(
+    void doResponseFlush(
         long traceId)
     {
-        boolean completed = false;
         final int remaining = cacheEntry.responseSize() - responseProgress;
         final int writable = Math.min(replyBudget - replyPadding, remaining);
 
@@ -162,10 +161,7 @@ final class HttpCacheProxyCachedResponse
         if (cacheEntry.isResponseCompleted() && responseProgress == cacheEntry.responseSize())
         {
             doResponseEnd(traceId);
-            completed = true;
         }
-
-        return completed;
     }
 
     void doResponseAbort(
@@ -202,6 +198,7 @@ final class HttpCacheProxyCachedResponse
                                  traceId);
 
         cleanupResponseIfNecessary();
+        resetHandler.accept(this);
     }
 
     private void onResponseReset(
@@ -228,10 +225,7 @@ final class HttpCacheProxyCachedResponse
             replyDebitorIndex = replyDebitor.acquire(replyDebitorId, replyId, this::doResponseFlush);
         }
 
-        if (doResponseFlush(traceId))
-        {
-            resetHandler.accept(this);
-        }
+        doResponseFlush(traceId);
     }
 
     private void buildResponsePayload(

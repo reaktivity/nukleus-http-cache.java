@@ -378,9 +378,11 @@ final class HttpCacheProxyCacheableRequest
         final long traceId = signal.traceId();
         final int signalId = signal.signalId();
 
-        if (signalId == PREFER_WAIT_EXPIRED_SIGNAL)
+        switch (signalId)
         {
+        case PREFER_WAIT_EXPIRED_SIGNAL:
             onResponseSignalPreferWaitExpired(traceId);
+            break;
         }
     }
 

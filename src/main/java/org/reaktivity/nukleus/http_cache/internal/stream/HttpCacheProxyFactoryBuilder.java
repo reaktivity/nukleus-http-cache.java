@@ -55,9 +55,6 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
     private Function<String, LongConsumer> supplyAccumulator;
     private SignalingExecutor executor;
 
-    private LongConsumer cacheEntries;
-    private LongConsumer requestGroupsCounter;
-
     public HttpCacheProxyFactoryBuilder(
             HttpCacheConfiguration config)
     {
@@ -152,7 +149,6 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
 
         if (defaultCache == null)
         {
-            cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
             final int httpCacheCapacity = config.cacheCapacity();
             final int httpCacheSlotCapacity = config.cacheSlotCapacity();
             Slab cacheBufferPool = new Slab(httpCacheCapacity, httpCacheSlotCapacity);
@@ -161,13 +157,10 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                             writeBuffer,
                                             cacheBufferPool,
                                             counters,
-                                            cacheEntries,
                                             supplyTypeId,
                                             config.allowedCachePercentage(),
                                             config.cacheCapacity());
         }
-
-        requestGroupsCounter = supplyAccumulator.apply("http-cache.request.groups");
 
         return new HttpCacheProxyFactory(config,
                                          router,
@@ -179,7 +172,6 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                          correlations,
                                          defaultCache,
                                          counters,
-                                         requestGroupsCounter,
                                          supplyTraceId,
                                          supplyTypeId,
                                          executor);

@@ -31,6 +31,7 @@ public final class HttpProxyCacheableRequestGroup
     private final int requestHash;
     private final Deque<HttpCacheProxyCacheableRequest> queuedRequests;
     private final Set<HttpCacheProxyCachedResponse> attachedResponses;
+    private final Set<HttpCacheProxyCachedResponse> detachedResponses;
 
     private String authorizationHeader;
     private HttpCacheProxyGroupRequest groupRequest;
@@ -56,6 +57,7 @@ public final class HttpProxyCacheableRequestGroup
         this.requestHash = requestHash;
         this.queuedRequests = new LinkedList<>();
         this.attachedResponses = new HashSet<>();
+        this.detachedResponses = new HashSet<>();
     }
 
     int requestHash()
@@ -126,7 +128,7 @@ public final class HttpProxyCacheableRequestGroup
         if (!hasQueuedRequests() && !hasAttachedResponses() && !groupRequestDeleted)
         {
             cleaner.accept(requestHash);
-            factory.requestGroupsCounter.accept(-1);
+            factory.counters.requestGroups.accept(-1);
             groupRequestDeleted = true;
         }
     }
@@ -140,7 +142,8 @@ public final class HttpProxyCacheableRequestGroup
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        assert attachedResponses.remove(response);
+        assert attachedResponses.contains(response);
+        detachedResponses.add(response);
         cleanupRequestGroupIfNecessary();
     }
 
@@ -187,7 +190,9 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupResponseData(
         long traceId)
     {
-        attachedResponses.removeIf(response -> response.doResponseFlush(traceId));
+        attachedResponses.removeIf(detachedResponses::contains);
+        detachedResponses.clear();
+        attachedResponses.forEach(response -> response.doResponseFlush(traceId));
         cleanupRequestGroupIfNecessary();
     }
 
@@ -199,6 +204,7 @@ public final class HttpProxyCacheableRequestGroup
 
         attachedResponses.forEach(r -> r.doResponseAbort(traceId));
         attachedResponses.clear();
+        detachedResponses.clear();
 
         cleanupRequestGroupIfNecessary();
     }
@@ -245,6 +251,6 @@ public final class HttpProxyCacheableRequestGroup
 
     boolean hasAttachedResponses()
     {
-        return !attachedResponses.isEmpty();
+        return attachedResponses.size() != detachedResponses.size();
     }
 }

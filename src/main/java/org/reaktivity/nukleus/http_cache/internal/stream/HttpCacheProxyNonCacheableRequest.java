@@ -36,7 +36,7 @@ final class HttpCacheProxyNonCacheableRequest
     private final MessageConsumer initial;
     private final long routeId;
     private final long initialId;
-    private String requestMethod;
+    private final boolean isMethodUnsafe;
     final long replyId;
 
     private final MessageConsumer connectInitial;
@@ -57,13 +57,13 @@ final class HttpCacheProxyNonCacheableRequest
         long resolveId,
         int requestHash,
         String requestURL,
-        String requestMethod)
+        boolean isMethodUnsafe)
     {
         this.factory = factory;
         this.initial = initial;
         this.routeId = routeId;
         this.initialId = initialId;
-        this.requestMethod = requestMethod;
+        this.isMethodUnsafe = isMethodUnsafe;
         this.replyId = factory.supplyReplyId.applyAsLong(initialId);
         this.requestHash = requestHash;
         this.requestURL = requestURL;
@@ -81,7 +81,7 @@ final class HttpCacheProxyNonCacheableRequest
             new HttpCacheProxyNonCacheableResponse(factory,
                                                    requestHash,
                                                    requestURL,
-                                                   requestMethod,
+                                                   isMethodUnsafe,
                                                    connectReply,
                                                    connectRouteId,
                                                    connectReplyId,
@@ -98,10 +98,12 @@ final class HttpCacheProxyNonCacheableRequest
         int index,
         int length)
     {
-        if (msgTypeId == ResetFW.TYPE_ID)
+        switch (msgTypeId)
         {
+        case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
+            break;
         }
     }
 
