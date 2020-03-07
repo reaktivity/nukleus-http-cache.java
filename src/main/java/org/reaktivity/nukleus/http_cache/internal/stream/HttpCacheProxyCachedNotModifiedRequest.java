@@ -103,7 +103,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.do304(acceptReply,
                              acceptRouteId,
                              acceptReplyId,
-                             factory.supplyTraceId.getAsLong(),
+                             traceId,
                              requestHeaders);
     }
 

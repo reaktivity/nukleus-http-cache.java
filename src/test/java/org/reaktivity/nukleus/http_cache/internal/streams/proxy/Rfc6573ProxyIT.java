@@ -62,7 +62,7 @@ public class Rfc6573ProxyIT
     public void shouldInvalidateCacheWhenCollectionRelativePath() throws Exception
     {
         k3po.finish();
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Test
@@ -74,7 +74,7 @@ public class Rfc6573ProxyIT
     public void shouldInvalidateCacheWhenCollectionSameOrigin() throws Exception
     {
         k3po.finish();
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Test
@@ -86,7 +86,7 @@ public class Rfc6573ProxyIT
     public void shouldInvalidateCachWithMultipleLinkTargets() throws Exception
     {
         k3po.finish();
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Test
@@ -98,6 +98,6 @@ public class Rfc6573ProxyIT
     public void shouldIgnoreLinkWhenCollectionCrossOrigin() throws Exception
     {
         k3po.finish();
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 }

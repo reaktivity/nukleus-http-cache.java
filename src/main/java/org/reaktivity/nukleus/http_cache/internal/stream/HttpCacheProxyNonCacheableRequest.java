@@ -36,6 +36,7 @@ final class HttpCacheProxyNonCacheableRequest
     private final MessageConsumer initial;
     private final long routeId;
     private final long initialId;
+    private final boolean isMethodUnsafe;
     final long replyId;
 
     private final MessageConsumer connectInitial;
@@ -55,12 +56,14 @@ final class HttpCacheProxyNonCacheableRequest
         long initialId,
         long resolveId,
         int requestHash,
-        String requestURL)
+        String requestURL,
+        boolean isMethodUnsafe)
     {
         this.factory = factory;
         this.initial = initial;
         this.routeId = routeId;
         this.initialId = initialId;
+        this.isMethodUnsafe = isMethodUnsafe;
         this.replyId = factory.supplyReplyId.applyAsLong(initialId);
         this.requestHash = requestHash;
         this.requestURL = requestURL;
@@ -78,6 +81,7 @@ final class HttpCacheProxyNonCacheableRequest
             new HttpCacheProxyNonCacheableResponse(factory,
                                                    requestHash,
                                                    requestURL,
+                                                   isMethodUnsafe,
                                                    connectReply,
                                                    connectRouteId,
                                                    connectReplyId,

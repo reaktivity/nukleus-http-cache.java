@@ -65,7 +65,6 @@ public final class DefaultCacheEntry
     private int requestSlot = NO_SLOT;
     private int responseHeadersSize;
     private int responseSize;
-    private int subscribers;
     private boolean validationRequired;
     private boolean responseCompleted;
     private Instant cacheStaleAt;
@@ -140,17 +139,6 @@ public final class DefaultCacheEntry
         validationRequired = true;
     }
 
-    public void setSubscribers(
-        int numberOfSubscribers)
-    {
-        this.subscribers += numberOfSubscribers;
-    }
-
-    public int getSubscribers()
-    {
-        return subscribers;
-    }
-
     public IntArrayList getResponseSlots()
     {
         return responseSlots;
@@ -179,12 +167,7 @@ public final class DefaultCacheEntry
         int requestHeaderSlot = requestPool.acquire(requestHash);
         if (requestHeaderSlot == NO_SLOT)
         {
-            cache.purgeEntriesForNonPendingRequests();
-            requestHeaderSlot = requestPool.acquire(requestHash);
-            if (requestHeaderSlot == NO_SLOT)
-            {
-                return false;
-            }
+            return false;
         }
         requestSlot = requestHeaderSlot;
 
@@ -230,12 +213,7 @@ public final class DefaultCacheEntry
         int headerSlot = responsePool.acquire(requestHash);
         if (headerSlot == NO_SLOT)
         {
-            cache.purgeEntriesForNonPendingRequests();
-            headerSlot = responsePool.acquire(requestHash);
-            if (headerSlot == NO_SLOT)
-            {
-                return false;
-            }
+            return false;
         }
         responseSlots.add(headerSlot);
 
@@ -366,12 +344,7 @@ public final class DefaultCacheEntry
             int newSlot = responsePool.acquire(requestHash);
             if (newSlot == NO_SLOT)
             {
-                cache.purgeEntriesForNonPendingRequests();
-                newSlot = responsePool.acquire(requestHash);
-                if (newSlot == NO_SLOT)
-                {
-                    return false;
-                }
+                return false;
             }
             responseSlots.add(newSlot);
         }

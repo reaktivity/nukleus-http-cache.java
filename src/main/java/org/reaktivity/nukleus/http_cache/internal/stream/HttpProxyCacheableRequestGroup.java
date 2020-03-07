@@ -31,10 +31,12 @@ public final class HttpProxyCacheableRequestGroup
     private final int requestHash;
     private final Deque<HttpCacheProxyCacheableRequest> queuedRequests;
     private final Set<HttpCacheProxyCachedResponse> attachedResponses;
+    private final Set<HttpCacheProxyCachedResponse> detachedResponses;
 
     private String authorizationHeader;
     private HttpCacheProxyGroupRequest groupRequest;
     private DefaultCacheEntry cacheEntry;
+    private boolean groupRequestDeleted;
 
     public void onCacheEntryInvalidated(
         long traceId)
@@ -55,6 +57,7 @@ public final class HttpProxyCacheableRequestGroup
         this.requestHash = requestHash;
         this.queuedRequests = new LinkedList<>();
         this.attachedResponses = new HashSet<>();
+        this.detachedResponses = new HashSet<>();
     }
 
     int requestHash()
@@ -81,7 +84,6 @@ public final class HttpProxyCacheableRequestGroup
     void cacheEntry(
         DefaultCacheEntry cacheEntry)
     {
-        cacheEntry.setSubscribers(attachedResponses.size());
         this.cacheEntry = cacheEntry;
     }
 
@@ -118,9 +120,16 @@ public final class HttpProxyCacheableRequestGroup
         boolean removed = queuedRequests.remove(request);
         assert removed;
 
-        if (queuedRequests.isEmpty())
+        cleanupRequestGroupIfNecessary();
+    }
+
+    private void cleanupRequestGroupIfNecessary()
+    {
+        if (!hasQueuedRequests() && !hasAttachedResponses() && !groupRequestDeleted)
         {
             cleaner.accept(requestHash);
+            factory.counters.requestGroups.accept(-1);
+            groupRequestDeleted = true;
         }
     }
 
@@ -133,7 +142,9 @@ public final class HttpProxyCacheableRequestGroup
     void detach(
         HttpCacheProxyCachedResponse response)
     {
-        attachedResponses.remove(response);
+        assert attachedResponses.contains(response);
+        detachedResponses.add(response);
+        cleanupRequestGroupIfNecessary();
     }
 
     void onResponseAbandoned(
@@ -153,6 +164,7 @@ public final class HttpProxyCacheableRequestGroup
     {
         queuedRequests.forEach(r -> r.do503RetryResponse(traceId));
         queuedRequests.clear();
+        cleanupRequestGroupIfNecessary();
     }
 
     void onGroupResponseBegin(
@@ -178,7 +190,10 @@ public final class HttpProxyCacheableRequestGroup
     void onGroupResponseData(
         long traceId)
     {
-        attachedResponses.forEach(r -> r.doResponseFlush(traceId));
+        attachedResponses.removeIf(detachedResponses::contains);
+        detachedResponses.clear();
+        attachedResponses.forEach(response -> response.doResponseFlush(traceId));
+        cleanupRequestGroupIfNecessary();
     }
 
     void onGroupResponseAbort(
@@ -189,6 +204,9 @@ public final class HttpProxyCacheableRequestGroup
 
         attachedResponses.forEach(r -> r.doResponseAbort(traceId));
         attachedResponses.clear();
+        detachedResponses.clear();
+
+        cleanupRequestGroupIfNecessary();
     }
 
     void onGroupRequestEnd(
@@ -196,7 +214,6 @@ public final class HttpProxyCacheableRequestGroup
     {
         assert groupRequest.request() == request;
         groupRequest = null;
-        attachedResponses.clear();
 
         flushNextRequest();
     }
@@ -212,7 +229,6 @@ public final class HttpProxyCacheableRequestGroup
             groupRequest = null;
         }
 
-        assert groupRequest == null;
         this.groupRequest = new HttpCacheProxyGroupRequest(factory, this, request);
 
         groupRequest.doRequest(traceId);
@@ -235,6 +251,12 @@ public final class HttpProxyCacheableRequestGroup
 
     boolean hasAttachedResponses()
     {
-        return !attachedResponses.isEmpty();
+        return attachedResponses.size() != detachedResponses.size();
+    }
+
+    public boolean isQueuedRequest(
+        HttpCacheProxyCacheableRequest request)
+    {
+        return queuedRequests.contains(request);
     }
 }

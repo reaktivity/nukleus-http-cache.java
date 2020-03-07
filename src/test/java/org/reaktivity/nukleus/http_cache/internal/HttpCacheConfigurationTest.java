@@ -16,7 +16,10 @@
 package org.reaktivity.nukleus.http_cache.internal;
 
 import static org.junit.Assert.assertEquals;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_CAPACITY;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_REQUESTS;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_SLOT_CAPACITY;
 
 import org.junit.Test;
 
@@ -24,10 +27,17 @@ public class HttpCacheConfigurationTest
 {
     // needed by test annotations
     public static final String HTTP_CACHE_MAXIMUM_REQUESTS_NAME = "nukleus.http_cache.maximum.requests";
+    public static final String HTTP_CACHE_CAPACITY_NAME = "nukleus.http_cache.capacity";
+    public static final String HTTP_CACHE_SLOT_CAPACITY_NAME = "nukleus.http_cache.slot.capacity";
+    public static final String HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME = "nukleus.http_cache.allowed.cache.percentage";
 
     @Test
     public void shouldVerifyConstants() throws Exception
     {
         assertEquals(HTTP_CACHE_MAXIMUM_REQUESTS.name(), HTTP_CACHE_MAXIMUM_REQUESTS_NAME);
+        assertEquals(HTTP_CACHE_CAPACITY.name(), HTTP_CACHE_CAPACITY_NAME);
+        assertEquals(HTTP_CACHE_SLOT_CAPACITY.name(), HTTP_CACHE_SLOT_CAPACITY_NAME);
+        assertEquals(HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE.name(), HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME);
+
     }
 }
