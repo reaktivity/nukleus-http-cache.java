@@ -247,9 +247,9 @@ public class HttpCacheProxyFactory implements StreamFactory
         ArrayFW<HttpHeaderFW> headers)
     {
         final String requestURL = getRequestURL(headers);
+        final boolean isMethodUnsafe = CacheUtils.isMethodUnsafe(headers);
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = requestHash(authorizationScope, requestURL.hashCode());
-
 
         MessageConsumer newStream = null;
 
@@ -277,27 +277,48 @@ public class HttpCacheProxyFactory implements StreamFactory
         }
         else if (isRequestCacheable)
         {
-            HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
-
-            HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
-            if (authorizationHeader != null)
+            if (defaultCache.isCacheFull())
             {
-                group.authorizationHeader(authorizationHeader.value().asString());
+                defaultCache.purgeEntriesForNonPendingRequests(requestGroups.keySet());
             }
-            newStream = newCacheableRequestStream(initial,
-                                                  routeId,
-                                                  initialId,
-                                                  resolveId,
-                                                  group);
+
+            if (!defaultCache.isCacheFull())
+            {
+                HttpProxyCacheableRequestGroup group = supplyCacheableRequestGroup(requestHash);
+
+                HttpHeaderFW authorizationHeader = headers.matchFirst(h -> AUTHORIZATION.equals(h.name().asString()));
+                if (authorizationHeader != null)
+                {
+                    group.authorizationHeader(authorizationHeader.value().asString());
+                }
+                newStream = newCacheableRequestStream(initial,
+                    routeId,
+                    initialId,
+                    resolveId,
+                    group);
+            }
+            else
+            {
+                newStream = newNonCacheableRequestStream(
+                    initial,
+                    routeId,
+                    initialId,
+                    resolveId,
+                    requestURL,
+                    requestHash,
+                    isMethodUnsafe);
+            }
         }
         else
         {
-            newStream = newNonCacheableRequestStream(initial,
-                                                     routeId,
-                                                     initialId,
-                                                     resolveId,
-                                                     requestURL,
-                                                     requestHash);
+            newStream = newNonCacheableRequestStream(
+                initial,
+                routeId,
+                initialId,
+                resolveId,
+                requestURL,
+                requestHash,
+                isMethodUnsafe);
         }
         counters.requests.getAsLong();
 
@@ -310,7 +331,8 @@ public class HttpCacheProxyFactory implements StreamFactory
         long initialId,
         long resolveId,
         String requestURL,
-        int requestHash)
+        int requestHash,
+        boolean isMethodUnsafe)
     {
         final HttpCacheProxyNonCacheableRequest nonCacheableRequest =
             new HttpCacheProxyNonCacheableRequest(this,
@@ -319,7 +341,8 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                   initialId,
                                                   resolveId,
                                                   requestHash,
-                                                  requestURL);
+                                                  requestURL,
+                                                  isMethodUnsafe);
         final MessageConsumer newStream = nonCacheableRequest::onRequestMessage;
         router.setThrottle(nonCacheableRequest.replyId, nonCacheableRequest::onResponseMessage);
         return newStream;
@@ -378,8 +401,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         long acceptReplyId,
         long trace)
     {
-        writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e ->
-            e.item(h -> h.name(STATUS).value("504")));
+        writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e -> e.item(h -> h.name(STATUS).value("504")));
         writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, trace);
 
         // count all responses
@@ -395,6 +417,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     private HttpProxyCacheableRequestGroup newCacheableRequestGroup(
         int requestHash)
     {
+        counters.requestGroups.accept(1);
         return new HttpProxyCacheableRequestGroup(this, requestGroups::remove, requestHash);
     }
 }

@@ -18,6 +18,9 @@ package org.reaktivity.nukleus.http_cache.internal.streams.proxy;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_CAPACITY_NAME;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_SLOT_CAPACITY_NAME;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
 import org.junit.Ignore;
@@ -30,8 +33,9 @@ import org.kaazing.k3po.junit.annotation.Specification;
 import org.kaazing.k3po.junit.rules.K3poRule;
 import org.reaktivity.nukleus.http_cache.internal.test.HttpCacheCountersRule;
 import org.reaktivity.reaktor.test.ReaktorRule;
+import org.reaktivity.reaktor.test.annotation.Configure;
 
-public class ProxyExceptionsIT
+public class ProxyBehaviourIT
 {
     private final K3poRule k3po = new K3poRule()
         .addScriptRoot("route", "org/reaktivity/specification/nukleus/http_cache/control/route")
@@ -65,7 +69,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Ignore("Request not processed until write closed")
@@ -79,7 +83,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         assertEquals(1, counters.requestsCachable());
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
         // We proceed with request out back anyways, TODO, consider adding to test response returning and getting cached
     }
 
@@ -93,7 +97,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Ignore("Request not processed until write closed")
@@ -107,7 +111,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Test
@@ -120,7 +124,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Test
@@ -133,7 +137,7 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 
     @Test
@@ -158,6 +162,38 @@ public class ProxyExceptionsIT
     {
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlots(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
+    }
+
+    @Test
+    @Configure(name = HTTP_CACHE_CAPACITY_NAME, value = "32768")  //8 buffer slots
+    @Configure(name = HTTP_CACHE_SLOT_CAPACITY_NAME, value = "4096")
+    @Configure(name = HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME, value = "75")
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/purge.cache.entry.on.full.cache/accept/client",
+        "${streams}/purge.cache.entry.on.full.cache/connect/server",
+    })
+    public void shouldPurgeCacheEntryOnFullCache() throws Exception
+    {
+        k3po.finish();
+        counters.assertExpectedCacheEntries(1);
+        counters.assertRequestGroups(0);
+    }
+
+    @Test
+    @Specification({
+        "${route}/proxy/controller",
+        "${streams}/reset.stream.if.group.request.already.dequeued/accept/client",
+        "${streams}/reset.stream.if.group.request.already.dequeued/connect/server",
+    })
+    public void shouldResetStreamIfGroupRequestAlreadyDequeued() throws Exception
+    {
+        k3po.start();
+        k3po.awaitBarrier("RESPONSE_ONE_RECEIVED");
+        k3po.notifyBarrier("SEND_GROUP_RESPONSE_ONE");
+        k3po.finish();
+        counters.assertExpectedCacheEntries(0);
+        counters.assertRequestsSlotsAndRequestGroups(0);
     }
 }

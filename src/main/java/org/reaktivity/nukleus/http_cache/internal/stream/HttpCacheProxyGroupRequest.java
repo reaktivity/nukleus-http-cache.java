@@ -355,9 +355,12 @@ final class HttpCacheProxyGroupRequest
         }
         else
         {
-            final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
-            newStream = relayedResponse::onResponseMessage;
-            resetHandler = relayedResponse::doResponseReset;
+            if (requestGroup.isQueuedRequest(request))
+            {
+                final HttpCacheProxyRelayedResponse relayedResponse = request.newRelayedResponse(initial, routeId, replyId);
+                newStream = relayedResponse::onResponseMessage;
+                resetHandler = relayedResponse::doResponseReset;
+            }
             cleanupRequestIfNecessary();
             requestGroup.onGroupRequestEnd(request);
         }
@@ -368,9 +371,8 @@ final class HttpCacheProxyGroupRequest
     void doResponseReset(
         long traceId)
     {
-        factory.router.clearThrottle(notifyId);
-        factory.correlations.remove(replyId);
         resetHandler.accept(traceId);
+        factory.router.clearThrottle(notifyId);
         cleanupRequestIfNecessary();
         state = HttpCacheRequestState.closingReply(state);
         flushResetIfNecessary(traceId);

@@ -38,10 +38,10 @@ final class HttpCacheProxyCachedResponse
 {
     private final HttpCacheProxyFactory factory;
     private final MessageConsumer reply;
-    private final long routeId;
-    final long replyId;
-    private final long authorization;
     private final DefaultCacheEntry cacheEntry;
+    private final long routeId;
+    private final long replyId;
+    private final long authorization;
     private final boolean promiseNextPollRequest;
 
     private int replyBudget;
@@ -173,7 +173,6 @@ final class HttpCacheProxyCachedResponse
                                traceId);
 
         cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
     }
 
     private void doResponseEnd(
@@ -199,14 +198,13 @@ final class HttpCacheProxyCachedResponse
                                  traceId);
 
         cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
+        resetHandler.accept(this);
     }
 
     private void onResponseReset(
         ResetFW reset)
     {
         cleanupResponseIfNecessary();
-        cacheEntry.setSubscribers(-1);
         resetHandler.accept(this);
     }
 
