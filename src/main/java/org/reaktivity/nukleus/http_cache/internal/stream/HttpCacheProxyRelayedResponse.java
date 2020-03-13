@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -133,7 +133,7 @@ public final class HttpCacheProxyRelayedResponse
         final boolean hasEtag = httpBeginEx0.headers().matchFirst(h -> ETAG.equals(h.name().asString())) != null;
         final HttpHeaderFW status = httpBeginEx0.headers().matchFirst(h -> STATUS.equals(h.name().asString()));
         final int statusGroup = status != null ? parseInt(status.value().asString()) / 100 : 0;
-        final Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
+        final Consumer<Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers = hs ->
         {
             httpBeginEx0.headers().forEach(h -> hs.item(i -> i.name(h.name()).value(h.value())));
             if ((statusGroup == 2 || statusGroup == 3) && prefer != null)

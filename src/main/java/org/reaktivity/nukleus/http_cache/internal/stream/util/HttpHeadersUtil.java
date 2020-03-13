@@ -26,7 +26,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.function.Predicate;
 
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 
 public final class HttpHeadersUtil
@@ -64,7 +64,7 @@ public final class HttpHeadersUtil
         return RETRY_AFTER.equalsIgnoreCase(name);
     };
 
-    public static String getRequestURL(ArrayFW<HttpHeaderFW> headers)
+    public static String getRequestURL(Array32FW<HttpHeaderFW> headers)
     {
         // TODO, less garbage collection...
         // streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
@@ -92,7 +92,7 @@ public final class HttpHeadersUtil
     }
 
     public static String getHeader(
-        ArrayFW<HttpHeaderFW> cachedRequestHeaders,
+        Array32FW<HttpHeaderFW> cachedRequestHeaders,
         String headerName)
     {
         // TODO remove GC when have streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16
@@ -109,7 +109,7 @@ public final class HttpHeadersUtil
     }
 
     public static String getHeaderOrDefault(
-            ArrayFW<HttpHeaderFW> responseHeaders,
+            Array32FW<HttpHeaderFW> responseHeaders,
             String headerName,
             String defaulted)
     {
@@ -118,7 +118,7 @@ public final class HttpHeadersUtil
     }
 
     public static boolean hasStatusCode(
-        ArrayFW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
         int statusCode)
     {
         return responseHeaders.anyMatch(h ->
@@ -126,7 +126,7 @@ public final class HttpHeadersUtil
     }
 
     public static boolean retry(
-        ArrayFW<HttpHeaderFW> responseHeaders)
+        Array32FW<HttpHeaderFW> responseHeaders)
     {
         return hasStatusCode(responseHeaders, 503) && responseHeaders.anyMatch(HAS_RETRY_AFTER);
     }
@@ -139,7 +139,7 @@ public final class HttpHeadersUtil
      * @return wait time in seconds from now for both formats
      */
     public static long retryAfter(
-        ArrayFW<HttpHeaderFW> responseHeaders)
+        Array32FW<HttpHeaderFW> responseHeaders)
     {
         HttpHeaderFW header = responseHeaders.matchFirst(HAS_RETRY_AFTER);
 
