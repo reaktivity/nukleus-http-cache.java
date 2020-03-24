@@ -159,7 +159,8 @@ public class HttpCacheProxyFactoryBuilder implements StreamFactoryBuilder
                                             counters,
                                             supplyTypeId,
                                             config.allowedCachePercentage(),
-                                            config.cacheCapacity());
+                                            config.cacheCapacity(),
+                                            config.allowedCacheEvictionPerBatchPercentage());
         }
 
         return new HttpCacheProxyFactory(config,

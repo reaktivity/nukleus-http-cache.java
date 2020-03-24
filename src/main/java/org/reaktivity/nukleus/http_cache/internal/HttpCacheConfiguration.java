@@ -28,6 +28,7 @@ public class HttpCacheConfiguration extends Configuration
     public static final IntPropertyDef HTTP_CACHE_MAXIMUM_REQUESTS;
     public static final IntPropertyDef HTTP_CACHE_ETAG_PREFIX;
     public static final IntPropertyDef HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE;
+    public static final IntPropertyDef HTTP_CACHE_ALLOWED_CACHE_EVICTION_PER_BATCH_PERCENTAGE;
     public static final IntPropertyDef HTTP_CACHE_PREFER_WAIT_MAXIMUM;
     public static final IntPropertyDef HTTP_CACHE_INITIAL_WINDOW_SIZE;
 
@@ -41,6 +42,8 @@ public class HttpCacheConfiguration extends Configuration
         HTTP_CACHE_MAXIMUM_REQUESTS = config.property("maximum.requests", 64 * 1024);
         HTTP_CACHE_ETAG_PREFIX = config.property("etag.prefix", new Random().nextInt(99999));
         HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE = config.property("allowed.cache.percentage", 95);
+        HTTP_CACHE_ALLOWED_CACHE_EVICTION_PER_BATCH_PERCENTAGE = config.property("allowed.cache.eviction.per.batch.percentage",
+            10);
         HTTP_CACHE_PREFER_WAIT_MAXIMUM = config.property("prefer.wait.maximum", Integer.MAX_VALUE);
         HTTP_CACHE_INITIAL_WINDOW_SIZE = config.property("initial.window.size", 6291456);
         HTTP_CACHE_CONFIG = config;
@@ -65,6 +68,11 @@ public class HttpCacheConfiguration extends Configuration
     public int allowedCachePercentage()
     {
         return HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE.getAsInt(this);
+    }
+
+    public int allowedCacheEvictionPerBatchPercentage()
+    {
+        return HTTP_CACHE_ALLOWED_CACHE_EVICTION_PER_BATCH_PERCENTAGE.getAsInt(this);
     }
 
     public int maximumRequests()

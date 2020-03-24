@@ -33,6 +33,8 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
@@ -40,6 +42,7 @@ import java.util.regex.Pattern;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
+import org.agrona.collections.MutableInteger;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
@@ -77,6 +80,7 @@ public class DefaultCache
 
     private final HttpCacheCounters counters;
     private final int allowedSlots;
+    private final int allowedCacheEvictionPerBatch;
 
     public DefaultCache(
         RouteManager router,
@@ -85,9 +89,12 @@ public class DefaultCache
         HttpCacheCounters counters,
         ToIntFunction<String> supplyTypeId,
         int allowedCachePercentage,
-        int cacheCapacity)
+        int cacheCapacity,
+        int allowedCacheEvictionPerBatchPercentage)
     {
         assert allowedCachePercentage >= 0 && allowedCachePercentage <= 100;
+        assert allowedCacheEvictionPerBatchPercentage >= 0 && allowedCacheEvictionPerBatchPercentage <= 100;
+        assert allowedCacheEvictionPerBatchPercentage <= allowedCachePercentage;
         this.cacheBufferPool = cacheBufferPool;
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
@@ -103,6 +110,7 @@ public class DefaultCache
         this.counters = counters;
         int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
         this.allowedSlots = (totalSlots * allowedCachePercentage) / 100;
+        this.allowedCacheEvictionPerBatch = (allowedSlots * allowedCacheEvictionPerBatchPercentage) / 100;
     }
 
     public BufferPool getResponsePool()
@@ -372,14 +380,22 @@ public class DefaultCache
     public void purgeEntriesForNonPendingRequests(
         Set<Integer> requestHashes)
     {
+        final MutableInteger counter = new MutableInteger(0);
         cachedEntriesByRequestHash.forEach((requestHash, cacheEntry) ->
         {
-            if (!requestHashes.contains(requestHash))
+            if (counter.value <= allowedCacheEvictionPerBatch)
             {
-                purge(requestHash);
+                if (!requestHashes.contains(requestHash))
+                {
+                    purge(requestHash);
+                }
             }
+            else
+            {
+                return;
+            }
+            counter.value++;
         });
-
     }
 
     public void updateResponseHeaderIfNecessary(

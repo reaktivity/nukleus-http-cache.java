@@ -292,6 +292,7 @@ final class HttpCacheProxyCacheableRequest
             response.doResponseBegin(now, traceId);
             requestGroup.attach(response);
             cleanupRequestHeadersIfNecessary();
+            cleanupRequestTimeoutIfNecessary();
         }
         else
         {
