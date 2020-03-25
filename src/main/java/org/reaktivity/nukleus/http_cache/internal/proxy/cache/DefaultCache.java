@@ -49,7 +49,7 @@ import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.route.RouteManager;
@@ -61,8 +61,8 @@ public class DefaultCache
             "((<(?<scheme>https?):/)?/?(?<hostname>[^:/\\s]+)(?<port>:(\\d+))?(?<path>[\\w\\-.]*[^#?\\s]+).*>;" +
             ".*(rel=\"(collection|items)\"))");
 
-    final ArrayFW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
-    final ArrayFW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
+    final Array32FW<HttpHeaderFW> cachedResponseHeadersRO = new HttpBeginExFW().headers();
+    final Array32FW<HttpHeaderFW> requestHeadersRO = new HttpBeginExFW().headers();
 
     final CacheControl responseCacheControl = new CacheControl();
     final CacheControl cachedRequestCacheControl = new CacheControl();
@@ -143,7 +143,7 @@ public class DefaultCache
 
 
     public boolean matchCacheableRequest(
-        ArrayFW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
         short authScope,
         int requestHash)
     {
@@ -175,7 +175,7 @@ public class DefaultCache
         int requestHash,
         String requestURL,
         long traceId,
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.get(requestHash);
         if (cacheEntry != null)
@@ -237,8 +237,8 @@ public class DefaultCache
         String ifNoneMatch,
         DefaultCacheEntry cacheEntry)
     {
-        ArrayFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
-        ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+        Array32FW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
+        Array32FW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
         if (isPreferWait(requestHeaders) &&
             !isPreferenceApplied(responseHeaders) &&
             requestHeaders.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) && h.value().asString().contains(MAX_AGE_0)))
@@ -257,8 +257,8 @@ public class DefaultCache
     }
 
     public boolean checkToRetry(
-        ArrayFW<HttpHeaderFW> requestHeaders,
-        ArrayFW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
         String ifNoneMatch,
         int requestHash)
     {
@@ -349,7 +349,7 @@ public class DefaultCache
     }
 
     public boolean isRequestCacheable(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
         {
@@ -384,7 +384,7 @@ public class DefaultCache
 
     public void updateResponseHeaderIfNecessary(
         int requestHash,
-        ArrayFW<HttpHeaderFW> responseHeaders)
+        Array32FW<HttpHeaderFW> responseHeaders)
     {
         String status = HttpHeadersUtil.getHeader(responseHeaders, HttpHeaders.STATUS);
         boolean isSelectedForUpdate = NOT_MODIFIED_304.equals(status) || OK_200.equals(status);
@@ -400,7 +400,7 @@ public class DefaultCache
     }
 
     public boolean satisfiedByCache(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         return !headers.anyMatch(h ->
         {

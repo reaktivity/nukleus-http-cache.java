@@ -22,27 +22,27 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 
 import java.util.function.Predicate;
 
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 
 public final class PreferHeader
 {
     public static boolean isPreferIfNoneMatch(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         return getHeader(headers, IF_NONE_MATCH) != null &&
                headers.anyMatch(PREFER_HEADER_NAME);
     }
 
     public static boolean isPreferWait(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         String prefer = getHeader(headers, PREFER);
         return prefer != null && prefer.toLowerCase().startsWith("wait=");
     }
 
     public static boolean isPreferenceApplied(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         String preferenceApplied = getHeader(headers, PREFERENCE_APPLIED);
         return preferenceApplied != null;
@@ -54,7 +54,7 @@ public final class PreferHeader
         return PREFER.equals(name);
     };
 
-    public static int getPreferWait(ArrayFW<HttpHeaderFW> headers)
+    public static int getPreferWait(Array32FW<HttpHeaderFW> headers)
     {
         String wait = getHeader(headers, PREFER);
         if (wait != null)

@@ -24,7 +24,7 @@ import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
@@ -121,7 +121,7 @@ final class HttpCacheProxyCacheableResponse
         final long traceId = begin.traceId();
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+        final Array32FW<HttpHeaderFW> headers = httpBeginFW.headers();
 
         final boolean stored = cacheEntry.storeResponseHeaders(headers);
         assert stored;
@@ -175,7 +175,7 @@ final class HttpCacheProxyCacheableResponse
 
         if (httpEndEx != null)
         {
-            ArrayFW<HttpHeaderFW> trailers = httpEndEx.trailers();
+            Array32FW<HttpHeaderFW> trailers = httpEndEx.trailers();
             HttpHeaderFW etag = trailers.matchFirst(h -> ETAG.equals(h.name().asString()));
             if (etag != null)
             {

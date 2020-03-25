@@ -27,7 +27,7 @@ import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
@@ -101,10 +101,10 @@ final class HttpCacheProxyCachedResponse
         Instant now,
         long traceId)
     {
-        ArrayFW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
+        Array32FW<HttpHeaderFW> responseHeaders = cacheEntry.getCachedResponseHeaders();
 
         factory.router.setThrottle(replyId, this::onResponseMessage);
-        final ArrayFW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
+        final Array32FW<HttpHeaderFW> requestHeaders = cacheEntry.getRequestHeaders();
         factory.writer.doHttpResponseWithUpdatedHeaders(reply,
                                                         routeId,
                                                         replyId,

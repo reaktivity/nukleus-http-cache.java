@@ -21,7 +21,7 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 
 public final class SurrogateControl
@@ -32,7 +32,7 @@ public final class SurrogateControl
     private static final String X_PROTECTED = "x-protected";
 
     public static int getSurrogateFreshnessExtension(
-            ArrayFW<HttpHeaderFW> responseHeadersRO)
+            Array32FW<HttpHeaderFW> responseHeadersRO)
     {
         String surrogateControl = getHeader(responseHeadersRO, SURROGATE_CONTROL);
         return getSurrogateFreshnessExtension(surrogateControl);
@@ -66,7 +66,7 @@ public final class SurrogateControl
     }
 
     public static int getSurrogateAge(
-            ArrayFW<HttpHeaderFW> responseHeadersRO)
+            Array32FW<HttpHeaderFW> responseHeadersRO)
     {
         String surrogateControl = getHeader(responseHeadersRO, SURROGATE_CONTROL);
         return getSurrogateAge(surrogateControl);
@@ -95,7 +95,7 @@ public final class SurrogateControl
         return -1;
     }
 
-    public static boolean isProtectedEx(ArrayFW<HttpHeaderFW> response)
+    public static boolean isProtectedEx(Array32FW<HttpHeaderFW> response)
     {
         String surrogateControl = getHeader(response, SURROGATE_CONTROL);
         if (surrogateControl != null)
