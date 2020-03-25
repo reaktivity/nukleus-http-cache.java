@@ -194,6 +194,6 @@ public class ProxyBehaviourIT
         k3po.notifyBarrier("SEND_GROUP_RESPONSE_ONE");
         k3po.finish();
         counters.assertExpectedCacheEntries(0);
-        counters.assertRequestsSlotsAndRequestGroups(0);
+        counters.assertRequestsSlotsAndRequestGroups(1);
     }
 }
