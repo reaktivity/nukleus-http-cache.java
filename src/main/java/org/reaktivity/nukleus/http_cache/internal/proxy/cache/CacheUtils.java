@@ -38,10 +38,10 @@ import java.util.stream.Collectors;
 
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
+import org.reaktivity.nukleus.http_cache.internal.types.String8FW;
 
 public final class CacheUtils
 {
@@ -51,7 +51,7 @@ public final class CacheUtils
         asList(new String16FW("GET"), new String16FW("HEAD"), new String16FW("OPTIONS"),
             new String16FW("TRACE")));
     public static final String RESPONSE_IS_STALE = "110 - \"Response is Stale\"";
-    public static final StringFW METHOD_NAME = new StringFW(METHOD);
+    public static final String8FW METHOD_NAME = new String8FW(METHOD);
 
     private CacheUtils()
     {
@@ -59,13 +59,13 @@ public final class CacheUtils
     }
 
     public static boolean isMethodUnsafe(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         return headers.anyMatch(h -> METHOD_NAME.equals(h.name()) && !SAFE_METHOD.contains(h.value()));
     }
 
     public static boolean hasMaxAgeZero(
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         return headers.anyMatch(h ->
         {
@@ -76,7 +76,7 @@ public final class CacheUtils
     }
 
     public static boolean isCacheableResponse(
-        ArrayFW<HttpHeaderFW> response)
+        Array32FW<HttpHeaderFW> response)
     {
         if (response.anyMatch(h -> CACHE_CONTROL.equals(h.name().asString()) &&
                               h.value().asString().contains(CacheDirectives.PRIVATE)) ||
@@ -90,7 +90,7 @@ public final class CacheUtils
     }
 
     public static boolean isPrivatelyCacheable(
-        ArrayFW<HttpHeaderFW> response)
+        Array32FW<HttpHeaderFW> response)
     {
         // TODO force passing of CacheControl as FW
         boolean isCacheableByCacheControl = isCacheControlCacheable(response);
@@ -108,7 +108,7 @@ public final class CacheUtils
     }
 
     public static Boolean isCacheControlCacheable(
-        ArrayFW<HttpHeaderFW> response)
+        Array32FW<HttpHeaderFW> response)
     {
         String cacheControl = getHeader(response, HttpHeaders.CACHE_CONTROL);
         boolean isCacheable = true;
@@ -137,8 +137,8 @@ public final class CacheUtils
     }
 
     public static boolean sameAuthorizationScope(
-        ArrayFW<HttpHeaderFW> request,
-        ArrayFW<HttpHeaderFW> cachedRequest,
+        Array32FW<HttpHeaderFW> request,
+        Array32FW<HttpHeaderFW> cachedRequest,
         CacheControl cachedResponse)
     {
         assert request.buffer() != cachedRequest.buffer();
@@ -172,9 +172,9 @@ public final class CacheUtils
     }
 
     public static boolean doesNotVary(
-        ArrayFW<HttpHeaderFW> request,
-        ArrayFW<HttpHeaderFW> cachedResponse,
-        ArrayFW<HttpHeaderFW> cachedRequest)
+        Array32FW<HttpHeaderFW> request,
+        Array32FW<HttpHeaderFW> cachedResponse,
+        Array32FW<HttpHeaderFW> cachedRequest)
     {
         assert request != cachedRequest;
         assert request.buffer() != cachedRequest.buffer();
@@ -223,7 +223,7 @@ public final class CacheUtils
 
     public static boolean isVaryHeader(
             String header,
-            ArrayFW<HttpHeaderFW> cachedResponse)
+            Array32FW<HttpHeaderFW> cachedResponse)
     {
         final String cachedVaryHeader = getHeader(cachedResponse, "vary");
         if (cachedVaryHeader == null)
@@ -235,7 +235,7 @@ public final class CacheUtils
     }
 
     public static boolean isMatchByEtag(
-        ArrayFW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
         String etag)
     {
         String ifMatch = HttpHeadersUtil.getHeader(requestHeaders, HttpHeaders.IF_NONE_MATCH);
