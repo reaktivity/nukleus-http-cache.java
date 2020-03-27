@@ -36,6 +36,8 @@ public class HttpCacheCounters
     public final LongSupplier responsesPurged;
     public final LongSupplier responsesAbortedVary;
     public final LongSupplier promises;
+    public final LongSupplier cacheHitFrequencies;
+    public final LongSupplier cacheFullness;
     public final LongConsumer cacheEntries;
     public final LongConsumer requestGroups;
 
@@ -60,5 +62,7 @@ public class HttpCacheCounters
         this.promises = supplyCounter.apply("http-cache.promises");
         this.cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
         this.requestGroups = supplyAccumulator.apply("http-cache.request.groups");
+        this.cacheHitFrequencies = supplyCounter.apply("http-cache.cache.hit.frequencies");
+        this.cacheFullness = supplyCounter.apply("http-cache.cache.cache.fullness");
     }
 }

@@ -44,6 +44,7 @@ import java.util.regex.Pattern;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.MutableInteger;
+import org.agrona.collections.ObjectHashSet;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheCounters;
@@ -406,7 +407,8 @@ public class DefaultCache
     {
         final MutableInteger count = new MutableInteger(0);
         Iterator<FrequencyBucket> iterator = frequencies.iterator();
-        while (count.value <= allowedCacheEvictionCount && iterator.hasNext())
+        counters.cacheFullness.getAsLong();
+        while (count.value < allowedCacheEvictionCount && iterator.hasNext())
         {
             final FrequencyBucket frequencyBucket = iterator.next();
             frequencyBucket.entries().forEach(entry ->
@@ -414,7 +416,7 @@ public class DefaultCache
                 final int requestHash = entry.requestHash();
                 if (!requestHashes.contains(requestHash))
                 {
-                    if (count.value <= allowedCacheEvictionCount)
+                    if (count.value < allowedCacheEvictionCount)
                     {
                         purge(requestHash);
                         count.value++;
@@ -497,13 +499,15 @@ public class DefaultCache
         {
             nextFrequency = new FrequencyBucket(nextFrequencyAmount);
             frequencies.add(nextFrequency);
+            counters.cacheHitFrequencies.getAsLong();
         }
 
         nextFrequency.entries().add(entry);
         entry.frequencyParent(nextFrequency);
         if (currentFrequency != null)
         {
-            currentFrequency.entries().remove(entry);
+            final ObjectHashSet<DefaultCacheEntry> entries = currentFrequency.entries();
+            entries.remove(entry);
         }
     }
 }
