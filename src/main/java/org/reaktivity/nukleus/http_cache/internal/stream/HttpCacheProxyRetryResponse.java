@@ -23,7 +23,7 @@ import java.util.function.LongConsumer;
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
@@ -105,7 +105,7 @@ final class HttpCacheProxyRetryResponse
         final long traceId = begin.traceId();
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+        final Array32FW<HttpHeaderFW> headers = httpBeginFW.headers();
         final String status = getHeader(headers, STATUS);
         assert status != null;
 

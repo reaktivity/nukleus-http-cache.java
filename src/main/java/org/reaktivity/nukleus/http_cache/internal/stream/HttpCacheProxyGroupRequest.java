@@ -33,7 +33,7 @@ import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
@@ -90,7 +90,7 @@ final class HttpCacheProxyGroupRequest
         }
         else
         {
-            final ArrayFW<HttpHeaderFW> headers = request.getHeaders();
+            final Array32FW<HttpHeaderFW> headers = request.getHeaders();
 
             // TODO: override if-none-match from requestGroup.ifNoneMatch
 
@@ -121,7 +121,7 @@ final class HttpCacheProxyGroupRequest
     private void doRequestAttempt(
         long traceId)
     {
-        final ArrayFW<HttpHeaderFW> headers = getRequestHeaders();
+        final Array32FW<HttpHeaderFW> headers = getRequestHeaders();
         final int initialState = 0;
 
         attempts++;
@@ -139,10 +139,10 @@ final class HttpCacheProxyGroupRequest
         factory.counters.groupRequestsCacheable.getAsLong();
     }
 
-    private Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(
-        ArrayFW<HttpHeaderFW> requestHeaders)
+    private Consumer<Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutateRequestHeaders(
+        Array32FW<HttpHeaderFW> requestHeaders)
     {
-        return (ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder) ->
+        return (Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder) ->
         {
             requestHeaders.forEach(h ->
             {
@@ -266,7 +266,7 @@ final class HttpCacheProxyGroupRequest
         doRequestAttempt(traceId);
     }
 
-    private ArrayFW<HttpHeaderFW> getRequestHeaders()
+    private Array32FW<HttpHeaderFW> getRequestHeaders()
     {
         assert headersSlot != NO_SLOT;
         final MutableDirectBuffer buffer = factory.headersPool.buffer(headersSlot);
@@ -298,7 +298,7 @@ final class HttpCacheProxyGroupRequest
     private MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
-        final ArrayFW<HttpHeaderFW> responseHeaders = beginEx.headers();
+        final Array32FW<HttpHeaderFW> responseHeaders = beginEx.headers();
         final boolean retry = HttpHeadersUtil.retry(responseHeaders);
         final int requestHash = requestGroup.requestHash();
         final String ifNoneMatch = requestGroup.ifNoneMatchHeader();
@@ -332,7 +332,7 @@ final class HttpCacheProxyGroupRequest
         }
         else if (isCacheableResponse(responseHeaders))
         {
-            final ArrayFW<HttpHeaderFW> requestHeaders = getRequestHeaders();
+            final Array32FW<HttpHeaderFW> requestHeaders = getRequestHeaders();
             final short authScope = authorizationScope(request.authorization);
             final String requestURL = getRequestURL(requestHeaders);
             final DefaultCacheEntry cacheEntry = factory.defaultCache.supply(requestHash, authScope, requestURL);

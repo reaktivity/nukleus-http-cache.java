@@ -41,13 +41,13 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW.Builder;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW.Builder;
 import org.reaktivity.nukleus.http_cache.internal.types.Flyweight;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
+import org.reaktivity.nukleus.http_cache.internal.types.String8FW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -128,8 +128,8 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
-        ArrayFW<HttpHeaderFW> responseHeaders,
-        ArrayFW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale,
         long traceId)
@@ -153,8 +153,8 @@ public class Writer
 
     private void updateResponseHeaders(
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
-        ArrayFW<HttpHeaderFW> responseHeaders,
-        ArrayFW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
         String etag,
         boolean isStale)
     {
@@ -163,7 +163,7 @@ public class Writer
         final boolean isEmulatedProtocolStack = requestHeaders.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
         responseHeaders.forEach(h ->
         {
-            final StringFW name = h.name();
+            final String8FW name = h.name();
             final String16FW value = h.value();
             if (!RETRY_AFTER.equals(name.asString()) &&
                 !CACHE_CONTROL.equals(name.asString()))
@@ -212,7 +212,7 @@ public class Writer
         boolean hasPreferWait,
         boolean isEmulatedProtocolStack)
     {
-        final StringFW nameFW = responseHeader.name();
+        final String8FW nameFW = responseHeader.name();
         final String name = nameFW.asString();
         final String16FW valueFW = responseHeader.value();
         final String value = valueFW.asString();
@@ -402,7 +402,7 @@ public class Writer
     }
 
     private Flyweight.Builder.Visitor visitHttpBeginEx(
-        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
+        Consumer<Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> headers)
     {
         return (buffer, offset, limit) ->
                 httpBeginExRW.wrap(buffer, offset, limit)
@@ -413,7 +413,7 @@ public class Writer
     }
 
     private Flyweight.Builder.Visitor visitHttpEndEx(
-        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
+        Consumer<Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> trailers)
     {
         return (buffer, offset, limit) ->
             httpEndExRW.wrap(buffer, offset, limit)
@@ -428,8 +428,8 @@ public class Writer
         long routeId,
         long streamId,
         long authorization,
-        ArrayFW<HttpHeaderFW>  requestHeaders,
-        ArrayFW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW>  requestHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
         String etag)
     {
         final int staleWhileRevalidate = SurrogateControl.getSurrogateFreshnessExtension(responseHeaders);
@@ -443,8 +443,8 @@ public class Writer
     }
 
     private Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> setPushPromiseHeaders(
-        ArrayFW<HttpHeaderFW> requestHeaders,
-        ArrayFW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
         int freshnessExtension,
         String etag)
     {
@@ -455,15 +455,15 @@ public class Writer
     }
 
     private void updateRequestHeaders(
-        ArrayFW<HttpHeaderFW> requestHeaders,
-        ArrayFW<HttpHeaderFW> responseHeaders,
+        Array32FW<HttpHeaderFW> requestHeaders,
+        Array32FW<HttpHeaderFW> responseHeaders,
         Builder<HttpHeaderFW.Builder, HttpHeaderFW> builder,
         int freshnessExtension,
         String etag)
     {
         requestHeaders.forEach(h ->
         {
-            final StringFW nameFW = h.name();
+            final String8FW nameFW = h.name();
             final String name = nameFW.asString();
             final String16FW valueFW = h.value();
             final String value = valueFW.asString();
@@ -546,7 +546,7 @@ public class Writer
         long authorization,
         long budgetId,
         int reserved,
-        Consumer<ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
+        Consumer<Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)

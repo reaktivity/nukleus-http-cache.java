@@ -36,11 +36,11 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.String16FW;
-import org.reaktivity.nukleus.http_cache.internal.types.StringFW;
+import org.reaktivity.nukleus.http_cache.internal.types.String8FW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.AbortFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.BeginFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.DataFW;
@@ -51,7 +51,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 
 final class HttpCacheProxyCacheableRequest
 {
-    private static final StringFW HEADER_NAME_STATUS = new StringFW(":status");
+    private static final String8FW HEADER_NAME_STATUS = new String8FW(":status");
     private static final String16FW HEADER_VALUE_STATUS_503 = new String16FW(SERVICE_UNAVAILABLE_503);
 
     private final HttpCacheProxyFactory factory;
@@ -199,7 +199,7 @@ final class HttpCacheProxyCacheableRequest
         final OctetsFW extension = begin.extension();
 
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
-        final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+        final Array32FW<HttpHeaderFW> headers = httpBeginFW.headers();
 
         authorization = begin.authorization();
         promiseNextPollRequest = headers.anyMatch(HAS_EMULATED_PROTOCOL_STACK);
@@ -221,7 +221,7 @@ final class HttpCacheProxyCacheableRequest
         else
         {
             final MutableDirectBuffer headersBuffer = factory.headersPool.buffer(headersSlot);
-            final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> newHeaders =
+            final Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> newHeaders =
                 factory.httpHeadersRW.wrap(headersBuffer, 0, headersBuffer.capacity());
             headers.forEach(h ->
             {
@@ -273,7 +273,7 @@ final class HttpCacheProxyCacheableRequest
         assert  headersSlot != NO_SLOT;
 
         final DefaultCacheEntry entry = factory.defaultCache.get(requestGroup.requestHash());
-        final ArrayFW<HttpHeaderFW> headers = getHeaders();
+        final Array32FW<HttpHeaderFW> headers = getHeaders();
         final short authScope = authorizationScope(authorization);
         final boolean isCacheEntryUpToDate = isCacheEntryUpdatedToBeServed(headers, authScope, entry);
         final boolean canBeCachedServed =
@@ -300,7 +300,7 @@ final class HttpCacheProxyCacheableRequest
     }
 
     private boolean isCacheEntryUpdatedToBeServed(
-        ArrayFW<HttpHeaderFW> headers,
+        Array32FW<HttpHeaderFW> headers,
         short authScope,
         DefaultCacheEntry cacheEntry)
     {
@@ -320,7 +320,7 @@ final class HttpCacheProxyCacheableRequest
     }
 
     private void doResponseTimeoutIfNecessary(
-        ArrayFW<HttpHeaderFW> requestHeaders)
+        Array32FW<HttpHeaderFW> requestHeaders)
     {
         if (isPreferIfNoneMatch(requestHeaders))
         {
@@ -336,7 +336,7 @@ final class HttpCacheProxyCacheableRequest
         }
     }
 
-    ArrayFW<HttpHeaderFW> getHeaders()
+    Array32FW<HttpHeaderFW> getHeaders()
     {
         final MutableDirectBuffer buffer = factory.headersPool.buffer(headersSlot);
         return factory.httpHeadersRO.wrap(buffer, 0, buffer.capacity());

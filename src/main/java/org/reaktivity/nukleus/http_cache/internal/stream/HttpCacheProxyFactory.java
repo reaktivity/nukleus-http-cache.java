@@ -46,7 +46,7 @@ import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCache;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.CountingBufferPool;
 import org.reaktivity.nukleus.http_cache.internal.stream.util.Writer;
-import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
+import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
 import org.reaktivity.nukleus.http_cache.internal.types.control.RouteFW;
@@ -78,13 +78,13 @@ public class HttpCacheProxyFactory implements StreamFactory
     final HttpBeginExFW defaultHttpBeginExRO;
     final HttpBeginExFW httpBeginExRO = new HttpBeginExFW();
     final HttpEndExFW httpEndExRO = new HttpEndExFW();
-    final ArrayFW<HttpHeaderFW> httpHeadersRO = new ArrayFW<>(new HttpHeaderFW());
+    final Array32FW<HttpHeaderFW> httpHeadersRO = new Array32FW<>(new HttpHeaderFW());
 
     final BeginFW.Builder beginRW = new BeginFW.Builder();
 
     final HttpBeginExFW.Builder httpBeginExRW = new HttpBeginExFW.Builder();
-    final ArrayFW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> httpHeadersRW =
-            new ArrayFW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
+    final Array32FW.Builder<HttpHeaderFW.Builder, HttpHeaderFW> httpHeadersRW =
+            new Array32FW.Builder<>(new HttpHeaderFW.Builder(), new HttpHeaderFW());
 
     final RouteManager router;
     final Long2ObjectHashMap<Function<HttpBeginExFW, MessageConsumer>> correlations;
@@ -200,7 +200,7 @@ public class HttpCacheProxyFactory implements StreamFactory
             final long traceId = begin.traceId();
             final OctetsFW extension = begin.extension();
             final HttpBeginExFW httpBeginFW = extension.get(httpBeginExRO::wrap);
-            final ArrayFW<HttpHeaderFW> headers = httpBeginFW.headers();
+            final Array32FW<HttpHeaderFW> headers = httpBeginFW.headers();
 
             newStream = newNativeRequestStream(initial,
                                                routeId,
@@ -244,7 +244,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         long traceId,
         long authorization,
         long resolveId,
-        ArrayFW<HttpHeaderFW> headers)
+        Array32FW<HttpHeaderFW> headers)
     {
         final String requestURL = getRequestURL(headers);
         final boolean isMethodUnsafe = CacheUtils.isMethodUnsafe(headers);
