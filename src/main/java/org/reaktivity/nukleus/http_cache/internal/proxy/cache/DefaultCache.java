@@ -33,8 +33,9 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.net.URI;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
@@ -76,11 +77,12 @@ public class DefaultCache
 
     private final Writer writer;
     private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHash;
+    private final LinkedList<FrequencyBucket> frequencies;
     private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> cachedEntriesByRequestHashWithoutQuery;
 
     private final HttpCacheCounters counters;
     private final int allowedSlots;
-    private final int allowedCacheEvictionPerBatch;
+    private final int allowedCacheEvictionCount;
 
     public DefaultCache(
         RouteManager router,
@@ -90,11 +92,9 @@ public class DefaultCache
         ToIntFunction<String> supplyTypeId,
         int allowedCachePercentage,
         int cacheCapacity,
-        int allowedCacheEvictionPerBatchPercentage)
+        int allowedCacheEvictionCount)
     {
         assert allowedCachePercentage >= 0 && allowedCachePercentage <= 100;
-        assert allowedCacheEvictionPerBatchPercentage >= 0 && allowedCacheEvictionPerBatchPercentage <= 100;
-        assert allowedCacheEvictionPerBatchPercentage <= allowedCachePercentage;
         this.cacheBufferPool = cacheBufferPool;
         this.writer = new Writer(router, supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
@@ -106,11 +106,12 @@ public class DefaultCache
                 counters.supplyCounter.apply("http-cache.cached.response.acquires"),
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
         this.cachedEntriesByRequestHash = new Int2ObjectHashMap<>();
+        this.frequencies = new LinkedList<>();
         this.cachedEntriesByRequestHashWithoutQuery = new Int2ObjectHashMap<>();
         this.counters = counters;
         int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
         this.allowedSlots = (totalSlots * allowedCachePercentage) / 100;
-        this.allowedCacheEvictionPerBatch = (allowedSlots * allowedCacheEvictionPerBatchPercentage) / 100;
+        this.allowedCacheEvictionCount = allowedCacheEvictionCount;
     }
 
     public BufferPool getResponsePool()
@@ -124,6 +125,17 @@ public class DefaultCache
         return cachedEntriesByRequestHash.get(requestHash);
     }
 
+    public DefaultCacheEntry lookup(
+        int requestHash)
+    {
+        DefaultCacheEntry entry = cachedEntriesByRequestHash.get(requestHash);
+        if (entry != null)
+        {
+            incrementFrequency(entry);
+        }
+        return entry;
+    }
+
     public DefaultCacheEntry supply(
         int requestHash,
         short authScope,
@@ -133,10 +145,18 @@ public class DefaultCache
         Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHashFromWithoutQueryList =
             cachedEntriesByRequestHashWithoutQuery.computeIfAbsent(requestHashWithoutQuery, l -> new Int2ObjectHashMap<>());
 
-        DefaultCacheEntry cacheEntry = computeCacheEntryIfAbsent(requestHash, authScope, requestHashWithoutQuery);
-        cachedEntriesByRequestHashFromWithoutQueryList.put(requestHash, cacheEntry);
-        cachedEntriesByRequestHash.put(requestHash, cacheEntry);
-        return cacheEntry;
+        DefaultCacheEntry entry = cachedEntriesByRequestHash.get(requestHash);
+        if (entry == null)
+        {
+            entry = new DefaultCacheEntry(this, requestHash, authScope, requestHashWithoutQuery, cachedRequestBufferPool,
+                                          cachedResponseBufferPool);
+            cachedEntriesByRequestHash.put(requestHash, entry);
+            counters.cacheEntries.accept(1);
+        }
+
+        cachedEntriesByRequestHashFromWithoutQueryList.put(requestHash, entry);
+
+        return entry;
     }
 
     private int generateRequestHashWithoutQuery(
@@ -166,15 +186,20 @@ public class DefaultCache
     public void purge(
         int requestHash)
     {
-        DefaultCacheEntry cacheEntry = cachedEntriesByRequestHash.remove(requestHash);
-        assert cacheEntry != null;
+        DefaultCacheEntry entry = cachedEntriesByRequestHash.remove(requestHash);
+        assert entry != null;
 
-        final int requestHashWithoutQuery = cacheEntry.requestHashWithoutQuery();
+        if (entry.frequencyParent() != null)
+        {
+            entry.frequencyParent().entries().remove(entry);
+        }
+
+        final int requestHashWithoutQuery = entry.requestHashWithoutQuery();
         cachedEntriesByRequestHashWithoutQuery.computeIfPresent(
             requestHashWithoutQuery, (h, m) -> m.remove(requestHash) != null && m.isEmpty() ? null : m);
 
+        entry.purge();
         counters.cacheEntries.accept(-1);
-        cacheEntry.purge();
         counters.responsesPurged.getAsLong();
     }
 
@@ -311,7 +336,7 @@ public class DefaultCache
         long authorization,
         boolean promiseNextPollRequest)
     {
-
+        DefaultCacheEntry cacheEntry = lookup(requestHash);
         if (preferWait != null)
         {
             writer.doHttpResponse(
@@ -326,7 +351,6 @@ public class DefaultCache
 
             if (promiseNextPollRequest)
             {
-                DefaultCacheEntry cacheEntry = get(requestHash);
                 writer.doHttpPushPromise(
                     reply,
                     routeId,
@@ -380,22 +404,28 @@ public class DefaultCache
     public void purgeEntriesForNonPendingRequests(
         Set<Integer> requestHashes)
     {
-        final MutableInteger counter = new MutableInteger(0);
-        cachedEntriesByRequestHash.forEach((requestHash, cacheEntry) ->
+        final MutableInteger count = new MutableInteger(0);
+        Iterator<FrequencyBucket> iterator = frequencies.iterator();
+        while (count.value <= allowedCacheEvictionCount && iterator.hasNext())
         {
-            if (counter.value <= allowedCacheEvictionPerBatch)
+            final FrequencyBucket frequencyBucket = iterator.next();
+            frequencyBucket.entries().forEach(entry ->
             {
+                final int requestHash = entry.requestHash();
                 if (!requestHashes.contains(requestHash))
                 {
-                    purge(requestHash);
+                    if (count.value <= allowedCacheEvictionCount)
+                    {
+                        purge(requestHash);
+                        count.value++;
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
-            }
-            else
-            {
-                return;
-            }
-            counter.value++;
-        });
+            });
+        }
     }
 
     public void updateResponseHeaderIfNecessary(
@@ -407,7 +437,7 @@ public class DefaultCache
 
         if (isSelectedForUpdate)
         {
-            DefaultCacheEntry cacheEntry =  get(requestHash);
+            DefaultCacheEntry cacheEntry =  cachedEntriesByRequestHash.get(requestHash);
             if (cacheEntry != null)
             {
                 cacheEntry.updateResponseHeader(status, responseHeaders);
@@ -423,30 +453,57 @@ public class DefaultCache
             final String name = h.name().asString();
             final String value = h.value().asString();
             return CACHE_CONTROL.equals(name) &&
+                   value != null &&
                    (value.contains(CacheDirectives.NO_CACHE) ||
                     value.contains(MAX_AGE_0) ||
                     value.contains(NO_STORE));
         });
     }
 
-
-    private DefaultCacheEntry computeCacheEntryIfAbsent(
-        int requestHash,
-        short authScope,
-        int collectionHash)
+    private void incrementFrequency(
+        DefaultCacheEntry entry)
     {
-        DefaultCacheEntry entry = get(requestHash);
-        if (entry == null)
+        final FrequencyBucket currentFrequency = entry.frequencyParent();
+        int nextFrequencyAmount;
+        FrequencyBucket nextFrequency = null;
+
+        if (currentFrequency == null)
         {
-            counters.cacheEntries.accept(1);
-            return new DefaultCacheEntry(this,
-                                         requestHash,
-                                         authScope,
-                                         collectionHash,
-                                         cachedRequestBufferPool,
-                                         cachedResponseBufferPool);
+            nextFrequencyAmount = 1;
+            try
+            {
+                nextFrequency = frequencies.getFirst();
+            }
+            catch (NoSuchElementException ex)
+            {
+                //NOOP
+            }
+        }
+        else
+        {
+            nextFrequencyAmount = currentFrequency.frequency() + 1;
+            final int newIndex = frequencies.indexOf(currentFrequency) + 1;
+            try
+            {
+                nextFrequency = frequencies.get(newIndex);
+            }
+            catch (IndexOutOfBoundsException ex)
+            {
+                //NOOP
+            }
         }
 
-        return entry;
+        if (nextFrequency == null || nextFrequency.frequency() != nextFrequencyAmount)
+        {
+            nextFrequency = new FrequencyBucket(nextFrequencyAmount);
+            frequencies.add(nextFrequency);
+        }
+
+        nextFrequency.entries().add(entry);
+        entry.frequencyParent(nextFrequency);
+        if (currentFrequency != null)
+        {
+            currentFrequency.entries().remove(entry);
+        }
     }
 }

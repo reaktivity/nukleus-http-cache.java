@@ -262,10 +262,12 @@ public class HttpCacheProxyFactory implements StreamFactory
             CacheUtils.isMatchByEtag(headers, cacheEntry.etag()))
         {
             final HttpCacheProxyCachedNotModifiedRequest cachedNotModifiedRequest =
-                new HttpCacheProxyCachedNotModifiedRequest(this,
+                new HttpCacheProxyCachedNotModifiedRequest(
+                    this,
                     initial,
                     routeId,
-                    initialId);
+                    initialId,
+                    cacheEntry);
             newStream = cachedNotModifiedRequest::onRequestMessage;
         }
         else if (headers.anyMatch(CacheDirectives.IS_ONLY_IF_CACHED) && !matchCacheableRequest)
@@ -291,7 +293,8 @@ public class HttpCacheProxyFactory implements StreamFactory
                 {
                     group.authorizationHeader(authorizationHeader.value().asString());
                 }
-                newStream = newCacheableRequestStream(initial,
+                newStream = newCacheableRequestStream(
+                    initial,
                     routeId,
                     initialId,
                     resolveId,

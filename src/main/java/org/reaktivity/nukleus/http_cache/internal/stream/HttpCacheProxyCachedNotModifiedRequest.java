@@ -15,8 +15,12 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFER;
+import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
+
 import org.agrona.DirectBuffer;
 import org.reaktivity.nukleus.function.MessageConsumer;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
 import org.reaktivity.nukleus.http_cache.internal.types.ArrayFW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -34,18 +38,21 @@ final class HttpCacheProxyCachedNotModifiedRequest
     private final long acceptRouteId;
     private final long acceptReplyId;
     private final long acceptInitialId;
+    private DefaultCacheEntry cacheEntry;
     private final int initialWindow;
 
     HttpCacheProxyCachedNotModifiedRequest(
         HttpCacheProxyFactory factory,
         MessageConsumer acceptReply,
         long acceptRouteId,
-        long acceptInitialId)
+        long acceptInitialId,
+        DefaultCacheEntry cacheEntry)
     {
         this.factory = factory;
         this.acceptReply = acceptReply;
         this.acceptRouteId = acceptRouteId;
         this.acceptInitialId = acceptInitialId;
+        this.cacheEntry = cacheEntry;
         this.acceptReplyId = factory.supplyReplyId.applyAsLong(acceptInitialId);
         this.initialWindow = factory.initialWindowSize;
     }
@@ -83,6 +90,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginFW = extension.get(factory.httpBeginExRO::wrap);
         final ArrayFW<HttpHeaderFW> requestHeaders = httpBeginFW.headers();
+        final long authorization = begin.authorization();
         final long traceId = begin.traceId();
 
         factory.writer.doWindow(acceptReply,
@@ -100,11 +108,16 @@ final class HttpCacheProxyCachedNotModifiedRequest
 
         factory.router.setThrottle(acceptReplyId, this::onResponseMessage);
 
-        factory.writer.do304(acceptReply,
-                             acceptRouteId,
-                             acceptReplyId,
-                             traceId,
-                             requestHeaders);
+        factory.defaultCache.send304(
+            cacheEntry.requestHash(),
+            cacheEntry.etag(),
+            getHeader(requestHeaders, PREFER),
+            acceptReply,
+            acceptRouteId,
+            acceptReplyId,
+            traceId,
+            authorization,
+            false);
     }
 
     private void onRequestData(
