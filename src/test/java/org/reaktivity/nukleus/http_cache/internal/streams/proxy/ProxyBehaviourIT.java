@@ -179,7 +179,7 @@ public class ProxyBehaviourIT
     public void shouldPurgeCacheEntryOnFullCache() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(2);
         counters.assertRequestGroups(0);
     }
 

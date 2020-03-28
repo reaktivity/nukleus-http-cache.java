@@ -38,7 +38,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
     private final long acceptRouteId;
     private final long acceptReplyId;
     private final long acceptInitialId;
-    private DefaultCacheEntry cacheEntry;
+    private final DefaultCacheEntry cacheEntry;
     private final int initialWindow;
 
     HttpCacheProxyCachedNotModifiedRequest(

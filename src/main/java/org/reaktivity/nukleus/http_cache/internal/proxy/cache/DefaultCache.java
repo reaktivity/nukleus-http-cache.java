@@ -33,9 +33,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
 import java.net.URI;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
@@ -78,7 +75,7 @@ public class DefaultCache
 
     private final Writer writer;
     private final Int2ObjectHashMap<DefaultCacheEntry> cachedEntriesByRequestHash;
-    private final LinkedList<FrequencyBucket> frequencies;
+    private final Int2ObjectHashMap<FrequencyBucket> frequencies;
     private final Int2ObjectHashMap<Int2ObjectHashMap<DefaultCacheEntry>> cachedEntriesByRequestHashWithoutQuery;
 
     private final HttpCacheCounters counters;
@@ -107,7 +104,7 @@ public class DefaultCache
                 counters.supplyCounter.apply("http-cache.cached.response.acquires"),
                 counters.supplyCounter.apply("http-cache.cached.response.releases"));
         this.cachedEntriesByRequestHash = new Int2ObjectHashMap<>();
-        this.frequencies = new LinkedList<>();
+        this.frequencies = new Int2ObjectHashMap<>();
         this.cachedEntriesByRequestHashWithoutQuery = new Int2ObjectHashMap<>();
         this.counters = counters;
         int totalSlots = cacheCapacity / cacheBufferPool.slotCapacity();
@@ -405,18 +402,15 @@ public class DefaultCache
     public void purgeEntriesForNonPendingRequests(
         Set<Integer> requestHashes)
     {
-        final MutableInteger count = new MutableInteger(0);
-        Iterator<FrequencyBucket> iterator = frequencies.iterator();
-        counters.cacheFullness.getAsLong();
-        while (count.value < allowedCacheEvictionCount && iterator.hasNext())
+        for (final MutableInteger count = new MutableInteger(1); count.value <= allowedCacheEvictionCount;)
         {
-            final FrequencyBucket frequencyBucket = iterator.next();
+            final FrequencyBucket frequencyBucket = frequencies.get(count.value);
             frequencyBucket.entries().forEach(entry ->
             {
                 final int requestHash = entry.requestHash();
                 if (!requestHashes.contains(requestHash))
                 {
-                    if (count.value < allowedCacheEvictionCount)
+                    if (count.value <= allowedCacheEvictionCount)
                     {
                         purge(requestHash);
                         count.value++;
@@ -428,6 +422,7 @@ public class DefaultCache
                 }
             });
         }
+        counters.cacheFullness.getAsLong();
     }
 
     public void updateResponseHeaderIfNecessary(
@@ -465,49 +460,34 @@ public class DefaultCache
     private void incrementFrequency(
         DefaultCacheEntry entry)
     {
-        final FrequencyBucket currentFrequency = entry.frequencyParent();
+        final int currentParentKey = (entry.frequencyParent() != null) ? entry.frequencyParent().frequency() : 0;
+        final FrequencyBucket currentFrequency = frequencies.get(currentParentKey);
         int nextFrequencyAmount;
         FrequencyBucket nextFrequency = null;
 
-        if (currentFrequency == null)
-        {
-            nextFrequencyAmount = 1;
-            try
-            {
-                nextFrequency = frequencies.getFirst();
-            }
-            catch (NoSuchElementException ex)
-            {
-                //NOOP
-            }
-        }
-        else
-        {
-            nextFrequencyAmount = currentFrequency.frequency() + 1;
-            final int newIndex = frequencies.indexOf(currentFrequency) + 1;
-            try
-            {
-                nextFrequency = frequencies.get(newIndex);
-            }
-            catch (IndexOutOfBoundsException ex)
-            {
-                //NOOP
-            }
-        }
+        nextFrequencyAmount =  (currentFrequency == null) ? 1 : currentParentKey + 1;
+        nextFrequency = frequencies.get(nextFrequencyAmount);
 
-        if (nextFrequency == null || nextFrequency.frequency() != nextFrequencyAmount)
+        if (nextFrequency == null)
         {
             nextFrequency = new FrequencyBucket(nextFrequencyAmount);
-            frequencies.add(nextFrequency);
-            counters.cacheHitFrequencies.getAsLong();
+            frequencies.put(nextFrequencyAmount, nextFrequency);
+            counters.cacheHitFrequencies.accept(1);
         }
 
         nextFrequency.entries().add(entry);
         entry.frequencyParent(nextFrequency);
+
         if (currentFrequency != null)
         {
             final ObjectHashSet<DefaultCacheEntry> entries = currentFrequency.entries();
             entries.remove(entry);
+
+            if (entries.isEmpty())
+            {
+                frequencies.remove(currentParentKey);
+                counters.cacheHitFrequencies.accept(-1);
+            }
         }
     }
 }
