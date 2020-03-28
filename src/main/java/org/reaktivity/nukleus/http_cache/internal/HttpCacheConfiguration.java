@@ -43,7 +43,7 @@ public class HttpCacheConfiguration extends Configuration
         HTTP_CACHE_ETAG_PREFIX = config.property("etag.prefix", new Random().nextInt(99999));
         HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE = config.property("allowed.cache.percentage", 95);
         HTTP_CACHE_ALLOWED_CACHE_EVICTION_COUNT = config.property("allowed.cache.eviction.count",
-            10);
+            200);
         HTTP_CACHE_PREFER_WAIT_MAXIMUM = config.property("prefer.wait.maximum", Integer.MAX_VALUE);
         HTTP_CACHE_INITIAL_WINDOW_SIZE = config.property("initial.window.size", 6291456);
         HTTP_CACHE_CONFIG = config;
