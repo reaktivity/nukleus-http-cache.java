@@ -434,10 +434,10 @@ public class DefaultCache
 
         if (isSelectedForUpdate)
         {
-            DefaultCacheEntry cacheEntry =  cachedEntriesByRequestHash.get(requestHash);
-            if (cacheEntry != null)
+            DefaultCacheEntry entry =  cachedEntriesByRequestHash.get(requestHash);
+            if (entry != null)
             {
-                cacheEntry.updateResponseHeader(status, responseHeaders);
+                entry.updateResponseHeader(status, responseHeaders);
             }
         }
     }
