@@ -16,9 +16,9 @@
 package org.reaktivity.nukleus.http_cache.internal;
 
 import static org.junit.Assert.assertEquals;
-import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_CAPACITY;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_MAXIMUM_REQUESTS;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration.HTTP_CACHE_SLOT_CAPACITY;
 
@@ -31,7 +31,7 @@ public class HttpCacheConfigurationTest
     public static final String HTTP_CACHE_CAPACITY_NAME = "nukleus.http_cache.capacity";
     public static final String HTTP_CACHE_SLOT_CAPACITY_NAME = "nukleus.http_cache.slot.capacity";
     public static final String HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME = "nukleus.http_cache.allowed.cache.percentage";
-    public static final String HTTP_CACHE_ALLOWED_CACHE_EVICTION_COUNT_NAME = "nukleus.http_cache.allowed.cache.eviction.count";
+    public static final String HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT_NAME = "nukleus.http_cache.maximum.cache.eviction.count";
 
     @Test
     public void shouldVerifyConstants() throws Exception
@@ -40,7 +40,7 @@ public class HttpCacheConfigurationTest
         assertEquals(HTTP_CACHE_CAPACITY.name(), HTTP_CACHE_CAPACITY_NAME);
         assertEquals(HTTP_CACHE_SLOT_CAPACITY.name(), HTTP_CACHE_SLOT_CAPACITY_NAME);
         assertEquals(HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE.name(), HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME);
-        assertEquals(HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT.name(), HTTP_CACHE_ALLOWED_CACHE_EVICTION_COUNT_NAME);
+        assertEquals(HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT.name(), HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT_NAME);
 
     }
 }
