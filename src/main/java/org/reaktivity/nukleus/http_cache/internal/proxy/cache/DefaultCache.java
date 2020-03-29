@@ -40,7 +40,6 @@ import java.util.regex.Pattern;
 
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
-import org.agrona.collections.MutableInteger;
 import org.agrona.collections.ObjectHashSet;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
@@ -402,27 +401,27 @@ public class DefaultCache
     public void purgeEntriesForNonPendingRequests(
         Set<Integer> requestHashes)
     {
-        for (final MutableInteger count = new MutableInteger(1); count.value <= allowedCacheEvictionCount;)
+        for (int count = 1; count <= allowedCacheEvictionCount;)
         {
-            final FrequencyBucket frequencyBucket = frequencies.get(count.value);
-            frequencyBucket.entries().forEach(entry ->
+            final FrequencyBucket frequencyBucket = frequencies.get(count);
+            for (DefaultCacheEntry entry : frequencyBucket.entries())
             {
                 final int requestHash = entry.requestHash();
                 if (!requestHashes.contains(requestHash))
                 {
-                    if (count.value <= allowedCacheEvictionCount)
+                    if (count <= allowedCacheEvictionCount)
                     {
                         purge(requestHash);
-                        count.value++;
+                        count++;
                     }
                     else
                     {
                         return;
                     }
                 }
-            });
+            }
         }
-        counters.cacheFullness.getAsLong();
+        counters.cachePurgeAttempts.getAsLong();
     }
 
     public void updateResponseHeaderIfNecessary(
@@ -460,7 +459,8 @@ public class DefaultCache
     private void incrementFrequency(
         DefaultCacheEntry entry)
     {
-        final int currentParentKey = (entry.frequencyParent() != null) ? entry.frequencyParent().frequency() : 0;
+        final FrequencyBucket frequencyBucket = entry.frequencyParent();
+        final int currentParentKey = (frequencyBucket != null) ? frequencyBucket.frequency() : 0;
         final FrequencyBucket currentFrequency = frequencies.get(currentParentKey);
         int nextFrequencyAmount;
         FrequencyBucket nextFrequency = null;
@@ -472,7 +472,7 @@ public class DefaultCache
         {
             nextFrequency = new FrequencyBucket(nextFrequencyAmount);
             frequencies.put(nextFrequencyAmount, nextFrequency);
-            counters.cacheHitFrequencies.accept(1);
+            counters.frequencyBuckets.accept(1);
         }
 
         nextFrequency.entries().add(entry);
@@ -486,7 +486,7 @@ public class DefaultCache
             if (entries.isEmpty())
             {
                 frequencies.remove(currentParentKey);
-                counters.cacheHitFrequencies.accept(-1);
+                counters.frequencyBuckets.accept(-1);
             }
         }
     }
