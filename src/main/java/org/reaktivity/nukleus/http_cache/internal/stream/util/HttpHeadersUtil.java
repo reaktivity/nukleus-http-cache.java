@@ -64,7 +64,8 @@ public final class HttpHeadersUtil
         return RETRY_AFTER.equalsIgnoreCase(name);
     };
 
-    public static String getRequestURL(Array32FW<HttpHeaderFW> headers)
+    public static String getRequestURL(
+        Array32FW<HttpHeaderFW> headers)
     {
         // TODO, less garbage collection...
         // streaming API: https://github.com/reaktivity/nukleus-maven-plugin/issues/16

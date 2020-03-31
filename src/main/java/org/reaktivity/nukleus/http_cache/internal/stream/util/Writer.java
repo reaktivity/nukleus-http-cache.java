@@ -25,7 +25,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.IF_NONE_MATCH;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.PREFERENCE_APPLIED;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.RETRY_AFTER;
-import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.STATUS;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.WARNING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_CACHE_CONTROL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.HAS_EMULATED_PROTOCOL_STACK;
@@ -40,7 +39,6 @@ import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheControl;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheDirectives;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils;
-import org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
@@ -561,27 +559,5 @@ public class Writer
                 .build();
 
         receiver.accept(data.typeId(), data.buffer(), data.offset(), data.sizeof());
-    }
-
-    public void do304(
-        MessageConsumer receiver,
-        long routeId,
-        long streamId,
-        long traceId,
-        Array32FW<HttpHeaderFW> requestHeaders)
-    {
-        this.doHttpResponse(receiver, routeId, streamId, traceId, builder ->
-        {
-            if (isPreferWait(requestHeaders))
-            {
-                builder.item(header -> header.name(ACCESS_CONTROL_EXPOSE_HEADERS)
-                                             .value(PREFERENCE_APPLIED));
-                builder.item(header -> header.name(PREFERENCE_APPLIED)
-                                             .value("wait=" + getPreferWait(requestHeaders)));
-            }
-
-            builder.item(h -> h.name(STATUS).value(HttpStatus.NOT_MODIFIED_304));
-            builder.item(h -> h.name(ETAG).value(getHeader(requestHeaders, IF_NONE_MATCH)));
-        });
     }
 }

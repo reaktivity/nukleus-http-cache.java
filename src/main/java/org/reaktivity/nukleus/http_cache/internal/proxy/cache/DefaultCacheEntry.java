@@ -62,6 +62,7 @@ public final class DefaultCacheEntry
 
     private String etag;
     private String varyBy;
+    private FrequencyBucket frequencyParent = null;
     private int requestSlot = NO_SLOT;
     private int responseHeadersSize;
     private int responseSize;
@@ -85,6 +86,17 @@ public final class DefaultCacheEntry
         this.requestPool = requestPool;
         this.responsePool = responsePool;
         this.responseSlots = new IntArrayList();
+    }
+
+    public FrequencyBucket frequencyParent()
+    {
+        return frequencyParent;
+    }
+
+    public void frequencyParent(
+        FrequencyBucket frequencyParent)
+    {
+        this.frequencyParent = frequencyParent;
     }
 
     public String getVaryBy()
@@ -523,5 +535,4 @@ public final class DefaultCacheEntry
         cacheStaleAt = null;
         cacheReceivedAt = null;
     }
-
 }

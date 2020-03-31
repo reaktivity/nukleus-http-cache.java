@@ -59,7 +59,7 @@ final class HttpCacheProxyCachedResponse
         long routeId,
         long replyId,
         long authorization,
-        DefaultCacheEntry cacheEntry,
+        int requestHash,
         boolean promiseNextPollRequest,
         Consumer<HttpCacheProxyCachedResponse> resetHandler)
     {
@@ -68,7 +68,7 @@ final class HttpCacheProxyCachedResponse
         this.routeId = routeId;
         this.replyId = replyId;
         this.authorization = authorization;
-        this.cacheEntry = cacheEntry;
+        this.cacheEntry = factory.defaultCache.lookup(requestHash);
         this.promiseNextPollRequest = promiseNextPollRequest;
         this.resetHandler = resetHandler;
     }
