@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.rules.RuleChain.outerRule;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_CAPACITY_NAME;
+import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT_NAME;
 import static org.reaktivity.nukleus.http_cache.internal.HttpCacheConfigurationTest.HTTP_CACHE_SLOT_CAPACITY_NAME;
 import static org.reaktivity.reaktor.test.ReaktorRule.EXTERNAL_AFFINITY_MASK;
 
@@ -169,6 +170,7 @@ public class ProxyBehaviourIT
     @Configure(name = HTTP_CACHE_CAPACITY_NAME, value = "32768")  //8 buffer slots
     @Configure(name = HTTP_CACHE_SLOT_CAPACITY_NAME, value = "4096")
     @Configure(name = HTTP_CACHE_ALLOWED_CACHE_PERCENTAGE_NAME, value = "75")
+    @Configure(name = HTTP_CACHE_MAXIMUM_CACHE_EVICTION_COUNT_NAME, value = "1")
     @Specification({
         "${route}/proxy/controller",
         "${streams}/purge.cache.entry.on.full.cache/accept/client",
@@ -177,7 +179,7 @@ public class ProxyBehaviourIT
     public void shouldPurgeCacheEntryOnFullCache() throws Exception
     {
         k3po.finish();
-        counters.assertExpectedCacheEntries(1);
+        counters.assertExpectedCacheEntries(2);
         counters.assertRequestGroups(0);
     }
 

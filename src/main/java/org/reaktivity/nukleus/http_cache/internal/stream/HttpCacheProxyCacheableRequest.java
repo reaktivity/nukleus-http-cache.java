@@ -101,10 +101,9 @@ final class HttpCacheProxyCacheableRequest
         long traceId)
     {
         final int requestHash = requestGroup.requestHash();
-        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestHash);
         final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
             factory, reply, routeId, replyId, authorization,
-            cacheEntry, promiseNextPollRequest, requestGroup::detach);
+            requestHash, promiseNextPollRequest, requestGroup::detach);
 
         response.doResponseBegin(now, traceId);
         requestGroup.attach(response);
@@ -273,10 +272,10 @@ final class HttpCacheProxyCacheableRequest
     {
         assert  headersSlot != NO_SLOT;
 
-        final DefaultCacheEntry cacheEntry = factory.defaultCache.get(requestGroup.requestHash());
+        final DefaultCacheEntry entry = factory.defaultCache.get(requestGroup.requestHash());
         final Array32FW<HttpHeaderFW> headers = getHeaders();
         final short authScope = authorizationScope(authorization);
-        final boolean isCacheEntryUpToDate = isCacheEntryUpdatedToBeServed(headers, authScope, cacheEntry);
+        final boolean isCacheEntryUpToDate = isCacheEntryUpdatedToBeServed(headers, authScope, entry);
         final boolean canBeCachedServed =
             factory.defaultCache.matchCacheableRequest(headers, authScope, requestGroup.requestHash());
 
@@ -287,7 +286,7 @@ final class HttpCacheProxyCacheableRequest
             final long replyId = factory.supplyReplyId.applyAsLong(initialId);
             final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
                 factory, reply, routeId, replyId, authorization,
-                cacheEntry, promiseNextPollRequest, requestGroup::detach);
+                requestGroup.requestHash(), promiseNextPollRequest, requestGroup::detach);
             final Instant now = Instant.now();
             response.doResponseBegin(now, traceId);
             requestGroup.attach(response);
