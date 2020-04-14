@@ -448,10 +448,7 @@ public class Writer
         int freshnessExtension,
         String etag)
     {
-        Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> result =
-            builder -> updateRequestHeaders(requestHeaders, responseHeaders, builder, freshnessExtension, etag);
-
-        return result;
+        return builder -> updateRequestHeaders(requestHeaders, responseHeaders, builder, freshnessExtension, etag);
     }
 
     private void updateRequestHeaders(

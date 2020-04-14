@@ -32,12 +32,15 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.TRANSFER_ENCODING;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getHeader;
 
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
 import java.util.Set;
 import java.util.function.ToIntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.agrona.LangUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.Int2ObjectHashMap;
 import org.agrona.collections.ObjectHashSet;
@@ -159,11 +162,18 @@ public class DefaultCache
     private int generateRequestHashWithoutQuery(
         String requestURL)
     {
-        final URI requestURI = URI.create(requestURL);
-        return String.format("%s://%s%s",
-                             requestURI.getScheme(),
-                             requestURI.getAuthority(),
-                             requestURI.getPath()).hashCode();
+        URL url = null;
+        try
+        {
+            url = new URL(requestURL);
+        }
+        catch (MalformedURLException ex)
+        {
+            LangUtil.rethrowUnchecked(ex);
+        }
+        return String.format("%s%s",
+                             url.getAuthority(),
+                             url.getPath()).hashCode();
     }
 
 
