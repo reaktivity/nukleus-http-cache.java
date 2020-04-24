@@ -32,22 +32,18 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 final class HttpCacheProxyNonCacheableRequest
 {
     private final HttpCacheProxyFactory factory;
+    private final HttpCacheProxyNonCacheableResponse nonCacheableResponse;
 
     private final MessageConsumer initial;
     private final long routeId;
     private final long initialId;
-    private final boolean isMethodUnsafe;
     final long replyId;
 
     private final MessageConsumer connectInitial;
     private final long connectRouteId;
     private final long connectInitialId;
 
-    private final MessageConsumer connectReply;
     final long connectReplyId;
-
-    private final String requestURL;
-    private final int requestHash;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -63,60 +59,30 @@ final class HttpCacheProxyNonCacheableRequest
         this.initial = initial;
         this.routeId = routeId;
         this.initialId = initialId;
-        this.isMethodUnsafe = isMethodUnsafe;
         this.replyId = factory.supplyReplyId.applyAsLong(initialId);
-        this.requestHash = requestHash;
-        this.requestURL = requestURL;
         this.connectRouteId = resolveId;
         this.connectInitialId = factory.supplyInitialId.applyAsLong(resolveId);
         this.connectInitial = factory.router.supplyReceiver(connectInitialId);
         this.connectReplyId = factory.supplyReplyId.applyAsLong(connectInitialId);
-        this.connectReply = factory.router.supplyReceiver(connectReplyId);
+
+        nonCacheableResponse =
+            new HttpCacheProxyNonCacheableResponse(factory,
+                requestHash,
+                requestURL,
+                isMethodUnsafe,
+                factory.router.supplyReceiver(connectReplyId),
+                connectRouteId,
+                connectReplyId,
+                initial,
+                routeId,
+                replyId);
+        factory.router.setThrottle(replyId, nonCacheableResponse::onResponseMessage);
     }
 
     MessageConsumer newResponse(
         HttpBeginExFW beginEx)
     {
-        final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
-            new HttpCacheProxyNonCacheableResponse(factory,
-                                                   requestHash,
-                                                   requestURL,
-                                                   isMethodUnsafe,
-                                                   connectReply,
-                                                   connectRouteId,
-                                                   connectReplyId,
-                                                   initial,
-                                                   routeId,
-                                                   replyId);
-        factory.router.setThrottle(replyId, nonCacheableResponse::onResponseMessage);
         return nonCacheableResponse::onResponseMessage;
-    }
-
-    void onResponseMessage(
-        int msgTypeId,
-        DirectBuffer buffer,
-        int index,
-        int length)
-    {
-        switch (msgTypeId)
-        {
-        case ResetFW.TYPE_ID:
-            final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
-            onResponseReset(reset);
-            break;
-        }
-    }
-
-    private void onResponseReset(
-        ResetFW reset)
-    {
-        final long traceId = reset.traceId();
-
-        factory.writer.doReset(connectInitial,
-                               connectRouteId,
-                               connectReplyId,
-                               traceId);
-        factory.correlations.remove(connectReplyId);
     }
 
     void onRequestMessage(

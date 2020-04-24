@@ -199,6 +199,7 @@ final class HttpCacheProxyNonCacheableResponse
     private void onResponseReset(
         final ResetFW reset)
     {
+        factory.correlations.remove(reset.streamId());
         factory.writer.doReset(connect,
                                connectRouteId,
                                connectReplyId,

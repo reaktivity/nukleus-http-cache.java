@@ -59,6 +59,9 @@ final class HttpCacheProxyCachedResponse
         long routeId,
         long replyId,
         long authorization,
+        long initialReplyBudgetId,
+        int initialWindow,
+        int initialPadding,
         int requestHash,
         boolean promiseNextPollRequest,
         Consumer<HttpCacheProxyCachedResponse> resetHandler)
@@ -71,6 +74,7 @@ final class HttpCacheProxyCachedResponse
         this.cacheEntry = factory.defaultCache.lookup(requestHash);
         this.promiseNextPollRequest = promiseNextPollRequest;
         this.resetHandler = resetHandler;
+        updateBudget(initialReplyBudgetId, initialWindow, initialPadding);
     }
 
     void onResponseMessage(
@@ -114,6 +118,7 @@ final class HttpCacheProxyCachedResponse
                                                         cacheEntry.isStale(now),
                                                         traceId);
         responseProgress = 0;
+        doResponseFlush(traceId);
 
         factory.counters.responses.getAsLong();
         factory.counters.responsesCached.getAsLong();
@@ -214,18 +219,25 @@ final class HttpCacheProxyCachedResponse
         assert responseProgress != -1;
         final long traceId = window.traceId();
 
-        replyDebitorId = window.budgetId();
-        replyPadding = window.padding();
-        int credit = window.credit();
+        updateBudget(window.budgetId(), window.credit(), window.padding());
+
+        doResponseFlush(traceId);
+    }
+
+    private void updateBudget(
+        long budgetId,
+        int credit,
+        int padding)
+    {
+        replyDebitorId = budgetId;
         replyBudget += credit;
+        replyPadding = padding;
 
         if (replyDebitorId != 0L && replyDebitor == null)
         {
             replyDebitor = factory.supplyDebitor.apply(replyDebitorId);
             replyDebitorIndex = replyDebitor.acquire(replyDebitorId, replyId, this::doResponseFlush);
         }
-
-        doResponseFlush(traceId);
     }
 
     private void buildResponsePayload(

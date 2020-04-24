@@ -48,6 +48,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
+import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
 
 final class HttpCacheProxyCacheableRequest
 {
@@ -73,6 +74,9 @@ final class HttpCacheProxyCacheableRequest
     private boolean promiseNextPollRequest;
 
     private int headersSlot = NO_SLOT;
+    private int initialReplyWindow;
+    private int initialReplyPadding;
+    private long initialReplyBudgetId;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -102,8 +106,17 @@ final class HttpCacheProxyCacheableRequest
     {
         final int requestHash = requestGroup.requestHash();
         final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
-            factory, reply, routeId, replyId, authorization,
-            requestHash, promiseNextPollRequest, requestGroup::detach);
+            factory,
+            reply,
+            routeId,
+            replyId,
+            authorization,
+            initialReplyBudgetId,
+            initialReplyWindow,
+            initialReplyPadding,
+            requestHash,
+            promiseNextPollRequest,
+            requestGroup::detach);
 
         response.doResponseBegin(now, traceId);
         requestGroup.attach(response);
@@ -162,7 +175,17 @@ final class HttpCacheProxyCacheableRequest
         factory.counters.responses.getAsLong();
         requestGroup.dequeue(this);
         cleanupRequestHeadersIfNecessary();
-        return new HttpCacheProxyRelayedResponse(factory, reply, routeId, replyId, sender, senderRouteId, senderReplyId, prefer);
+        return new HttpCacheProxyRelayedResponse(factory,
+            reply,
+            routeId,
+            replyId,
+            sender,
+            senderRouteId,
+            senderReplyId,
+            prefer,
+            initialReplyBudgetId,
+            initialReplyWindow,
+            initialReplyPadding);
     }
 
     void onRequestMessage(
@@ -285,8 +308,17 @@ final class HttpCacheProxyCacheableRequest
 
             final long replyId = factory.supplyReplyId.applyAsLong(initialId);
             final HttpCacheProxyCachedResponse response = new HttpCacheProxyCachedResponse(
-                factory, reply, routeId, replyId, authorization,
-                requestGroup.requestHash(), promiseNextPollRequest, requestGroup::detach);
+                factory,
+                reply,
+                routeId,
+                replyId,
+                authorization,
+                initialReplyBudgetId,
+                initialReplyWindow,
+                initialReplyPadding,
+                requestGroup.requestHash(),
+                promiseNextPollRequest,
+                requestGroup::detach);
             final Instant now = Instant.now();
             response.doResponseBegin(now, traceId);
             requestGroup.attach(response);
@@ -350,6 +382,9 @@ final class HttpCacheProxyCacheableRequest
     {
         switch (msgTypeId)
         {
+        case WindowFW.TYPE_ID:
+            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+            onResponseWindow(window);
         case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
@@ -361,6 +396,14 @@ final class HttpCacheProxyCacheableRequest
         default:
             break;
         }
+    }
+
+    private void onResponseWindow(
+        WindowFW window)
+    {
+        initialReplyBudgetId = window.budgetId();
+        initialReplyWindow += window.credit();
+        initialReplyPadding = window.padding();
     }
 
     private void onResponseReset(
