@@ -348,6 +348,7 @@ public class HttpCacheProxyFactory implements StreamFactory
                                                   requestURL,
                                                   isMethodUnsafe);
         final MessageConsumer newStream = nonCacheableRequest::onRequestMessage;
+        router.setThrottle(nonCacheableRequest.replyId, nonCacheableRequest::onResponseMessage);
         return newStream;
     }
 

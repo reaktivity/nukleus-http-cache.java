@@ -60,8 +60,8 @@ final class HttpCacheProxyCachedResponse
         long replyId,
         long authorization,
         long initialReplyBudgetId,
-        int initialWindow,
-        int initialPadding,
+        int initialReplyCredit,
+        int initialReplyPadding,
         int requestHash,
         boolean promiseNextPollRequest,
         Consumer<HttpCacheProxyCachedResponse> resetHandler)
@@ -74,7 +74,7 @@ final class HttpCacheProxyCachedResponse
         this.cacheEntry = factory.defaultCache.lookup(requestHash);
         this.promiseNextPollRequest = promiseNextPollRequest;
         this.resetHandler = resetHandler;
-        updateBudget(initialReplyBudgetId, initialWindow, initialPadding);
+        updateBudget(initialReplyBudgetId, initialReplyCredit, initialReplyPadding);
     }
 
     void onResponseMessage(
@@ -216,7 +216,6 @@ final class HttpCacheProxyCachedResponse
     private void onResponseWindow(
         WindowFW window)
     {
-        assert responseProgress != -1;
         final long traceId = window.traceId();
 
         updateBudget(window.budgetId(), window.credit(), window.padding());

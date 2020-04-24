@@ -74,7 +74,7 @@ final class HttpCacheProxyCacheableRequest
     private boolean promiseNextPollRequest;
 
     private int headersSlot = NO_SLOT;
-    private int initialReplyWindow;
+    private int initialReplyCredit;
     private int initialReplyPadding;
     private long initialReplyBudgetId;
 
@@ -112,14 +112,14 @@ final class HttpCacheProxyCacheableRequest
             replyId,
             authorization,
             initialReplyBudgetId,
-            initialReplyWindow,
+            initialReplyCredit,
             initialReplyPadding,
             requestHash,
             promiseNextPollRequest,
             requestGroup::detach);
 
-        response.doResponseBegin(now, traceId);
         requestGroup.attach(response);
+        response.doResponseBegin(now, traceId);
         cleanupRequestHeadersIfNecessary();
     }
 
@@ -184,7 +184,7 @@ final class HttpCacheProxyCacheableRequest
             senderReplyId,
             prefer,
             initialReplyBudgetId,
-            initialReplyWindow,
+            initialReplyCredit,
             initialReplyPadding);
     }
 
@@ -314,14 +314,14 @@ final class HttpCacheProxyCacheableRequest
                 replyId,
                 authorization,
                 initialReplyBudgetId,
-                initialReplyWindow,
+                initialReplyCredit,
                 initialReplyPadding,
                 requestGroup.requestHash(),
                 promiseNextPollRequest,
                 requestGroup::detach);
             final Instant now = Instant.now();
-            response.doResponseBegin(now, traceId);
             requestGroup.attach(response);
+            response.doResponseBegin(now, traceId);
             cleanupRequestHeadersIfNecessary();
             cleanupRequestTimeoutIfNecessary();
         }
@@ -385,6 +385,7 @@ final class HttpCacheProxyCacheableRequest
         case WindowFW.TYPE_ID:
             final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
             onResponseWindow(window);
+            break;
         case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
@@ -402,7 +403,7 @@ final class HttpCacheProxyCacheableRequest
         WindowFW window)
     {
         initialReplyBudgetId = window.budgetId();
-        initialReplyWindow += window.credit();
+        initialReplyCredit += window.credit();
         initialReplyPadding = window.padding();
     }
 
