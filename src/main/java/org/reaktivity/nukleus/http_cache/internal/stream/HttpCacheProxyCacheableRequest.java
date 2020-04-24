@@ -175,7 +175,8 @@ final class HttpCacheProxyCacheableRequest
         factory.counters.responses.getAsLong();
         requestGroup.dequeue(this);
         cleanupRequestHeadersIfNecessary();
-        return new HttpCacheProxyRelayedResponse(factory,
+        return new HttpCacheProxyRelayedResponse(
+            factory,
             reply,
             routeId,
             replyId,

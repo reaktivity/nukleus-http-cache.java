@@ -77,6 +77,7 @@ final class HttpCacheProxyNonCacheableResponse
         this.initialReplyBudgetId = initialReplyBudgetId;
         this.initialReplyCredit = initialReplyCredit;
         this.initialReplyPadding = initialReplyPadding;
+        acceptReplyBudget += initialReplyCredit;
     }
 
     @Override
@@ -148,14 +149,14 @@ final class HttpCacheProxyNonCacheableResponse
 
         if (initialReplyCredit > 0)
         {
-            factory.writer.doWindow(connect,
+            factory.writer.doWindow(
+                connect,
                 connectRouteId,
                 connectReplyId,
                 traceId,
                 initialReplyBudgetId,
                 initialReplyCredit,
                 initialReplyPadding);
-            acceptReplyBudget += initialReplyCredit;
         }
     }
 

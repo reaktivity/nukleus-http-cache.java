@@ -81,7 +81,8 @@ final class HttpCacheProxyNonCacheableRequest
         HttpBeginExFW beginEx)
     {
         final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
-            new HttpCacheProxyNonCacheableResponse(factory,
+            new HttpCacheProxyNonCacheableResponse(
+                factory,
                 requestHash,
                 requestURL,
                 isMethodUnsafe,
@@ -201,7 +202,8 @@ final class HttpCacheProxyNonCacheableRequest
         final int reserved = data.reserved();
         final OctetsFW payload = data.payload();
 
-        factory.writer.doHttpData(connectInitial,
+        factory.writer.doHttpData(
+            connectInitial,
             connectRouteId,
             connectInitialId,
             traceId,
