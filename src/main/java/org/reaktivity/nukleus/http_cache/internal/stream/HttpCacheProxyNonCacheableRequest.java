@@ -48,6 +48,9 @@ final class HttpCacheProxyNonCacheableRequest
 
     private final String requestURL;
     private final int requestHash;
+    private long initialReplyBudgetId;
+    private int initialReplyCredit;
+    private int initialReplyPadding;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -78,16 +81,20 @@ final class HttpCacheProxyNonCacheableRequest
         HttpBeginExFW beginEx)
     {
         final HttpCacheProxyNonCacheableResponse nonCacheableResponse =
-            new HttpCacheProxyNonCacheableResponse(factory,
-                                                   requestHash,
-                                                   requestURL,
-                                                   isMethodUnsafe,
-                                                   connectReply,
-                                                   connectRouteId,
-                                                   connectReplyId,
-                                                   initial,
-                                                   routeId,
-                                                   replyId);
+            new HttpCacheProxyNonCacheableResponse(
+                factory,
+                requestHash,
+                requestURL,
+                isMethodUnsafe,
+                connectReply,
+                connectRouteId,
+                connectReplyId,
+                initial,
+                routeId,
+                replyId,
+                initialReplyBudgetId,
+                initialReplyCredit,
+                initialReplyPadding);
         factory.router.setThrottle(replyId, nonCacheableResponse::onResponseMessage);
         return nonCacheableResponse::onResponseMessage;
     }
@@ -100,11 +107,23 @@ final class HttpCacheProxyNonCacheableRequest
     {
         switch (msgTypeId)
         {
+        case WindowFW.TYPE_ID:
+            final WindowFW window = factory.windowRO.wrap(buffer, index, index + length);
+            onResponseWindow(window);
+            break;
         case ResetFW.TYPE_ID:
             final ResetFW reset = factory.resetRO.wrap(buffer, index, index + length);
             onResponseReset(reset);
             break;
         }
+    }
+
+    private void onResponseWindow(
+        WindowFW window)
+    {
+        initialReplyBudgetId = window.budgetId();
+        initialReplyCredit += window.credit();
+        initialReplyPadding = window.padding();
     }
 
     private void onResponseReset(
@@ -113,9 +132,9 @@ final class HttpCacheProxyNonCacheableRequest
         final long traceId = reset.traceId();
 
         factory.writer.doReset(connectInitial,
-                               connectRouteId,
-                               connectReplyId,
-                               traceId);
+            connectRouteId,
+            connectReplyId,
+            traceId);
         factory.correlations.remove(connectReplyId);
     }
 
@@ -183,15 +202,16 @@ final class HttpCacheProxyNonCacheableRequest
         final int reserved = data.reserved();
         final OctetsFW payload = data.payload();
 
-        factory.writer.doHttpData(connectInitial,
-                                  connectRouteId,
-                                  connectInitialId,
-                                  traceId,
-                                  budgetId,
-                                  payload.buffer(),
-                                  payload.offset(),
-                                  payload.sizeof(),
-                                  reserved);
+        factory.writer.doHttpData(
+            connectInitial,
+            connectRouteId,
+            connectInitialId,
+            traceId,
+            budgetId,
+            payload.buffer(),
+            payload.offset(),
+            payload.sizeof(),
+            reserved);
     }
 
     private void onRequestEnd(

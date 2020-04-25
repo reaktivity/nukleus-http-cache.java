@@ -50,6 +50,9 @@ public final class HttpCacheProxyRelayedResponse
     private final long senderRouteId;
     private final long senderReplyId;
     private final String prefer;
+    private final long initialReplyBudgetId;
+    private final int initialWindow;
+    private final int initialPadding;
 
     HttpCacheProxyRelayedResponse(
         HttpCacheProxyFactory factory,
@@ -59,7 +62,10 @@ public final class HttpCacheProxyRelayedResponse
         MessageConsumer sender,
         long senderRouteId,
         long senderReplyId,
-        String prefer)
+        String prefer,
+        long initialReplyBudgetId,
+        int initialWindow,
+        int initialPadding)
     {
         this.factory = factory;
         this.receiver = receiver;
@@ -69,6 +75,9 @@ public final class HttpCacheProxyRelayedResponse
         this.senderRouteId = senderRouteId;
         this.senderReplyId = senderReplyId;
         this.prefer = prefer;
+        this.initialReplyBudgetId = initialReplyBudgetId;
+        this.initialWindow = initialWindow;
+        this.initialPadding = initialPadding;
     }
 
     void doResponseReset(
@@ -164,5 +173,10 @@ public final class HttpCacheProxyRelayedResponse
         factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
         receiver.accept(newBegin.typeId(), newBegin.buffer(), newBegin.offset(), newBegin.sizeof());
 
+        if (initialWindow > 0)
+        {
+            factory.writer.doWindow(receiver, receiverRouteId, senderReplyId, traceId,
+                initialReplyBudgetId, initialWindow, initialPadding);
+        }
     }
 }

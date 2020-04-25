@@ -43,6 +43,9 @@ final class HttpCacheProxyNonCacheableResponse
     private final MessageConsumer accept;
     private final long acceptRouteId;
     private final long acceptReplyId;
+    private final long initialReplyBudgetId;
+    private final int initialReplyCredit;
+    private final int initialReplyPadding;
 
     private int acceptReplyBudget;
 
@@ -56,7 +59,10 @@ final class HttpCacheProxyNonCacheableResponse
         long connectReplyId,
         MessageConsumer accept,
         long acceptRouteId,
-        long acceptReplyId)
+        long acceptReplyId,
+        long initialReplyBudgetId,
+        int initialReplyCredit,
+        int initialReplyPadding)
     {
         this.factory = factory;
         this.requestHash = requestHash;
@@ -68,6 +74,10 @@ final class HttpCacheProxyNonCacheableResponse
         this.accept = accept;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
+        this.initialReplyBudgetId = initialReplyBudgetId;
+        this.initialReplyCredit = initialReplyCredit;
+        this.initialReplyPadding = initialReplyPadding;
+        acceptReplyBudget += initialReplyCredit;
     }
 
     @Override
@@ -135,6 +145,18 @@ final class HttpCacheProxyNonCacheableResponse
         if (isMethodUnsafe)
         {
             factory.defaultCache.invalidateCacheEntryIfNecessary(factory, requestHash, requestURL, traceId, headers);
+        }
+
+        if (initialReplyCredit > 0)
+        {
+            factory.writer.doWindow(
+                connect,
+                connectRouteId,
+                connectReplyId,
+                traceId,
+                initialReplyBudgetId,
+                initialReplyCredit,
+                initialReplyPadding);
         }
     }
 
