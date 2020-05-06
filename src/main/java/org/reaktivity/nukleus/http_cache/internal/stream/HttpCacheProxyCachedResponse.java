@@ -27,6 +27,7 @@ import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.http_cache.internal.proxy.cache.DefaultCacheEntry;
+import org.reaktivity.nukleus.http_cache.internal.proxy.cache.SurrogateControl;
 import org.reaktivity.nukleus.http_cache.internal.types.Array32FW;
 import org.reaktivity.nukleus.http_cache.internal.types.HttpHeaderFW;
 import org.reaktivity.nukleus.http_cache.internal.types.OctetsFW;
@@ -184,8 +185,10 @@ final class HttpCacheProxyCachedResponse
         long traceId)
     {
         assert responseProgress == cacheEntry.responseSize();
+        final Array32FW<HttpHeaderFW> cachedResponseHeaders = cacheEntry.getCachedResponseHeaders();
+        int freshnessExtension = SurrogateControl.getSurrogateFreshnessExtension(cachedResponseHeaders);
 
-        if (promiseNextPollRequest)
+        if (promiseNextPollRequest && freshnessExtension > 0)
         {
             factory.counters.promises.getAsLong();
             factory.writer.doHttpPushPromise(reply,
@@ -193,7 +196,7 @@ final class HttpCacheProxyCachedResponse
                                              replyId,
                                              authorization,
                                              cacheEntry.getRequestHeaders(),
-                                             cacheEntry.getCachedResponseHeaders(),
+                                             cachedResponseHeaders,
                                              cacheEntry.etag());
         }
 
