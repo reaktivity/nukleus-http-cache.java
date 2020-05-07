@@ -361,8 +361,16 @@ final class HttpCacheProxyGroupRequest
                 newStream = relayedResponse::onResponseMessage;
                 resetHandler = relayedResponse::doResponseReset;
             }
-            cleanupRequestIfNecessary();
             requestGroup.onGroupRequestEnd(request);
+
+            factory.correlations.remove(replyId);
+            releaseRequestSlotIfNecessary();
+
+            if (retryRequest != null)
+            {
+                retryRequest.cancel(true);
+                retryRequest = null;
+            }
         }
 
         return newStream;
