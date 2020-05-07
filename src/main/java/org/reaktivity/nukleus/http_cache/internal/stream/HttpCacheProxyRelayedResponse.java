@@ -175,7 +175,7 @@ public final class HttpCacheProxyRelayedResponse
 
         if (initialWindow > 0)
         {
-            factory.writer.doWindow(receiver, receiverRouteId, senderReplyId, traceId,
+            factory.writer.doWindow(sender, senderRouteId, senderReplyId, traceId,
                 initialReplyBudgetId, initialWindow, initialPadding);
         }
     }
