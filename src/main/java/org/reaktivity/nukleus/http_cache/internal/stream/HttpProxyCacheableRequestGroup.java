@@ -97,7 +97,7 @@ public final class HttpProxyCacheableRequestGroup
         {
             doRequest(request);
         }
-        else if (!attachedResponses.isEmpty())
+        else if (cacheEntry != null && !attachedResponses.isEmpty())
         {
             final String etag = cacheEntry.etag();
             final boolean notModified = etag != null && etag.equals(request.ifNoneMatch);
