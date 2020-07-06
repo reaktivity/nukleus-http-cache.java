@@ -134,7 +134,7 @@ final class HttpCacheProxyCachedResponse
         if (writable > 0)
         {
             final int maximum = writable + replyPadding;
-            final int minimum = Math.min(maximum, 1024);
+            final int minimum = Math.min(maximum, 1024 + replyPadding);
 
             int claimed = maximum;
             if (replyDebitorIndex != NO_DEBITOR_INDEX)
