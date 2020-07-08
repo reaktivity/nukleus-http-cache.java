@@ -404,19 +404,23 @@ public class DefaultCache
         for (int count = 1; count <= allowedCacheEvictionCount;)
         {
             final FrequencyBucket frequencyBucket = frequencies.get(count);
-            for (DefaultCacheEntry entry : frequencyBucket.entries())
+
+            if (frequencyBucket != null)
             {
-                final int requestHash = entry.requestHash();
-                if (!requestHashes.contains(requestHash))
+                for (DefaultCacheEntry entry : frequencyBucket.entries())
                 {
-                    if (count <= allowedCacheEvictionCount)
+                    final int requestHash = entry.requestHash();
+                    if (!requestHashes.contains(requestHash))
                     {
-                        purge(requestHash);
-                        count++;
-                    }
-                    else
-                    {
-                        return;
+                        if (count <= allowedCacheEvictionCount)
+                        {
+                            purge(requestHash);
+                            count++;
+                        }
+                        else
+                        {
+                            return;
+                        }
                     }
                 }
             }

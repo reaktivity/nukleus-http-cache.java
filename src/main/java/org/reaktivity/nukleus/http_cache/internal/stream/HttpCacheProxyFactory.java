@@ -250,7 +250,6 @@ public class HttpCacheProxyFactory implements StreamFactory
         final boolean isMethodUnsafe = CacheUtils.isMethodUnsafe(headers);
         final short authorizationScope = authorizationScope(authorization);
         final int requestHash = requestHash(authorizationScope, requestURL.hashCode());
-        final long replyId = supplyReplyId.applyAsLong(initialId);
 
         MessageConsumer newStream = null;
 

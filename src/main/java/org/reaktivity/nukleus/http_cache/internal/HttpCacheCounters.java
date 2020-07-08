@@ -63,6 +63,6 @@ public class HttpCacheCounters
         this.cacheEntries = supplyAccumulator.apply("http-cache.cache.entries");
         this.requestGroups = supplyAccumulator.apply("http-cache.request.groups");
         this.frequencyBuckets = supplyAccumulator.apply("http-cache.frequency.buckets");
-        this.cachePurgeAttempts = supplyCounter.apply("http-cache.cache.cache.purge.attempts");
+        this.cachePurgeAttempts = supplyCounter.apply("http-cache.cache.purge.attempts");
     }
 }
