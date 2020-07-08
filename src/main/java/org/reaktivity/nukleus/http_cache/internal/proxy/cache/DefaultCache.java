@@ -401,9 +401,10 @@ public class DefaultCache
     public void purgeEntriesForNonPendingRequests(
         Set<Integer> requestHashes)
     {
+        int frequency = 1;
         for (int count = 1; count <= allowedCacheEvictionCount;)
         {
-            final FrequencyBucket frequencyBucket = frequencies.get(count);
+            final FrequencyBucket frequencyBucket = frequencies.get(frequency);
 
             if (frequencyBucket != null)
             {
@@ -424,6 +425,7 @@ public class DefaultCache
                     }
                 }
             }
+            frequency++;
         }
         counters.cachePurgeAttempts.getAsLong();
     }
