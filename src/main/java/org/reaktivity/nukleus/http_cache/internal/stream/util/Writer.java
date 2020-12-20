@@ -55,9 +55,7 @@ import org.reaktivity.nukleus.http_cache.internal.types.stream.EndFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpBeginExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.HttpEndExFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.ResetFW;
-import org.reaktivity.nukleus.http_cache.internal.types.stream.SignalFW;
 import org.reaktivity.nukleus.http_cache.internal.types.stream.WindowFW;
-import org.reaktivity.nukleus.route.RouteManager;
 
 public class Writer
 {
@@ -69,19 +67,15 @@ public class Writer
     private final WindowFW.Builder windowRW = new WindowFW.Builder();
     private final ResetFW.Builder resetRW = new ResetFW.Builder();
     private final AbortFW.Builder abortRW = new AbortFW.Builder();
-    private final SignalFW.Builder signalRW = new SignalFW.Builder();
     private final CacheControl cacheControlParser = new CacheControl();
 
-    private final RouteManager router;
     private final MutableDirectBuffer writeBuffer;
     private final int httpTypeId;
 
     public Writer(
-        RouteManager router,
         ToIntFunction<String> supplyTypeId,
         MutableDirectBuffer writeBuffer)
     {
-        this.router = router;
         this.writeBuffer = writeBuffer;
         this.httpTypeId = supplyTypeId.applyAsInt("http");
     }
@@ -90,6 +84,9 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         long traceId,
         long authorization,
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
@@ -97,6 +94,9 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .authorization(authorization)
                 .affinity(0L)
@@ -110,12 +110,18 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         long traceId,
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator)
     {
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .affinity(0L)
                 .extension(e -> e.set(visitHttpBeginEx(mutator)))
@@ -128,6 +134,9 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         Array32FW<HttpHeaderFW> responseHeaders,
         Array32FW<HttpHeaderFW> requestHeaders,
         String etag,
@@ -144,6 +153,9 @@ public class Writer
         final BeginFW begin = beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                      .routeId(routeId)
                                      .streamId(streamId)
+                                     .sequence(sequence)
+                                     .acknowledge(acknowledge)
+                                     .maximum(maximum)
                                      .traceId(traceId)
                                      .affinity(0L)
                                      .extension(e -> e.set(visitHttpBeginEx(mutator)))
@@ -250,6 +262,9 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         long traceId,
         long budgetId,
         DirectBuffer payload,
@@ -261,6 +276,9 @@ public class Writer
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .budgetId(budgetId)
                 .reserved(reserved)
@@ -274,6 +292,9 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         long traceId,
         long budgetId,
         int reserved,
@@ -282,6 +303,9 @@ public class Writer
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .budgetId(budgetId)
                 .reserved(reserved)
@@ -292,10 +316,13 @@ public class Writer
     }
 
     public void doHttpEnd(
-        final MessageConsumer receiver,
-        final long routeId,
-        final long streamId,
-        final long traceId,
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
+        long traceId,
         String etag)
     {
         Consumer<Builder<HttpHeaderFW.Builder, HttpHeaderFW>> mutator =
@@ -304,6 +331,9 @@ public class Writer
         final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                .routeId(routeId)
                                .streamId(streamId)
+                               .sequence(sequence)
+                               .acknowledge(acknowledge)
+                               .maximum(maximum)
                                .traceId(traceId)
                                .extension(e -> e.set(visitHttpEndEx(mutator)))
                                .build();
@@ -312,15 +342,21 @@ public class Writer
     }
 
     public void doHttpEnd(
-            final MessageConsumer receiver,
-            final long routeId,
-            final long streamId,
-            final long traceId,
-            OctetsFW extension)
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
+        long traceId,
+        OctetsFW extension)
     {
         final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .extension(extension)
                 .build();
@@ -336,14 +372,20 @@ public class Writer
     }
 
     public void doHttpEnd(
-        final MessageConsumer receiver,
-        final long routeId,
-        final long streamId,
-        final long traceId)
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
+        long traceId)
     {
         final EndFW end = endRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .build();
 
@@ -351,14 +393,20 @@ public class Writer
     }
 
     public void doAbort(
-        final MessageConsumer receiver,
-        final long routeId,
-        final long streamId,
-        final long traceId)
+        MessageConsumer receiver,
+        long routeId,
+        long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
+        long traceId)
     {
         final AbortFW abort = abortRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .build();
 
@@ -366,20 +414,24 @@ public class Writer
     }
 
     public void doWindow(
-        final MessageConsumer sender,
-        final long routeId,
-        final long streamId,
-        final long traceId,
-        final long budgetId,
-        final int credit,
-        final int padding)
+        MessageConsumer sender,
+        long routeId,
+        long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
+        long traceId,
+        long budgetId,
+        int padding)
     {
         final WindowFW window = windowRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .budgetId(budgetId)
-                .credit(credit)
                 .padding(padding)
                 .build();
 
@@ -387,14 +439,20 @@ public class Writer
     }
 
     public void doReset(
-        final MessageConsumer sender,
-        final long routeId,
-        final long streamId,
-        final long traceId)
+        MessageConsumer sender,
+        long routeId,
+        long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
+        long traceId)
     {
         final ResetFW reset = resetRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .traceId(traceId)
                 .build();
 
@@ -427,6 +485,9 @@ public class Writer
         MessageConsumer acceptReply,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         long authorization,
         Array32FW<HttpHeaderFW>  requestHeaders,
         Array32FW<HttpHeaderFW> responseHeaders,
@@ -436,6 +497,9 @@ public class Writer
         doH2PushPromise(acceptReply,
                         routeId,
                         streamId,
+                        sequence,
+                        acknowledge,
+                        maximum,
                         authorization,
                         0L,
                         0,
@@ -543,6 +607,9 @@ public class Writer
         MessageConsumer receiver,
         long routeId,
         long streamId,
+        long sequence,
+        long acknowledge,
+        int maximum,
         long authorization,
         long budgetId,
         int reserved,
@@ -551,6 +618,9 @@ public class Writer
         final DataFW data = dataRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                 .routeId(routeId)
                 .streamId(streamId)
+                .sequence(sequence)
+                .acknowledge(acknowledge)
+                .maximum(maximum)
                 .authorization(authorization)
                 .budgetId(budgetId)
                 .reserved(reserved)

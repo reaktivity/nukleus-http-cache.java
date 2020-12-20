@@ -64,7 +64,7 @@ public class ServerStreamFactory implements StreamFactory
         this.supplyTraceId = requireNonNull(supplyTraceId);
         this.router = requireNonNull(router);
         this.supplyReplyId = requireNonNull(supplyReplyId);
-        this.writer = new Writer(router, supplyTypeId, writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
     }
 
     @Override
@@ -155,7 +155,7 @@ public class ServerStreamFactory implements StreamFactory
             }
             else
             {
-                writer.doReset(acceptReply, acceptRouteId, acceptInitialId, supplyTrace.getAsLong());
+                writer.doReset(acceptReply, acceptRouteId, acceptInitialId, 0L, 0L, 0, supplyTrace.getAsLong());
             }
         }
 
@@ -180,7 +180,7 @@ public class ServerStreamFactory implements StreamFactory
                 onAbort(abort);
                 break;
             default:
-                writer.doReset(acceptReply, acceptRouteId, acceptInitialId, supplyTrace.getAsLong());
+                writer.doReset(acceptReply, acceptRouteId, acceptInitialId, 0L, 0L, 0, supplyTrace.getAsLong());
                 break;
             }
         }
@@ -216,11 +216,13 @@ public class ServerStreamFactory implements StreamFactory
             writer.doWindow(acceptReply,
                             acceptRouteId,
                             begin.streamId(),
+                            begin.sequence(),
+                            begin.acknowledge(),
+                            0,
                             this.supplyTrace.getAsLong(),
                             0L,
-                            0,
                             0);
-            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, begin.traceId(), hs ->
+            writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, 0L, 0L, 0, begin.traceId(), hs ->
             {
                 hs.item(h -> h.name(":status").value("200"));
                 hs.item(h -> h.name("content-type").value("text/event-stream"));
@@ -232,7 +234,10 @@ public class ServerStreamFactory implements StreamFactory
         private void onData(
             final DataFW data)
         {
-            writer.doReset(acceptReply, acceptRouteId, acceptInitialId, supplyTrace.getAsLong());
+            final long sequence = data.sequence();
+            final long acknowledge = data.acknowledge();
+            final int maximum = data.maximum();
+            writer.doReset(acceptReply, acceptRouteId, acceptInitialId, sequence, acknowledge, maximum, supplyTrace.getAsLong());
         }
 
         private void onEnd(
@@ -244,8 +249,11 @@ public class ServerStreamFactory implements StreamFactory
         private void onAbort(
             final AbortFW abort)
         {
+            final long sequence = abort.sequence();
+            final long acknowledge = abort.acknowledge();
+            final int maximum = abort.maximum();
             final long traceId = abort.traceId();
-            writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, traceId);
+            writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, sequence, acknowledge, maximum, traceId);
         }
 
         private void onWindow(
@@ -258,8 +266,11 @@ public class ServerStreamFactory implements StreamFactory
         private void onReset(
             ResetFW reset)
         {
+            final long sequence = reset.sequence();
+            final long acknowledge = reset.acknowledge();
+            final int maximum = reset.maximum();
             final long traceId = reset.traceId();
-            writer.doReset(acceptReply, acceptRouteId, acceptInitialId, traceId);
+            writer.doReset(acceptReply, acceptRouteId, acceptInitialId, sequence, acknowledge, maximum, traceId);
         }
     }
 

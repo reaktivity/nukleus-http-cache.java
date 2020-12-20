@@ -41,7 +41,10 @@ final class HttpCacheProxyRetryResponse
     private final long replyId;
     private final LongConsumer retryRequestAfter;
 
-    private int replyBudget;
+    private long replySeq;
+    private long replyAck;
+    private int replyMax;
+
     private long retryAfter;
 
     HttpCacheProxyRetryResponse(
@@ -69,7 +72,7 @@ final class HttpCacheProxyRetryResponse
     void doResponseReset(
         long traceId)
     {
-        factory.writer.doReset(initial, routeId, replyId, traceId);
+        factory.writer.doReset(initial, routeId, replyId, 0L, 0L, 0, traceId);
     }
 
     void onResponseMessage(
@@ -113,16 +116,25 @@ final class HttpCacheProxyRetryResponse
 
         factory.defaultCache.updateResponseHeaderIfNecessary(requestHash, headers);
 
-        doResponseWindow(traceId, factory.initialWindowSize);
+        doResponseWindow(traceId, 0, factory.initialWindowSize);
     }
 
     private void onResponseData(
         DataFW data)
     {
+        final long sequence = data.sequence();
+        final long acknowledge = data.acknowledge();
         final long traceId = data.traceId();
         final int reserved = data.reserved();
 
-        doResponseWindow(traceId, reserved);
+        assert acknowledge <= sequence;
+        assert sequence >= replySeq;
+
+        replySeq = sequence + reserved;
+
+        assert replyAck <= replySeq;
+
+        doResponseWindow(traceId, 0, replyMax);
     }
 
     private void onResponseEnd(
@@ -139,18 +151,26 @@ final class HttpCacheProxyRetryResponse
 
     private void doResponseWindow(
         long traceId,
-        int credit)
+        int minReplyNoAck,
+        int minReplyMax)
     {
-        replyBudget += credit;
+        final long newReplyAck = Math.max(replySeq - minReplyNoAck, replyAck);
 
-        if (replyBudget > 0)
+        if (newReplyAck > replyAck || minReplyMax > replyMax)
         {
+            replyAck = newReplyAck;
+            assert replyAck <= replySeq;
+
+            replyMax = minReplyMax;
+
             factory.writer.doWindow(initial,
                                     routeId,
                                     replyId,
+                                    replySeq,
+                                    replyAck,
+                                    replyMax,
                                     traceId,
                                     0L,
-                                    credit,
                                     0);
         }
     }
