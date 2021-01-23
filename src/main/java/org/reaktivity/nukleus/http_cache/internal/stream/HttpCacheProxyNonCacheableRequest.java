@@ -48,9 +48,11 @@ final class HttpCacheProxyNonCacheableRequest
 
     private final String requestURL;
     private final int requestHash;
-    private long initialReplyBudgetId;
-    private int initialReplyCredit;
-    private int initialReplyPadding;
+    private long replyBudgetId;
+    private long replySeq;
+    private long replyAck;
+    private int replyMax;
+    private int replyPad;
 
     HttpCacheProxyNonCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -92,9 +94,11 @@ final class HttpCacheProxyNonCacheableRequest
                 initial,
                 routeId,
                 replyId,
-                initialReplyBudgetId,
-                initialReplyCredit,
-                initialReplyPadding);
+                replyBudgetId,
+                replySeq,
+                replyAck,
+                replyMax,
+                replyPad);
         factory.router.setThrottle(replyId, nonCacheableResponse::onResponseMessage);
         return nonCacheableResponse::onResponseMessage;
     }
@@ -121,19 +125,27 @@ final class HttpCacheProxyNonCacheableRequest
     private void onResponseWindow(
         WindowFW window)
     {
-        initialReplyBudgetId = window.budgetId();
-        initialReplyCredit += window.credit();
-        initialReplyPadding = window.padding();
+        replyBudgetId = window.budgetId();
+        replySeq = window.sequence();
+        replyAck = window.acknowledge();
+        replyMax = window.maximum();
+        replyPad = window.padding();
     }
 
     private void onResponseReset(
         ResetFW reset)
     {
+        final long sequence = reset.sequence();
+        final long acknowledge = reset.acknowledge();
+        final int maximum = reset.maximum();
         final long traceId = reset.traceId();
 
         factory.writer.doReset(connectInitial,
             connectRouteId,
             connectReplyId,
+            sequence,
+            acknowledge,
+            maximum,
             traceId);
         factory.correlations.remove(connectReplyId);
     }
@@ -178,6 +190,9 @@ final class HttpCacheProxyNonCacheableRequest
     private void onRequestBegin(
         BeginFW begin)
     {
+        final long sequence = begin.sequence();
+        final long acknowledge = begin.acknowledge();
+        final int maximum = begin.maximum();
         final OctetsFW extension = begin.extension();
         final HttpBeginExFW httpBeginEx = extension.get(factory.httpBeginExRO::tryWrap);
         assert httpBeginEx != null;
@@ -188,6 +203,9 @@ final class HttpCacheProxyNonCacheableRequest
             connectInitial,
             connectRouteId,
             connectInitialId,
+            sequence,
+            acknowledge,
+            maximum,
             factory.supplyTraceId.getAsLong(),
             0L,
             hs -> headers.forEach(h -> hs.item(item -> item.name(h.name()).value(h.value()))));
@@ -197,6 +215,9 @@ final class HttpCacheProxyNonCacheableRequest
     private void onRequestData(
         final DataFW data)
     {
+        final long sequence = data.sequence();
+        final long acknowledge = data.acknowledge();
+        final int maximum = data.maximum();
         final long traceId = data.traceId();
         final long budgetId = data.budgetId();
         final int reserved = data.reserved();
@@ -206,6 +227,9 @@ final class HttpCacheProxyNonCacheableRequest
             connectInitial,
             connectRouteId,
             connectInitialId,
+            sequence,
+            acknowledge,
+            maximum,
             traceId,
             budgetId,
             payload.buffer(),
@@ -217,33 +241,44 @@ final class HttpCacheProxyNonCacheableRequest
     private void onRequestEnd(
         final EndFW end)
     {
+        final long sequence = end.sequence();
+        final long acknowledge = end.acknowledge();
+        final int maximum = end.maximum();
         final long traceId = end.traceId();
-        factory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, traceId);
+        factory.writer.doHttpEnd(connectInitial, connectRouteId, connectInitialId, sequence, acknowledge, maximum, traceId);
     }
 
     private void onRequestAbort(
         final AbortFW abort)
     {
+        final long sequence = abort.sequence();
+        final long acknowledge = abort.acknowledge();
+        final int maximum = abort.maximum();
         final long traceId = abort.traceId();
-        factory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, traceId);
+        factory.writer.doAbort(connectInitial, connectRouteId, connectInitialId, sequence, acknowledge, maximum, traceId);
     }
 
     private void onRequestWindow(
         final WindowFW window)
     {
+        final long sequence = window.sequence();
+        final long acknowledge = window.acknowledge();
+        final int maximum = window.maximum();
         final long traceId = window.traceId();
         final long budgetId = window.budgetId();
-        final int credit = window.credit();
         final int padding = window.padding();
 
-        factory.writer.doWindow(initial, routeId, initialId, traceId, budgetId, credit, padding);
+        factory.writer.doWindow(initial, routeId, initialId, sequence, acknowledge, maximum, traceId, budgetId, padding);
     }
 
     private void onRequestReset(
         final ResetFW reset)
     {
+        final long sequence = reset.sequence();
+        final long acknowledge = reset.acknowledge();
+        final int maximum = reset.maximum();
         final long traceId = reset.traceId();
 
-        factory.writer.doReset(initial, routeId, initialId, traceId);
+        factory.writer.doReset(initial, routeId, initialId, sequence, acknowledge, maximum, traceId);
     }
 }

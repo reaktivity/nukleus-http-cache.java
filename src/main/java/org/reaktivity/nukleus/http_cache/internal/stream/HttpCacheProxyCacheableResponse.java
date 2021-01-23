@@ -49,7 +49,9 @@ final class HttpCacheProxyCacheableResponse
     private final Runnable cleanupRequest;
 
     private String ifNoneMatch;
-    private int replyBudget;
+    private long replySeq;
+    private long replyAck;
+    private int replyMax;
     private Instant responseAt;
     private long retryAfter = NO_RETRY_AFTER;
 
@@ -78,14 +80,14 @@ final class HttpCacheProxyCacheableResponse
     @Override
     public String toString()
     {
-        return String.format("%s[routeId=%016x, replyId=%d, replyBudget=%d]",
-                getClass().getSimpleName(), routeId, replyId, replyBudget);
+        return String.format("%s[routeId=%016x, replyId=%d, replySeq=%d, replyAck=%d, replyMax=%d]",
+                getClass().getSimpleName(), routeId, replyId, replySeq, replyAck, replyMax);
     }
 
     void doResponseReset(
         long traceId)
     {
-        factory.writer.doReset(initial, routeId, replyId, traceId);
+        factory.writer.doReset(initial, routeId, replyId, replySeq, replyAck, replyMax, traceId);
     }
 
     void onResponseMessage(
@@ -144,16 +146,19 @@ final class HttpCacheProxyCacheableResponse
             requestGroup.onGroupResponseBegin(responseAt, traceId);
         }
 
-        doResponseWindow(traceId, factory.initialWindowSize);
+        doResponseWindow(traceId, 0, factory.initialWindowSize);
     }
 
     private void onResponseData(
         DataFW data)
     {
+        final long sequence = data.sequence();
         final long traceId = data.traceId();
         final int reserved = data.reserved();
 
-        doResponseWindow(traceId, reserved);
+        replySeq = sequence + reserved;
+
+        doResponseWindow(traceId, 0, replyMax);
 
         boolean stored = cacheEntry.storeResponseData(data);
         assert stored;
@@ -224,17 +229,26 @@ final class HttpCacheProxyCacheableResponse
 
     private void doResponseWindow(
         long traceId,
-        int credit)
+        int minReplyNoAck,
+        int minReplyMax)
     {
-        replyBudget += credit;
-        if (replyBudget > 0)
+        final long newReplyAck = Math.max(replySeq - minReplyNoAck, replyAck);
+
+        if (newReplyAck > replyAck || minReplyMax > replyMax)
         {
+            replyAck = newReplyAck;
+            assert replyAck <= replySeq;
+
+            replyMax = minReplyMax;
+
             factory.writer.doWindow(initial,
                                     routeId,
                                     replyId,
+                                    replySeq,
+                                    replyAck,
+                                    replyMax,
                                     traceId,
                                     0L,
-                                    credit,
                                     0);
         }
     }

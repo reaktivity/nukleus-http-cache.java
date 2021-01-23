@@ -43,11 +43,12 @@ final class HttpCacheProxyNonCacheableResponse
     private final MessageConsumer accept;
     private final long acceptRouteId;
     private final long acceptReplyId;
-    private final long initialReplyBudgetId;
-    private final int initialReplyCredit;
-    private final int initialReplyPadding;
+    private final long replyBudgetId;
 
-    private int acceptReplyBudget;
+    private long replySeq;
+    private long replyAck;
+    private int replyMax;
+    private int replyPad;
 
     HttpCacheProxyNonCacheableResponse(
         HttpCacheProxyFactory factory,
@@ -60,9 +61,11 @@ final class HttpCacheProxyNonCacheableResponse
         MessageConsumer accept,
         long acceptRouteId,
         long acceptReplyId,
-        long initialReplyBudgetId,
-        int initialReplyCredit,
-        int initialReplyPadding)
+        long replyBudgetId,
+        long replySeq,
+        long replyAck,
+        int replyMax,
+        int replyPad)
     {
         this.factory = factory;
         this.requestHash = requestHash;
@@ -74,10 +77,11 @@ final class HttpCacheProxyNonCacheableResponse
         this.accept = accept;
         this.acceptRouteId = acceptRouteId;
         this.acceptReplyId = acceptReplyId;
-        this.initialReplyBudgetId = initialReplyBudgetId;
-        this.initialReplyCredit = initialReplyCredit;
-        this.initialReplyPadding = initialReplyPadding;
-        acceptReplyBudget += initialReplyCredit;
+        this.replyBudgetId = replyBudgetId;
+        this.replySeq = replySeq;
+        this.replyAck = replyAck;
+        this.replyMax = replyMax;
+        this.replyPad = replyPad;
     }
 
     @Override
@@ -136,6 +140,9 @@ final class HttpCacheProxyNonCacheableResponse
             accept,
             acceptRouteId,
             acceptReplyId,
+            replySeq,
+            replyAck,
+            replyMax,
             traceId,
             builder -> headers.forEach(h -> builder.item(item -> item.name(h.name()).value(h.value()))));
 
@@ -147,33 +154,45 @@ final class HttpCacheProxyNonCacheableResponse
             factory.defaultCache.invalidateCacheEntryIfNecessary(factory, requestHash, requestURL, traceId, headers);
         }
 
-        if (initialReplyCredit > 0)
+        if (replySeq > 0 || replyAck > 0 || replyMax > 0 || replyPad > 0)
         {
             factory.writer.doWindow(
                 connect,
                 connectRouteId,
                 connectReplyId,
+                replySeq,
+                replyAck,
+                replyMax,
                 traceId,
-                initialReplyBudgetId,
-                initialReplyCredit,
-                initialReplyPadding);
+                replyBudgetId,
+                replyPad);
         }
     }
 
     private void onResponseData(
         final DataFW data)
     {
+        final long sequence = data.sequence();
+        final long acknowledge = data.acknowledge();
+        final int maximum = data.maximum();
         final long traceId = data.traceId();
         final long budgetId = data.budgetId();
         final int reserved = data.reserved();
         final OctetsFW payload = data.payload();
 
-        acceptReplyBudget -= reserved;
-        assert acceptReplyBudget >= 0;
+        assert acknowledge <= sequence;
+        assert sequence >= replySeq;
+
+        replySeq = sequence + reserved;
+
+        assert replyAck <= replySeq;
 
         factory.writer.doHttpData(accept,
                                   acceptRouteId,
                                   acceptReplyId,
+                                  sequence,
+                                  acknowledge,
+                                  maximum,
                                   traceId,
                                   budgetId,
                                   payload.buffer(),
@@ -185,45 +204,70 @@ final class HttpCacheProxyNonCacheableResponse
     private void onResponseEnd(
         final EndFW end)
     {
+        final long sequence = end.sequence();
+        final long acknowledge = end.acknowledge();
+        final int maximum = end.maximum();
         final long traceId = end.traceId();
         final OctetsFW extension = end.extension();
 
-        factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, traceId, extension);
+        factory.writer.doHttpEnd(accept, acceptRouteId, acceptReplyId, sequence, acknowledge, maximum, traceId, extension);
     }
 
     private void onResponseAbort(
         final AbortFW abort)
     {
+        final long sequence = abort.sequence();
+        final long acknowledge = abort.acknowledge();
+        final int maximum = abort.maximum();
         final long traceId = abort.traceId();
 
-        factory.writer.doAbort(accept, acceptRouteId, acceptReplyId, traceId);
+        factory.writer.doAbort(accept, acceptRouteId, acceptReplyId, sequence, acknowledge, maximum, traceId);
     }
 
     private void onResponseWindow(
         final WindowFW window)
     {
+        final long sequence = window.sequence();
+        final long acknowledge = window.acknowledge();
+        final int maximum = window.maximum();
         final long traceId = window.traceId();
         final long budgetId = window.budgetId();
-        final int credit = window.credit();
         final int padding = window.padding();
 
-        acceptReplyBudget += credit;
+        assert acknowledge <= sequence;
+        assert sequence <= replySeq;
+        assert acknowledge >= replyAck;
+        assert maximum >= replyMax;
+
+        this.replyAck = acknowledge;
+        this.replyMax = maximum;
+        this.replyPad = padding;
 
         factory.writer.doWindow(connect,
                                 connectRouteId,
                                 connectReplyId,
+                                sequence,
+                                acknowledge,
+                                maximum,
                                 traceId,
                                 budgetId,
-                                credit,
                                 padding);
     }
 
     private void onResponseReset(
         final ResetFW reset)
     {
+        final long sequence = reset.sequence();
+        final long acknowledge = reset.acknowledge();
+        final int maximum = reset.maximum();
+        final long traceId = reset.traceId();
+
         factory.writer.doReset(connect,
                                connectRouteId,
                                connectReplyId,
-                               reset.traceId());
+                               sequence,
+                               acknowledge,
+                               maximum,
+                               traceId);
     }
 }

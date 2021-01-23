@@ -50,9 +50,11 @@ public final class HttpCacheProxyRelayedResponse
     private final long senderRouteId;
     private final long senderReplyId;
     private final String prefer;
-    private final long initialReplyBudgetId;
-    private final int initialWindow;
-    private final int initialPadding;
+    private final long replyBudgetId;
+    private final long replySeq;
+    private final long replyAck;
+    private final int replyMax;
+    private final int replyPad;
 
     HttpCacheProxyRelayedResponse(
         HttpCacheProxyFactory factory,
@@ -63,9 +65,11 @@ public final class HttpCacheProxyRelayedResponse
         long senderRouteId,
         long senderReplyId,
         String prefer,
-        long initialReplyBudgetId,
-        int initialWindow,
-        int initialPadding)
+        long replyBudgetId,
+        long replySeq,
+        long replyAck,
+        int replyMax,
+        int replyPad)
     {
         this.factory = factory;
         this.receiver = receiver;
@@ -75,15 +79,17 @@ public final class HttpCacheProxyRelayedResponse
         this.senderRouteId = senderRouteId;
         this.senderReplyId = senderReplyId;
         this.prefer = prefer;
-        this.initialReplyBudgetId = initialReplyBudgetId;
-        this.initialWindow = initialWindow;
-        this.initialPadding = initialPadding;
+        this.replyBudgetId = replyBudgetId;
+        this.replySeq = replySeq;
+        this.replyAck = replyAck;
+        this.replyMax = replyMax;
+        this.replyPad = replyPad;
     }
 
     void doResponseReset(
         long traceId)
     {
-        factory.writer.doReset(receiver, receiverRouteId, senderReplyId, traceId);
+        factory.writer.doReset(receiver, receiverRouteId, senderReplyId, replySeq, replyAck, replyMax, traceId);
     }
 
     void onResponseMessage(
@@ -130,6 +136,9 @@ public final class HttpCacheProxyRelayedResponse
     private void onResponseBegin(
         BeginFW begin)
     {
+        final long sequence = begin.sequence();
+        final long acknowledge = begin.acknowledge();
+        final int maximum = begin.maximum();
         final long traceId = begin.traceId();
         final long authorization = begin.authorization();
         final long affinity = begin.affinity();
@@ -164,6 +173,9 @@ public final class HttpCacheProxyRelayedResponse
         final BeginFW newBegin = factory.beginRW.wrap(writeBuffer, 0, writeBuffer.capacity())
                                                 .routeId(receiverRouteId)
                                                 .streamId(receiverReplyId)
+                                                .sequence(sequence)
+                                                .acknowledge(acknowledge)
+                                                .maximum(maximum)
                                                 .traceId(traceId)
                                                 .authorization(authorization)
                                                 .affinity(affinity)
@@ -173,10 +185,10 @@ public final class HttpCacheProxyRelayedResponse
         factory.router.setThrottle(receiverReplyId, this::onResponseMessage);
         receiver.accept(newBegin.typeId(), newBegin.buffer(), newBegin.offset(), newBegin.sizeof());
 
-        if (initialWindow > 0)
+        if (replySeq > 0 || replyAck > 0 || replyPad > 0 || replyMax > 0)
         {
-            factory.writer.doWindow(sender, senderRouteId, senderReplyId, traceId,
-                initialReplyBudgetId, initialWindow, initialPadding);
+            factory.writer.doWindow(sender, senderRouteId, senderReplyId, replySeq, replyAck, replyMax, traceId,
+                replyBudgetId, replyPad);
         }
     }
 }

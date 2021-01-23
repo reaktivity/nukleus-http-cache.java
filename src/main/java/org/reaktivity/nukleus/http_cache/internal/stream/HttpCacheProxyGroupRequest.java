@@ -133,7 +133,7 @@ final class HttpCacheProxyGroupRequest
 
         factory.router.setThrottle(initialId, this::onRequestMessage);
         final long authorization = 0; // TODO: request.authorization
-        factory.writer.doHttpRequest(initial, routeId, initialId, traceId, authorization,
+        factory.writer.doHttpRequest(initial, routeId, initialId, 0L, 0L, 0, traceId, authorization,
                                      mutateRequestHeaders(headers));
         factory.correlations.put(replyId, this::newResponse);
         factory.counters.groupRequestsCacheable.getAsLong();
@@ -222,9 +222,12 @@ final class HttpCacheProxyGroupRequest
     private void onRequestWindow(
         final WindowFW window)
     {
+        final long sequence = window.sequence();
+        final long acknowledge = window.acknowledge();
+        final int maximum = window.maximum();
         final long traceId = window.traceId();
         state = HttpCacheRequestState.openInitial(state);
-        factory.writer.doHttpEnd(initial, routeId, initialId, traceId);
+        factory.writer.doHttpEnd(initial, routeId, initialId, sequence, acknowledge, maximum, traceId);
         state = HttpCacheRequestState.closedInitial(state);
 
         flushResetIfNecessary(traceId);
@@ -392,7 +395,7 @@ final class HttpCacheProxyGroupRequest
         if (HttpCacheRequestState.initialClosed(state) &&
             HttpCacheRequestState.replyClosing(state))
         {
-            factory.writer.doReset(initial, routeId, replyId, traceId);
+            factory.writer.doReset(initial, routeId, replyId, 0L, 0L, 0, traceId);
             state = HttpCacheRequestState.closedReply(state);
         }
     }

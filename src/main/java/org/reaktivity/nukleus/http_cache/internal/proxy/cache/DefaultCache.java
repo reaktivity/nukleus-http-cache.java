@@ -93,7 +93,7 @@ public class DefaultCache
     {
         assert allowedCachePercentage >= 0 && allowedCachePercentage <= 100;
         this.cacheBufferPool = cacheBufferPool;
-        this.writer = new Writer(router, supplyTypeId, writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
         this.cachedRequestBufferPool = new CountingBufferPool(
                 cacheBufferPool,
                 counters.supplyCounter.apply("http-cache.cached.request.acquires"),
@@ -329,6 +329,9 @@ public class DefaultCache
         MessageConsumer reply,
         long routeId,
         long replyId,
+        long replySeq,
+        long replyAck,
+        int replyMax,
         long traceId,
         long authorization,
         boolean promiseNextPollRequest)
@@ -340,6 +343,9 @@ public class DefaultCache
                 reply,
                 routeId,
                 replyId,
+                replySeq,
+                replyAck,
+                replyMax,
                 traceId,
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag))
@@ -352,6 +358,9 @@ public class DefaultCache
                     reply,
                     routeId,
                     replyId,
+                    replySeq,
+                    replyAck,
+                    replyMax,
                     authorization,
                     cacheEntry.getRequestHeaders(),
                     cacheEntry.getCachedResponseHeaders(),
@@ -364,12 +373,15 @@ public class DefaultCache
                 reply,
                 routeId,
                 replyId,
+                replySeq,
+                replyAck,
+                replyMax,
                 traceId,
                 e -> e.item(h -> h.name(STATUS).value(NOT_MODIFIED_304))
                       .item(h -> h.name(ETAG).value(etag)));
         }
 
-        writer.doHttpEnd(reply, routeId, replyId, traceId);
+        writer.doHttpEnd(reply, routeId, replyId, replySeq, replyAck, replyMax, traceId);
     }
 
     public boolean isCacheFull()

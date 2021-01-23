@@ -137,7 +137,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.correlations = requireNonNull(correlations);
         this.defaultCache = defaultCache;
 
-        this.writer = new Writer(router, supplyTypeId, writeBuffer);
+        this.writer = new Writer(supplyTypeId, writeBuffer);
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
         this.executor = executor;
@@ -380,9 +380,11 @@ public class HttpCacheProxyFactory implements StreamFactory
         writer.doWindow(initial,
                         routeId,
                         initialId,
-                        traceId,
+                        0L,
                         0L,
                         0,
+                        traceId,
+                        0L,
                         0);
 
         final long replyId = supplyReplyId.applyAsLong(initialId);
@@ -402,10 +404,11 @@ public class HttpCacheProxyFactory implements StreamFactory
         MessageConsumer acceptReply,
         long acceptRouteId,
         long acceptReplyId,
-        long trace)
+        long traceId)
     {
-        writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, trace, e -> e.item(h -> h.name(STATUS).value("504")));
-        writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, trace);
+        writer.doHttpResponse(acceptReply, acceptRouteId, acceptReplyId, 0L, 0L, 0, traceId,
+            e -> e.item(h -> h.name(STATUS).value("504")));
+        writer.doAbort(acceptReply, acceptRouteId, acceptReplyId, 0L, 0L, 0, traceId);
 
         // count all responses
         counters.responses.getAsLong();

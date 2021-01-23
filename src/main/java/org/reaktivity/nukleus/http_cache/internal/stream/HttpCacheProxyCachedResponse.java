@@ -45,8 +45,10 @@ final class HttpCacheProxyCachedResponse
     private final long authorization;
     private final boolean promiseNextPollRequest;
 
-    private int replyBudget;
-    private int replyPadding;
+    private long replySeq;
+    private long replyAck;
+    private int replyMax;
+    private int replyPad;
     private long replyDebitorId;
     private BudgetDebitor replyDebitor;
     private long replyDebitorIndex = NO_DEBITOR_INDEX;
@@ -60,9 +62,11 @@ final class HttpCacheProxyCachedResponse
         long routeId,
         long replyId,
         long authorization,
-        long initialReplyBudgetId,
-        int initialReplyCredit,
-        int initialReplyPadding,
+        long replyBudgetId,
+        long replySeq,
+        long replyAck,
+        int replyMax,
+        int replyPad,
         int requestHash,
         boolean promiseNextPollRequest,
         Consumer<HttpCacheProxyCachedResponse> resetHandler)
@@ -75,7 +79,7 @@ final class HttpCacheProxyCachedResponse
         this.cacheEntry = factory.defaultCache.lookup(requestHash);
         this.promiseNextPollRequest = promiseNextPollRequest;
         this.resetHandler = resetHandler;
-        updateBudget(initialReplyBudgetId, initialReplyCredit, initialReplyPadding);
+        updateBudget(replyBudgetId, replySeq, replyAck, replyMax, replyPad);
     }
 
     void onResponseMessage(
@@ -113,6 +117,9 @@ final class HttpCacheProxyCachedResponse
         factory.writer.doHttpResponseWithUpdatedHeaders(reply,
                                                         routeId,
                                                         replyId,
+                                                        replySeq,
+                                                        replyAck,
+                                                        replyMax,
                                                         responseHeaders,
                                                         requestHeaders,
                                                         cacheEntry.etag(),
@@ -129,21 +136,22 @@ final class HttpCacheProxyCachedResponse
         long traceId)
     {
         final int remaining = cacheEntry.responseSize() - responseProgress;
-        final int writable = Math.min(replyBudget - replyPadding, remaining);
+        final int replyNoAck = (int)(replySeq - replyAck);
+        final int writable = Math.min(replyMax - replyNoAck - replyPad, remaining);
 
         if (writable > 0)
         {
-            final int maximum = writable + replyPadding;
-            final int minimum = Math.min(maximum, 1024 + replyPadding);
+            final int maximum = writable + replyPad;
+            final int minimum = Math.min(maximum, 1024 + replyPad);
 
             int claimed = maximum;
             if (replyDebitorIndex != NO_DEBITOR_INDEX)
             {
-                claimed = replyDebitor.claim(replyDebitorIndex, replyId, minimum, maximum);
+                claimed = replyDebitor.claim(traceId, replyDebitorIndex, replyId, minimum, maximum, 0);
             }
 
-            final int required = claimed;
-            final int writableMax = required - replyPadding;
+            final int reserved = claimed;
+            final int writableMax = reserved - replyPad;
             if (writableMax > 0)
             {
                 final BufferPool cacheResponsePool = factory.defaultCache.getResponsePool();
@@ -152,15 +160,19 @@ final class HttpCacheProxyCachedResponse
                     reply,
                     routeId,
                     replyId,
+                    replySeq,
+                    replyAck,
+                    replyMax,
                     traceId,
                     replyDebitorId,
-                    required,
+                    reserved,
                     p -> buildResponsePayload(responseProgress, writableMax, p, cacheResponsePool));
 
                 responseProgress += writableMax;
 
-                replyBudget -= required;
-                assert replyBudget >= 0;
+                replySeq += reserved;
+
+                assert replyAck <= replySeq;
             }
         }
 
@@ -176,6 +188,9 @@ final class HttpCacheProxyCachedResponse
         factory.writer.doAbort(reply,
                                routeId,
                                replyId,
+                               replySeq,
+                               replyAck,
+                               replyMax,
                                traceId);
 
         cleanupResponseIfNecessary();
@@ -194,6 +209,9 @@ final class HttpCacheProxyCachedResponse
             factory.writer.doHttpPushPromise(reply,
                                              routeId,
                                              replyId,
+                                             replySeq,
+                                             replyAck,
+                                             replyMax,
                                              authorization,
                                              cacheEntry.getRequestHeaders(),
                                              cachedResponseHeaders,
@@ -203,6 +221,9 @@ final class HttpCacheProxyCachedResponse
         factory.writer.doHttpEnd(reply,
                                  routeId,
                                  replyId,
+                                 replySeq,
+                                 replyAck,
+                                 replyMax,
                                  traceId);
 
         cleanupResponseIfNecessary();
@@ -221,19 +242,23 @@ final class HttpCacheProxyCachedResponse
     {
         final long traceId = window.traceId();
 
-        updateBudget(window.budgetId(), window.credit(), window.padding());
+        updateBudget(window.budgetId(), window.sequence(), window.acknowledge(), window.maximum(), window.padding());
 
         doResponseFlush(traceId);
     }
 
     private void updateBudget(
         long budgetId,
-        int credit,
+        long sequence,
+        long acknowledge,
+        int maximum,
         int padding)
     {
         replyDebitorId = budgetId;
-        replyBudget += credit;
-        replyPadding = padding;
+        replySeq = sequence;
+        replyAck = acknowledge;
+        replyMax = maximum;
+        replyPad = padding;
 
         if (replyDebitorId != 0L && replyDebitor == null)
         {

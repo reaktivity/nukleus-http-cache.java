@@ -74,9 +74,11 @@ final class HttpCacheProxyCacheableRequest
     private boolean promiseNextPollRequest;
 
     private int headersSlot = NO_SLOT;
-    private int initialReplyCredit;
-    private int initialReplyPadding;
-    private long initialReplyBudgetId;
+    private long replySeq;
+    private long replyAck;
+    private int replyMax;
+    private int replyPad;
+    private long replyBudgetId;
 
     HttpCacheProxyCacheableRequest(
         HttpCacheProxyFactory factory,
@@ -111,9 +113,11 @@ final class HttpCacheProxyCacheableRequest
             routeId,
             replyId,
             authorization,
-            initialReplyBudgetId,
-            initialReplyCredit,
-            initialReplyPadding,
+            replyBudgetId,
+            replySeq,
+            replyAck,
+            replyMax,
+            replyPad,
             requestHash,
             promiseNextPollRequest,
             requestGroup::detach);
@@ -132,6 +136,9 @@ final class HttpCacheProxyCacheableRequest
                                      reply,
                                      routeId,
                                      replyId,
+                                     replySeq,
+                                     replyAck,
+                                     replyMax,
                                      traceId,
                                      authorization,
                                      promiseNextPollRequest);
@@ -148,6 +155,9 @@ final class HttpCacheProxyCacheableRequest
             reply,
             routeId,
             replyId,
+            replySeq,
+            replyAck,
+            replyMax,
             traceId,
             e -> e.item(h -> h.name(HEADER_NAME_STATUS).value(HEADER_VALUE_STATUS_503))
                   .item(h -> h.name("retry-after").value("0")));
@@ -156,6 +166,9 @@ final class HttpCacheProxyCacheableRequest
             reply,
             routeId,
             replyId,
+            replySeq,
+            replyAck,
+            replyMax,
             traceId);
 
         // count all responses
@@ -184,9 +197,11 @@ final class HttpCacheProxyCacheableRequest
             senderRouteId,
             senderReplyId,
             prefer,
-            initialReplyBudgetId,
-            initialReplyCredit,
-            initialReplyPadding);
+            replyBudgetId,
+            replySeq,
+            replyAck,
+            replyMax,
+            replyPad);
     }
 
     void onRequestMessage(
@@ -231,9 +246,11 @@ final class HttpCacheProxyCacheableRequest
         factory.writer.doWindow(reply,
                                 routeId,
                                 initialId,
+                                0,
+                                0,
+                                factory.initialWindowSize,
                                 traceId,
                                 0L,
-                                factory.initialWindowSize,
                                 0);
 
         assert headersSlot == NO_SLOT;
@@ -277,6 +294,7 @@ final class HttpCacheProxyCacheableRequest
     private void onRequestData(
         final DataFW data)
     {
+        final long sequence = data.sequence();
         final long traceId = data.traceId();
         final long budgetId = data.budgetId();
         final int reserved = data.reserved();
@@ -285,9 +303,11 @@ final class HttpCacheProxyCacheableRequest
         factory.writer.doWindow(reply,
                                 routeId,
                                 initialId,
+                                sequence + reserved,
+                                sequence + reserved,
+                                factory.initialWindowSize,
                                 traceId,
                                 budgetId,
-                                reserved,
                                 padding);
     }
 
@@ -314,9 +334,11 @@ final class HttpCacheProxyCacheableRequest
                 routeId,
                 replyId,
                 authorization,
-                initialReplyBudgetId,
-                initialReplyCredit,
-                initialReplyPadding,
+                replyBudgetId,
+                replySeq,
+                replyAck,
+                replyMax,
+                replyPad,
                 requestGroup.requestHash(),
                 promiseNextPollRequest,
                 requestGroup::detach);
@@ -403,9 +425,11 @@ final class HttpCacheProxyCacheableRequest
     private void onResponseWindow(
         WindowFW window)
     {
-        initialReplyBudgetId = window.budgetId();
-        initialReplyCredit += window.credit();
-        initialReplyPadding = window.padding();
+        replyBudgetId = window.budgetId();
+        replySeq = window.sequence();
+        replyAck = window.acknowledge();
+        replyMax = window.maximum();
+        replyPad = window.padding();
     }
 
     private void onResponseReset(
@@ -440,6 +464,9 @@ final class HttpCacheProxyCacheableRequest
                                      reply,
                                      routeId,
                                      replyId,
+                                     replySeq,
+                                     replyAck,
+                                     replyMax,
                                      traceId,
                                      authorization,
                                      promiseNextPollRequest);
