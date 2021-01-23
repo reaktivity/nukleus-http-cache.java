@@ -39,7 +39,10 @@ final class HttpCacheProxyCachedNotModifiedRequest
     private final long acceptReplyId;
     private final long acceptInitialId;
     private final DefaultCacheEntry cacheEntry;
-    private final int initialWindow;
+    private final int acceptInitialMax;
+
+    private long acceptInitialSeq;
+    private long acceptInitialAck;
 
     HttpCacheProxyCachedNotModifiedRequest(
         HttpCacheProxyFactory factory,
@@ -54,7 +57,7 @@ final class HttpCacheProxyCachedNotModifiedRequest
         this.acceptInitialId = acceptInitialId;
         this.cacheEntry = cacheEntry;
         this.acceptReplyId = factory.supplyReplyId.applyAsLong(acceptInitialId);
-        this.initialWindow = factory.initialWindowSize;
+        this.acceptInitialMax = factory.initialWindowSize;
     }
 
     void onRequestMessage(
@@ -96,9 +99,11 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
+                                0L,
+                                0L,
+                                acceptInitialMax,
                                 traceId,
                                 0L,
-                                initialWindow,
                                 0);
 
         // count all responses
@@ -115,6 +120,9 @@ final class HttpCacheProxyCachedNotModifiedRequest
             acceptReply,
             acceptRouteId,
             acceptReplyId,
+            0L,
+            0L,
+            0,
             traceId,
             authorization,
             false);
@@ -123,12 +131,27 @@ final class HttpCacheProxyCachedNotModifiedRequest
     private void onRequestData(
         final DataFW data)
     {
+        final long sequence = data.sequence();
+        final long acknowledge = data.acknowledge();
+        final int reserved = data.reserved();
+
+        assert acknowledge <= sequence;
+        assert sequence >= acceptInitialSeq;
+
+        acceptInitialSeq = sequence + reserved;
+
+        assert acceptInitialAck <= acceptInitialSeq;
+
+        acceptInitialAck = acceptInitialSeq;
+
         factory.writer.doWindow(acceptReply,
                                 acceptRouteId,
                                 acceptInitialId,
+                                acceptInitialSeq,
+                                acceptInitialAck,
+                                acceptInitialMax,
                                 data.traceId(),
                                 data.budgetId(),
-                                data.reserved(),
                                 0);
     }
 
@@ -138,6 +161,9 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doHttpEnd(acceptReply,
                                  acceptRouteId,
                                  acceptReplyId,
+                                 acceptInitialSeq,
+                                 acceptInitialAck,
+                                 acceptInitialMax,
                                  end.traceId());
     }
 
@@ -147,6 +173,9 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doAbort(acceptReply,
                                acceptRouteId,
                                acceptReplyId,
+                               0L,
+                               0L,
+                               0,
                                abort.traceId());
     }
 
@@ -173,6 +202,9 @@ final class HttpCacheProxyCachedNotModifiedRequest
         factory.writer.doReset(acceptReply,
                                acceptRouteId,
                                acceptInitialId,
+                               acceptInitialSeq,
+                               acceptInitialAck,
+                               acceptInitialMax,
                                reset.traceId());
     }
 }
