@@ -35,7 +35,7 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.reaktivity.nukleus.budget.BudgetDebitor;
 import org.reaktivity.nukleus.buffer.BufferPool;
-import org.reaktivity.nukleus.concurrent.SignalingExecutor;
+import org.reaktivity.nukleus.concurrent.Signaler;
 import org.reaktivity.nukleus.function.MessageConsumer;
 import org.reaktivity.nukleus.function.MessagePredicate;
 import org.reaktivity.nukleus.http_cache.internal.HttpCacheConfiguration;
@@ -101,7 +101,7 @@ public class HttpCacheProxyFactory implements StreamFactory
     final Writer writer;
     final DefaultCache defaultCache;
     final HttpCacheCounters counters;
-    final SignalingExecutor executor;
+    final Signaler signaler;
     final int preferWaitMaximum;
     final int initialWindowSize;
 
@@ -118,7 +118,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         HttpCacheCounters counters,
         LongSupplier supplyTraceId,
         ToIntFunction<String> supplyTypeId,
-        SignalingExecutor executor)
+        Signaler signaler)
     {
         this.router = requireNonNull(router);
         this.supplyInitialId = requireNonNull(supplyInitialId);
@@ -140,7 +140,7 @@ public class HttpCacheProxyFactory implements StreamFactory
         this.writer = new Writer(supplyTypeId, writeBuffer);
         this.requestGroups = new Int2ObjectHashMap<>();
         this.counters = counters;
-        this.executor = executor;
+        this.signaler = signaler;
 
         this.defaultHttpBeginExRO = new HttpBeginExFW.Builder()
             .wrap(new UnsafeBuffer(new byte[64]), 0, 64)

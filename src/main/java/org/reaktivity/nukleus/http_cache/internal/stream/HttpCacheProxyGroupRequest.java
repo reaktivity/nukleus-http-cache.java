@@ -15,8 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.concurrent.Signaler.NO_CANCEL_ID;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.isCacheableResponse;
 import static org.reaktivity.nukleus.http_cache.internal.stream.Signals.GROUP_REQUEST_RETRY_SIGNAL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders.AUTHORIZATION;
@@ -24,7 +26,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeadersUtil.getRequestURL;
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
-import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 
@@ -58,7 +59,7 @@ final class HttpCacheProxyGroupRequest
     private int attempts;
     private int headersSlot = NO_SLOT;
 
-    private Future<?> retryRequest;
+    private long retryRequest = NO_CANCEL_ID;
     private LongConsumer resetHandler = NOOP_RESET_HANDLER;
 
     HttpCacheProxyGroupRequest(
@@ -111,9 +112,11 @@ final class HttpCacheProxyGroupRequest
     void doRetryRequestImmediatelyIfPending(
         long traceId)
     {
-        if (retryRequest != null)
+        if (retryRequest != NO_CANCEL_ID)
         {
-            retryRequest.cancel(true);
+            factory.signaler.cancel(retryRequest);
+            retryRequest = NO_CANCEL_ID;
+
             doRetryRequest(traceId);
         }
     }
@@ -253,8 +256,7 @@ final class HttpCacheProxyGroupRequest
         }
         else
         {
-            retryRequest = factory.executor.schedule(retryAfter,
-                                                     SECONDS,
+            retryRequest = factory.signaler.signalAt(currentTimeMillis() + SECONDS.toMillis(retryAfter),
                                                      routeId,
                                                      notifyId,
                                                      GROUP_REQUEST_RETRY_SIGNAL);
@@ -282,10 +284,10 @@ final class HttpCacheProxyGroupRequest
         factory.router.clearThrottle(replyId);
         releaseRequestSlotIfNecessary();
 
-        if (retryRequest != null)
+        if (retryRequest != NO_CANCEL_ID)
         {
-            retryRequest.cancel(true);
-            retryRequest = null;
+            factory.signaler.cancel(retryRequest);
+            retryRequest = NO_CANCEL_ID;
         }
     }
 
@@ -369,10 +371,10 @@ final class HttpCacheProxyGroupRequest
             factory.correlations.remove(replyId);
             releaseRequestSlotIfNecessary();
 
-            if (retryRequest != null)
+            if (retryRequest != NO_CANCEL_ID)
             {
-                retryRequest.cancel(true);
-                retryRequest = null;
+                factory.signaler.cancel(retryRequest);
+                retryRequest = NO_CANCEL_ID;
             }
         }
 
