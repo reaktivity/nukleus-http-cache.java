@@ -15,8 +15,10 @@
  */
 package org.reaktivity.nukleus.http_cache.internal.stream;
 
+import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.reaktivity.nukleus.buffer.BufferPool.NO_SLOT;
+import static org.reaktivity.nukleus.concurrent.Signaler.NO_CANCEL_ID;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.CacheUtils.hasMaxAgeZero;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.HttpStatus.SERVICE_UNAVAILABLE_503;
 import static org.reaktivity.nukleus.http_cache.internal.proxy.cache.PreferHeader.getPreferWait;
@@ -30,7 +32,6 @@ import static org.reaktivity.nukleus.http_cache.internal.stream.util.HttpHeaders
 import static org.reaktivity.nukleus.http_cache.internal.stream.util.RequestUtil.authorizationScope;
 
 import java.time.Instant;
-import java.util.concurrent.Future;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -70,7 +71,7 @@ final class HttpCacheProxyCacheableRequest
     String prefer;
     boolean maxAgeZero;
 
-    private Future<?> preferWaitExpired;
+    private long preferWaitExpired = NO_CANCEL_ID;
     private boolean promiseNextPollRequest;
 
     private int headersSlot = NO_SLOT;
@@ -382,8 +383,7 @@ final class HttpCacheProxyCacheableRequest
             final int preferWait = Math.min(getPreferWait(requestHeaders), factory.preferWaitMaximum);
             if (preferWait > 0)
             {
-                preferWaitExpired = factory.executor.schedule(preferWait,
-                                                              SECONDS,
+                preferWaitExpired = factory.signaler.signalAt(currentTimeMillis() + SECONDS.toMillis(preferWait),
                                                               routeId,
                                                               replyId,
                                                               PREFER_WAIT_EXPIRED_SIGNAL);
@@ -480,10 +480,10 @@ final class HttpCacheProxyCacheableRequest
 
     private void cleanupRequestTimeoutIfNecessary()
     {
-        if (preferWaitExpired != null)
+        if (preferWaitExpired != NO_CANCEL_ID)
         {
-            preferWaitExpired.cancel(true);
-            preferWaitExpired = null;
+            factory.signaler.cancel(preferWaitExpired);
+            preferWaitExpired = NO_CANCEL_ID;
         }
     }
 
